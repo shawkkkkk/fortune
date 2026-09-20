@@ -19,6 +19,16 @@ interface IFortuneV3FactoryLike {
     ) external view returns (address pool);
 }
 
+interface IFortuneAmmPoolLike {
+    function factory() external view returns (address);
+    function token0() external view returns (address);
+    function token1() external view returns (address);
+}
+
+interface IFortuneV3PoolIdentityLike {
+    function fee() external view returns (uint24);
+}
+
 /// @notice Registry of known AMM pools used by Fortune's optional anti-farmer
 ///         protection. Anyone may register a pool that can be proven through an
 ///         owner-approved DEX factory. Governance cannot arbitrarily label an
@@ -85,6 +95,96 @@ contract FortunePoolRegistry is Ownable2Step {
             kind,
             active
         );
+    }
+
+    function isRecognizedPool(
+        address candidate
+    ) external view returns (bool recognized) {
+        if (candidate == address(0) || candidate.code.length == 0) {
+            return false;
+        }
+
+        if (registeredPool[candidate]) {
+            return true;
+        }
+
+        address factory;
+        address token0;
+        address token1;
+
+        try IFortuneAmmPoolLike(candidate).factory()
+            returns (address value)
+        {
+            factory = value;
+        } catch {
+            return false;
+        }
+
+        FactoryConfig memory config =
+            factoryConfig[factory];
+
+        if (!config.active) {
+            return false;
+        }
+
+        try IFortuneAmmPoolLike(candidate).token0()
+            returns (address value)
+        {
+            token0 = value;
+        } catch {
+            return false;
+        }
+
+        try IFortuneAmmPoolLike(candidate).token1()
+            returns (address value)
+        {
+            token1 = value;
+        } catch {
+            return false;
+        }
+
+        if (
+            token0 == address(0) ||
+            token1 == address(0) ||
+            token0 == token1
+        ) {
+            return false;
+        }
+
+        if (config.kind == FactoryKind.V2) {
+            try IFortuneV2FactoryLike(factory).getPair(
+                token0,
+                token1
+            ) returns (address pair) {
+                return pair == candidate;
+            } catch {
+                return false;
+            }
+        }
+
+        if (config.kind == FactoryKind.V3) {
+            uint24 fee;
+
+            try IFortuneV3PoolIdentityLike(candidate).fee()
+                returns (uint24 value)
+            {
+                fee = value;
+            } catch {
+                return false;
+            }
+
+            try IFortuneV3FactoryLike(factory).getPool(
+                token0,
+                token1,
+                fee
+            ) returns (address pool) {
+                return pool == candidate;
+            } catch {
+                return false;
+            }
+        }
+
+        return false;
     }
 
     function registerV2Pair(

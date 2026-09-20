@@ -464,8 +464,10 @@ contract FortuneCurve is ReentrancyGuard {
         );
 
         uint16 shieldBps = currentSnipeTaxBps();
+        uint16 protocolFeeBps =
+            feeRouter.totalFeeBps();
         uint16 feeBps =
-            feeRouter.totalFeeBps() +
+            protocolFeeBps +
             curveBuyTaxBps;
 
         quoteSpent = amountIn;
@@ -473,7 +475,12 @@ contract FortuneCurve is ReentrancyGuard {
             snipeTax,
             normalFee,
             netQuote
-        ) = _feesForGross(quoteSpent, shieldBps, feeBps);
+        ) = _feesForGross(
+            quoteSpent,
+            shieldBps,
+            protocolFeeBps,
+            curveBuyTaxBps
+        );
         usdIn = _usdValue(quoteAsset, netQuote);
 
         uint256 remainingUsd =
@@ -529,7 +536,12 @@ contract FortuneCurve is ReentrancyGuard {
                 snipeTax,
                 normalFee,
                 netQuote
-            ) = _feesForGross(quoteSpent, shieldBps, feeBps);
+            ) = _feesForGross(
+            quoteSpent,
+            shieldBps,
+            protocolFeeBps,
+            curveBuyTaxBps
+        );
 
             // Rounding can leave one or two base units below the target.
             while (
@@ -544,7 +556,8 @@ contract FortuneCurve is ReentrancyGuard {
                 ) = _feesForGross(
                     quoteSpent,
                     shieldBps,
-                    feeBps
+                    protocolFeeBps,
+                    curveBuyTaxBps
                 );
             }
 
@@ -689,7 +702,8 @@ contract FortuneCurve is ReentrancyGuard {
     function _feesForGross(
         uint256 gross,
         uint16 shieldBps,
-        uint16 feeBps
+        uint16 protocolFeeBps,
+        uint16 launchTaxBps
     )
         internal
         pure
@@ -701,7 +715,18 @@ contract FortuneCurve is ReentrancyGuard {
     {
         shieldTax = gross * shieldBps / BPS;
         uint256 afterShield = gross - shieldTax;
-        normalFee = afterShield * feeBps / BPS;
+
+        // Protocol fees and launch tax are independent percentages. Calculate
+        // each leg independently so preview accounting exactly matches the
+        // transfers in buy/sell, including sub-wei rounding on partial fills.
+        uint256 protocolFee =
+            afterShield * protocolFeeBps / BPS;
+        uint256 launchTax =
+            afterShield * launchTaxBps / BPS;
+
+        normalFee =
+            protocolFee +
+            launchTax;
         net = afterShield - normalFee;
     }
 
@@ -782,18 +807,18 @@ contract FortuneCurve is ReentrancyGuard {
             "INSUFFICIENT_QUOTE_RESERVE"
         );
 
-        normalFee =
+        uint256 protocolFee =
             grossQuote *
-            (
-                uint256(
-                    feeRouter
-                        .totalFeeBps()
-                ) +
-                uint256(
-                    curveSellTaxBps
-                )
-            ) /
+            feeRouter.totalFeeBps() /
             BPS;
+        uint256 launchTax =
+            grossQuote *
+            curveSellTaxBps /
+            BPS;
+
+        normalFee =
+            protocolFee +
+            launchTax;
         quoteOut = grossQuote - normalFee;
     }
 

@@ -1,20 +1,30 @@
 import { apiOk } from "@/lib/public-api";
+import { PUBLIC_TESTNET } from "@/lib/public-testnet";
 
 export const revalidate = 60;
 
 export async function GET() {
+  const chainId = Number(
+    process.env.NEXT_PUBLIC_CHAIN_ID || PUBLIC_TESTNET.chainId
+  );
   const factory =
-    process.env.NEXT_PUBLIC_FORTUNE_FACTORY_ADDRESS || null;
+    process.env.NEXT_PUBLIC_FORTUNE_FACTORY_ADDRESS ||
+    (chainId === PUBLIC_TESTNET.chainId
+      ? PUBLIC_TESTNET.contracts.factory
+      : null);
 
   return apiOk(
     {
-      chainId: Number(
-        process.env.NEXT_PUBLIC_CHAIN_ID || 97
-      ),
+      chainId,
       deployment: {
         factory,
         configured: Boolean(factory),
-        environment: factory ? "testnet/research" : "not-deployed",
+        environment:
+          chainId === PUBLIC_TESTNET.chainId && factory
+            ? "public-testnet-beta"
+            : factory
+              ? "configured"
+              : "not-deployed",
       },
       token: {
         fixedSupply: true,
@@ -56,7 +66,9 @@ export async function GET() {
         ],
         priceAnchor: true,
         destination:
-          "approved IGraduationAdapter; PancakeSwap production adapter pending audit",
+          chainId === PUBLIC_TESTNET.chainId
+            ? "Pancake V3 testnet adapter + permanent LP locker"
+            : "approved IGraduationAdapter; production adapter requires audit",
       },
       api: {
         basePath: "/api/public/v1",

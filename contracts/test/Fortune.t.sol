@@ -518,6 +518,40 @@ contract FortuneTest is Test {
         assertEq(curve.graduationAnchorPriceUsd1e18(), anchor);
     }
 
+    function testGraduationLiquidityMatchesStoredCurveAnchor() public {
+        FortuneFactory.LaunchInfo memory info =
+            factory.createLaunch(_params(50e18));
+        FortuneCurve curve = FortuneCurve(info.curve);
+
+        vm.warp(block.timestamp + 16);
+
+        vm.startPrank(user);
+        usdt.approve(address(curve), type(uint256).max);
+        curve.buy(address(usdt), 100e18, 1);
+        vm.stopPrank();
+
+        uint256 reserveUsd =
+            curve.netReserveUsd1e18();
+        uint256 lpTokens =
+            curve.requiredLaunchTokensForGraduation();
+        uint256 anchor =
+            curve.graduationAnchorPriceUsd1e18();
+
+        uint256 representedUsd =
+            lpTokens * anchor / 1e18;
+
+        assertApproxEqAbs(
+            representedUsd,
+            reserveUsd,
+            2
+        );
+        assertLt(
+            lpTokens,
+            FortuneToken(info.token)
+                .balanceOf(address(curve))
+        );
+    }
+
     function testGraduationMovesBasketToApprovedAdapter() public {
         FortuneFactory.LaunchInfo memory info = factory.createLaunch(_params(50e18));
         FortuneCurve curve = FortuneCurve(info.curve);
@@ -547,7 +581,7 @@ contract FortuneTest is Test {
         assertEq(token.launchManifest(), info.manifestHash);
         assertEq(token.totalSupply(), token.initialSupply());
         assertEq(token.fortuneFactory(), address(factory));
-        assertEq(token.FORTUNE_TOKEN_VERSION(), 1);
+        assertEq(token.FORTUNE_TOKEN_VERSION(), 2);
     }
 
     function testCreatorCanPermanentlySurrenderFeesToHolders() public {

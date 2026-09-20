@@ -291,10 +291,10 @@ VERIFY="$(cast call "$OPERATOR" \
   --rpc-url "$RPC")"
 printf '%s\n' "$VERIFY"
 
-CURVE_TAX="$(cast call "$TAX_PROCESSOR" "totalCurveTaxRecorded()(uint256)" --rpc-url "$RPC")"
-DEX_PROCESSED="$(cast call "$TAX_PROCESSOR" "totalDexTaxTokensProcessed()(uint256)" --rpc-url "$RPC")"
-TOKENS_BURNED="$(cast call "$TAX_PROCESSOR" "totalTokensBurned()(uint256)" --rpc-url "$RPC")"
-DIVIDEND_EPOCHS="$(cast call "$TAX_DIVIDEND_VAULT" "epochCount()(uint256)" --rpc-url "$RPC")"
+CURVE_TAX="$(cast call "$TAX_PROCESSOR" "totalCurveTaxRecorded()(uint256)" --rpc-url "$RPC" | awk '{print $1}')"
+DEX_PROCESSED="$(cast call "$TAX_PROCESSOR" "totalDexTaxTokensProcessed()(uint256)" --rpc-url "$RPC" | awk '{print $1}')"
+TOKENS_BURNED="$(cast call "$TAX_PROCESSOR" "totalTokensBurned()(uint256)" --rpc-url "$RPC" | awk '{print $1}')"
+DIVIDEND_EPOCHS="$(cast call "$TAX_DIVIDEND_VAULT" "epochCount()(uint256)" --rpc-url "$RPC" | awk '{print $1}')"
 
 test "$CURVE_TAX" -gt 0
 test "$DEX_PROCESSED" -gt 0

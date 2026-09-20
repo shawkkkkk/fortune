@@ -67,6 +67,7 @@ contract FortuneFactory is Ownable2Step {
     LaunchInfo[] public launches;
     mapping(address => uint256) public curveIndexPlusOne;
     mapping(address => uint256) public creatorLaunchNonce;
+    mapping(address => address) public graduationAdapterForCurve;
 
     struct GraduationStatus {
         uint64 attempts;
@@ -648,6 +649,9 @@ contract FortuneFactory is Ownable2Step {
         curveIndexPlusOne[
             address(curve)
         ] = launches.length;
+        graduationAdapterForCurve[
+            address(curve)
+        ] = graduationAdapter;
 
         emit LaunchCreated(
             launchId,
@@ -686,6 +690,7 @@ contract FortuneFactory is Ownable2Step {
                         automationRegistry
                     ),
                     automationExecutor,
+                    graduationAdapter,
                     creator,
                     launchNonce,
                     p.name,
@@ -812,9 +817,20 @@ contract FortuneFactory is Ownable2Step {
         external
         returns (bool success)
     {
-        address adapter = graduationAdapter;
-        require(adapter != address(0), "NO_ADAPTER");
-        require(curveIndexPlusOne[curve] != 0, "UNKNOWN_CURVE");
+        require(
+            curveIndexPlusOne[curve] != 0,
+            "UNKNOWN_CURVE"
+        );
+
+        address adapter =
+            graduationAdapterForCurve[
+                curve
+            ];
+
+        require(
+            adapter != address(0),
+            "NO_ADAPTER"
+        );
 
         GraduationStatus storage status = graduationStatus[curve];
         require(!status.completed, "ALREADY_GRADUATED");

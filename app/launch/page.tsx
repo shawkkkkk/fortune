@@ -112,6 +112,7 @@ export default function LaunchPage() {
   const [depthTier, setDepthTier] = useState<"low" | "standard">("low");
   const [customAddress, setCustomAddress] = useState("");
   const [customCheck, setCustomCheck] = useState<CustomTokenCheck | null>(null);
+  const [customResolvedId, setCustomResolvedId] = useState<string | null>(null);
   const [customCheckError, setCustomCheckError] = useState("");
   const [customChecking, setCustomChecking] = useState(false);
   const protocolBps = 10;
@@ -278,6 +279,7 @@ export default function LaunchPage() {
   async function checkCustomToken() {
     setCustomChecking(true);
     setCustomCheck(null);
+    setCustomResolvedId(null);
     setCustomCheckError("");
 
     try {
@@ -295,7 +297,17 @@ export default function LaunchPage() {
         return;
       }
 
-      setCustomCheck(body.data || null);
+      const result = (body.data || null) as CustomTokenCheck | null;
+      setCustomCheck(result);
+
+      if (result?.launchability.launchableNow) {
+        const known = assets.find(
+          (asset) =>
+            asset.address?.toLowerCase() ===
+            result.address.toLowerCase()
+        );
+        setCustomResolvedId(known?.id || null);
+      }
     } catch {
       setCustomCheckError("Token compatibility check failed.");
     } finally {
@@ -629,6 +641,17 @@ export default function LaunchPage() {
                         <span>Pairable now</span>
                         <strong>{customCheck.launchability.launchableNow ? "Yes" : "No"}</strong>
                       </div>
+                      {customCheck.launchability.launchableNow && customResolvedId && (
+                        <button
+                          type="button"
+                          className="secondaryCta"
+                          onClick={()=>toggleAsset(customResolvedId)}
+                        >
+                          {selected.includes(customResolvedId)
+                            ? "Already in basket"
+                            : "Add approved token to basket"}
+                        </button>
+                      )}
                       {!customCheck.launchability.launchableNow && (
                         <small>
                           Fortune does not treat “contract exists” as safe enough for

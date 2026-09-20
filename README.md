@@ -36,6 +36,7 @@ Demo market/analytics values are deliberately marked as placeholders until oncha
 - `FortuneFeeRouter` — immutable per-launch absolute-bps Fee Matrix
 - `FortuneAutomationRegistry` — purpose-scoped allowlist for automation adapters
 - `FortuneAutomationVault` — restricted holder-reward / buyback / LP automation vault primitive
+- `FortunePermanentLiquidityLocker` — irreversible custody for graduation LP-position NFTs with permissionless fee harvesting to a fixed recipient
 - `IGraduationAdapter` — isolated destination-market adapter interface
 - `MockGraduationAdapter` — test-only graduation target
 - BSC testnet mock oracle/quote assets + deployment script
@@ -143,6 +144,14 @@ Provider discovery currently supports:
 - Binance Web3 RWA search for Ondo and bStocks when server API credentials are configured.
 
 Even a provider-returned token remains subject to the Fortune onchain Asset Registry, oracle, compatibility and eligibility gates.
+
+## Creator fee surrender
+
+A creator with a configured creator fee can permanently surrender that entire fee share to the launch's purpose-locked holder-reward vault. This is one-way: it cannot raise fees, restore creator routing or alter any other launch route.
+
+## Custom BSC pair checks
+
+Fortune accepts arbitrary BSC contract addresses for compatibility inspection, but unlike a plain address-paste flow it does not equate "contract exists" with "safe reserve asset." The public checker reads contract code, decimals, metadata and current Fortune approval, while flagging transfer behavior, oracle, liquidity and graduation checks that still must pass.
 
 ## Fee Matrix
 

@@ -28,7 +28,7 @@ jobs:
     if: ${{ inputs.confirm == 'DEPLOY_PUBLIC_ALPHA' }}
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
     defaults:
       run:
         working-directory: contracts
@@ -178,6 +178,80 @@ jobs:
           pancakeV3PositionManager=$PANCAKE_V3_POSITION_MANAGER
           EOF
           cat /tmp/fortune-public-alpha-addresses.txt
+
+      - name: Publish successful stack to public testnet config
+        run: |
+          set -euo pipefail
+
+          STANDARD_TOKEN=$(grep "LaunchToken" /tmp/fortune-standard-public-alpha-drill.log | grep -oE '0x[a-fA-F0-9]{40}' | tail -1)
+          STANDARD_CURVE=$(grep "FortuneCurve" /tmp/fortune-standard-public-alpha-drill.log | grep -oE '0x[a-fA-F0-9]{40}' | tail -1)
+          LP_TOKEN_ID=$(grep "LPPositionTokenId" /tmp/fortune-standard-public-alpha-drill.log | grep -oE '[0-9]+' | tail -1)
+          TAX_TOKEN=$(grep "LaunchToken" /tmp/fortune-tax-public-alpha-drill.log | grep -oE '0x[a-fA-F0-9]{40}' | tail -1)
+          TAX_CURVE=$(grep "FortuneCurve" /tmp/fortune-tax-public-alpha-drill.log | grep -oE '0x[a-fA-F0-9]{40}' | tail -1)
+          TAX_POOL=$(grep "OfficialPancakeV2Pool" /tmp/fortune-tax-public-alpha-drill.log | grep -oE '0x[a-fA-F0-9]{40}' | tail -1)
+
+          STANDARD_POOL=$(cast call "$PANCAKE_V3_FACTORY"             "getPool(address,address,uint24)(address)"             "$STANDARD_TOKEN" "$FORTUNE_MOCK_QUOTE" 500             --rpc-url "$BSC_TESTNET_RPC_URL")
+
+          export STANDARD_TOKEN STANDARD_CURVE STANDARD_POOL LP_TOKEN_ID
+          export TAX_TOKEN TAX_CURVE TAX_POOL
+
+          python3 - <<'PY'
+          import os, re
+          from pathlib import Path
+
+          path = Path("../lib/public-testnet.ts")
+          text = path.read_text()
+
+          replacements = {
+              "factory": os.environ["FORTUNE_FACTORY"],
+              "taxFactory": os.environ["FORTUNE_TAX_FACTORY"],
+              "registry": os.environ["FORTUNE_REGISTRY"],
+              "poolRegistry": os.environ["FORTUNE_POOL_REGISTRY"],
+              "graduationAdapter": os.environ["FORTUNE_V3_ADAPTER"],
+              "liquidityLocker": os.environ["FORTUNE_V3_LOCKER"],
+              "taxGraduationAdapter": os.environ["FORTUNE_V2_TAX_ADAPTER"],
+              "taxLiquidityLocker": os.environ["FORTUNE_V2_LOCKER"],
+              "mockQuote": os.environ["FORTUNE_MOCK_QUOTE"],
+              "referenceCurve": os.environ["STANDARD_CURVE"],
+              "referenceToken": os.environ["STANDARD_TOKEN"],
+              "referencePool": os.environ["STANDARD_POOL"],
+              "pancakeV2Factory": os.environ["PANCAKE_V2_FACTORY"],
+              "pancakeV2Router": os.environ["PANCAKE_V2_ROUTER"],
+              "pancakeV3Factory": os.environ["PANCAKE_V3_FACTORY"],
+              "pancakeV3PositionManager": os.environ["PANCAKE_V3_POSITION_MANAGER"],
+              "referenceTaxToken": os.environ["TAX_TOKEN"],
+              "referenceTaxCurve": os.environ["TAX_CURVE"],
+              "referenceTaxPool": os.environ["TAX_POOL"],
+          }
+
+          for key, value in replacements.items():
+              pattern = rf'(\s+{re.escape(key)}:\s*)"[^"]*"'
+              text, count = re.subn(pattern, rf'\1"{value}"', text, count=1)
+              if count != 1:
+                  raise SystemExit(f"Could not update {key}")
+
+          text, count = re.subn(
+              r'(referenceLpTokenId:\s*)\d+',
+              rf'\g<1>{os.environ["LP_TOKEN_ID"]}',
+              text,
+              count=1,
+          )
+          if count != 1:
+              raise SystemExit("Could not update referenceLpTokenId")
+
+          path.write_text(text)
+          PY
+
+          git -C .. config user.name "fortune-public-alpha"
+          git -C .. config user.email "actions@users.noreply.github.com"
+          git -C .. add lib/public-testnet.ts
+
+          if git -C .. diff --cached --quiet; then
+            echo "Public testnet config already matches deployed stack."
+          else
+            git -C .. commit -m "Publish verified Fortune public alpha stack"
+            git -C .. push origin HEAD:main
+          fi
 
       - name: Upload public-alpha evidence
         if: always()

@@ -24,6 +24,10 @@ export default async function TokenPage({ params }: { params: Promise<{ id: stri
 
         <aside className="panel tradePanel">
           <span className="eyebrow">TRADE ON CURVE</span><h2>Buy {"$" + launch.symbol}</h2>
+          <div className="shieldTradeNotice">
+            <strong>🛡 Fortune Launch Shield</strong>
+            <span>New launches begin with a 99% buy tax that rapidly decays to 0 after 5 seconds. The live transaction quote must display the current shield tax before signing.</span>
+          </div>
           <label>Pay with<select>{launch.quoteAssets.map((a)=><option key={a}>{a}</option>)}</select></label>
           <label>Amount<input placeholder="0.00" /></label>
           <div className="quoteBox"><span>Estimated tokens</span><strong>—</strong></div>

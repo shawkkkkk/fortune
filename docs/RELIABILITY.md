@@ -9,6 +9,21 @@ The two primary failure classes are:
 
 ## 1. Market and liquidity reliability
 
+### Launch-wide preflight
+
+`FortuneFactory.preflightLaunch` is the final contract-level gate before a launch can exist. It rejects a launch when:
+- the protocol is paused;
+- no executable graduation adapter is configured;
+- quote assets are duplicated, disabled or missing graduation capability;
+- an asset's oracle is stale, future-dated, zero-priced or reverting;
+- a token's decimals changed after registry approval;
+- basket weights do not total exactly 10,000 bps;
+- the primary market is not in the basket;
+- the configured fee routes are invalid;
+- metadata/economic inputs exceed bounded ranges.
+
+The same check is called inside `createLaunch`, so bypassing the website cannot bypass readiness validation.
+
 ### Preflight before funds move
 
 Every production graduation adapter must implement `IGraduationPreflight`.
@@ -57,6 +72,14 @@ If the destination adapter reverts, the whole transaction rolls back. The curve 
 
 This makes failed graduations visible rather than leaving a token silently broken.
 
+### Exact curve integration
+
+Fortune no longer treats a large buy as though every token in that transaction was purchased at the pre-trade spot price. The linear curve is integrated across the entire trade. Sells use the same area-under-the-curve accounting in reverse.
+
+This removes a major source of artificial price jumps and prevents large transactions from underpaying relative to the displayed curve.
+
+At graduation, Fortune calculates how many unsold launch tokens are actually required to pair the accumulated reserve basket at the stored graduation anchor price. Only that amount is sent to LP creation; excess unsold inventory is burned atomically. If graduation later reverts, the burn reverts too.
+
 ### Price continuity / charts
 
 When a curve reaches its threshold, `FortuneCurve` stores and emits one immutable:
@@ -90,6 +113,26 @@ curve.
 
 This path cannot touch a successfully graduated pool and does not make external
 fee/automation vaults withdrawable.
+
+### Pancake V3 graduation guard
+
+`FortunePancakeV3GraduationAdapter` is a configurable research adapter for the real graduation path. It hardcodes no external deployment addresses.
+
+Its preflight checks:
+- Fortune registry graduation capability and live asset health;
+- supported fee tier / tick spacing;
+- 1–5 reserve plan shape and exact weights;
+- deadline bounds;
+- permanent-locker readiness;
+- existing-pool price deviation from the Fortune target price;
+- nonzero launch-token allocation for every active pool.
+
+Execution:
+- creates/initializes missing pools only at the derived Fortune price;
+- mints LP positions with a maximum residual/dust tolerance;
+- moves each position NFT directly to the permanent locker;
+- sends bounded unused token dust to the launch's liquidity-reinforcement vault;
+- reverts the entire graduation if any pool cannot satisfy the plan.
 
 ### Pool health state
 
@@ -157,6 +200,12 @@ The frontend must never automatically resubmit a buy/launch transaction after:
 - server error.
 
 First recover the transaction hash/account nonce and check chain state.
+
+### RPC redundancy
+
+Server-side BSC reads use a provider failover list rather than one RPC URL. `/api/ready` checks the configured chain, healthy provider count and deployed factory bytecode without exposing provider URLs.
+
+For BSC mainnet, production readiness requires at least two configured providers. Runtime can remain available with one healthy provider while reporting degraded redundancy.
 
 ### Multi-provider RPC
 

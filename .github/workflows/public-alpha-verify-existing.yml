@@ -1,0 +1,191 @@
+name: Fortune Verify Existing Public Alpha
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "contracts/public-alpha-verify.trigger"
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type VERIFY_PUBLIC_ALPHA to run real standard + tax lifecycle verification against the deployed BSC Testnet stack"
+        required: true
+        type: string
+
+jobs:
+  verify-live-stack:
+    if: ${{ github.event_name == 'push' || inputs.confirm == 'VERIFY_PUBLIC_ALPHA' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    defaults:
+      run:
+        working-directory: contracts
+    env:
+      PRIVATE_KEY: ${{ secrets.FORTUNE_TESTNET_PRIVATE_KEY }}
+      BSC_TESTNET_RPC_URL: ${{ secrets.BSC_TESTNET_RPC_URL }}
+
+      FORTUNE_FACTORY: "0x744782be89EBeB68dF4c3729b980B9e064a57a24"
+      FORTUNE_TAX_FACTORY: "0x2de91c238c9673Cc1D2BD594eb7d7470513d603E"
+      FORTUNE_REGISTRY: "0x9b379DbF1e5Bcfc68Ec54637Dc03CFC0B03fa284"
+      FORTUNE_POOL_REGISTRY: "0xd4F53A3be71c0EC859dBFf59e5Ec6D56430fE73B"
+      FORTUNE_V3_ADAPTER: "0xbE4C6398fEA94a5a5498586D5575F114C9EBFF26"
+      FORTUNE_V3_LOCKER: "0x9c0782999ED4Bca8A872feFaF6817726d2D25166"
+      FORTUNE_V2_TAX_ADAPTER: "0x819E69ef8A5585dC1919689e980ACFEC8600c066"
+      FORTUNE_V2_LOCKER: "0x21FFC86795881934CAe206d9c06FF6e10fbd0135"
+      FORTUNE_MOCK_QUOTE: "0x37FbCEFB35181022090847D38E7a848265E1e4B2"
+      FORTUNE_MOCK_ORACLE: "0x2057E7AcF631591c320569AeCB1181F0E6636446"
+
+      PANCAKE_V2_FACTORY: "0xB7926C0430Afb07AA7DEfDE6DA862aE0Bde767bc"
+      PANCAKE_V2_ROUTER: "0x9ac64cc6e4415144c455bd8e4837fea55603e5c3"
+      PANCAKE_V3_FACTORY: "0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865"
+      PANCAKE_V3_POSITION_MANAGER: "0x427bF5b37357632377eCbEC9de3626C71A5396c1"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Require BSC Testnet credentials
+        run: |
+          test -n "$PRIVATE_KEY" || (echo "Missing FORTUNE_TESTNET_PRIVATE_KEY" && exit 1)
+          test -n "$BSC_TESTNET_RPC_URL" || (echo "Missing BSC_TESTNET_RPC_URL" && exit 1)
+
+      - name: Install Solidity libraries
+        run: |
+          forge install OpenZeppelin/openzeppelin-contracts@v5.1.0 --no-commit
+          forge install foundry-rs/forge-std --no-commit
+
+      - name: Build current contracts
+        run: forge build
+
+      - name: Verify deployed public-alpha stack
+        run: |
+          set -euo pipefail
+
+          CHAIN_ID=$(cast chain-id --rpc-url "$BSC_TESTNET_RPC_URL")
+          test "$CHAIN_ID" = "97" || (echo "Expected chain 97, got $CHAIN_ID" && exit 1)
+
+          for ADDRESS in \
+            "$FORTUNE_FACTORY" \
+            "$FORTUNE_TAX_FACTORY" \
+            "$FORTUNE_REGISTRY" \
+            "$FORTUNE_POOL_REGISTRY" \
+            "$FORTUNE_V3_ADAPTER" \
+            "$FORTUNE_V3_LOCKER" \
+            "$FORTUNE_V2_TAX_ADAPTER" \
+            "$FORTUNE_V2_LOCKER" \
+            "$FORTUNE_MOCK_QUOTE" \
+            "$FORTUNE_MOCK_ORACLE" \
+            "$PANCAKE_V2_FACTORY" \
+            "$PANCAKE_V2_ROUTER" \
+            "$PANCAKE_V3_FACTORY" \
+            "$PANCAKE_V3_POSITION_MANAGER"
+          do
+            CODE=$(cast code "$ADDRESS" --rpc-url "$BSC_TESTNET_RPC_URL")
+            test "$CODE" != "0x" || (echo "No bytecode: $ADDRESS" && exit 1)
+          done
+
+          STANDARD_ADAPTER=$(cast call "$FORTUNE_FACTORY" "graduationAdapter()(address)" --rpc-url "$BSC_TESTNET_RPC_URL")
+          TAX_ADAPTER=$(cast call "$FORTUNE_TAX_FACTORY" "graduationAdapter()(address)" --rpc-url "$BSC_TESTNET_RPC_URL")
+          TAX_PAUSED=$(cast call "$FORTUNE_TAX_FACTORY" "launchesPaused()(bool)" --rpc-url "$BSC_TESTNET_RPC_URL")
+          ROUTER_FACTORY=$(cast call "$PANCAKE_V2_ROUTER" "factory()(address)" --rpc-url "$BSC_TESTNET_RPC_URL")
+          ASSET_HEALTH=$(cast call "$FORTUNE_REGISTRY" "assetHealth(address)(bool,bytes32,uint256,uint256)" "$FORTUNE_MOCK_QUOTE" --rpc-url "$BSC_TESTNET_RPC_URL")
+
+          test "${STANDARD_ADAPTER,,}" = "${FORTUNE_V3_ADAPTER,,}"
+          test "${TAX_ADAPTER,,}" = "${FORTUNE_V2_TAX_ADAPTER,,}"
+          test "$TAX_PAUSED" = "false"
+          test "${ROUTER_FACTORY,,}" = "${PANCAKE_V2_FACTORY,,}"
+          echo "$ASSET_HEALTH" | grep -q '^true'
+
+          WALLET=$(cast wallet address --private-key "$PRIVATE_KEY")
+          BALANCE=$(cast balance "$WALLET" --rpc-url "$BSC_TESTNET_RPC_URL")
+          echo "Lifecycle verifier wallet: $WALLET"
+          echo "Remaining tBNB balance (wei): $BALANCE"
+          test "$BALANCE" -ge 30000000000000000 || (
+            echo "Need at least 0.03 tBNB to run both bounded lifecycle proofs."
+            exit 1
+          )
+
+      - name: Run real bounded standard + tax lifecycle verification
+        run: |
+          set -o pipefail
+          bash script/verify-existing-public-alpha.sh \
+            2>&1 | tee /tmp/fortune-existing-public-alpha-lifecycle.log
+
+      - name: Require both onchain lifecycle markers
+        run: |
+          grep -q "STANDARD_ONCHAIN_EXECUTION_COMPLETE_AND_SUCCESSFUL" /tmp/fortune-existing-public-alpha-lifecycle.log
+          grep -q "TAX_ONCHAIN_EXECUTION_COMPLETE_AND_SUCCESSFUL" /tmp/fortune-existing-public-alpha-lifecycle.log
+
+      - name: Publish verified public-alpha addresses to website config
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PY'
+          import os, re
+          from pathlib import Path
+
+          path = Path("../lib/public-testnet.ts")
+          text = path.read_text()
+
+          replacements = {
+              "factory": os.environ["FORTUNE_FACTORY"],
+              "taxFactory": os.environ["FORTUNE_TAX_FACTORY"],
+              "registry": os.environ["FORTUNE_REGISTRY"],
+              "poolRegistry": os.environ["FORTUNE_POOL_REGISTRY"],
+              "graduationAdapter": os.environ["FORTUNE_V3_ADAPTER"],
+              "liquidityLocker": os.environ["FORTUNE_V3_LOCKER"],
+              "taxGraduationAdapter": os.environ["FORTUNE_V2_TAX_ADAPTER"],
+              "taxLiquidityLocker": os.environ["FORTUNE_V2_LOCKER"],
+              "mockQuote": os.environ["FORTUNE_MOCK_QUOTE"],
+              "referenceCurve": os.environ["STANDARD_CURVE"],
+              "referenceToken": os.environ["STANDARD_TOKEN"],
+              "referencePool": os.environ["STANDARD_POOL"],
+              "pancakeV2Factory": os.environ["PANCAKE_V2_FACTORY"],
+              "pancakeV2Router": os.environ["PANCAKE_V2_ROUTER"],
+              "pancakeV3Factory": os.environ["PANCAKE_V3_FACTORY"],
+              "pancakeV3PositionManager": os.environ["PANCAKE_V3_POSITION_MANAGER"],
+              "referenceTaxToken": os.environ["TAX_TOKEN"],
+              "referenceTaxCurve": os.environ["TAX_CURVE"],
+              "referenceTaxPool": os.environ["TAX_POOL"],
+          }
+
+          for key, value in replacements.items():
+              pattern = rf'(\s+{re.escape(key)}:\s*)"[^"]*"'
+              text, count = re.subn(pattern, rf'\1"{value}"', text, count=1)
+              if count != 1:
+                  raise SystemExit(f"Could not update {key}")
+
+          text, count = re.subn(
+              r'(referenceLpTokenId:\s*)\d+',
+              rf'\g<1>{os.environ["STANDARD_LP_TOKEN_ID"]}',
+              text,
+              count=1,
+          )
+          if count != 1:
+              raise SystemExit("Could not update referenceLpTokenId")
+
+          path.write_text(text)
+          PY
+
+          git -C .. config user.name "fortune-public-alpha"
+          git -C .. config user.email "actions@users.noreply.github.com"
+          git -C .. add lib/public-testnet.ts
+
+          if git -C .. diff --cached --quiet; then
+            echo "Website config already points at the verified stack."
+          else
+            git -C .. commit -m "Publish verified Fortune public alpha stack"
+            git -C .. push origin HEAD:main
+          fi
+
+      - name: Upload verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fortune-existing-public-alpha-verification
+          path: |
+            /tmp/fortune-existing-public-alpha-lifecycle.log
+            /tmp/fortune-existing-public-alpha-lifecycle.env
+          retention-days: 30

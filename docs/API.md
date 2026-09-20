@@ -81,6 +81,26 @@ launch lists do not shift items between numbered pages as easily.
 
 Describes API and protocol capabilities.
 
+### GET /readiness
+
+Returns Fortune's infrastructure launch gate. The endpoint checks:
+- BNB Chain ID;
+- healthy RPC availability;
+- RPC redundancy;
+- Fortune Factory bytecode;
+- Asset Registry bytecode;
+- graduation adapter bytecode;
+- permanent LP locker bytecode;
+- configured Pancake V3 factory bytecode;
+- configured Pancake position manager bytecode;
+- Launch Shield;
+- atomic graduation;
+- delayed graduation recovery;
+- chart continuity anchor;
+- transaction recovery.
+
+This is an infrastructure check. `FortuneFactory.preflightLaunch` still validates each individual launch immediately before deployment.
+
 ### GET /protocol
 
 Canonical client configuration:

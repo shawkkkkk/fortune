@@ -533,7 +533,7 @@ contract FortuneTaxFactory is Ownable2Step {
         TaxLaunchParams calldata p,
         bytes32 vanitySalt
     )
-        external
+        public
         returns (LaunchInfo memory info)
     {
         (bool ready, bytes32 reasonCode) =

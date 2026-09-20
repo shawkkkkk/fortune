@@ -22,6 +22,26 @@ type ChinaStockCandidate = {
   status: string;
 };
 
+type NasdaqTokenizedResult = {
+  provider: string;
+  tokenSymbol?: string | null;
+  pairingAddress?: string | null;
+  pairable: boolean;
+  underlyingTicker: string;
+  underlyingCompany?: string | null;
+  pennyStock?: boolean | null;
+  note?: string;
+};
+
+type NasdaqUnderlying = {
+  verified: boolean;
+  symbol: string;
+  companyName?: string | null;
+  exchange?: string | null;
+  lastPrice?: number | null;
+  isPenny?: boolean | null;
+};
+
 const FACTORY_ADDRESS = process.env.NEXT_PUBLIC_FORTUNE_FACTORY_ADDRESS || "";
 
 export default function LaunchPage() {
@@ -42,8 +62,11 @@ export default function LaunchPage() {
   const [liquidityBps, setLiquidityBps] = useState(15);
   const [bscCandidates, setBscCandidates] = useState<BscCandidate[]>([]);
   const [chinaStocks, setChinaStocks] = useState<ChinaStockCandidate[]>([]);
+  const [nasdaqResults, setNasdaqResults] = useState<NasdaqTokenizedResult[]>([]);
+  const [nasdaqUnderlying, setNasdaqUnderlying] = useState<NasdaqUnderlying | null>(null);
   const [catalogLoading, setCatalogLoading] = useState(false);
   const [chinaLoading, setChinaLoading] = useState(false);
+  const [nasdaqLoading, setNasdaqLoading] = useState(false);
   const protocolBps = 10;
 
   useEffect(() => {
@@ -70,6 +93,30 @@ export default function LaunchPage() {
       .finally(() => setChinaLoading(false));
   }, [activeCategory, chinaStocks.length]);
 
+  useEffect(() => {
+    if (activeCategory !== "NASDAQ Microcaps") return;
+
+    const ticker = query.trim().toUpperCase();
+    if (!ticker) {
+      setNasdaqResults([]);
+      setNasdaqUnderlying(null);
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setNasdaqLoading(true);
+      void fetch("/api/registry/nasdaq-stocks?q=" + encodeURIComponent(ticker))
+        .then((response) => response.json())
+        .then((data) => {
+          setNasdaqResults(Array.isArray(data.results) ? data.results : []);
+          setNasdaqUnderlying(data.underlying || null);
+        })
+        .finally(() => setNasdaqLoading(false));
+    }, 350);
+
+    return () => window.clearTimeout(timer);
+  }, [activeCategory, query]);
+
   const chinaAssets = useMemo<FortuneAsset[]>(
     () =>
       chinaStocks.map((stock) => ({
@@ -89,9 +136,35 @@ export default function LaunchPage() {
     [chinaStocks]
   );
 
+  const nasdaqAssets = useMemo<FortuneAsset[]>(
+    () =>
+      nasdaqResults.map((stock, index) => ({
+        id:
+          "nasdaq:" +
+          stock.underlyingTicker +
+          ":" +
+          stock.provider +
+          ":" +
+          index,
+        symbol: stock.tokenSymbol || stock.underlyingTicker,
+        name:
+          (stock.underlyingCompany || stock.underlyingTicker) +
+          " · " +
+          stock.provider,
+        category: "NASDAQ Microcaps",
+        icon: "NQ",
+        chain: "BSC",
+        verification: stock.pairable ? "Provider Verified" : "Unavailable",
+        capabilities: stock.pairable ? ["quote", "graduation"] : [],
+        address: stock.pairingAddress || undefined,
+        note: stock.note,
+      })),
+    [nasdaqResults]
+  );
+
   const selectableAssets = useMemo(
-    () => [...assets, ...chinaAssets],
-    [chinaAssets]
+    () => [...assets, ...chinaAssets, ...nasdaqAssets],
+    [chinaAssets, nasdaqAssets]
   );
 
   const filtered = useMemo(() => {
@@ -161,7 +234,49 @@ export default function LaunchPage() {
                 <button key={category} onClick={()=>setActiveCategory(category)} className={activeCategory===category?"tabActive":""}>{category}</button>
               ))}
             </div>
-            <input className="searchInput" value={query} onChange={(e)=>setQuery(e.target.value)} placeholder="Search approved BSC assets by symbol or name" />
+            <input
+              className="searchInput"
+              value={query}
+              onChange={(e)=>setQuery(e.target.value)}
+              placeholder={
+                activeCategory === "NASDAQ Microcaps"
+                  ? "Enter any NASDAQ ticker, e.g. FAMI"
+                  : "Search approved BSC assets by symbol or name"
+              }
+            />
+
+            {activeCategory==="NASDAQ Microcaps" && (
+              <div className="registryNotice">
+                <strong>NASDAQ → BNB stock-token lookup</strong>
+                <span>
+                  Enter a real NASDAQ ticker. Fortune verifies the listing, checks whether it is below $5 when price data is available, then searches recognized BNB stock-token providers. A ticker is never synthesized into a fake stock token.
+                </span>
+              </div>
+            )}
+
+            {activeCategory==="NASDAQ Microcaps" && nasdaqUnderlying && (
+              <div className="selectedBasket">
+                <div className="selectedBasketHeader">
+                  <strong>{nasdaqUnderlying.companyName || nasdaqUnderlying.symbol}</strong>
+                  <span>{nasdaqUnderlying.verified ? "NASDAQ verified" : "Listing not verified"}</span>
+                </div>
+                <div className="basketAllocation">
+                  <span>{nasdaqUnderlying.symbol}</span>
+                  <strong>
+                    {nasdaqUnderlying.lastPrice == null
+                      ? "Price unavailable"
+                      : "$" + nasdaqUnderlying.lastPrice.toFixed(4)}
+                  </strong>
+                  <span>
+                    {nasdaqUnderlying.isPenny === true
+                      ? "Penny stock"
+                      : nasdaqUnderlying.isPenny === false
+                        ? "Above $5"
+                        : "Price pending"}
+                  </span>
+                </div>
+              </div>
+            )}
 
             {activeCategory==="China Stocks" && (
               <div className="registryNotice">
@@ -189,6 +304,24 @@ export default function LaunchPage() {
                   </button>
                 );
               })}
+              {activeCategory==="NASDAQ Microcaps" && nasdaqLoading && (
+                <div className="customAssetBox">
+                  <strong>Checking NASDAQ and BNB tokenized-stock providers…</strong>
+                </div>
+              )}
+
+              {activeCategory==="NASDAQ Microcaps" &&
+                !nasdaqLoading &&
+                query.trim() &&
+                nasdaqResults.length === 0 && (
+                  <div className="customAssetBox">
+                    <strong>No verified BNB representation found yet.</strong>
+                    <p>
+                      Fortune can catalog the real NASDAQ stock, but direct pairing only turns on when a recognized provider has an actual BSC token for it. We do not create synthetic ticker copies.
+                    </p>
+                  </div>
+                )}
+
               {activeCategory==="BSC 400" && (
                 <>
                   {catalogLoading && (

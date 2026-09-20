@@ -572,7 +572,10 @@ export default function LaunchPage() {
     setReceipt(null);
 
     try {
-      const wallet = account || (await connectNetwork());
+      // Re-confirm the production network immediately before constructing any
+      // real-value transaction; a previously connected account may have since
+      // switched chains.
+      const wallet = await connectNetwork();
       setAccount(wallet);
 
       if (!selected) {

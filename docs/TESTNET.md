@@ -102,3 +102,10 @@ Verified against PancakeSwap's official developer address page on 2026-09-20:
 Source: `https://developer.pancakeswap.finance/contracts/v3/addresses`
 
 These values are workflow defaults only, not protocol constants. The testnet drill checks that both addresses contain bytecode before simulation and broadcast. Re-verify the official PancakeSwap documentation before every real drill or mainnet deployment.
+
+
+## Public beta reference deployment
+
+The persistent public-beta contract addresses, test instructions, and release evidence are maintained in `docs/PUBLIC_TESTNET.md`.
+
+The public beta uses the dedicated `/testnet` UI path and Fortune-owned mock fUSD. It does not treat real-value BSC assets as test reserves. The larger concurrent-graduation ladder may be run later for capacity characterization; the current public-beta release gate is the successful real-testnet launch storm plus post-storm invariant verification.

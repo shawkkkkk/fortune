@@ -21,7 +21,7 @@ export async function GET() {
         configured: Boolean(factory),
         environment:
           chainId === PUBLIC_TESTNET.chainId && factory
-            ? "public-testnet-beta"
+            ? "public-testnet-alpha"
             : factory
               ? "configured"
               : "not-deployed",

@@ -27,6 +27,10 @@ import {FortunePerpReferenceRegistry} from "../src/FortunePerpReferenceRegistry.
 import {FortuneMetadataRegistry} from "../src/FortuneMetadataRegistry.sol";
 import {MockReferenceOracle} from "../src/test/MockReferenceOracle.sol";
 import {IFortunePriceOracle} from "../src/interfaces/IFortunePriceOracle.sol";
+import {FortuneTokenDeployer} from "../src/deployers/FortuneTokenDeployer.sol";
+import {FortuneVaultDeployer} from "../src/deployers/FortuneVaultDeployer.sol";
+import {FortuneFeeRouterDeployer} from "../src/deployers/FortuneFeeRouterDeployer.sol";
+import {FortuneCurveDeployer} from "../src/deployers/FortuneCurveDeployer.sol";
 
 contract MockERC20 is ERC20 {
     constructor(string memory n, string memory s) ERC20(n, s) {}
@@ -90,6 +94,11 @@ contract FortuneTest is Test {
     FortuneAssetRegistry registry;
     FortuneFactory factory;
     FortuneAutomationRegistry factoryAutomationRegistry;
+    FortuneMetadataRegistry metadataRegistry;
+    FortuneTokenDeployer tokenDeployer;
+    FortuneVaultDeployer vaultDeployer;
+    FortuneFeeRouterDeployer feeRouterDeployer;
+    FortuneCurveDeployer curveDeployer;
     MockFortuneOracle oracle;
     MockERC20 usdt;
     MockERC20 wbnb;
@@ -126,14 +135,36 @@ contract FortuneTest is Test {
 
         factoryAutomationRegistry =
             new FortuneAutomationRegistry(address(this));
+        metadataRegistry =
+            new FortuneMetadataRegistry(address(this));
+        tokenDeployer =
+            new FortuneTokenDeployer();
+        vaultDeployer =
+            new FortuneVaultDeployer();
+        feeRouterDeployer =
+            new FortuneFeeRouterDeployer();
+        curveDeployer =
+            new FortuneCurveDeployer();
+
         factory = new FortuneFactory(
             address(this),
             address(registry),
             address(factoryAutomationRegistry),
+            address(metadataRegistry),
+            address(tokenDeployer),
+            address(vaultDeployer),
+            address(feeRouterDeployer),
+            address(curveDeployer),
             address(this),
             protocol
         );
-        factory.setGraduationAdapter(address(new MockGraduationAdapter()));
+
+        metadataRegistry.bindFactory(
+            address(factory)
+        );
+        factory.setGraduationAdapter(
+            address(new MockGraduationAdapter())
+        );
 
         usdt.mint(user, 10_000e18);
         wbnb.mint(user, 100e18);

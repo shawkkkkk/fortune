@@ -20,6 +20,7 @@ contract FortuneAssetRegistry is Ownable2Step {
     }
 
     mapping(address => AssetConfig) private _assets;
+    mapping(address => uint8) public registeredDecimals;
     address[] public allAssets;
 
     event AssetConfigured(
@@ -29,7 +30,8 @@ contract FortuneAssetRegistry is Ownable2Step {
         bool rewardEnabled,
         bool graduationEnabled,
         bool active,
-        string category
+        string category,
+        uint8 decimals
     );
 
     constructor(address initialOwner) Ownable(initialOwner) {}
@@ -39,11 +41,15 @@ contract FortuneAssetRegistry is Ownable2Step {
         require(config.oracle != address(0), "ZERO_ORACLE");
         require(config.maxOracleAge >= 60, "ORACLE_AGE_TOO_LOW");
 
+        uint8 decimals = IERC20Metadata(asset).decimals();
+        require(decimals <= 36, "UNSUPPORTED_DECIMALS");
+
         if (_assets[asset].oracle == address(0)) {
             allAssets.push(asset);
         }
 
         _assets[asset] = config;
+        registeredDecimals[asset] = decimals;
         emit AssetConfigured(
             asset,
             config.oracle,
@@ -51,7 +57,8 @@ contract FortuneAssetRegistry is Ownable2Step {
             config.rewardEnabled,
             config.graduationEnabled,
             config.active,
-            config.category
+            config.category,
+            decimals
         );
     }
 
@@ -83,6 +90,10 @@ contract FortuneAssetRegistry is Ownable2Step {
         require(block.timestamp - updatedAt <= config.maxOracleAge, "STALE_PRICE");
 
         uint8 decimals = IERC20Metadata(asset).decimals();
+        require(
+            decimals == registeredDecimals[asset],
+            "ASSET_DECIMALS_CHANGED"
+        );
         return amount * price / (10 ** uint256(decimals));
     }
 
@@ -95,6 +106,10 @@ contract FortuneAssetRegistry is Ownable2Step {
         require(block.timestamp - updatedAt <= config.maxOracleAge, "STALE_PRICE");
 
         uint8 decimals = IERC20Metadata(asset).decimals();
+        require(
+            decimals == registeredDecimals[asset],
+            "ASSET_DECIMALS_CHANGED"
+        );
         return usd1e18 * (10 ** uint256(decimals)) / price;
     }
 

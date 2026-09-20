@@ -246,6 +246,8 @@ contract FortuneTest is Test {
         FortuneCurve curve = FortuneCurve(info.curve);
         FortuneToken token = FortuneToken(info.token);
 
+        vm.warp(block.timestamp + 16);
+
         vm.startPrank(user);
         usdt.approve(address(curve), type(uint256).max);
         wbnb.approve(address(curve), type(uint256).max);
@@ -269,6 +271,8 @@ contract FortuneTest is Test {
         FortuneCurve curve = FortuneCurve(info.curve);
         FortuneToken token = FortuneToken(info.token);
 
+        vm.warp(block.timestamp + 16);
+
         vm.startPrank(user);
         usdt.approve(address(curve), type(uint256).max);
         wbnb.approve(address(curve), type(uint256).max);
@@ -291,6 +295,8 @@ contract FortuneTest is Test {
             factory.createLaunch(_params(50e18));
         FortuneCurve curve = FortuneCurve(info.curve);
 
+        vm.warp(block.timestamp + 16);
+
         vm.startPrank(user);
         usdt.approve(address(curve), type(uint256).max);
         curve.buy(address(usdt), 100e18, 1);
@@ -308,6 +314,8 @@ contract FortuneTest is Test {
     function testGraduationMovesBasketToApprovedAdapter() public {
         FortuneFactory.LaunchInfo memory info = factory.createLaunch(_params(50e18));
         FortuneCurve curve = FortuneCurve(info.curve);
+
+        vm.warp(block.timestamp + 16);
 
         vm.startPrank(user);
         usdt.approve(address(curve), type(uint256).max);
@@ -604,6 +612,8 @@ contract FortuneTest is Test {
 
         FortuneFactory.LaunchInfo memory info = factory.createLaunch(p);
         FortuneCurve curve = FortuneCurve(info.curve);
+
+        vm.warp(block.timestamp + 16);
 
         rebaseToken.mint(user, 60e18);
         vm.startPrank(user);

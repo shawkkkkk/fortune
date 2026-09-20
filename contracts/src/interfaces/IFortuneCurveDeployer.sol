@@ -14,6 +14,9 @@ interface IFortuneCurveDeployer {
         uint256 slopeUsd1e18;
         uint256 graduationUsd1e18;
         bool adaptiveGraduation;
+        address taxProcessor;
+        uint16 curveBuyTaxBps;
+        uint16 curveSellTaxBps;
     }
 
     function deploy(CurveParams calldata params)

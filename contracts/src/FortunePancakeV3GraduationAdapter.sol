@@ -145,6 +145,19 @@ contract FortunePancakeV3GraduationAdapter is
 
         uint256 weightSum;
         uint256 launchAssigned;
+        uint256 lastWeightedIndex;
+        bool hasWeightedReserve;
+
+        for (uint256 i; i < reserves.length; ++i) {
+            if (reserves[i].weightBps > 0) {
+                lastWeightedIndex = i;
+                hasWeightedReserve = true;
+            }
+        }
+
+        if (!hasWeightedReserve) {
+            return (false, bytes32("NO_WEIGHTED_RESERVE"));
+        }
 
         for (uint256 i; i < reserves.length; ++i) {
             AssetReserve calldata reserveInfo = reserves[i];
@@ -211,7 +224,7 @@ contract FortunePancakeV3GraduationAdapter is
             }
 
             uint256 launchAllocation;
-            if (i == reserves.length - 1) {
+            if (i == lastWeightedIndex) {
                 launchAllocation =
                     launchTokenAmount -
                     launchAssigned;
@@ -345,6 +358,13 @@ contract FortunePancakeV3GraduationAdapter is
         );
 
         uint256 launchAssigned;
+        uint256 lastWeightedIndex;
+
+        for (uint256 i; i < reserves.length; ++i) {
+            if (reserves[i].weightBps > 0) {
+                lastWeightedIndex = i;
+            }
+        }
 
         for (uint256 i; i < reserves.length; ++i) {
             AssetReserve calldata reserveInfo = reserves[i];
@@ -354,7 +374,7 @@ contract FortunePancakeV3GraduationAdapter is
             }
 
             uint256 launchAllocation;
-            if (i == reserves.length - 1) {
+            if (i == lastWeightedIndex) {
                 launchAllocation =
                     launchTokenAmount -
                     launchAssigned;

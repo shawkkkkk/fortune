@@ -305,9 +305,25 @@ type TestLaunch = {
   transactionHash: Hex;
   taxProcessor?: Address;
   dividendVault?: Address;
+  createdAt?: string;
+};
+
+type ServiceHealthState =
+  | "checking"
+  | "ready"
+  | "degraded"
+  | "unavailable";
+
+type TrackedTransaction = {
+  hash: Hex;
+  label: string;
+  state: "pending" | "confirmed" | "unknown";
+  updatedAt: string;
 };
 
 const LAST_LAUNCH_KEY = "fortune:bsc-testnet:last-launch:v1";
+const LAUNCH_HISTORY_KEY = "fortune:bsc-testnet:launch-history:v1";
+const MAX_SAVED_LAUNCHES = 10;
 
 function isSavedLaunch(value: unknown): value is TestLaunch {
   if (!value || typeof value !== "object") return false;
@@ -518,6 +534,11 @@ export default function PublicTestnetPage() {
   ]);
   const [treasury, setTreasury] = useState("");
   const [launch, setLaunch] = useState<TestLaunch | null>(null);
+  const [launchHistory, setLaunchHistory] = useState<TestLaunch[]>([]);
+  const [serviceHealth, setServiceHealth] =
+    useState<ServiceHealthState>("checking");
+  const [lastTransaction, setLastTransaction] =
+    useState<TrackedTransaction | null>(null);
   const [quoteBalance, setQuoteBalance] = useState("0");
   const [busy, setBusy] = useState("");
   const [message, setMessage] = useState(
@@ -531,19 +552,79 @@ export default function PublicTestnetPage() {
 
   useEffect(() => {
     try {
-      const raw = window.localStorage.getItem(LAST_LAUNCH_KEY);
-      if (!raw) return;
-      const saved = JSON.parse(raw) as unknown;
-      if (isSavedLaunch(saved)) {
-        setLaunch(saved);
-        setMode(saved.mode);
+      const rawLast = window.localStorage.getItem(LAST_LAUNCH_KEY);
+      const rawHistory = window.localStorage.getItem(LAUNCH_HISTORY_KEY);
+      const last = rawLast ? (JSON.parse(rawLast) as unknown) : null;
+      const parsedHistory = rawHistory
+        ? (JSON.parse(rawHistory) as unknown)
+        : [];
+      const history = Array.isArray(parsedHistory)
+        ? parsedHistory.filter(isSavedLaunch).slice(0, MAX_SAVED_LAUNCHES)
+        : [];
+
+      if (isSavedLaunch(last)) {
+        setLaunch(last);
+        setMode(last.mode);
+        setLaunchHistory(
+          history.some(
+            (item) =>
+              item.token.toLowerCase() === last.token.toLowerCase()
+          )
+            ? history
+            : [last, ...history].slice(0, MAX_SAVED_LAUNCHES)
+        );
         setMessage(
           "Recovered your last Fortune testnet launch from this browser. You can continue its lifecycle below."
         );
+      } else if (history.length > 0) {
+        setLaunchHistory(history);
+        setLaunch(history[0]);
+        setMode(history[0].mode);
+        setMessage(
+          "Recovered your latest saved Fortune testnet launch. You can continue its lifecycle below."
+        );
       }
     } catch {
-      // A stale or blocked browser storage entry should never block the launch page.
+      // Browser storage is a convenience only; chain state remains authoritative.
     }
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function probeService() {
+      try {
+        const response = await fetch("/api/ready", {
+          cache: "no-store",
+        });
+        const body = (await response.json()) as {
+          ready?: boolean;
+          degraded?: boolean;
+        };
+
+        if (cancelled) return;
+        setServiceHealth(
+          body.ready
+            ? body.degraded
+              ? "degraded"
+              : "ready"
+            : "unavailable"
+        );
+      } catch {
+        if (!cancelled) setServiceHealth("unavailable");
+      }
+    }
+
+    void probeService();
+    const interval = window.setInterval(
+      () => void probeService(),
+      30_000
+    );
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
   }, []);
 
   useEffect(() => {
@@ -612,6 +693,97 @@ export default function PublicTestnetPage() {
     return next;
   }
 
+  async function waitTracked(
+    publicClient: ReturnType<typeof clients>["publicClient"],
+    hash: Hex,
+    label: string
+  ) {
+    setLastTransaction({
+      hash,
+      label,
+      state: "pending",
+      updatedAt: new Date().toISOString(),
+    });
+
+    try {
+      const receipt = await publicClient.waitForTransactionReceipt({
+        hash,
+      });
+      setLastTransaction({
+        hash,
+        label,
+        state: "confirmed",
+        updatedAt: new Date().toISOString(),
+      });
+      return receipt;
+    } catch (error) {
+      setLastTransaction({
+        hash,
+        label,
+        state: "unknown",
+        updatedAt: new Date().toISOString(),
+      });
+      throw error;
+    }
+  }
+
+  async function copyDiagnostics() {
+    const packet = {
+      product: "Fortune public BSC testnet alpha",
+      generatedAt: new Date().toISOString(),
+      chainId: PUBLIC_TESTNET.chainId,
+      serviceHealth,
+      connectedAccount: account,
+      quoteBalance,
+      message,
+      lastTransaction,
+      activeLaunch: launch,
+      savedLaunchCount: launchHistory.length,
+      page:
+        window.location.origin + window.location.pathname,
+      contracts: {
+        factory: PUBLIC_TESTNET.contracts.factory,
+        taxFactory: PUBLIC_TESTNET.contracts.taxFactory,
+        registry: PUBLIC_TESTNET.contracts.registry,
+        poolRegistry: PUBLIC_TESTNET.contracts.poolRegistry,
+        graduationAdapter:
+          PUBLIC_TESTNET.contracts.graduationAdapter,
+        liquidityLocker:
+          PUBLIC_TESTNET.contracts.liquidityLocker,
+        taxGraduationAdapter:
+          PUBLIC_TESTNET.contracts.taxGraduationAdapter,
+        taxLiquidityLocker:
+          PUBLIC_TESTNET.contracts.taxLiquidityLocker,
+        mockQuote: PUBLIC_TESTNET.contracts.mockQuote,
+      },
+    };
+
+    try {
+      await navigator.clipboard.writeText(
+        JSON.stringify(packet, null, 2)
+      );
+      setMessage(
+        "Diagnostics copied. Paste them into the public testnet bug report; they contain public addresses and transaction data, never private keys or seed phrases."
+      );
+    } catch {
+      setMessage(
+        "Browser clipboard access was blocked. Open the launch transaction on BscScan and include its hash in your bug report."
+      );
+    }
+  }
+
+  function recoverLaunch(saved: TestLaunch) {
+    setLaunch(saved);
+    setMode(saved.mode);
+    setMessage(
+      "Recovered saved " +
+        saved.mode +
+        " launch " +
+        shorten(saved.token) +
+        "."
+    );
+  }
+
   async function refreshQuoteBalance(nextAccount?: Address) {
     const active = nextAccount || account;
     if (!active) return;
@@ -655,7 +827,7 @@ export default function PublicTestnetPage() {
         functionName: "faucet",
         args: [parseUnits("1000", 18)],
       });
-      await publicClient.waitForTransactionReceipt({ hash });
+      await waitTracked(publicClient, hash, "fUSD faucet");
       try {
         await refreshQuoteBalance(active);
         setMessage("1,000 fUSD test tokens minted to your wallet.");
@@ -689,9 +861,38 @@ export default function PublicTestnetPage() {
   }
 
   function rememberLaunch(next: TestLaunch) {
-    setLaunch(next);
+    const saved: TestLaunch = {
+      ...next,
+      createdAt: next.createdAt || new Date().toISOString(),
+    };
+
+    setLaunch(saved);
+    setLaunchHistory((current) => {
+      const history = [
+        saved,
+        ...current.filter(
+          (item) =>
+            item.token.toLowerCase() !== saved.token.toLowerCase()
+        ),
+      ].slice(0, MAX_SAVED_LAUNCHES);
+
+      try {
+        window.localStorage.setItem(
+          LAUNCH_HISTORY_KEY,
+          JSON.stringify(history)
+        );
+      } catch {
+        // Browser storage is a convenience only.
+      }
+
+      return history;
+    });
+
     try {
-      window.localStorage.setItem(LAST_LAUNCH_KEY, JSON.stringify(next));
+      window.localStorage.setItem(
+        LAST_LAUNCH_KEY,
+        JSON.stringify(saved)
+      );
     } catch {
       // Browser storage is a convenience only; chain state remains authoritative.
     }
@@ -783,7 +984,7 @@ export default function PublicTestnetPage() {
             functionName: "approve",
             args: [PUBLIC_TESTNET.contracts.factory as Address, initial],
           });
-          await publicClient.waitForTransactionReceipt({ hash: approval });
+          await waitTracked(publicClient, approval, "fUSD approval");
 
           hash = await walletClient.writeContract({
             address: PUBLIC_TESTNET.contracts.factory as Address,
@@ -887,7 +1088,7 @@ export default function PublicTestnetPage() {
         });
       }
 
-      const receipt = await publicClient.waitForTransactionReceipt({ hash });
+      const receipt = await waitTracked(publicClient, hash, "Launch creation");
       let created: TestLaunch | null = null;
 
       for (const log of receipt.logs) {
@@ -966,7 +1167,7 @@ export default function PublicTestnetPage() {
             functionName: "approve",
             args: [created.curve, initial],
           });
-          await publicClient.waitForTransactionReceipt({ hash: approval });
+          await waitTracked(publicClient, approval, "fUSD approval");
 
           const buyHash = await walletClient.writeContract({
             address: created.curve,
@@ -978,7 +1179,7 @@ export default function PublicTestnetPage() {
               1n,
             ],
           });
-          await publicClient.waitForTransactionReceipt({ hash: buyHash });
+          await waitTracked(publicClient, buyHash, "Curve buy");
         } catch (error) {
           try {
             await refreshQuoteBalance(active);
@@ -1042,7 +1243,7 @@ export default function PublicTestnetPage() {
         functionName: "approve",
         args: [launch.curve, amount],
       });
-      await publicClient.waitForTransactionReceipt({ hash: approval });
+      await waitTracked(publicClient, approval, "fUSD approval");
 
       const buyHash = await walletClient.writeContract({
         address: launch.curve,
@@ -1050,7 +1251,7 @@ export default function PublicTestnetPage() {
         functionName: "buy",
         args: [PUBLIC_TESTNET.contracts.mockQuote as Address, amount, 1n],
       });
-      await publicClient.waitForTransactionReceipt({ hash: buyHash });
+      await waitTracked(publicClient, buyHash, "Curve buy");
 
       let ready: boolean | null = null;
       try {
@@ -1152,7 +1353,7 @@ export default function PublicTestnetPage() {
       }
 
       const hash = await walletClient.writeContract(simulation.request);
-      await publicClient.waitForTransactionReceipt({ hash });
+      await waitTracked(publicClient, hash, "Graduation");
 
       let graduated: boolean;
       let phase: number;
@@ -1239,6 +1440,35 @@ export default function PublicTestnetPage() {
         <span>
           Chain 97 · fUSD is valueless · use a test-only wallet. Every setting
           below is exercised through real testnet contracts.
+        </span>
+      </section>
+
+      <section
+        className={
+          serviceHealth === "unavailable"
+            ? "registryNotice statusError"
+            : "registryNotice"
+        }
+        style={{ marginTop: 14 }}
+      >
+        <strong>
+          SERVICE ·{" "}
+          {serviceHealth === "ready"
+            ? "READY"
+            : serviceHealth === "degraded"
+              ? "DEGRADED"
+              : serviceHealth === "checking"
+                ? "CHECKING"
+                : "UNAVAILABLE"}
+        </strong>
+        <span>
+          {serviceHealth === "ready"
+            ? "All published Fortune testnet contracts and at least one RPC are responding."
+            : serviceHealth === "degraded"
+              ? "The Fortune stack is healthy, but one or more RPC providers are degraded. Confirm transactions on BscScan before retrying."
+              : serviceHealth === "checking"
+                ? "Checking the public alpha stack and RPC connectivity."
+                : "Fortune cannot currently verify the full public alpha stack. Avoid resubmitting a transaction solely because the website cannot refresh."}
         </span>
       </section>
 
@@ -1561,9 +1791,76 @@ export default function PublicTestnetPage() {
         )}
       </section>
 
+      {launchHistory.length > 0 ? (
+        <section className="panel" style={{ marginTop: 14 }}>
+          <div className="panelTitle">
+            <div>
+              <span className="eyebrow">RECOVERY</span>
+              <h2>Saved launches on this browser</h2>
+            </div>
+          </div>
+          <div className="heroActions">
+            {launchHistory.map((saved) => (
+              <button
+                key={saved.token}
+                className="secondaryCta"
+                onClick={() => recoverLaunch(saved)}
+                disabled={Boolean(busy)}
+                title={saved.token}
+              >
+                {saved.mode === "tax" ? "Tax" : "Standard"} ·{" "}
+                {shorten(saved.token)}
+              </button>
+            ))}
+          </div>
+          <p className="launchDescription" style={{ minHeight: 0 }}>
+            Fortune stores only public launch addresses and transaction hashes
+            in this browser. Wallet keys are never stored.
+          </p>
+        </section>
+      ) : null}
+
       <section className="panel" style={{ marginTop: 14 }}>
-        <span className="eyebrow">TRANSACTION STATUS</span>
-        <p className="launchDescription" style={{ minHeight: 0 }}>{message}</p>
+        <div className="panelTitle">
+          <div>
+            <span className="eyebrow">TRANSACTION STATUS</span>
+            <h2>Know what actually happened onchain</h2>
+          </div>
+          {lastTransaction ? (
+            <a
+              className="secondaryCta"
+              href={explorer + "/tx/" + lastTransaction.hash}
+              target="_blank"
+              rel="noreferrer"
+            >
+              {lastTransaction.state === "confirmed"
+                ? "Confirmed"
+                : lastTransaction.state === "pending"
+                  ? "Pending"
+                  : "Check status"}{" "}
+              on BscScan ↗
+            </a>
+          ) : null}
+        </div>
+        <p className="launchDescription" style={{ minHeight: 0 }}>
+          {message}
+        </p>
+        <div className="heroActions">
+          <button
+            className="secondaryCta"
+            onClick={() => void copyDiagnostics()}
+          >
+            Copy diagnostics
+          </button>
+          <a
+            className="secondaryCta"
+            href="https://github.com/shawkkkkk/fortune/issues/new?template=testnet-bug.yml"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Report a bug ↗
+          </a>
+        </div>
       </section>
 
       <section className="panel" style={{ marginTop: 14 }}>

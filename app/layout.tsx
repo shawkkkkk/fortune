@@ -4,14 +4,18 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { LanguageProvider } from "@/components/LanguageProvider";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { FORTUNE_NETWORK } from "@/lib/fortune-network";
 
 export const metadata: Metadata = {
   title: {
-    default: "Fortune — Public Alpha on BSC Testnet",
+    default: FORTUNE_NETWORK.isMainnet
+      ? "Fortune — Launch on BNB Smart Chain"
+      : "Fortune — Public Alpha on BSC Testnet",
     template: "%s · Fortune",
   },
-  description:
-    "Fortune is a non-custodial launch protocol running a public alpha on BNB Smart Chain Testnet.",
+  description: FORTUNE_NETWORK.isMainnet
+    ? "Fortune is a non-custodial token launch protocol on BNB Smart Chain."
+    : "Fortune is a non-custodial launch protocol running a public alpha on BNB Smart Chain Testnet.",
   applicationName: "Fortune",
   icons: {
     icon: "/icon.svg",
@@ -20,13 +24,15 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" data-theme="light">
       <body>
-        <LanguageProvider>
-          <Header />
-          {children}
-          <Footer />
-        </LanguageProvider>
+        <ThemeProvider>
+          <LanguageProvider>
+            <Header />
+            {children}
+            <Footer />
+          </LanguageProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

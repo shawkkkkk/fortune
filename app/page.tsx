@@ -15,7 +15,8 @@ export default function ExplorePage() {
             RWAs, or Fortune Registry assets.
           </p>
           <div className="heroActions">
-            <Link href="/launch" className="primaryCta">Launch a token →</Link>
+            <Link href="/testnet" className="primaryCta">Try public testnet →</Link>
+            <Link href="/launch" className="secondaryCta">Explore launch builder</Link>
             <Link href="/analytics" className="secondaryCta">Protocol analytics</Link>
           </div>
         </div>

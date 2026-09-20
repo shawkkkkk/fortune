@@ -72,6 +72,16 @@ const taxParams = [
 const standardFactoryAbi = [
   {
     type: "function",
+    name: "preflightLaunch",
+    stateMutability: "view",
+    inputs: [{ name: "p", type: "tuple", components: standardParams }],
+    outputs: [
+      { name: "ready", type: "bool" },
+      { name: "reasonCode", type: "bytes32" },
+    ],
+  },
+  {
+    type: "function",
     name: "previewPreparedVanity",
     stateMutability: "view",
     inputs: [
@@ -131,6 +141,16 @@ const standardFactoryAbi = [
 ] as const;
 
 const taxFactoryAbi = [
+  {
+    type: "function",
+    name: "preflightLaunch",
+    stateMutability: "view",
+    inputs: [{ name: "p", type: "tuple", components: taxParams }],
+    outputs: [
+      { name: "ready", type: "bool" },
+      { name: "reasonCode", type: "bytes32" },
+    ],
+  },
   {
     type: "function",
     name: "previewPreparedVanity",
@@ -287,6 +307,41 @@ type TestLaunch = {
   dividendVault?: Address;
 };
 
+const LAST_LAUNCH_KEY = "fortune:bsc-testnet:last-launch:v1";
+
+function isSavedLaunch(value: unknown): value is TestLaunch {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Partial<TestLaunch>;
+  if (candidate.mode !== "standard" && candidate.mode !== "tax") return false;
+  if (
+    typeof candidate.token !== "string" ||
+    typeof candidate.curve !== "string" ||
+    !isAddress(candidate.token) ||
+    !isAddress(candidate.curve)
+  ) {
+    return false;
+  }
+  if (
+    typeof candidate.transactionHash !== "string" ||
+    !/^0x[0-9a-fA-F]{64}$/.test(candidate.transactionHash)
+  ) {
+    return false;
+  }
+  if (
+    candidate.taxProcessor !== undefined &&
+    !isAddress(candidate.taxProcessor)
+  ) {
+    return false;
+  }
+  if (
+    candidate.dividendVault !== undefined &&
+    !isAddress(candidate.dividendVault)
+  ) {
+    return false;
+  }
+  return true;
+}
+
 const allocationLabels = [
   "Creator",
   "Direct burn",
@@ -299,6 +354,55 @@ const allocationLabels = [
 
 function shorten(value: string) {
   return value.slice(0, 8) + "…" + value.slice(-6);
+}
+
+function decodeReason(value: Hex) {
+  try {
+    const raw = value.slice(2);
+    const bytes = raw.match(/.{2}/g) || [];
+    return bytes
+      .map((byte) => String.fromCharCode(parseInt(byte, 16)))
+      .join("")
+      .replace(/\0/g, "")
+      .trim();
+  } catch {
+    return value;
+  }
+}
+
+function parseTokenAmount(label: string, value: string) {
+  const clean = value.trim() || "0";
+  if (!/^\d+(?:\.\d{1,18})?$/.test(clean)) {
+    throw new Error(`${label} must be a non-negative number with at most 18 decimals.`);
+  }
+  return parseUnits(clean, 18);
+}
+
+function publicMetadataUrl(
+  label: string,
+  value: string,
+  options?: { allowIpfs?: boolean }
+) {
+  const clean = value.trim();
+  if (!clean) return "";
+  if (clean.length > 512) {
+    throw new Error(`${label} must be 512 characters or fewer.`);
+  }
+  if (options?.allowIpfs && clean.toLowerCase().startsWith("ipfs://")) {
+    return clean;
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(clean);
+  } catch {
+    throw new Error(`${label} must be a valid http(s) URL${options?.allowIpfs ? " or ipfs:// URI" : ""}.`);
+  }
+
+  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+    throw new Error(`${label} must use http:// or https://${options?.allowIpfs ? " (image metadata may also use ipfs://)" : ""}.`);
+  }
+  return clean;
 }
 
 function provider() {
@@ -396,6 +500,7 @@ export default function PublicTestnetPage() {
   const [description, setDescription] = useState(
     "Created on the Fortune BSC public alpha."
   );
+  const [imageURI, setImageURI] = useState("");
   const [website, setWebsite] = useState("");
   const [xProfile, setXProfile] = useState("");
   const [telegram, setTelegram] = useState("");
@@ -423,6 +528,23 @@ export default function PublicTestnetPage() {
     () => taxAllocation.reduce((sum, value) => sum + value, 0),
     [taxAllocation]
   );
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(LAST_LAUNCH_KEY);
+      if (!raw) return;
+      const saved = JSON.parse(raw) as unknown;
+      if (isSavedLaunch(saved)) {
+        setLaunch(saved);
+        setMode(saved.mode);
+        setMessage(
+          "Recovered your last Fortune testnet launch from this browser. You can continue its lifecycle below."
+        );
+      }
+    } catch {
+      // A stale or blocked browser storage entry should never block the launch page.
+    }
+  }, []);
 
   useEffect(() => {
     const injected = (
@@ -482,7 +604,10 @@ export default function PublicTestnetPage() {
   }, []);
 
   async function withAccount() {
-    const next = account || (await connectTestnet());
+    // Always re-check the active chain before an onchain action. The cached
+    // account can remain populated after the wallet is switched away from BSC
+    // Testnet, and using it directly would surface a confusing chain mismatch.
+    const next = await connectTestnet();
     setAccount(next);
     return next;
   }
@@ -531,8 +656,14 @@ export default function PublicTestnetPage() {
         args: [parseUnits("1000", 18)],
       });
       await publicClient.waitForTransactionReceipt({ hash });
-      await refreshQuoteBalance(active);
-      setMessage("1,000 fUSD test tokens minted to your wallet.");
+      try {
+        await refreshQuoteBalance(active);
+        setMessage("1,000 fUSD test tokens minted to your wallet.");
+      } catch {
+        setMessage(
+          "1,000 fUSD mint transaction confirmed. Balance refresh is temporarily unavailable; do not retry the mint just because the displayed balance is stale."
+        );
+      }
     } catch (error) {
       setMessage(
         error instanceof Error
@@ -547,19 +678,27 @@ export default function PublicTestnetPage() {
   function metadata() {
     return {
       description: description.trim().slice(0, 4096),
-      imageURI: "",
-      website: website.trim().slice(0, 512),
-      xProfile: xProfile.trim().slice(0, 512),
-      telegram: telegram.trim().slice(0, 512),
-      github: github.trim().slice(0, 512),
-      youtube: youtube.trim().slice(0, 512),
-      debox: debox.trim().slice(0, 512),
+      imageURI: publicMetadataUrl("Image", imageURI, { allowIpfs: true }),
+      website: publicMetadataUrl("Website", website),
+      xProfile: publicMetadataUrl("X / Twitter", xProfile),
+      telegram: publicMetadataUrl("Telegram", telegram),
+      github: publicMetadataUrl("GitHub", github),
+      youtube: publicMetadataUrl("YouTube", youtube),
+      debox: publicMetadataUrl("DeBox", debox),
     };
+  }
+
+  function rememberLaunch(next: TestLaunch) {
+    setLaunch(next);
+    try {
+      window.localStorage.setItem(LAST_LAUNCH_KEY, JSON.stringify(next));
+    } catch {
+      // Browser storage is a convenience only; chain state remains authoritative.
+    }
   }
 
   async function createLaunch() {
     setBusy("launch");
-    setLaunch(null);
 
     try {
       const active = await withAccount();
@@ -578,11 +717,19 @@ export default function PublicTestnetPage() {
         );
       }
 
-      const initial = parseUnits(creatorPurchase || "0", 18);
-      const destination =
-        treasury.trim() && isAddress(treasury.trim())
-          ? (treasury.trim() as Address)
-          : active;
+      const initial = parseTokenAmount(
+        "Initial creator purchase",
+        creatorPurchase
+      );
+      const treasuryInput = treasury.trim();
+      if (treasuryInput && !isAddress(treasuryInput)) {
+        throw new Error(
+          "Community treasury recipient must be a valid EVM address."
+        );
+      }
+      const destination = treasuryInput
+        ? (treasuryInput as Address)
+        : active;
       const { publicClient, walletClient } = clients(active);
       let hash: Hex;
 
@@ -603,6 +750,20 @@ export default function PublicTestnetPage() {
           metadataEditable: true,
           ...metadata(),
         };
+
+        setMessage("Running onchain launch preflight…");
+        const [ready, reasonCode] = await publicClient.readContract({
+          address: PUBLIC_TESTNET.contracts.factory as Address,
+          abi: standardFactoryAbi,
+          functionName: "preflightLaunch",
+          args: [params],
+        });
+        if (!ready) {
+          throw new Error(
+            "Launch preflight failed: " +
+              (decodeReason(reasonCode) || reasonCode)
+          );
+        }
 
         setMessage("Finding your deterministic 0xfe token address…");
         const [salt] = await publicClient.readContract({
@@ -680,15 +841,29 @@ export default function PublicTestnetPage() {
           buyTaxBps,
           sellTaxBps,
           antiFarmerDuration: days * 24 * 60 * 60,
-          minimumDividendBalance: parseUnits(
-            minimumDividendBalance || "0",
-            18
+          minimumDividendBalance: parseTokenAmount(
+            "Minimum dividend balance",
+            minimumDividendBalance
           ),
           taxAllocationBps: allocationBps,
           ...metadata(),
         };
 
         const taxFactory = PUBLIC_TESTNET.contracts.taxFactory as Address;
+
+        setMessage("Running tax-token launch preflight…");
+        const [ready, reasonCode] = await publicClient.readContract({
+          address: taxFactory,
+          abi: taxFactoryAbi,
+          functionName: "preflightLaunch",
+          args: [params],
+        });
+        if (!ready) {
+          throw new Error(
+            "Tax launch preflight failed: " +
+              (decodeReason(reasonCode) || reasonCode)
+          );
+        }
 
         setMessage("Finding your deterministic 0xfe tax-token address…");
         const [salt] = await publicClient.readContract({
@@ -774,34 +949,56 @@ export default function PublicTestnetPage() {
         );
       }
 
+      // The launch transaction is already final at this point. Persist it before
+      // any optional follow-up transaction so a rejected/failed creator buy
+      // cannot make a successfully created tax token look lost.
+      rememberLaunch(created);
+
       if (mode === "tax" && initial > 0n) {
-        setMessage(
-          "Tax launch confirmed. Approve fUSD for the curve, then confirm your creator first purchase."
-        );
+        try {
+          setMessage(
+            "Tax launch confirmed. Approve fUSD for the curve, then confirm your creator first purchase."
+          );
 
-        const approval = await walletClient.writeContract({
-          address: PUBLIC_TESTNET.contracts.mockQuote as Address,
-          abi: quoteAbi,
-          functionName: "approve",
-          args: [created.curve, initial],
-        });
-        await publicClient.waitForTransactionReceipt({ hash: approval });
+          const approval = await walletClient.writeContract({
+            address: PUBLIC_TESTNET.contracts.mockQuote as Address,
+            abi: quoteAbi,
+            functionName: "approve",
+            args: [created.curve, initial],
+          });
+          await publicClient.waitForTransactionReceipt({ hash: approval });
 
-        const buyHash = await walletClient.writeContract({
-          address: created.curve,
-          abi: curveAbi,
-          functionName: "buy",
-          args: [
-            PUBLIC_TESTNET.contracts.mockQuote as Address,
-            initial,
-            1n,
-          ],
-        });
-        await publicClient.waitForTransactionReceipt({ hash: buyHash });
+          const buyHash = await walletClient.writeContract({
+            address: created.curve,
+            abi: curveAbi,
+            functionName: "buy",
+            args: [
+              PUBLIC_TESTNET.contracts.mockQuote as Address,
+              initial,
+              1n,
+            ],
+          });
+          await publicClient.waitForTransactionReceipt({ hash: buyHash });
+        } catch (error) {
+          try {
+            await refreshQuoteBalance(active);
+          } catch {
+            // The confirmed launch is still authoritative if the balance RPC is unavailable.
+          }
+          setMessage(
+            "Tax token launch succeeded, but the optional creator first-buy did not complete. " +
+              (error instanceof Error ? error.message : "The follow-up transaction failed.") +
+              " Your launch is preserved below and can continue normally."
+          );
+          return;
+        }
       }
 
-      setLaunch(created);
-      await refreshQuoteBalance(active);
+      try {
+        await refreshQuoteBalance(active);
+      } catch {
+        // Do not turn a confirmed launch into a false failure because a read RPC hiccupped.
+      }
       setMessage(
         initial > 0n
           ? mode === "tax"
@@ -855,17 +1052,29 @@ export default function PublicTestnetPage() {
       });
       await publicClient.waitForTransactionReceipt({ hash: buyHash });
 
-      const ready = await publicClient.readContract({
-        address: launch.curve,
-        abi: curveAbi,
-        functionName: "graduationReady",
-      });
+      let ready: boolean | null = null;
+      try {
+        ready = await publicClient.readContract({
+          address: launch.curve,
+          abi: curveAbi,
+          functionName: "graduationReady",
+        });
+      } catch {
+        // The buy receipt is authoritative; readiness can be checked again later.
+      }
 
-      await refreshQuoteBalance(active);
+      try {
+        await refreshQuoteBalance(active);
+      } catch {
+        // A stale balance must not make a confirmed buy look failed.
+      }
+
       setMessage(
-        ready
-          ? "Curve reached GraduationReady."
-          : "Buy confirmed. This curve has not reached GraduationReady yet."
+        ready === true
+          ? "Buy confirmed. Curve reached GraduationReady."
+          : ready === false
+            ? "Buy confirmed. This curve has not reached GraduationReady yet."
+            : "Buy transaction confirmed, but Fortune could not refresh graduation state from RPC. Do not retry the buy just because this read failed; refresh or try Finalize once RPC is available."
       );
     } catch (error) {
       setMessage(
@@ -945,18 +1154,27 @@ export default function PublicTestnetPage() {
       const hash = await walletClient.writeContract(simulation.request);
       await publicClient.waitForTransactionReceipt({ hash });
 
-      const [graduated, phase] = await Promise.all([
-        publicClient.readContract({
-          address: launch.curve,
-          abi: curveAbi,
-          functionName: "graduated",
-        }),
-        publicClient.readContract({
-          address: launch.curve,
-          abi: curveAbi,
-          functionName: "phase",
-        }),
-      ]);
+      let graduated: boolean;
+      let phase: number;
+      try {
+        [graduated, phase] = await Promise.all([
+          publicClient.readContract({
+            address: launch.curve,
+            abi: curveAbi,
+            functionName: "graduated",
+          }),
+          publicClient.readContract({
+            address: launch.curve,
+            abi: curveAbi,
+            functionName: "phase",
+          }),
+        ]);
+      } catch {
+        setMessage(
+          "Graduation transaction confirmed, but Fortune could not refresh the final curve state from RPC. Do not resubmit the graduation transaction based on this read error; verify the confirmed transaction on BscScan and refresh."
+        );
+        return;
+      }
 
       if (!graduated || phase !== 2) {
         throw new Error(
@@ -1037,7 +1255,6 @@ export default function PublicTestnetPage() {
             className={mode === "standard" ? "selectedMode" : ""}
             onClick={() => {
               setMode("standard");
-              setLaunch(null);
             }}
           >
             <strong>Standard</strong>
@@ -1048,7 +1265,6 @@ export default function PublicTestnetPage() {
             disabled={!taxReady}
             onClick={() => {
               setMode("tax");
-              setLaunch(null);
             }}
           >
             <strong>Tax Token</strong>
@@ -1239,6 +1455,17 @@ export default function PublicTestnetPage() {
           </div>
         </div>
         <div className="fieldGrid">
+          <label>
+            Token image
+            <input
+              value={imageURI}
+              onChange={(e) => setImageURI(e.target.value)}
+              placeholder="https://... or ipfs://..."
+            />
+            <small className="fieldHint">
+              Public image URL or IPFS URI. Stored as token metadata; Fortune never needs your private keys.
+            </small>
+          </label>
           <label>Website<input value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://..." /></label>
           <label>X / Twitter<input value={xProfile} onChange={(e) => setXProfile(e.target.value)} placeholder="https://x.com/..." /></label>
           <label>Telegram<input value={telegram} onChange={(e) => setTelegram(e.target.value)} placeholder="https://t.me/..." /></label>

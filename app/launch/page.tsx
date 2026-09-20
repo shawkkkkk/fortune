@@ -362,6 +362,61 @@ function short(value: string) {
   return value.slice(0, 8) + "…" + value.slice(-6);
 }
 
+function parseTokenAmount(
+  label: string,
+  value: string,
+  decimals: number
+) {
+  const clean = value.trim() || "0";
+  if (!/^\d+(?:\.\d+)?$/.test(clean)) {
+    throw new Error(label + " must be a non-negative number.");
+  }
+  const fractional = clean.split(".")[1] || "";
+  if (fractional.length > decimals) {
+    throw new Error(
+      label + " supports at most " + decimals + " decimal places."
+    );
+  }
+  return parseUnits(clean, decimals);
+}
+
+function publicMetadataUrl(
+  label: string,
+  value: string,
+  options?: { allowIpfs?: boolean }
+) {
+  const clean = value.trim();
+  if (!clean) return "";
+  if (clean.length > 512) {
+    throw new Error(label + " must be 512 characters or fewer.");
+  }
+  if (options?.allowIpfs && clean.toLowerCase().startsWith("ipfs://")) {
+    return clean;
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(clean);
+  } catch {
+    throw new Error(
+      label +
+        " must be a valid http(s) URL" +
+        (options?.allowIpfs ? " or ipfs:// URI." : ".")
+    );
+  }
+
+  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+    throw new Error(
+      label +
+        " must use http:// or https://" +
+        (options?.allowIpfs
+          ? " (image metadata may also use ipfs://)."
+          : ".")
+    );
+  }
+  return clean;
+}
+
 export default function LaunchPage() {
   const [mode, setMode] = useState<LaunchMode>("standard");
   const [account, setAccount] = useState<Address | null>(null);
@@ -372,6 +427,7 @@ export default function LaunchPage() {
   const [name, setName] = useState("");
   const [symbol, setSymbol] = useState("");
   const [description, setDescription] = useState("");
+  const [imageURI, setImageURI] = useState("");
   const [totalSupply, setTotalSupply] = useState("1000000000");
   const [basePrice, setBasePrice] = useState("");
   const [slope, setSlope] = useState("0");
@@ -516,7 +572,10 @@ export default function LaunchPage() {
     setReceipt(null);
 
     try {
-      const wallet = account || (await connectNetwork());
+      // Re-confirm the production network immediately before constructing any
+      // real-value transaction; a previously connected account may have since
+      // switched chains.
+      const wallet = await connectNetwork();
       setAccount(wallet);
 
       if (!selected) {
@@ -548,23 +607,29 @@ export default function LaunchPage() {
         throw new Error("The production tax-token stack is not activated.");
       }
 
-      const destination =
-        treasury.trim() && isAddress(treasury.trim())
-          ? (treasury.trim() as Address)
-          : wallet;
-      const initial = parseUnits(
-        creatorPurchase || "0",
+      const treasuryInput = treasury.trim();
+      if (treasuryInput && !isAddress(treasuryInput)) {
+        throw new Error(
+          "Community treasury recipient must be a valid EVM address."
+        );
+      }
+      const destination = treasuryInput
+        ? (treasuryInput as Address)
+        : wallet;
+      const initial = parseTokenAmount(
+        "Creator first purchase",
+        creatorPurchase,
         selected.decimals
       );
       const meta = {
         description: description.trim().slice(0, 4096),
-        imageURI: "",
-        website: website.trim().slice(0, 512),
-        xProfile: xProfile.trim().slice(0, 512),
-        telegram: telegram.trim().slice(0, 512),
-        github: github.trim().slice(0, 512),
-        youtube: youtube.trim().slice(0, 512),
-        debox: debox.trim().slice(0, 512),
+        imageURI: publicMetadataUrl("Image", imageURI, { allowIpfs: true }),
+        website: publicMetadataUrl("Website", website),
+        xProfile: publicMetadataUrl("X / Twitter", xProfile),
+        telegram: publicMetadataUrl("Telegram", telegram),
+        github: publicMetadataUrl("GitHub", github),
+        youtube: publicMetadataUrl("YouTube", youtube),
+        debox: publicMetadataUrl("DeBox", debox),
       };
 
       const { publicClient, walletClient } = clients(wallet);
@@ -674,8 +739,9 @@ export default function LaunchPage() {
           buyTaxBps,
           sellTaxBps,
           antiFarmerDuration: days * 24 * 60 * 60,
-          minimumDividendBalance: parseUnits(
-            minimumDividendBalance || "0",
+          minimumDividendBalance: parseTokenAmount(
+            "Minimum dividend balance",
+            minimumDividendBalance,
             18
           ),
           taxAllocationBps: allocationBps,
@@ -782,35 +848,49 @@ export default function LaunchPage() {
         );
       }
 
+      // The launch itself is final before any optional tax-token follow-up buy.
+      // Surface it immediately so a rejected second transaction cannot make the
+      // successfully created token appear lost.
+      setReceipt(created);
+
       if (mode === "tax" && initial > 0n) {
-        setMessage(
-          "Tax launch confirmed. Approve the quote asset, then confirm your creator first purchase."
-        );
+        try {
+          setMessage(
+            "Tax launch confirmed. Approve the quote asset, then confirm your creator first purchase."
+          );
 
-        const approveHash = await walletClient.writeContract({
-          address: selected.address,
-          abi: erc20Abi,
-          functionName: "approve",
-          args: [created.curve, initial],
-        });
-        await publicClient.waitForTransactionReceipt({ hash: approveHash });
+          const approveHash = await walletClient.writeContract({
+            address: selected.address,
+            abi: erc20Abi,
+            functionName: "approve",
+            args: [created.curve, initial],
+          });
+          await publicClient.waitForTransactionReceipt({ hash: approveHash });
 
-        const buyHash = await walletClient.writeContract({
-          address: created.curve,
-          abi: curveBuyAbi,
-          functionName: "buy",
-          args: [selected.address, initial, 1n],
-        });
-        await publicClient.waitForTransactionReceipt({ hash: buyHash });
+          const buyHash = await walletClient.writeContract({
+            address: created.curve,
+            abi: curveBuyAbi,
+            functionName: "buy",
+            args: [selected.address, initial, 1n],
+          });
+          await publicClient.waitForTransactionReceipt({ hash: buyHash });
 
-        setMessage(
-          "Tax launch and creator first purchase confirmed on BNB Smart Chain."
-        );
+          setMessage(
+            "Tax launch and creator first purchase confirmed on BNB Smart Chain."
+          );
+        } catch (error) {
+          setMessage(
+            "Tax token launch succeeded, but the optional creator first purchase did not complete. " +
+              (error instanceof Error
+                ? error.message
+                : "The follow-up transaction failed.") +
+              " The confirmed token remains available below."
+          );
+          return;
+        }
       } else {
         setMessage("Launch confirmed on BNB Smart Chain.");
       }
-
-      setReceipt(created);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Launch failed.");
     } finally {
@@ -1143,6 +1223,17 @@ export default function LaunchPage() {
           </div>
         </div>
         <div className="fieldGrid">
+          <label>
+            Token image
+            <input
+              value={imageURI}
+              onChange={(e) => setImageURI(e.target.value)}
+              placeholder="https://... or ipfs://..."
+            />
+            <small className="fieldHint">
+              Public image URL or IPFS URI.
+            </small>
+          </label>
           <label>Website<input value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://..." /></label>
           <label>X / Twitter<input value={xProfile} onChange={(e) => setXProfile(e.target.value)} placeholder="https://x.com/..." /></label>
           <label>Telegram<input value={telegram} onChange={(e) => setTelegram(e.target.value)} placeholder="https://t.me/..." /></label>

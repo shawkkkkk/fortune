@@ -1110,6 +1110,62 @@ contract FortuneTest is Test {
         );
     }
 
+    function testExistingLaunchKeepsItsGraduationAdapterAfterGlobalUpgrade() public {
+        FortuneFactory.LaunchInfo memory info =
+            factory.createLaunch(
+                _params(50e18)
+            );
+        FortuneCurve curve =
+            FortuneCurve(info.curve);
+
+        address frozenAdapter =
+            factory
+                .graduationAdapterForCurve(
+                    info.curve
+                );
+
+        MockGraduationAdapter replacement =
+            new MockGraduationAdapter();
+        replacement.setRevertOnGraduate(
+            true
+        );
+
+        factory.setGraduationAdapter(
+            address(replacement)
+        );
+
+        assertEq(
+            factory
+                .graduationAdapterForCurve(
+                    info.curve
+                ),
+            frozenAdapter
+        );
+
+        vm.warp(block.timestamp + 16);
+
+        vm.startPrank(user);
+        usdt.approve(
+            address(curve),
+            type(uint256).max
+        );
+        curve.buy(
+            address(usdt),
+            100e18,
+            1
+        );
+        vm.stopPrank();
+
+        bool success =
+            factory.finalizeGraduation(
+                info.curve,
+                ""
+            );
+
+        assertTrue(success);
+        assertTrue(curve.graduated());
+    }
+
     function testGraduationMovesBasketToApprovedAdapter() public {
         FortuneFactory.LaunchInfo memory info = factory.createLaunch(_params(50e18));
         FortuneCurve curve = FortuneCurve(info.curve);

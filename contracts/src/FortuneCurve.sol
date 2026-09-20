@@ -4,7 +4,9 @@ pragma solidity ^0.8.24;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {FortuneAssetRegistry} from "./FortuneAssetRegistry.sol";
+import {FortuneToken} from "./FortuneToken.sol";
 import {FortuneFeeRouter} from "./FortuneFeeRouter.sol";
 import {IGraduationAdapter} from "./interfaces/IGraduationAdapter.sol";
 import {IGraduationPreflight} from "./interfaces/IGraduationPreflight.sol";
@@ -99,6 +101,7 @@ contract FortuneCurve is ReentrancyGuard {
         uint256 reserveUsd1e18,
         uint256 tokensSold
     );
+    event UnsoldInventoryBurned(uint256 amount);
     event Graduated(address indexed adapter);
     event RescueActivated(
         uint256 circulatingRescueSupply,
@@ -285,8 +288,7 @@ contract FortuneCurve is ReentrancyGuard {
         }
 
         quoteRefund = amountIn - quoteSpent;
-        uint256 price = currentPriceUsd1e18();
-        tokensOut = usdIn * 1e18 / price;
+        tokensOut = _tokensForUsd(usdIn);
 
         uint256 inventory = launchToken.balanceOf(address(this));
         require(tokensOut <= inventory, "INSUFFICIENT_CURVE_TOKENS");
@@ -446,12 +448,24 @@ contract FortuneCurve is ReentrancyGuard {
         );
 
         uint256 nextSold = tokensSold - tokenAmount;
-        uint256 sellPrice =
+        uint256 currentPrice =
+            currentPriceUsd1e18();
+        uint256 nextPrice =
             basePriceUsd1e18 +
-            (slopeUsd1e18 * nextSold / 1e18);
+            Math.mulDiv(
+                slopeUsd1e18,
+                nextSold,
+                1e18
+            );
 
+        // Exact integral of the linear curve over the sold token interval:
+        // average endpoint price × token amount.
         usdGross =
-            tokenAmount * sellPrice / 1e18;
+            Math.mulDiv(
+                currentPrice + nextPrice,
+                tokenAmount,
+                2e18
+            );
         grossQuote =
             registry.tokenAmountForUsd(
                 quoteAsset,
@@ -522,6 +536,43 @@ contract FortuneCurve is ReentrancyGuard {
             quoteOut,
             usdGross
         );
+    }
+
+    function _tokensForUsd(uint256 usdIn)
+        internal
+        view
+        returns (uint256 tokensOut)
+    {
+        uint256 price0 = currentPriceUsd1e18();
+
+        if (slopeUsd1e18 == 0) {
+            return
+                Math.mulDiv(
+                    usdIn,
+                    1e18,
+                    price0
+                );
+        }
+
+        // For P(x)=P0+kx and spend C:
+        // P1^2 = P0^2 + 2*k*C.
+        // Factory preflight bounds terminal price so this square is safe.
+        uint256 radicand =
+            price0 *
+            price0 +
+            2 *
+            slopeUsd1e18 *
+            usdIn;
+
+        uint256 price1 = Math.sqrt(radicand);
+        if (price1 <= price0) return 0;
+
+        tokensOut =
+            Math.mulDiv(
+                price1 - price0,
+                1e18,
+                slopeUsd1e18
+            );
     }
 
     function quoteAssetCount() external view returns (uint256) {
@@ -606,7 +657,40 @@ contract FortuneCurve is ReentrancyGuard {
             });
         }
 
-        launchTokenAmount = launchToken.balanceOf(address(this));
+        launchTokenAmount =
+            requiredLaunchTokensForGraduation();
+    }
+
+    /// @notice Amount of unsold curve inventory needed to seed graduation
+    ///         liquidity at the exact stored curve anchor price.
+    function requiredLaunchTokensForGraduation()
+        public
+        view
+        returns (uint256)
+    {
+        require(
+            graduationAnchorPriceUsd1e18 > 0,
+            "NO_GRADUATION_ANCHOR"
+        );
+
+        uint256 reserveUsd =
+            netReserveUsd1e18();
+
+        uint256 required =
+            Math.mulDiv(
+                reserveUsd,
+                1e18,
+                graduationAnchorPriceUsd1e18
+            );
+
+        require(required > 0, "ZERO_LP_TOKEN_AMOUNT");
+        require(
+            launchToken.balanceOf(address(this)) >=
+                required,
+            "INSUFFICIENT_LP_INVENTORY"
+        );
+
+        return required;
     }
 
     function preflightGraduation(address adapter, bytes calldata data)
@@ -664,6 +748,19 @@ contract FortuneCurve is ReentrancyGuard {
 
         graduated = true;
 
+        uint256 inventory =
+            launchToken.balanceOf(address(this));
+        uint256 unsoldExcess =
+            inventory - tokenAmount;
+
+        if (unsoldExcess > 0) {
+            FortuneToken(address(launchToken))
+                .burn(unsoldExcess);
+            emit UnsoldInventoryBurned(
+                unsoldExcess
+            );
+        }
+
         for (uint256 i; i < reserves.length; ++i) {
             IERC20(reserves[i].asset).safeTransfer(
                 adapter,
@@ -700,6 +797,16 @@ contract FortuneCurve is ReentrancyGuard {
 
         rescueActive = true;
         rescueSupply = tokensSold;
+
+        uint256 unsoldInventory =
+            launchToken.balanceOf(address(this));
+        if (unsoldInventory > 0) {
+            FortuneToken(address(launchToken))
+                .burn(unsoldInventory);
+            emit UnsoldInventoryBurned(
+                unsoldInventory
+            );
+        }
 
         emit RescueActivated(
             rescueSupply,

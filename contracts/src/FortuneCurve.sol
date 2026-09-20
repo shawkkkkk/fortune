@@ -300,8 +300,12 @@ contract FortuneCurve is ReentrancyGuard {
     ) internal view returns (uint256) {
         (
             uint256 price,
-            
+            uint256 observedAt
         ) = _priceUsd(asset);
+        require(
+            observedAt > 0,
+            "BAD_PRICE_TIMESTAMP"
+        );
 
         return
             Math.mulDiv(
@@ -321,8 +325,12 @@ contract FortuneCurve is ReentrancyGuard {
     ) internal view returns (uint256 amount) {
         (
             uint256 price,
-            
+            uint256 observedAt
         ) = _priceUsd(asset);
+        require(
+            observedAt > 0,
+            "BAD_PRICE_TIMESTAMP"
+        );
 
         uint256 scale =
             10 **

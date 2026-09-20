@@ -39,9 +39,9 @@ jobs:
     env:
       PRIVATE_KEY: ${{ secrets.FORTUNE_TESTNET_PRIVATE_KEY }}
       BSC_TESTNET_RPC_URL: ${{ secrets.BSC_TESTNET_RPC_URL }}
-      PANCAKE_V3_FACTORY: ${{ inputs.pancake_v3_factory }}
-      PANCAKE_V3_POSITION_MANAGER: ${{ inputs.pancake_v3_position_manager }}
-      PANCAKE_V2_ROUTER: ${{ inputs.pancake_v2_router }}
+      PANCAKE_V3_FACTORY: ${{ inputs.pancake_v3_factory || '0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865' }}
+      PANCAKE_V3_POSITION_MANAGER: ${{ inputs.pancake_v3_position_manager || '0x427bF5b37357632377eCbEC9de3626C71A5396c1' }}
+      PANCAKE_V2_ROUTER: ${{ inputs.pancake_v2_router || '0x9ac64cc6e4415144c455bd8e4837fea55603e5c3' }}
 
     steps:
       - uses: actions/checkout@v4

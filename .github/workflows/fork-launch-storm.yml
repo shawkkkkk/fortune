@@ -119,6 +119,15 @@ jobs:
             0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38 \
             0x3635C9ADC5DEA00000 >/dev/null
 
+          # Foundry CREATE2 scripts use the canonical deterministic deployment
+          # proxy at 0x4e59.... Inject its standard runtime locally so Anvil
+          # never needs to lazy-fetch that account from the pruned upstream RPC.
+          CREATE2_DEPLOYER=0x4e59b44847b379578588920cA78FbF26c0B4956C
+          CREATE2_RUNTIME=0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe03601600081602082378035828234f58015156039578182fd5b8082525050506014600cf3
+          cast rpc --rpc-url "$LOCAL_RPC_URL" anvil_setCode "$CREATE2_DEPLOYER" "$CREATE2_RUNTIME" >/dev/null
+          cast rpc --rpc-url "$LOCAL_RPC_URL" anvil_setNonce "$CREATE2_DEPLOYER" 0x1 >/dev/null
+
+          echo "::add-mask::$LOCAL_KEY"
           {
             echo "PRIVATE_KEY=$LOCAL_KEY"
             echo "LOCAL_SIGNER=$LOCAL_SIGNER"

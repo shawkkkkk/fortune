@@ -1,0 +1,56 @@
+name: Public testnet bug
+description: Report a reproducible Fortune BSC Testnet beta problem
+title: "[testnet] "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for testing Fortune. Public testnet uses valueless test assets only.
+        **Never paste a seed phrase, private key, or wallet backup into an issue.**
+  - type: input
+    id: tx
+    attributes:
+      label: Transaction hash
+      description: If an onchain action failed, paste the BSC Testnet transaction hash.
+      placeholder: "0x..."
+  - type: input
+    id: wallet
+    attributes:
+      label: Public wallet address
+      description: Optional. Only share the public 0x address involved.
+      placeholder: "0x..."
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Wallet / network
+        - Testnet faucet
+        - Create launch
+        - Curve buy
+        - Graduation / Pancake
+        - LP lock
+        - API / readiness
+        - UI / other
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: What did you do, and what happened?
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Browser / wallet
+      description: Browser, wallet extension, and anything else that may help reproduce the issue.

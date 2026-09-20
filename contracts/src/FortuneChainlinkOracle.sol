@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
+import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IFortunePriceOracle} from "./interfaces/IFortunePriceOracle.sol";
 
 interface IAggregatorV3 {
@@ -41,7 +42,7 @@ contract FortuneChainlinkOracle is IFortunePriceOracle, Ownable2Step {
         require(answer > 0, "BAD_ANSWER");
 
         uint8 decimals = IAggregatorV3(feed).decimals();
-        price = uint256(answer) * 1e18 / (10 ** decimals);
+        price = uint256(answer) * 1e18 / (10 ** uint256(decimals));
         updatedAt = timestamp;
     }
 }

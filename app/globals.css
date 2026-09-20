@@ -191,3 +191,11 @@ input,textarea,select{width:100%;border:1px solid #323832;background:#0e1110;col
 .apiCode{margin:16px 0 0;border:1px solid #293029;border-radius:13px;background:#0b0e0c;padding:15px;overflow:auto;color:#c9d1c5;font:10px/1.65 ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;white-space:pre-wrap}
 .apiPrinciples{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:16px}.apiPrinciples>div{border:1px solid #2b322a;border-radius:13px;background:#111411;padding:13px;display:flex;flex-direction:column;gap:5px}.apiPrinciples strong{font-size:10px;color:#e3e7df}.apiPrinciples span{font-size:8px;line-height:1.5;color:#737c72}
 @media(max-width:760px){.apiEndpointRow{grid-template-columns:55px 1fr}.apiEndpointRow>span{grid-column:1/-1}.apiPrinciples{grid-template-columns:1fr}}
+
+
+.customCompatibilityBox{display:flex;flex-direction:column;gap:10px}
+.customCheckRow{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center}
+.customCheckRow input{min-width:0}
+.customCheckResult{border:1px solid #313a2f;border-radius:12px;background:#0f130e;padding:11px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.customCheckResult>div{display:flex;flex-direction:column;gap:3px}.customCheckResult span{font-size:8px;color:#727d70}.customCheckResult strong{font-size:10px;color:#e3e8df}.customCheckResult>small{grid-column:1/-1;font-size:8px;line-height:1.5;color:#7c8678}
+@media(max-width:760px){.customCheckRow,.customCheckResult{grid-template-columns:1fr}}

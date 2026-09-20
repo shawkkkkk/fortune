@@ -666,18 +666,13 @@ contract FortuneTest is Test {
         assertEq(manager.ownerOf(tokenId), address(locker));
         assertEq(locker.lockedPositionCount(), 1);
 
-        (
-            address launchToken,
-            address feeRecipient,
-            bytes32 poolKeyHash,
-            ,
-            bool registered
-        ) = locker.position(tokenId);
+        FortunePermanentLiquidityLocker.LockedPosition memory locked =
+            locker.position(tokenId);
 
-        assertEq(launchToken, address(usdt));
-        assertEq(feeRecipient, treasury);
-        assertEq(poolKeyHash, keccak256("FORT/USDT"));
-        assertTrue(registered);
+        assertEq(locked.launchToken, address(usdt));
+        assertEq(locked.feeRecipient, treasury);
+        assertEq(locked.poolKeyHash, keccak256("FORT/USDT"));
+        assertTrue(locked.registered);
 
         manager.setCollectAmounts(11, 22);
         (uint256 amount0, uint256 amount1) =

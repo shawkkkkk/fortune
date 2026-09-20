@@ -41,27 +41,57 @@ jobs:
       REPORT_PATH: "/tmp/fortune-launch-storm-report.json"
 
       NEXT_PUBLIC_CHAIN_ID: "97"
-      NEXT_PUBLIC_FORTUNE_FACTORY_ADDRESS: "0x9Eac6c6CdA0A19cbb0f8Abc51Ee968545E6EB415"
-      NEXT_PUBLIC_FORTUNE_REGISTRY_ADDRESS: "0x943176d26A332F4687d52695fe9625866c2c3A67"
-      NEXT_PUBLIC_FORTUNE_GRADUATION_ADAPTER_ADDRESS: "0xF666487e58dEFB8584C7eAa2378DEe1BbAbe012C"
-      NEXT_PUBLIC_FORTUNE_LIQUIDITY_LOCKER_ADDRESS: "0x861Deb497eA845dda8727B11462d11Abe34E2AE8"
-
-      FORTUNE_REGISTRY: "0x943176d26A332F4687d52695fe9625866c2c3A67"
-      FORTUNE_GRADUATION_ADAPTER: "0xF666487e58dEFB8584C7eAa2378DEe1BbAbe012C"
-      FORTUNE_LIQUIDITY_LOCKER: "0x861Deb497eA845dda8727B11462d11Abe34E2AE8"
 
       PANCAKE_V3_FACTORY: "0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865"
       PANCAKE_V3_POSITION_MANAGER: "0x427bF5b37357632377eCbEC9de3626C71A5396c1"
 
-      LIVE_CURVE: "0x5E7967bde6286aE030bFd45FbB8650df221F22e9"
-      LIVE_TOKEN: "0xC27aF82E8A228a0167FbE1673CaD13cD35Ee16Fe"
-      LIVE_QUOTE: "0x871356a53Dd988EFDAa82261c9d212Ac08988fd0"
-      LIVE_POOL: "0x5c9fAB9ee5286fE5c071Bd547f9B308a550FA50f"
-      LIVE_LOCKER: "0x861Deb497eA845dda8727B11462d11Abe34E2AE8"
-      LIVE_LP_TOKEN_ID: "37496"
-
     steps:
       - uses: actions/checkout@v4
+
+      - name: Load published Fortune testnet references
+        run: |
+          python3 - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          text = Path("lib/public-testnet.ts").read_text()
+          address_keys = {
+              "NEXT_PUBLIC_FORTUNE_FACTORY_ADDRESS": "factory",
+              "NEXT_PUBLIC_FORTUNE_REGISTRY_ADDRESS": "registry",
+              "NEXT_PUBLIC_FORTUNE_GRADUATION_ADAPTER_ADDRESS": "graduationAdapter",
+              "NEXT_PUBLIC_FORTUNE_LIQUIDITY_LOCKER_ADDRESS": "liquidityLocker",
+              "FORTUNE_REGISTRY": "registry",
+              "FORTUNE_GRADUATION_ADAPTER": "graduationAdapter",
+              "FORTUNE_LIQUIDITY_LOCKER": "liquidityLocker",
+              "LIVE_CURVE": "referenceCurve",
+              "LIVE_TOKEN": "referenceToken",
+              "LIVE_QUOTE": "mockQuote",
+              "LIVE_POOL": "referencePool",
+              "LIVE_LOCKER": "liquidityLocker",
+          }
+
+          values = {}
+          for env_name, key in address_keys.items():
+              match = re.search(
+                  rf'\b{re.escape(key)}:\s*"(?P<address>0x[a-fA-F0-9]{{40}})"',
+                  text,
+              )
+              if not match:
+                  raise SystemExit(f"Missing published address for {key}")
+              values[env_name] = match.group("address")
+
+          lp = re.search(r'\breferenceLpTokenId:\s*(?P<id>\d+)', text)
+          if not lp:
+              raise SystemExit("Missing referenceLpTokenId")
+          values["LIVE_LP_TOKEN_ID"] = lp.group("id")
+
+          with open(os.environ["GITHUB_ENV"], "a") as env:
+              for key, value in values.items():
+                  env.write(f"{key}={value}\n")
+
+          print("Loaded current published Fortune testnet references.")
+          PY
 
       - uses: actions/setup-node@v4
         with:

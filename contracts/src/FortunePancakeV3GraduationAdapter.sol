@@ -107,6 +107,14 @@ contract FortunePancakeV3GraduationAdapter is
         bytes calldata data
     ) internal view returns (bool ready, bytes32 reasonCode) {
         if (
+            fortuneFactory.curveIndexPlusOne(
+                msg.sender
+            ) == 0
+        ) {
+            return (false, bytes32("UNKNOWN_CURVE"));
+        }
+
+        if (
             launchToken == address(0) ||
             launchToken.code.length == 0 ||
             launchTokenAmount == 0
@@ -190,25 +198,9 @@ contract FortunePancakeV3GraduationAdapter is
             if (reserveInfo.amount == 0) {
                 return (false, bytes32("ZERO_RESERVE"));
             }
-            if (
-                !registry.isGraduationAsset(
-                    reserveInfo.asset
-                )
-            ) {
-                return (false, bytes32("ASSET_NOT_GRAD"));
-            }
-
-            (
-                bool healthy,
-                bytes32 assetReason,
-                ,
-            ) = registry.assetHealth(
-                reserveInfo.asset
-            );
-
-            if (!healthy) {
-                return (false, assetReason);
-            }
+            // Asset eligibility/oracle/decimal configuration was frozen into
+            // the canonical FortuneCurve at launch. Registry governance cannot
+            // retroactively brick an existing graduation.
 
             int24 tickSpacing;
             try pancakeFactory.feeAmountTickSpacing(

@@ -4,6 +4,8 @@ pragma solidity ^0.8.24;
 import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {FortuneToken} from "./FortuneToken.sol";
 import {FortuneCurve} from "./FortuneCurve.sol";
@@ -18,6 +20,7 @@ import {IFortuneCurveDeployer} from "./interfaces/IFortuneCurveDeployer.sol";
 import {FortunePermanentLiquidityLocker} from "./FortunePermanentLiquidityLocker.sol";
 
 contract FortuneFactory is Ownable2Step {
+    using SafeERC20 for IERC20;
     error LaunchPreflightFailed(bytes32 reasonCode);
     uint16 public constant BPS = 10_000;
     uint8 public constant FORTUNE_ADDRESS_SUFFIX = 0xfe;
@@ -503,6 +506,118 @@ contract FortuneFactory is Ownable2Step {
                 vanitySalt,
                 true
             );
+    }
+
+    /// @notice Atomically creates a launch and executes the creator's first curve
+    ///         purchase. The quote allowance is granted beforehand, but no third
+    ///         party can trade between deployment and this buy because both actions
+    ///         execute inside the same transaction.
+    function createLaunchPreparedAndBuy(
+        LaunchParams calldata p,
+        bytes32 vanitySalt,
+        uint256 amountIn,
+        uint256 minTokensOut
+    )
+        external
+        returns (
+            LaunchInfo memory info,
+            uint256 tokensOut
+        )
+    {
+        require(
+            amountIn > 0,
+            "ZERO_INITIAL_PURCHASE"
+        );
+
+        info =
+            _createLaunch(
+                p,
+                vanitySalt,
+                true
+            );
+
+        IERC20 quote =
+            IERC20(p.primaryQuote);
+        IERC20 launchToken =
+            IERC20(info.token);
+
+        uint256 quoteBefore =
+            quote.balanceOf(
+                address(this)
+            );
+
+        quote.safeTransferFrom(
+            msg.sender,
+            address(this),
+            amountIn
+        );
+
+        require(
+            quote.balanceOf(
+                address(this)
+            ) ==
+                quoteBefore +
+                amountIn,
+            "NON_STANDARD_QUOTE"
+        );
+
+        quote.forceApprove(
+            info.curve,
+            amountIn
+        );
+
+        uint256 tokenBefore =
+            launchToken.balanceOf(
+                address(this)
+            );
+
+        tokensOut =
+            FortuneCurve(
+                info.curve
+            ).buy(
+                p.primaryQuote,
+                amountIn,
+                minTokensOut
+            );
+
+        quote.forceApprove(
+            info.curve,
+            0
+        );
+
+        uint256 received =
+            launchToken.balanceOf(
+                address(this)
+            ) -
+            tokenBefore;
+
+        require(
+            received ==
+                tokensOut &&
+                received > 0,
+            "INITIAL_BUY_MISMATCH"
+        );
+
+        launchToken.safeTransfer(
+            msg.sender,
+            received
+        );
+
+        uint256 quoteAfter =
+            quote.balanceOf(
+                address(this)
+            );
+
+        if (
+            quoteAfter >
+            quoteBefore
+        ) {
+            quote.safeTransfer(
+                msg.sender,
+                quoteAfter -
+                    quoteBefore
+            );
+        }
     }
 
     function _createLaunch(

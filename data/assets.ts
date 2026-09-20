@@ -27,6 +27,7 @@ export const assetCategories = [
   "BNB Chain",
   "Stablecoins",
   "xStocks",
+  "China Stocks",
   "PreStocks",
   "RWAs",
   "DeFi",

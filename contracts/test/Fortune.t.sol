@@ -10,6 +10,9 @@ import {FortuneCurve} from "../src/FortuneCurve.sol";
 import {FortuneToken} from "../src/FortuneToken.sol";
 import {FortuneChainlinkOracle} from "../src/FortuneChainlinkOracle.sol";
 import {MockGraduationAdapter} from "../src/MockGraduationAdapter.sol";
+import {FortuneAutomationRegistry} from "../src/FortuneAutomationRegistry.sol";
+import {FortuneAutomationVault} from "../src/FortuneAutomationVault.sol";
+import {MockAutomationAdapter} from "../src/test/MockAutomationAdapter.sol";
 import {IFortunePriceOracle} from "../src/interfaces/IFortunePriceOracle.sol";
 
 contract MockERC20 is ERC20 {
@@ -251,6 +254,44 @@ contract FortuneTest is Test {
         vm.expectRevert("NON_STANDARD_QUOTE_TOKEN");
         curve.buy(address(feeToken), 10e18, 1);
         vm.stopPrank();
+    }
+
+    function testAutomationVaultOnlyUsesApprovedPurposeAdapter() public {
+        FortuneFactory.LaunchInfo memory info = factory.createLaunch(_params(1_000e18));
+
+        FortuneAutomationRegistry automationRegistry =
+            new FortuneAutomationRegistry(address(this));
+        MockAutomationAdapter adapter = new MockAutomationAdapter();
+
+        FortuneAutomationVault vault = new FortuneAutomationVault(
+            address(automationRegistry),
+            FortuneAutomationRegistry.Purpose.HolderRewards,
+            info.token,
+            address(this)
+        );
+
+        usdt.mint(address(vault), 20e18);
+
+        vm.expectRevert("ADAPTER_NOT_APPROVED");
+        vault.execute(address(usdt), 10e18, address(adapter), "");
+
+        automationRegistry.setAdapter(
+            FortuneAutomationRegistry.Purpose.HolderRewards,
+            address(adapter),
+            true
+        );
+
+        vault.execute(address(usdt), 10e18, address(adapter), "");
+
+        assertEq(vault.executions(), 1);
+        assertEq(adapter.lastCaller(), address(vault));
+        assertEq(adapter.lastLaunchToken(), info.token);
+        assertEq(adapter.lastAsset(), address(usdt));
+        assertEq(adapter.lastAmount(), 10e18);
+        assertEq(
+            adapter.lastPurpose(),
+            uint8(FortuneAutomationRegistry.Purpose.HolderRewards)
+        );
     }
 
     function testPositiveRebaseChangesReserveAndCanTriggerGraduation() public {

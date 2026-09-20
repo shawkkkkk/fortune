@@ -163,6 +163,22 @@ contract FortuneTest is Test {
         });
     }
 
+    function testEveryFortuneTokenAddressEndsInFe() public {
+        FortuneFactory.LaunchInfo memory first =
+            factory.createLaunch(_params(1_000e18));
+        FortuneFactory.LaunchInfo memory second =
+            factory.createLaunch(_params(1_000e18));
+
+        assertTrue(factory.hasFortuneSuffix(first.token));
+        assertTrue(factory.hasFortuneSuffix(second.token));
+        assertEq(uint8(uint160(first.token)), uint8(0xfe));
+        assertEq(uint8(uint160(second.token)), uint8(0xfe));
+        assertTrue(first.token != second.token);
+        assertTrue(first.vanitySalt != bytes32(0));
+        assertTrue(second.vanitySalt != bytes32(0));
+        assertTrue(first.vanitySalt != second.vanitySalt);
+    }
+
     function testTwoQuoteAssetsMoveOneCurve() public {
         FortuneFactory.LaunchInfo memory info = factory.createLaunch(_params(1_000e18));
         FortuneCurve curve = FortuneCurve(info.curve);

@@ -168,6 +168,12 @@ The prototype caps the total configured trade fee at 5%. The route is immutable 
 
 If holders are meant to receive a different asset from the quote asset, conversion belongs in an approved automation adapter/vault rather than inside the core curve.
 
+## Launch Readiness
+
+The launch page now fails closed behind a 14-point readiness gate. It combines local configuration checks, server-side launch preview, RPC/factory deployment health, permanent LP-lock readiness and graduation/Pancake infrastructure. The Launch button remains disabled until the visible gates pass; the Solidity factory then repeats launch preflight onchain immediately before deployment.
+
+Production clients should use `createLaunchPrepared`: call `previewPreparedVanity` through `eth_call`, then submit the returned salt. This keeps the `0xfe` CREATE2 vanity search out of paid launch gas and makes launch gas much more predictable.
+
 ## Public API
 
 Fortune now exposes a versioned developer surface at:

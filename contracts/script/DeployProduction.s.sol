@@ -49,7 +49,7 @@ contract DeployProduction is Script {
         );
 
         uint256 assetCount = vm.envUint("PRODUCTION_ASSET_COUNT");
-        require(assetCount >= 1 && assetCount <= 5, "BAD_ASSET_COUNT");
+        require(assetCount >= 1 && assetCount <= 128, "BAD_ASSET_COUNT");
 
         vm.startBroadcast(deployerKey);
 

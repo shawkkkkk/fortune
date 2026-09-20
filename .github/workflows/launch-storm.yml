@@ -1,0 +1,47 @@
+name: Fortune Launch Storm
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "Public Fortune deployment URL to load-test"
+        required: true
+        type: string
+      stages:
+        description: "Concurrency x request stages"
+        required: true
+        default: "50x500,200x2000,500x5000"
+        type: string
+      p95_limit_ms:
+        description: "Maximum acceptable stage p95 latency"
+        required: true
+        default: "2500"
+        type: string
+
+jobs:
+  storm:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      BASE_URL: ${{ inputs.base_url }}
+      STAGES: ${{ inputs.stages }}
+      P95_LIMIT_MS: ${{ inputs.p95_limit_ms }}
+      SUCCESS_FLOOR: "0.995"
+      TIMEOUT_MS: "8000"
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Validate public URL
+        run: |
+          case "$BASE_URL" in
+            https://*) ;;
+            *) echo "BASE_URL must be a public https URL"; exit 1 ;;
+          esac
+
+      - name: Run staged launch storm
+        run: node scripts/launch-storm.mjs

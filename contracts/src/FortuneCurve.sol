@@ -550,7 +550,7 @@ contract FortuneCurve is ReentrancyGuard {
         uint256 minQuoteOut
     ) external nonReentrant tradingOpen returns (uint256 quoteOut) {
         (
-            ,
+            uint256 grossQuote,
             uint256 fee,
             uint256 previewQuoteOut,
             uint256 usdGross

@@ -10,6 +10,7 @@ import {FortuneFeeRouter} from "./FortuneFeeRouter.sol";
 import {FortuneAssetRegistry} from "./FortuneAssetRegistry.sol";
 import {FortuneAutomationRegistry} from "./FortuneAutomationRegistry.sol";
 import {FortuneAutomationVault} from "./FortuneAutomationVault.sol";
+import {FortuneMetadataRegistry} from "./FortuneMetadataRegistry.sol";
 
 contract FortuneFactory is Ownable2Step {
     struct LaunchParams {
@@ -26,6 +27,12 @@ contract FortuneFactory is Ownable2Step {
         /// creator, holders, buyback, liquidity, community treasury, protocol
         uint16[6] feeBps;
         address treasury;
+        bool metadataEditable;
+        string description;
+        string imageURI;
+        string website;
+        string xProfile;
+        string telegram;
     }
 
     struct LaunchInfo {
@@ -42,6 +49,7 @@ contract FortuneFactory is Ownable2Step {
 
     FortuneAssetRegistry public immutable registry;
     FortuneAutomationRegistry public immutable automationRegistry;
+    FortuneMetadataRegistry public immutable metadataRegistry;
     address public immutable automationExecutor;
     address public immutable protocolTreasury;
 
@@ -85,6 +93,7 @@ contract FortuneFactory is Ownable2Step {
 
         registry = FortuneAssetRegistry(registry_);
         automationRegistry = FortuneAutomationRegistry(automationRegistry_);
+        metadataRegistry = new FortuneMetadataRegistry(address(this));
         automationExecutor = automationExecutor_;
         protocolTreasury = protocolTreasury_;
     }
@@ -149,7 +158,13 @@ contract FortuneFactory is Ownable2Step {
                 p.graduationUsd1e18,
                 p.adaptiveGraduation,
                 p.feeBps,
-                p.treasury
+                p.treasury,
+                p.metadataEditable,
+                p.description,
+                p.imageURI,
+                p.website,
+                p.xProfile,
+                p.telegram
             )
         );
 
@@ -158,6 +173,21 @@ contract FortuneFactory is Ownable2Step {
             p.symbol,
             p.totalSupply,
             manifestHash
+        );
+
+        metadataRegistry.registerToken(
+            address(token),
+            msg.sender,
+            p.metadataEditable,
+            FortuneMetadataRegistry.Metadata({
+                displayName: p.name,
+                displaySymbol: p.symbol,
+                description: p.description,
+                imageURI: p.imageURI,
+                website: p.website,
+                xProfile: p.xProfile,
+                telegram: p.telegram
+            })
         );
 
         address holderVault = _automationVault(

@@ -1110,6 +1110,73 @@ contract FortuneTest is Test {
         );
     }
 
+    function testRegistryDisableStopsNewLaunchesWithoutBrickingExistingCurve() public {
+        FortuneFactory.LaunchInfo memory info =
+            factory.createLaunch(
+                _params(50e18)
+            );
+        FortuneCurve curve =
+            FortuneCurve(info.curve);
+
+        FortuneAssetRegistry.AssetConfig
+            memory disabled =
+                FortuneAssetRegistry
+                    .AssetConfig({
+                        oracle: address(oracle),
+                        maxOracleAge: 1 hours,
+                        quoteEnabled: false,
+                        rewardEnabled: false,
+                        graduationEnabled: false,
+                        active: false,
+                        category: "disabled"
+                    });
+
+        registry.configureAsset(
+            address(usdt),
+            disabled
+        );
+
+        (
+            bool newLaunchReady,
+            
+        ) = factory.preflightLaunch(
+                _params(50e18)
+            );
+
+        assertFalse(
+            newLaunchReady
+        );
+
+        vm.warp(block.timestamp + 16);
+
+        vm.startPrank(user);
+        usdt.approve(
+            address(curve),
+            type(uint256).max
+        );
+        uint256 out =
+            curve.buy(
+                address(usdt),
+                100e18,
+                1
+            );
+        vm.stopPrank();
+
+        assertGt(out, 0);
+        assertTrue(
+            curve.graduationReady()
+        );
+
+        bool success =
+            factory.finalizeGraduation(
+                info.curve,
+                ""
+            );
+
+        assertTrue(success);
+        assertTrue(curve.graduated());
+    }
+
     function testExistingLaunchKeepsItsGraduationAdapterAfterGlobalUpgrade() public {
         FortuneFactory.LaunchInfo memory info =
             factory.createLaunch(

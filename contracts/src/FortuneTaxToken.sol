@@ -15,9 +15,9 @@ interface IFortuneTaxProcessorActivation {
 
 /// @notice Fixed-supply Fortune token variant with immutable post-graduation
 ///         buy/sell taxes and an optional bounded competing-pool protection window.
-/// @dev Tax rates and the anti-farmer duration are immutable. The factory may only
-///      bind launch infrastructure once; the frozen graduation adapter may only
-///      activate one official DEX pool once.
+/// @dev Tax rates, dividend threshold and anti-farmer duration are immutable.
+///      The factory may only bind launch infrastructure once; the frozen
+///      graduation adapter may only activate one official DEX pool once.
 contract FortuneTaxToken is ERC20, ERC20Burnable {
     uint16 public constant FORTUNE_TAX_TOKEN_VERSION = 1;
     uint16 public constant MAX_TAX_BPS = 1_000; // 10%
@@ -40,6 +40,7 @@ contract FortuneTaxToken is ERC20, ERC20Burnable {
     uint16 public immutable buyTaxBps;
     uint16 public immutable sellTaxBps;
     uint32 public immutable antiFarmerDuration;
+    uint256 public immutable minimumDividendBalance;
 
     address public taxProcessor;
     address public dividendVault;
@@ -50,8 +51,11 @@ contract FortuneTaxToken is ERC20, ERC20Burnable {
     bool public infrastructureBound;
 
     uint64 public stateNonce;
+    uint256 public currentEligibleDividendSupply;
+
     mapping(address => Checkpoint[]) private _balanceHistory;
     Checkpoint[] private _supplyHistory;
+    Checkpoint[] private _eligibleSupplyHistory;
 
     event TaxInfrastructureBound(
         address indexed processor,
@@ -70,11 +74,6 @@ contract FortuneTaxToken is ERC20, ERC20Burnable {
         uint256 taxAmount,
         uint16 taxBps
     );
-    event AlternativePoolBlocked(
-        address indexed pool,
-        address indexed from,
-        address indexed to
-    );
 
     constructor(
         address fortuneFactory_,
@@ -87,7 +86,8 @@ contract FortuneTaxToken is ERC20, ERC20Burnable {
         bytes32 manifest_,
         uint16 buyTaxBps_,
         uint16 sellTaxBps_,
-        uint32 antiFarmerDuration_
+        uint32 antiFarmerDuration_,
+        uint256 minimumDividendBalance_
     ) ERC20(name_, symbol_) {
         require(
             fortuneFactory_ != address(0) &&
@@ -118,6 +118,11 @@ contract FortuneTaxToken is ERC20, ERC20Burnable {
                 MAX_ANTI_FARMER_DURATION,
             "ANTI_FARMER_TOO_LONG"
         );
+        require(
+            minimumDividendBalance_ <=
+                supply_,
+            "DIVIDEND_THRESHOLD_TOO_HIGH"
+        );
 
         fortuneFactory = fortuneFactory_;
         poolConfigurator = poolConfigurator_;
@@ -132,6 +137,8 @@ contract FortuneTaxToken is ERC20, ERC20Burnable {
         sellTaxBps = sellTaxBps_;
         antiFarmerDuration =
             antiFarmerDuration_;
+        minimumDividendBalance =
+            minimumDividendBalance_;
 
         _mint(fortuneFactory_, supply_);
     }
@@ -206,9 +213,20 @@ contract FortuneTaxToken is ERC20, ERC20Burnable {
             "BAD_DEX"
         );
 
+        uint256 poolEligibleBefore =
+            _eligibleCurrent(
+                pool_
+            );
+
         officialPool = pool_;
         dexRouter = router_;
         dexActivatedAt = uint64(block.timestamp);
+
+        if (poolEligibleBefore > 0) {
+            currentEligibleDividendSupply -=
+                poolEligibleBefore;
+            _writeSnapshotOnly();
+        }
 
         IFortuneTaxProcessorActivation(
             taxProcessor
@@ -254,6 +272,19 @@ contract FortuneTaxToken is ERC20, ERC20Burnable {
             block.timestamp < until;
     }
 
+    function isDividendExcluded(
+        address account
+    ) public view returns (bool) {
+        return
+            account == address(0) ||
+            account == DEAD ||
+            account == address(this) ||
+            account == curve ||
+            account == taxProcessor ||
+            account == dividendVault ||
+            account == officialPool;
+    }
+
     function balanceAtNonce(
         address account,
         uint64 nonce
@@ -275,67 +306,42 @@ contract FortuneTaxToken is ERC20, ERC20Burnable {
             );
     }
 
-    /// @notice Supply eligible for holder-reward snapshots at a particular
-    ///         token state. Curve inventory, protocol infrastructure and the
-    ///         official DEX pool are excluded.
     function eligibleSupplyAtNonce(
         uint64 nonce
     ) external view returns (uint256) {
-        uint256 supply =
-            totalSupplyAtNonce(nonce);
+        return
+            _valueAt(
+                _eligibleSupplyHistory,
+                nonce
+            );
+    }
 
-        address[6] memory excluded = [
-            curve,
-            taxProcessor,
-            dividendVault,
-            officialPool,
-            address(this),
-            DEAD
-        ];
-
-        for (
-            uint256 i;
-            i < excluded.length;
-            ++i
+    function eligibleBalanceAtNonce(
+        address account,
+        uint64 nonce
+    ) external view returns (uint256) {
+        if (
+            isDividendExcluded(
+                account
+            )
         ) {
-            address account =
-                excluded[i];
-
-            if (account == address(0)) {
-                continue;
-            }
-
-            bool duplicate;
-            for (uint256 j; j < i; ++j) {
-                if (
-                    excluded[j] ==
-                    account
-                ) {
-                    duplicate = true;
-                    break;
-                }
-            }
-
-            if (!duplicate) {
-                uint256 excludedBalance =
-                    balanceAtNonce(
-                        account,
-                        nonce
-                    );
-
-                if (
-                    excludedBalance <=
-                    supply
-                ) {
-                    supply -=
-                        excludedBalance;
-                } else {
-                    supply = 0;
-                }
-            }
+            return 0;
         }
 
-        return supply;
+        uint256 balance =
+            balanceAtNonce(
+                account,
+                nonce
+            );
+
+        if (
+            balance <
+            minimumDividendBalance
+        ) {
+            return 0;
+        }
+
+        return balance;
     }
 
     function balanceCheckpointCount(
@@ -399,24 +405,15 @@ contract FortuneTaxToken is ERC20, ERC20Burnable {
             uint256 netAmount =
                 value - taxAmount;
 
-            super._update(
+            _move(
                 from,
                 taxProcessor,
                 taxAmount
             );
-            _writeState(
-                from,
-                taxProcessor
-            );
-
-            super._update(
+            _move(
                 from,
                 to,
                 netAmount
-            );
-            _writeState(
-                from,
-                to
             );
 
             emit TransferTaxTaken(
@@ -430,32 +427,94 @@ contract FortuneTaxToken is ERC20, ERC20Burnable {
             return;
         }
 
+        _move(
+            from,
+            to,
+            value
+        );
+    }
+
+    function _move(
+        address from,
+        address to,
+        uint256 value
+    ) internal {
+        uint256 beforeFrom =
+            _eligibleCurrent(
+                from
+            );
+        uint256 beforeTo =
+            to == from
+                ? beforeFrom
+                : _eligibleCurrent(
+                    to
+                );
+
         super._update(
             from,
             to,
             value
         );
+
+        uint256 afterFrom =
+            _eligibleCurrent(
+                from
+            );
+        uint256 afterTo =
+            to == from
+                ? afterFrom
+                : _eligibleCurrent(
+                    to
+                );
+
+        currentEligibleDividendSupply =
+            currentEligibleDividendSupply +
+            afterFrom +
+            afterTo -
+            beforeFrom -
+            beforeTo;
+
         _writeState(
             from,
             to
         );
     }
 
+    function _eligibleCurrent(
+        address account
+    ) internal view returns (uint256) {
+        if (
+            account == address(0) ||
+            isDividendExcluded(
+                account
+            )
+        ) {
+            return 0;
+        }
+
+        uint256 balance =
+            balanceOf(account);
+
+        if (
+            balance <
+            minimumDividendBalance
+        ) {
+            return 0;
+        }
+
+        return balance;
+    }
+
     function _enforceOfficialPool(
         address from,
         address to
-    ) internal {
+    ) internal view {
         if (
             from != officialPool &&
             poolRegistry.registeredPool(
                 from
             )
         ) {
-            emit AlternativePoolBlocked(
-                from,
-                from,
-                to
-            );
             revert(
                 "ANTI_FARMER_POOL"
             );
@@ -467,11 +526,6 @@ contract FortuneTaxToken is ERC20, ERC20Burnable {
                 to
             )
         ) {
-            emit AlternativePoolBlocked(
-                to,
-                from,
-                to
-            );
             revert(
                 "ANTI_FARMER_POOL"
             );
@@ -509,6 +563,31 @@ contract FortuneTaxToken is ERC20, ERC20Burnable {
             _supplyHistory,
             nonce,
             totalSupply()
+        );
+
+        _pushCheckpoint(
+            _eligibleSupplyHistory,
+            nonce,
+            currentEligibleDividendSupply
+        );
+    }
+
+    function _writeSnapshotOnly()
+        internal
+    {
+        stateNonce += 1;
+        uint64 nonce =
+            stateNonce;
+
+        _pushCheckpoint(
+            _supplyHistory,
+            nonce,
+            totalSupply()
+        );
+        _pushCheckpoint(
+            _eligibleSupplyHistory,
+            nonce,
+            currentEligibleDividendSupply
         );
     }
 

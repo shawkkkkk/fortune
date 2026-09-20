@@ -454,15 +454,10 @@ contract FortuneFactory is Ownable2Step {
                 p
             );
 
-        bytes32 initCodeHash =
-            _tokenInitCodeHash(
-                p,
-                manifestHash
-            );
-
         (vanitySalt, predictedToken) =
             _findFortuneSalt(
-                initCodeHash,
+                creator,
+                p,
                 manifestHash
             );
     }
@@ -525,21 +520,19 @@ contract FortuneFactory is Ownable2Step {
                 p
             );
 
-        bytes32 initCodeHash =
-            _tokenInitCodeHash(
-                p,
-                manifestHash
-            );
-
         bytes32 vanitySalt;
         address predictedToken;
 
         if (prepared) {
             vanitySalt = suppliedSalt;
             predictedToken =
-                _computeCreate2Address(
-                    vanitySalt,
-                    initCodeHash
+                tokenDeployer.predict(
+                    address(this),
+                    p.name,
+                    p.symbol,
+                    p.totalSupply,
+                    manifestHash,
+                    vanitySalt
                 );
 
             require(
@@ -551,7 +544,8 @@ contract FortuneFactory is Ownable2Step {
                 vanitySalt,
                 predictedToken
             ) = _findFortuneSalt(
-                initCodeHash,
+                msg.sender,
+                p,
                 manifestHash
             );
         }
@@ -559,21 +553,24 @@ contract FortuneFactory is Ownable2Step {
         creatorLaunchNonce[msg.sender] =
             launchNonce + 1;
 
-        FortuneToken token =
-            new FortuneToken{
-                salt: vanitySalt
-            }(
+        address tokenAddress =
+            tokenDeployer.deploy(
+                address(this),
                 p.name,
                 p.symbol,
                 p.totalSupply,
-                manifestHash
+                manifestHash,
+                vanitySalt
             );
 
+        FortuneToken token =
+            FortuneToken(tokenAddress);
+
         require(
-            address(token) ==
+            tokenAddress ==
                 predictedToken &&
                 hasFortuneSuffix(
-                    address(token)
+                    tokenAddress
                 ),
             "FORTUNE_VANITY_MISMATCH"
         );
@@ -625,8 +622,8 @@ contract FortuneFactory is Ownable2Step {
                 address(token)
             );
 
-        FortuneFeeRouter router =
-            new FortuneFeeRouter(
+        address routerAddress =
+            feeRouterDeployer.deploy(
                 address(this),
                 msg.sender,
                 holderVault,
@@ -637,22 +634,33 @@ contract FortuneFactory is Ownable2Step {
                 p.feeBps
             );
 
-        FortuneCurve curve =
-            new FortuneCurve(
-                address(this),
-                address(token),
-                address(registry),
-                address(router),
-                liquidityVault,
-                p.quoteAssets,
-                p.weightsBps,
-                p.basePriceUsd1e18,
-                p.slopeUsd1e18,
-                p.graduationUsd1e18,
-                p.adaptiveGraduation
+        FortuneFeeRouter router =
+            FortuneFeeRouter(
+                routerAddress
             );
 
-        router.setCurve(address(curve));
+        address curveAddress =
+            curveDeployer.deploy(
+                IFortuneCurveDeployer
+                    .CurveParams({
+                        factory: address(this),
+                        launchToken: tokenAddress,
+                        registry: address(registry),
+                        feeRouter: routerAddress,
+                        shieldVault: liquidityVault,
+                        quoteAssets: p.quoteAssets,
+                        weightsBps: p.weightsBps,
+                        basePriceUsd1e18: p.basePriceUsd1e18,
+                        slopeUsd1e18: p.slopeUsd1e18,
+                        graduationUsd1e18: p.graduationUsd1e18,
+                        adaptiveGraduation: p.adaptiveGraduation
+                    })
+            );
+
+        FortuneCurve curve =
+            FortuneCurve(curveAddress);
+
+        router.setCurve(curveAddress);
 
         require(
             token.transfer(
@@ -747,72 +755,52 @@ contract FortuneFactory is Ownable2Step {
             );
     }
 
-    function _tokenInitCodeHash(
-        LaunchParams calldata p,
-        bytes32 manifestHash
-    ) internal pure returns (bytes32) {
-        return
-            keccak256(
-                abi.encodePacked(
-                    type(FortuneToken)
-                        .creationCode,
-                    abi.encode(
-                        p.name,
-                        p.symbol,
-                        p.totalSupply,
-                        manifestHash
-                    )
-                )
-            );
-    }
-
     /// @notice Every Fortune-created launch token is deployed with CREATE2
     ///         so the final byte of its address is 0xfe.
-    /// @dev A one-byte suffix takes ~256 trials on average. The bounded search
-    ///      keeps launch gas predictable while making failure vanishingly rare.
+    /// @dev Search happens through the small TokenDeployer rather than embedding
+    ///      token creation bytecode in FortuneFactory.
     function _findFortuneSalt(
-        bytes32 initCodeHash,
+        address creator,
+        LaunchParams calldata p,
         bytes32 entropy
     ) internal view returns (bytes32 salt, address predicted) {
-        for (uint256 nonce; nonce < VANITY_SEARCH_LIMIT; ++nonce) {
+        for (
+            uint256 nonce;
+            nonce < VANITY_SEARCH_LIMIT;
+            ++nonce
+        ) {
             salt = keccak256(
                 abi.encodePacked(
-                    msg.sender,
+                    creator,
                     entropy,
                     nonce
                 )
             );
 
-            predicted = _computeCreate2Address(
-                salt,
-                initCodeHash
-            );
+            predicted =
+                tokenDeployer.predict(
+                    address(this),
+                    p.name,
+                    p.symbol,
+                    p.totalSupply,
+                    entropy,
+                    salt
+                );
 
-            if (hasFortuneSuffix(predicted)) {
-                return (salt, predicted);
+            if (
+                hasFortuneSuffix(
+                    predicted
+                )
+            ) {
+                return (
+                    salt,
+                    predicted
+                );
             }
         }
 
-        revert("FORTUNE_SUFFIX_NOT_FOUND");
-    }
-
-    function _computeCreate2Address(
-        bytes32 salt,
-        bytes32 initCodeHash
-    ) internal view returns (address predicted) {
-        predicted = address(
-            uint160(
-                uint256(
-                    keccak256(
-                        abi.encodePacked(
-                            bytes1(0xff),
-                            address(this),
-                            salt,
-                            initCodeHash
-                        )
-                    )
-                )
-            )
+        revert(
+            "FORTUNE_SUFFIX_NOT_FOUND"
         );
     }
 
@@ -831,14 +819,15 @@ contract FortuneFactory is Ownable2Step {
     ) internal returns (address) {
         if (routeBps == 0) return address(0);
 
-        return address(
-            new FortuneAutomationVault(
-                address(automationRegistry),
-                purpose,
+        return
+            vaultDeployer.deploy(
+                address(
+                    automationRegistry
+                ),
+                uint8(purpose),
                 launchToken,
                 automationExecutor
-            )
-        );
+            );
     }
 
     /// @notice Permissionless keeper entrypoint. Adapter choice remains protocol-governed.

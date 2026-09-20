@@ -16,8 +16,10 @@ import {FortunePermanentLiquidityLocker} from "./FortunePermanentLiquidityLocker
 
 contract FortuneFactory is Ownable2Step {
     error LaunchPreflightFailed(bytes32 reasonCode);
+    uint16 public constant BPS = 10_000;
     uint8 public constant FORTUNE_ADDRESS_SUFFIX = 0xfe;
     uint256 public constant VANITY_SEARCH_LIMIT = 4096;
+    uint16 public constant MIN_GRADUATION_SUPPLY_BUFFER_BPS = 1_000; // 10%
     struct LaunchParams {
         string name;
         string symbol;
@@ -231,6 +233,80 @@ contract FortuneFactory is Ownable2Step {
 
         if (maxPrice > maxCurveScalar) {
             return (false, bytes32("TERMINAL_PRICE_RANGE"));
+        }
+
+        uint256 soldAtGraduation;
+        uint256 anchorAtGraduation;
+
+        if (p.slopeUsd1e18 == 0) {
+            soldAtGraduation =
+                Math.mulDiv(
+                    p.graduationUsd1e18,
+                    1e18,
+                    p.basePriceUsd1e18
+                );
+            anchorAtGraduation =
+                p.basePriceUsd1e18;
+        } else {
+            uint256 radicand =
+                p.basePriceUsd1e18 *
+                    p.basePriceUsd1e18 +
+                2 *
+                    p.slopeUsd1e18 *
+                    p.graduationUsd1e18;
+
+            uint256 terminalPrice =
+                Math.sqrt(radicand);
+
+            if (
+                terminalPrice <=
+                p.basePriceUsd1e18
+            ) {
+                return (false, bytes32("CURVE_TOO_SMALL"));
+            }
+
+            soldAtGraduation =
+                Math.mulDiv(
+                    terminalPrice -
+                        p.basePriceUsd1e18,
+                    1e18,
+                    p.slopeUsd1e18
+                );
+
+            anchorAtGraduation =
+                p.basePriceUsd1e18 +
+                Math.mulDiv(
+                    p.slopeUsd1e18,
+                    soldAtGraduation,
+                    1e18
+                );
+        }
+
+        if (
+            soldAtGraduation == 0 ||
+            anchorAtGraduation == 0
+        ) {
+            return (false, bytes32("ZERO_GRADUATION_OUTPUT"));
+        }
+
+        uint256 lpTokensAtGraduation =
+            Math.mulDiv(
+                p.graduationUsd1e18,
+                1e18,
+                anchorAtGraduation
+            );
+
+        uint256 minimumSupply =
+            Math.mulDiv(
+                soldAtGraduation +
+                    lpTokensAtGraduation,
+                BPS +
+                    MIN_GRADUATION_SUPPLY_BUFFER_BPS,
+                BPS
+            );
+
+        if (p.totalSupply < minimumSupply) {
+            return (false, bytes32("SUPPLY_TOO_SMALL"));
         }
 
         bytes memory nameBytes = bytes(p.name);

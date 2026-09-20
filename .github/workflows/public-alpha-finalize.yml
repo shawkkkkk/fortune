@@ -1,0 +1,214 @@
+name: Fortune Finalize Verified Public Alpha
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "contracts/public-alpha-finalize.trigger"
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      BSC_TESTNET_RPC_URL: ${{ secrets.BSC_TESTNET_RPC_URL }}
+
+      FORTUNE_FACTORY: "0x70641975E43c5807621146874022fd9d1b735AA1"
+      FORTUNE_TAX_FACTORY: "0xB4510F1F134B0582298934fdFbCc77bECED8d0f5"
+      FORTUNE_REGISTRY: "0x49eb59EB418b4552F56791ECe81338769e90fa19"
+      FORTUNE_POOL_REGISTRY: "0x7ac440219A1475Bdd0F1C88e1d4f8E1CA80Ecf35"
+      FORTUNE_V3_ADAPTER: "0x474f13dF3179cE7f26b3b3344b3E74643f6ebe2F"
+      FORTUNE_V3_LOCKER: "0xa502027AC3e7BF732ecce3108837837aC3559304"
+      FORTUNE_V2_TAX_ADAPTER: "0xAA1B2d5ebB6A5f212E1b7bDCd975cf866b2739Fb"
+      FORTUNE_V2_LOCKER: "0xB03ff39306449ab42bb8Af2CFF25B28B4E6E76e2"
+      FORTUNE_MOCK_QUOTE: "0x1bDcF1500866E273Cb11E99cC1832Aa2436Db17d"
+      FORTUNE_MOCK_ORACLE: "0x5fFafe2F42fd818f990c649ef001aff8b8EA5444"
+      LIFECYCLE_OPERATOR: "0xDB01B662E85f9a588fC5810b4889F1bF3F14ceaC"
+
+      PANCAKE_V2_FACTORY: "0xB7926C0430Afb07AA7DEfDE6DA862aE0Bde767bc"
+      PANCAKE_V2_ROUTER: "0x9ac64cc6e4415144c455bd8e4837fea55603e5c3"
+      PANCAKE_V3_FACTORY: "0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865"
+      PANCAKE_V3_POSITION_MANAGER: "0x427bF5b37357632377eCbEC9de3626C71A5396c1"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Verify completed onchain lifecycle state
+        run: |
+          set -euo pipefail
+          RPC="$BSC_TESTNET_RPC_URL"
+
+          test "$(cast chain-id --rpc-url "$RPC")" = "97"
+
+          for ADDRESS in \
+            "$FORTUNE_FACTORY" \
+            "$FORTUNE_TAX_FACTORY" \
+            "$FORTUNE_REGISTRY" \
+            "$FORTUNE_POOL_REGISTRY" \
+            "$FORTUNE_V3_ADAPTER" \
+            "$FORTUNE_V3_LOCKER" \
+            "$FORTUNE_V2_TAX_ADAPTER" \
+            "$FORTUNE_V2_LOCKER" \
+            "$FORTUNE_MOCK_QUOTE" \
+            "$FORTUNE_MOCK_ORACLE" \
+            "$LIFECYCLE_OPERATOR"
+          do
+            test "$(cast code "$ADDRESS" --rpc-url "$RPC")" != "0x"
+          done
+
+          for FLAG in \
+            standardLaunchPassed \
+            standardGraduationPassed \
+            taxLaunchPassed \
+            taxFirstBuyPassed \
+            taxGraduationPassed \
+            taxSellPassed
+          do
+            VALUE=$(cast call "$LIFECYCLE_OPERATOR" "$FLAG()(bool)" --rpc-url "$RPC")
+            echo "$FLAG=$VALUE"
+            test "$VALUE" = "true"
+          done
+
+          STANDARD_TOKEN=$(cast call "$LIFECYCLE_OPERATOR" "standardToken()(address)" --rpc-url "$RPC")
+          STANDARD_CURVE=$(cast call "$LIFECYCLE_OPERATOR" "standardCurve()(address)" --rpc-url "$RPC")
+          STANDARD_LP_TOKEN_ID=$(cast call "$LIFECYCLE_OPERATOR" "standardLpTokenId()(uint256)" --rpc-url "$RPC" | awk '{print $1}')
+          STANDARD_ANCHOR=$(cast call "$LIFECYCLE_OPERATOR" "standardAnchor()(uint256)" --rpc-url "$RPC" | awk '{print $1}')
+          STANDARD_POOL=$(cast call "$PANCAKE_V3_FACTORY" \
+            "getPool(address,address,uint24)(address)" \
+            "$STANDARD_TOKEN" "$FORTUNE_MOCK_QUOTE" 500 \
+            --rpc-url "$RPC")
+
+          STANDARD_GRADUATED=$(cast call "$STANDARD_CURVE" "graduated()(bool)" --rpc-url "$RPC")
+          STANDARD_PHASE=$(cast call "$STANDARD_CURVE" "phase()(uint8)" --rpc-url "$RPC" | awk '{print $1}')
+          STANDARD_LP_OWNER=$(cast call "$PANCAKE_V3_POSITION_MANAGER" "ownerOf(uint256)(address)" "$STANDARD_LP_TOKEN_ID" --rpc-url "$RPC")
+
+          test "$STANDARD_GRADUATED" = "true"
+          test "$STANDARD_PHASE" = "2"
+          test "${STANDARD_LP_OWNER,,}" = "${FORTUNE_V3_LOCKER,,}"
+          test "$STANDARD_POOL" != "0x0000000000000000000000000000000000000000"
+          test "$STANDARD_ANCHOR" -gt 0
+
+          TAX_TOKEN=$(cast call "$LIFECYCLE_OPERATOR" "taxToken()(address)" --rpc-url "$RPC")
+          TAX_CURVE=$(cast call "$LIFECYCLE_OPERATOR" "taxCurve()(address)" --rpc-url "$RPC")
+          TAX_PROCESSOR=$(cast call "$LIFECYCLE_OPERATOR" "taxProcessor()(address)" --rpc-url "$RPC")
+          TAX_DIVIDEND_VAULT=$(cast call "$LIFECYCLE_OPERATOR" "taxDividendVault()(address)" --rpc-url "$RPC")
+          TAX_POOL=$(cast call "$LIFECYCLE_OPERATOR" "taxPool()(address)" --rpc-url "$RPC")
+          TAX_LOCKED_LP=$(cast call "$LIFECYCLE_OPERATOR" "taxLockedLp()(uint256)" --rpc-url "$RPC" | awk '{print $1}')
+
+          TAX_GRADUATED=$(cast call "$TAX_CURVE" "graduated()(bool)" --rpc-url "$RPC")
+          TAX_PHASE=$(cast call "$TAX_CURVE" "phase()(uint8)" --rpc-url "$RPC" | awk '{print $1}')
+          TAX_OFFICIAL_POOL=$(cast call "$TAX_TOKEN" "officialPool()(address)" --rpc-url "$RPC")
+          TAX_ANTI_FARMER=$(cast call "$TAX_TOKEN" "antiFarmerActive()(bool)" --rpc-url "$RPC")
+          TAX_RECOGNIZED=$(cast call "$FORTUNE_POOL_REGISTRY" "isRecognizedPool(address)(bool)" "$TAX_POOL" --rpc-url "$RPC")
+
+          CURVE_TAX=$(cast call "$TAX_PROCESSOR" "totalCurveTaxRecorded()(uint256)" --rpc-url "$RPC" | awk '{print $1}')
+          DEX_PROCESSED=$(cast call "$TAX_PROCESSOR" "totalDexTaxTokensProcessed()(uint256)" --rpc-url "$RPC" | awk '{print $1}')
+          TOKENS_BURNED=$(cast call "$TAX_PROCESSOR" "totalTokensBurned()(uint256)" --rpc-url "$RPC" | awk '{print $1}')
+          DIVIDEND_EPOCHS=$(cast call "$TAX_DIVIDEND_VAULT" "epochCount()(uint256)" --rpc-url "$RPC" | awk '{print $1}')
+
+          test "$TAX_GRADUATED" = "true"
+          test "$TAX_PHASE" = "2"
+          test "${TAX_OFFICIAL_POOL,,}" = "${TAX_POOL,,}"
+          test "$TAX_ANTI_FARMER" = "true"
+          test "$TAX_RECOGNIZED" = "true"
+          test "$TAX_LOCKED_LP" -gt 0
+          test "$CURVE_TAX" -gt 0
+          test "$DEX_PROCESSED" -gt 0
+          test "$TOKENS_BURNED" -gt 0
+          test "$DIVIDEND_EPOCHS" -gt 0
+
+          echo "STANDARD_ONCHAIN_EXECUTION_COMPLETE_AND_SUCCESSFUL"
+          echo "TAX_ONCHAIN_EXECUTION_COMPLETE_AND_SUCCESSFUL"
+
+          cat > /tmp/fortune-final-public-alpha.env <<EOF
+          STANDARD_TOKEN=$STANDARD_TOKEN
+          STANDARD_CURVE=$STANDARD_CURVE
+          STANDARD_POOL=$STANDARD_POOL
+          STANDARD_LP_TOKEN_ID=$STANDARD_LP_TOKEN_ID
+          STANDARD_ANCHOR=$STANDARD_ANCHOR
+          TAX_TOKEN=$TAX_TOKEN
+          TAX_CURVE=$TAX_CURVE
+          TAX_POOL=$TAX_POOL
+          TAX_PROCESSOR=$TAX_PROCESSOR
+          TAX_DIVIDEND_VAULT=$TAX_DIVIDEND_VAULT
+          TAX_LOCKED_LP=$TAX_LOCKED_LP
+          CURVE_TAX=$CURVE_TAX
+          DEX_PROCESSED=$DEX_PROCESSED
+          TOKENS_BURNED=$TOKENS_BURNED
+          DIVIDEND_EPOCHS=$DIVIDEND_EPOCHS
+          EOF
+
+          cat /tmp/fortune-final-public-alpha.env
+          cat /tmp/fortune-final-public-alpha.env >> "$GITHUB_ENV"
+
+      - name: Publish verified stack to website
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PY'
+          import os, re
+          from pathlib import Path
+
+          path = Path("lib/public-testnet.ts")
+          text = path.read_text()
+
+          replacements = {
+              "factory": os.environ["FORTUNE_FACTORY"],
+              "taxFactory": os.environ["FORTUNE_TAX_FACTORY"],
+              "registry": os.environ["FORTUNE_REGISTRY"],
+              "poolRegistry": os.environ["FORTUNE_POOL_REGISTRY"],
+              "graduationAdapter": os.environ["FORTUNE_V3_ADAPTER"],
+              "liquidityLocker": os.environ["FORTUNE_V3_LOCKER"],
+              "taxGraduationAdapter": os.environ["FORTUNE_V2_TAX_ADAPTER"],
+              "taxLiquidityLocker": os.environ["FORTUNE_V2_LOCKER"],
+              "mockQuote": os.environ["FORTUNE_MOCK_QUOTE"],
+              "referenceCurve": os.environ["STANDARD_CURVE"],
+              "referenceToken": os.environ["STANDARD_TOKEN"],
+              "referencePool": os.environ["STANDARD_POOL"],
+              "pancakeV2Factory": os.environ["PANCAKE_V2_FACTORY"],
+              "pancakeV2Router": os.environ["PANCAKE_V2_ROUTER"],
+              "pancakeV3Factory": os.environ["PANCAKE_V3_FACTORY"],
+              "pancakeV3PositionManager": os.environ["PANCAKE_V3_POSITION_MANAGER"],
+              "referenceTaxToken": os.environ["TAX_TOKEN"],
+              "referenceTaxCurve": os.environ["TAX_CURVE"],
+              "referenceTaxPool": os.environ["TAX_POOL"],
+          }
+
+          for key, value in replacements.items():
+              pattern = rf'(\s+{re.escape(key)}:\s*)"[^"]*"'
+              text, count = re.subn(pattern, rf'\1"{value}"', text, count=1)
+              if count != 1:
+                  raise SystemExit(f"Could not update {key}")
+
+          text, count = re.subn(
+              r'(referenceLpTokenId:\s*)\d+',
+              rf'\g<1>{os.environ["STANDARD_LP_TOKEN_ID"]}',
+              text,
+              count=1,
+          )
+          if count != 1:
+              raise SystemExit("Could not update referenceLpTokenId")
+
+          path.write_text(text)
+          PY
+
+          git config user.name "fortune-public-alpha"
+          git config user.email "actions@users.noreply.github.com"
+          git add lib/public-testnet.ts
+
+          if git diff --cached --quiet; then
+            echo "Website already points at this verified stack."
+          else
+            git commit -m "Publish fully verified Fortune public alpha stack"
+            git push origin HEAD:main
+          fi
+
+      - name: Upload final verification evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: fortune-final-public-alpha-verification
+          path: /tmp/fortune-final-public-alpha.env
+          retention-days: 30

@@ -28,10 +28,20 @@ export const FORTUNE_NETWORK = {
       (configuredChainId === PUBLIC_TESTNET.chainId
         ? PUBLIC_TESTNET.contracts.factory
         : ""),
+    taxFactory:
+      process.env.NEXT_PUBLIC_FORTUNE_TAX_FACTORY_ADDRESS ||
+      (configuredChainId === PUBLIC_TESTNET.chainId
+        ? PUBLIC_TESTNET.contracts.taxFactory
+        : ""),
     registry:
       process.env.NEXT_PUBLIC_FORTUNE_REGISTRY_ADDRESS ||
       (configuredChainId === PUBLIC_TESTNET.chainId
         ? PUBLIC_TESTNET.contracts.registry
+        : ""),
+    poolRegistry:
+      process.env.NEXT_PUBLIC_FORTUNE_POOL_REGISTRY_ADDRESS ||
+      (configuredChainId === PUBLIC_TESTNET.chainId
+        ? PUBLIC_TESTNET.contracts.poolRegistry
         : ""),
     graduationAdapter:
       process.env.NEXT_PUBLIC_FORTUNE_GRADUATION_ADAPTER_ADDRESS ||
@@ -42,6 +52,16 @@ export const FORTUNE_NETWORK = {
       process.env.NEXT_PUBLIC_FORTUNE_LIQUIDITY_LOCKER_ADDRESS ||
       (configuredChainId === PUBLIC_TESTNET.chainId
         ? PUBLIC_TESTNET.contracts.liquidityLocker
+        : ""),
+    taxGraduationAdapter:
+      process.env.NEXT_PUBLIC_FORTUNE_TAX_GRADUATION_ADAPTER_ADDRESS ||
+      (configuredChainId === PUBLIC_TESTNET.chainId
+        ? PUBLIC_TESTNET.contracts.taxGraduationAdapter
+        : ""),
+    taxLiquidityLocker:
+      process.env.NEXT_PUBLIC_FORTUNE_TAX_LIQUIDITY_LOCKER_ADDRESS ||
+      (configuredChainId === PUBLIC_TESTNET.chainId
+        ? PUBLIC_TESTNET.contracts.taxLiquidityLocker
         : ""),
   },
   primaryQuote: {
@@ -68,4 +88,14 @@ export const FORTUNE_NETWORK_CONFIGURED =
       FORTUNE_NETWORK.contracts.graduationAdapter &&
       FORTUNE_NETWORK.contracts.liquidityLocker &&
       FORTUNE_NETWORK.primaryQuote.address
+  );
+
+
+export const FORTUNE_TAX_NETWORK_CONFIGURED =
+  FORTUNE_NETWORK_CONFIGURED &&
+  Boolean(
+    FORTUNE_NETWORK.contracts.taxFactory &&
+      FORTUNE_NETWORK.contracts.poolRegistry &&
+      FORTUNE_NETWORK.contracts.taxGraduationAdapter &&
+      FORTUNE_NETWORK.contracts.taxLiquidityLocker
   );

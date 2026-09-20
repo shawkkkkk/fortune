@@ -11,3 +11,5 @@ Retry 2: split tax launch and creator first buy into separate BSC transactions.
 Retry 3: precompute vanity salts via eth_call so launch transactions stay below BSC gas cap.
 
 Release verification rerun: launch-hardening + recovery + full-stack readiness gate.
+
+Final launch gate rerun after race-safe publish fix.

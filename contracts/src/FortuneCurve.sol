@@ -255,10 +255,46 @@ contract FortuneCurve is ReentrancyGuard {
         ) = _feesForGross(quoteSpent, shieldBps, feeBps);
         usdIn = registry.usdValue(quoteAsset, netQuote);
 
-        uint256 remainingUsd = graduationUsd1e18 - reserveUsdBefore;
+        uint256 remainingUsd =
+            graduationUsd1e18 -
+            reserveUsdBefore;
+
+        if (!adaptiveGraduation) {
+            uint256 targetAssetUsd =
+                fixedTargetReserveUsd(
+                    quoteAsset
+                );
+            uint256 assetUsdBefore =
+                registry.usdValue(
+                    quoteAsset,
+                    reserve(quoteAsset)
+                );
+
+            require(
+                assetUsdBefore <
+                    targetAssetUsd,
+                "FIXED_ASSET_FILLED"
+            );
+
+            uint256 assetRemainingUsd =
+                targetAssetUsd -
+                assetUsdBefore;
+
+            if (
+                assetRemainingUsd <
+                remainingUsd
+            ) {
+                remainingUsd =
+                    assetRemainingUsd;
+            }
+        }
+
         if (usdIn > remainingUsd) {
             uint256 targetNetQuote =
-                registry.tokenAmountForUsd(quoteAsset, remainingUsd);
+                registry.tokenAmountForUsdCeil(
+                    quoteAsset,
+                    remainingUsd
+                );
 
             quoteSpent = _grossForNet(
                 targetNetQuote,
@@ -606,37 +642,162 @@ contract FortuneCurve is ReentrancyGuard {
         _checkGraduation();
     }
 
-    function graduationWeights() public view returns (uint16[] memory weights) {
-        weights = new uint16[](quoteAssets.length);
+    /// @notice Exact USD target for one reserve in Fixed Basket mode.
+    /// @dev Rounding remainder is assigned to the last configured asset so all
+    ///      fixed targets sum exactly to the graduation threshold.
+    function fixedTargetReserveUsd(address asset)
+        public
+        view
+        returns (uint256 targetUsd)
+    {
+        require(
+            acceptedQuote[asset],
+            "QUOTE_NOT_ACCEPTED"
+        );
+
+        uint256 assigned;
+        for (
+            uint256 i;
+            i < quoteAssets.length;
+            ++i
+        ) {
+            address current =
+                quoteAssets[i];
+
+            uint256 currentTarget;
+            if (
+                i ==
+                quoteAssets.length - 1
+            ) {
+                currentTarget =
+                    graduationUsd1e18 -
+                    assigned;
+            } else {
+                currentTarget =
+                    Math.mulDiv(
+                        graduationUsd1e18,
+                        fixedWeightBps[
+                            current
+                        ],
+                        BPS
+                    );
+                assigned += currentTarget;
+            }
+
+            if (current == asset) {
+                return currentTarget;
+            }
+        }
+
+        revert("QUOTE_NOT_ACCEPTED");
+    }
+
+    function graduationWeights()
+        public
+        view
+        returns (
+            uint16[] memory weights
+        )
+    {
+        weights =
+            new uint16[](
+                quoteAssets.length
+            );
 
         if (!adaptiveGraduation) {
-            for (uint256 i; i < quoteAssets.length; ++i) {
-                weights[i] = fixedWeightBps[quoteAssets[i]];
+            for (
+                uint256 i;
+                i < quoteAssets.length;
+                ++i
+            ) {
+                weights[i] =
+                    fixedWeightBps[
+                        quoteAssets[i]
+                    ];
             }
             return weights;
         }
 
         uint256 totalUsd;
-        uint256[] memory values = new uint256[](quoteAssets.length);
-        for (uint256 i; i < quoteAssets.length; ++i) {
-            values[i] = registry.usdValue(quoteAssets[i], reserve(quoteAssets[i]));
-            totalUsd += values[i];
+        uint256[] memory values =
+            new uint256[](
+                quoteAssets.length
+            );
+
+        uint256 lastNonzeroIndex;
+        bool foundNonzero;
+
+        for (
+            uint256 i;
+            i < quoteAssets.length;
+            ++i
+        ) {
+            uint256 amount =
+                reserve(
+                    quoteAssets[i]
+                );
+
+            if (amount == 0) {
+                values[i] = 0;
+                continue;
+            }
+
+            values[i] =
+                registry.usdValue(
+                    quoteAssets[i],
+                    amount
+                );
+
+            if (values[i] > 0) {
+                totalUsd += values[i];
+                lastNonzeroIndex = i;
+                foundNonzero = true;
+            }
         }
 
-        if (totalUsd == 0) {
-            for (uint256 i; i < quoteAssets.length; ++i) {
-                weights[i] = fixedWeightBps[quoteAssets[i]];
+        if (!foundNonzero) {
+            for (
+                uint256 i;
+                i < quoteAssets.length;
+                ++i
+            ) {
+                weights[i] =
+                    fixedWeightBps[
+                        quoteAssets[i]
+                    ];
             }
             return weights;
         }
 
         uint256 assigned;
-        for (uint256 i; i < quoteAssets.length; ++i) {
-            if (i == quoteAssets.length - 1) {
-                weights[i] = uint16(BPS - assigned);
+        for (
+            uint256 i;
+            i < quoteAssets.length;
+            ++i
+        ) {
+            if (values[i] == 0) {
+                weights[i] = 0;
+                continue;
+            }
+
+            if (i == lastNonzeroIndex) {
+                weights[i] =
+                    uint16(
+                        BPS -
+                            assigned
+                    );
             } else {
-                uint16 weight = uint16(values[i] * BPS / totalUsd);
-                weights[i] = weight;
+                uint16 weight =
+                    uint16(
+                        Math.mulDiv(
+                            values[i],
+                            BPS,
+                            totalUsd
+                        )
+                    );
+
+                weights[i] =
+                    weight;
                 assigned += weight;
             }
         }

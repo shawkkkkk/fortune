@@ -105,6 +105,22 @@ Filters:
 - `cursor`
 - `limit`
 
+### POST /assets/check
+
+Inspects an arbitrary BSC contract address through the configured BSC RPC.
+
+It reports:
+- contract-code presence;
+- readable name/symbol;
+- decimals;
+- raw total supply;
+- static ERC-20 compatibility;
+- whether the address is currently known to Fortune;
+- quote/graduation capability state;
+- runtime checks still required.
+
+Passing these static checks does not automatically approve an asset. Fee-on-transfer, rebasing/share accounting, blacklist/pause behavior, oracle coverage, external liquidity and graduation compatibility remain explicit gates.
+
 ### GET /pairs
 
 Quote-asset view of the registry.

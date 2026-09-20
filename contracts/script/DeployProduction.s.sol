@@ -178,6 +178,10 @@ contract DeployProduction is Script {
         );
         factory.setGraduationAdapter(address(adapter));
 
+        // Production deploys closed. Governance must explicitly activate
+        // launches after ownership acceptance and final release checks.
+        factory.setLaunchesPaused(true);
+
         // Ownable2Step deliberately leaves the deployer as owner until the
         // governance address explicitly accepts ownership onchain.
         oracle.transferOwnership(governance);
@@ -202,6 +206,8 @@ contract DeployProduction is Script {
         console2.log("FortunePancakeV3GraduationAdapter", address(adapter));
         console2.log("PancakeV3Factory", pancakeV3Factory);
         console2.log("PancakeV3PositionManager", positionManager);
+        console2.log("LaunchesPaused", factory.launchesPaused());
         console2.log("IMPORTANT: governance must accept Ownable2Step ownership");
+        console2.log("IMPORTANT: production launches remain paused until explicit activation");
     }
 }

@@ -16,10 +16,10 @@ export default function ExplorePage() {
           <div className="heroBrandLockup">
             <FortuneLogo size="lg" />
           </div>
-          <div className="eyebrow">FORTUNE PUBLIC BSC TESTNET BETA</div>
+          <div className="eyebrow">FORTUNE PUBLIC BSC TESTNET ALPHA</div>
           <h1>Launch against anything. Test it for real.</h1>
           <p>
-            Fortune is now running an onchain public beta on BNB Smart Chain
+            Fortune is now running an onchain public alpha on BNB Smart Chain
             Testnet. Create a real Fortune test token, trade its curve with
             valueless mock fUSD, and graduate it into a real Pancake V3
             testnet pool.
@@ -33,7 +33,7 @@ export default function ExplorePage() {
             </Link>
           </div>
           <p className="dataDisclaimer">
-            Public beta only. The contracts are pre-audit and mainnet remains
+            Public alpha only. The contracts are pre-audit and mainnet remains
             disabled. Do not use real funds.
           </p>
         </div>
@@ -60,7 +60,7 @@ export default function ExplorePage() {
         <div className="sectionHeader">
           <div>
             <span className="eyebrow">WHAT IS LIVE</span>
-            <h2>One narrow, real beta path.</h2>
+            <h2>One narrow, real alpha path.</h2>
           </div>
         </div>
 
@@ -91,7 +91,7 @@ export default function ExplorePage() {
       <section className="panel">
         <div className="panelTitle">
           <div>
-            <span className="eyebrow">PUBLIC BETA DEPLOYMENT</span>
+            <span className="eyebrow">PUBLIC ALPHA DEPLOYMENT</span>
             <h2>Verify the contracts yourself.</h2>
           </div>
           <a
@@ -125,7 +125,7 @@ export default function ExplorePage() {
 
       <section className="registryStrip">
         <div>
-          <span className="eyebrow">BETA SCOPE</span>
+          <span className="eyebrow">ALPHA SCOPE</span>
           <h2>No fake markets or fake volume.</h2>
         </div>
         <div className="registryCategories">

@@ -111,7 +111,10 @@ contract FortunePublicLifecycleOperator {
         );
     }
 
-    function runStandardLaunch()
+    function runStandardLaunch(
+        bytes32 salt,
+        address predictedToken
+    )
         external
         returns (address token, address curve)
     {
@@ -119,51 +122,8 @@ contract FortunePublicLifecycleOperator {
 
         mockQuote.faucet(500e18);
 
-        address[] memory quoteAssets = new address[](1);
-        quoteAssets[0] = address(mockQuote);
-
-        uint16[] memory weights = new uint16[](1);
-        weights[0] = 10_000;
-
-        uint16[6] memory fees = [
-            uint16(25),
-            uint16(25),
-            uint16(25),
-            uint16(15),
-            uint16(0),
-            uint16(10)
-        ];
-
         FortuneFactory.LaunchParams memory p =
-            FortuneFactory.LaunchParams({
-                name: "Fortune Standard Public Alpha",
-                symbol: "FSTD",
-                totalSupply: 1_000_000_000e18,
-                quoteAssets: quoteAssets,
-                weightsBps: weights,
-                primaryQuote: address(mockQuote),
-                basePriceUsd1e18: 1e15,
-                slopeUsd1e18: 1e6,
-                graduationUsd1e18: 1e18,
-                adaptiveGraduation: true,
-                feeBps: fees,
-                treasury: address(this),
-                metadataEditable: false,
-                description: "Fortune real BSC testnet standard lifecycle proof",
-                imageURI: "",
-                website: "",
-                xProfile: "",
-                telegram: "",
-                github: "",
-                youtube: "",
-                debox: ""
-            });
-
-        (
-            bytes32 salt,
-            address predictedToken,
-            ,
-        ) = standardFactory.previewPreparedVanity(address(this), p);
+            _standardParams();
 
         standardLockIndex = v3Locker.lockedPositionCount();
 
@@ -253,62 +213,17 @@ contract FortunePublicLifecycleOperator {
         standardGraduationPassed = true;
     }
 
-    function runTaxLaunch()
+    function runTaxLaunch(
+        bytes32 salt,
+        address predictedToken
+    )
         external
         returns (address token, address curve)
     {
         require(!taxLaunchPassed, "TAX_ALREADY_RUN");
 
-        uint16[6] memory baseFees = [
-            uint16(25),
-            uint16(25),
-            uint16(25),
-            uint16(15),
-            uint16(0),
-            uint16(10)
-        ];
-
-        uint16[7] memory taxAllocation = [
-            uint16(2_000),
-            uint16(1_000),
-            uint16(2_000),
-            uint16(2_000),
-            uint16(1_500),
-            uint16(500),
-            uint16(1_000)
-        ];
-
         FortuneTaxFactory.TaxLaunchParams memory p =
-            FortuneTaxFactory.TaxLaunchParams({
-                name: "Fortune Tax Public Alpha",
-                symbol: "FTAX",
-                totalSupply: 1_000_000_000e18,
-                quoteAsset: address(mockQuote),
-                basePriceUsd1e18: 1e15,
-                slopeUsd1e18: 1e6,
-                graduationUsd1e18: 1e18,
-                feeBps: baseFees,
-                treasury: address(this),
-                buyTaxBps: 200,
-                sellTaxBps: 300,
-                antiFarmerDuration: 30 days,
-                minimumDividendBalance: 100e18,
-                taxAllocationBps: taxAllocation,
-                description: "Fortune real BSC testnet tax lifecycle proof",
-                imageURI: "",
-                website: "",
-                xProfile: "",
-                telegram: "",
-                github: "",
-                youtube: "",
-                debox: ""
-            });
-
-        (
-            bytes32 salt,
-            address predictedToken,
-            ,
-        ) = taxFactory.previewPreparedVanity(address(this), p);
+            _taxParams();
 
         FortuneTaxFactory.LaunchInfo memory info =
             taxFactory.createLaunchPrepared(
@@ -456,6 +371,139 @@ contract FortunePublicLifecycleOperator {
         );
 
         taxSellPassed = true;
+    }
+
+    function previewStandardLaunch()
+        external
+        view
+        returns (
+            bytes32 salt,
+            address predictedToken
+        )
+    {
+        FortuneFactory.LaunchParams memory p =
+            _standardParams();
+
+        (salt, predictedToken, , ) =
+            standardFactory.previewPreparedVanity(
+                address(this),
+                p
+            );
+    }
+
+    function previewTaxLaunch()
+        external
+        view
+        returns (
+            bytes32 salt,
+            address predictedToken
+        )
+    {
+        FortuneTaxFactory.TaxLaunchParams memory p =
+            _taxParams();
+
+        (salt, predictedToken, , ) =
+            taxFactory.previewPreparedVanity(
+                address(this),
+                p
+            );
+    }
+
+    function _standardParams()
+        internal
+        view
+        returns (FortuneFactory.LaunchParams memory p)
+    {
+        address[] memory quoteAssets =
+            new address[](1);
+        quoteAssets[0] = address(mockQuote);
+
+        uint16[] memory weights =
+            new uint16[](1);
+        weights[0] = 10_000;
+
+        uint16[6] memory fees = [
+            uint16(25),
+            uint16(25),
+            uint16(25),
+            uint16(15),
+            uint16(0),
+            uint16(10)
+        ];
+
+        p = FortuneFactory.LaunchParams({
+            name: "Fortune Standard Public Alpha",
+            symbol: "FSTD",
+            totalSupply: 1_000_000_000e18,
+            quoteAssets: quoteAssets,
+            weightsBps: weights,
+            primaryQuote: address(mockQuote),
+            basePriceUsd1e18: 1e15,
+            slopeUsd1e18: 1e6,
+            graduationUsd1e18: 1e18,
+            adaptiveGraduation: true,
+            feeBps: fees,
+            treasury: address(this),
+            metadataEditable: false,
+            description: "Fortune real BSC testnet standard lifecycle proof",
+            imageURI: "",
+            website: "",
+            xProfile: "",
+            telegram: "",
+            github: "",
+            youtube: "",
+            debox: ""
+        });
+    }
+
+    function _taxParams()
+        internal
+        view
+        returns (FortuneTaxFactory.TaxLaunchParams memory p)
+    {
+        uint16[6] memory baseFees = [
+            uint16(25),
+            uint16(25),
+            uint16(25),
+            uint16(15),
+            uint16(0),
+            uint16(10)
+        ];
+
+        uint16[7] memory taxAllocation = [
+            uint16(2_000),
+            uint16(1_000),
+            uint16(2_000),
+            uint16(2_000),
+            uint16(1_500),
+            uint16(500),
+            uint16(1_000)
+        ];
+
+        p = FortuneTaxFactory.TaxLaunchParams({
+            name: "Fortune Tax Public Alpha",
+            symbol: "FTAX",
+            totalSupply: 1_000_000_000e18,
+            quoteAsset: address(mockQuote),
+            basePriceUsd1e18: 1e15,
+            slopeUsd1e18: 1e6,
+            graduationUsd1e18: 1e18,
+            feeBps: baseFees,
+            treasury: address(this),
+            buyTaxBps: 200,
+            sellTaxBps: 300,
+            antiFarmerDuration: 30 days,
+            minimumDividendBalance: 100e18,
+            taxAllocationBps: taxAllocation,
+            description: "Fortune real BSC testnet tax lifecycle proof",
+            imageURI: "",
+            website: "",
+            xProfile: "",
+            telegram: "",
+            github: "",
+            youtube: "",
+            debox: ""
+        });
     }
 
     function verifyTaxProcessing()

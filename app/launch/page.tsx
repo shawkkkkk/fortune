@@ -94,7 +94,7 @@ export default function LaunchPage() {
   }, [activeCategory, chinaStocks.length]);
 
   useEffect(() => {
-    if (activeCategory !== "NASDAQ Microcaps") return;
+    if (activeCategory !== "NASDAQ Penny Stocks") return;
 
     const ticker = query.trim().toUpperCase();
     if (!ticker) {
@@ -151,7 +151,7 @@ export default function LaunchPage() {
           (stock.underlyingCompany || stock.underlyingTicker) +
           " · " +
           stock.provider,
-        category: "NASDAQ Microcaps",
+        category: "NASDAQ Penny Stocks",
         icon: "NQ",
         chain: "BSC",
         verification: stock.pairable ? "Provider Verified" : "Unavailable",
@@ -239,13 +239,13 @@ export default function LaunchPage() {
               value={query}
               onChange={(e)=>setQuery(e.target.value)}
               placeholder={
-                activeCategory === "NASDAQ Microcaps"
+                activeCategory === "NASDAQ Penny Stocks"
                   ? "Enter any NASDAQ ticker, e.g. FAMI"
                   : "Search approved BSC assets by symbol or name"
               }
             />
 
-            {activeCategory==="NASDAQ Microcaps" && (
+            {activeCategory==="NASDAQ Penny Stocks" && (
               <div className="registryNotice">
                 <strong>NASDAQ → BNB stock-token lookup</strong>
                 <span>
@@ -254,7 +254,7 @@ export default function LaunchPage() {
               </div>
             )}
 
-            {activeCategory==="NASDAQ Microcaps" && nasdaqUnderlying && (
+            {activeCategory==="NASDAQ Penny Stocks" && nasdaqUnderlying && (
               <div className="selectedBasket">
                 <div className="selectedBasketHeader">
                   <strong>{nasdaqUnderlying.companyName || nasdaqUnderlying.symbol}</strong>
@@ -304,13 +304,13 @@ export default function LaunchPage() {
                   </button>
                 );
               })}
-              {activeCategory==="NASDAQ Microcaps" && nasdaqLoading && (
+              {activeCategory==="NASDAQ Penny Stocks" && nasdaqLoading && (
                 <div className="customAssetBox">
                   <strong>Checking NASDAQ and BNB tokenized-stock providers…</strong>
                 </div>
               )}
 
-              {activeCategory==="NASDAQ Microcaps" &&
+              {activeCategory==="NASDAQ Penny Stocks" &&
                 !nasdaqLoading &&
                 query.trim() &&
                 nasdaqResults.length === 0 && (

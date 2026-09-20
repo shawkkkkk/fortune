@@ -11,7 +11,7 @@ Fortune is a BNB Smart Chain launch protocol built around a shared **multi-asset
 ### Web product
 
 - **Explore** — launch discovery with basket/reward/graduation metadata
-- **Launch** — interactive 1–5 asset Basket wizard, fee routing, rewards, dev buy and immutable manifest preview
+- **Launch** — Basket Curve, **Stock Floor**, and experimental **Pre-IPO Perp** launch engines; fee routing, rewards, dev buy and immutable manifest preview
 - **Assets** — transparent Fortune Asset Registry UI
 - **Forum** — market-native discussion feed with attached launch cards
 - **Analytics** — protocol, basket, graduation and fee-routing analytics surfaces
@@ -30,6 +30,8 @@ Demo market/analytics values are deliberately marked as placeholders until oncha
 - `FortuneChainlinkOracle` — configurable USD feed adapter
 - `FortuneFactory` — creates token + curve + immutable fee router and embeds a Launch Manifest hash
 - `FortuneCurve` — experimental shared curve accepting 1–5 quote assets
+- `FortuneStockFloorVault` — reserve-backed pro-rata redemption floor for stock-token launches
+- `FortunePerpReferenceRegistry` — approved external-perp reference markets, oracle freshness and multiplier/depth limits
 - `FortuneFeeRouter` — immutable per-launch absolute-bps Fee Matrix
 - `FortuneAutomationRegistry` — purpose-scoped allowlist for automation adapters
 - `FortuneAutomationVault` — restricted holder-reward / buyback / LP automation vault primitive
@@ -166,7 +168,7 @@ Before mainnet:
 7. indexer + reproducible analytics;
 8. legal/compliance review for tokenized securities/RWAs and regional restrictions.
 
-See `docs/SECURITY.md` and `docs/ARCHITECTURE.md`.
+See `docs/SECURITY.md`, `docs/ARCHITECTURE.md`, and `docs/LAUNCH_ENGINES.md`.
 
 ## License
 

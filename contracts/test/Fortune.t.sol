@@ -59,13 +59,24 @@ contract MockRebaseToken is ERC20 {
 
 contract MockFortuneOracle is IFortunePriceOracle {
     mapping(address => uint256) public prices;
+    mapping(address => uint256) public timestamps;
 
     function setPrice(address asset, uint256 price) external {
         prices[asset] = price;
+        timestamps[asset] = block.timestamp;
+    }
+
+    function setPriceAt(
+        address asset,
+        uint256 price,
+        uint256 timestamp
+    ) external {
+        prices[asset] = price;
+        timestamps[asset] = timestamp;
     }
 
     function priceUsd(address asset) external view returns (uint256, uint256) {
-        return (prices[asset], block.timestamp);
+        return (prices[asset], timestamps[asset]);
     }
 }
 
@@ -166,6 +177,41 @@ contract FortuneTest is Test {
         });
     }
 
+    function testLaunchPreflightPassesOnlyWithHealthyGraduationStack() public {
+        FortuneFactory.LaunchParams memory p = _params(1_000e18);
+
+        (bool ready, bytes32 reason) = factory.preflightLaunch(p);
+        assertTrue(ready);
+        assertEq(reason, bytes32("OK"));
+
+        vm.warp(block.timestamp + 2 hours);
+        (ready, reason) = factory.preflightLaunch(p);
+
+        assertFalse(ready);
+        assertEq(reason, bytes32("STALE_PRICE"));
+    }
+
+    function testLaunchPreflightRejectsDuplicateQuoteAssets() public {
+        FortuneFactory.LaunchParams memory p = _params(1_000e18);
+        p.quoteAssets[1] = p.quoteAssets[0];
+
+        (bool ready, bytes32 reason) = factory.preflightLaunch(p);
+
+        assertFalse(ready);
+        assertEq(reason, bytes32("DUPLICATE_QUOTE"));
+    }
+
+    function testLaunchPreflightRejectsMissingTreasuryRoute() public {
+        FortuneFactory.LaunchParams memory p = _params(1_000e18);
+        p.feeBps[4] = 1;
+        p.treasury = address(0);
+
+        (bool ready, bytes32 reason) = factory.preflightLaunch(p);
+
+        assertFalse(ready);
+        assertEq(reason, bytes32("TREASURY_REQUIRED"));
+    }
+
     function testEveryFortuneTokenAddressEndsInFe() public {
         FortuneFactory.LaunchInfo memory first =
             factory.createLaunch(_params(1_000e18));
@@ -243,6 +289,73 @@ contract FortuneTest is Test {
         vm.stopPrank();
 
         assertGt(out, 0);
+    }
+
+    function testFuzzBuyPreviewConservesInput(uint96 rawAmount) public {
+        uint256 amountIn = bound(
+            uint256(rawAmount),
+            1e15,
+            1_000e18
+        );
+
+        FortuneFactory.LaunchInfo memory info =
+            factory.createLaunch(_params(10_000e18));
+        FortuneCurve curve = FortuneCurve(info.curve);
+
+        vm.warp(block.timestamp + 16);
+        usdt.mint(user, amountIn);
+
+        (
+            uint256 spent,
+            uint256 refund,
+            uint256 shieldTax,
+            uint256 normalFee,
+            uint256 netQuote,
+            ,
+            uint256 tokensOut
+        ) = curve.previewBuy(address(usdt), amountIn);
+
+        assertEq(spent + refund, amountIn);
+        assertEq(
+            shieldTax + normalFee + netQuote,
+            spent
+        );
+        assertGt(tokensOut, 0);
+    }
+
+    function testFuzzBuyThenSellCannotCreateFreeUsdt(uint96 rawAmount) public {
+        uint256 amountIn = bound(
+            uint256(rawAmount),
+            1e18,
+            100e18
+        );
+
+        FortuneFactory.LaunchInfo memory info =
+            factory.createLaunch(_params(100_000e18));
+        FortuneCurve curve = FortuneCurve(info.curve);
+
+        vm.warp(block.timestamp + 16);
+        usdt.mint(user, amountIn);
+
+        uint256 beforeBalance = usdt.balanceOf(user);
+
+        vm.startPrank(user);
+        usdt.approve(address(curve), type(uint256).max);
+        FortuneToken(info.token).approve(
+            address(curve),
+            type(uint256).max
+        );
+
+        uint256 bought =
+            curve.buy(address(usdt), amountIn, 1);
+
+        curve.sell(address(usdt), bought, 0);
+        vm.stopPrank();
+
+        assertLe(
+            usdt.balanceOf(user),
+            beforeBalance
+        );
     }
 
     function testTwoQuoteAssetsMoveOneCurve() public {

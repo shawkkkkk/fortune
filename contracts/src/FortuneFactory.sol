@@ -43,6 +43,9 @@ contract FortuneFactory is Ownable2Step {
         string website;
         string xProfile;
         string telegram;
+        string github;
+        string youtube;
+        string debox;
     }
 
     struct LaunchInfo {
@@ -363,7 +366,10 @@ contract FortuneFactory is Ownable2Step {
             bytes(p.imageURI).length > 512 ||
             bytes(p.website).length > 512 ||
             bytes(p.xProfile).length > 512 ||
-            bytes(p.telegram).length > 512
+            bytes(p.telegram).length > 512 ||
+            bytes(p.github).length > 512 ||
+            bytes(p.youtube).length > 512 ||
+            bytes(p.debox).length > 512
         ) {
             return (false, bytes32("METADATA_TOO_LONG"));
         }
@@ -592,7 +598,10 @@ contract FortuneFactory is Ownable2Step {
                 imageURI: p.imageURI,
                 website: p.website,
                 xProfile: p.xProfile,
-                telegram: p.telegram
+                telegram: p.telegram,
+                github: p.github,
+                youtube: p.youtube,
+                debox: p.debox
             })
         );
 
@@ -761,7 +770,10 @@ contract FortuneFactory is Ownable2Step {
                     p.imageURI,
                     p.website,
                     p.xProfile,
-                    p.telegram
+                    p.telegram,
+                    p.github,
+                    p.youtube,
+                    p.debox
                 )
             );
     }

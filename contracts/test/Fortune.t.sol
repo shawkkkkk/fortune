@@ -1592,6 +1592,7 @@ contract FortuneTest is Test {
 
     function testStockFloorVaultProvidesProRataRedemption() public {
         FortuneToken meme = new FortuneToken(
+            address(this),
             "Stock Floor Meme",
             "SFM",
             1_000e18,

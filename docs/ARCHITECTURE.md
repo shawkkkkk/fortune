@@ -108,3 +108,18 @@ Onchain events are the source of truth for production analytics. A future indexe
 - automation execution events
 
 The demo frontend currently uses mock values and labels them accordingly.
+
+
+## Vanity token addresses
+
+All `FortuneToken` deployments use CREATE2 and are required to end in the byte `0xfe`.
+
+The factory:
+1. increments a creator-specific launch nonce;
+2. includes that nonce in the immutable Launch Manifest hash;
+3. computes the FortuneToken init-code hash;
+4. searches deterministic CREATE2 salts for an address whose least-significant byte is `0xfe`;
+5. deploys with the matching salt;
+6. verifies the resulting address before continuing the launch.
+
+The suffix is branding only. It does not grant security, verification, or special EVM privileges. Users should still verify that a token was emitted by the canonical FortuneFactory.

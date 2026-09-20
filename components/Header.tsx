@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useLanguage } from "@/components/LanguageProvider";
 import FortuneLogo from "@/components/FortuneLogo";
+import { useTheme } from "@/components/ThemeProvider";
 import { PUBLIC_TESTNET } from "@/lib/public-testnet";
 
 type InjectedEthereum = {
@@ -74,6 +75,7 @@ export default function Header() {
   const [chainId, setChainId] = useState("");
   const [connecting, setConnecting] = useState(false);
   const { language, setLanguage } = useLanguage();
+  const { theme, toggleTheme } = useTheme();
 
   useEffect(() => {
     const ethereum = window.ethereum;
@@ -180,6 +182,16 @@ export default function Header() {
         </nav>
 
         <div className="headerActions">
+          <button
+            className="themeToggle"
+            type="button"
+            onClick={toggleTheme}
+            aria-label={theme === "light" ? "Dark mode" : "Light mode"}
+            title={theme === "light" ? "Dark mode" : "Light mode"}
+          >
+            <span aria-hidden="true">{theme === "light" ? "☾" : "☀"}</span>
+          </button>
+
           <div
             className="languageSwitch"
             role="group"

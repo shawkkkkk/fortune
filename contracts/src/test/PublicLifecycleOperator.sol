@@ -58,6 +58,7 @@ contract FortunePublicLifecycleOperator {
     address public taxPool;
     uint256 public taxLockedLp;
     bool public taxLaunchPassed;
+    bool public taxFirstBuyPassed;
     bool public taxGraduationPassed;
     bool public taxSellPassed;
 
@@ -258,8 +259,6 @@ contract FortunePublicLifecycleOperator {
     {
         require(!taxLaunchPassed, "TAX_ALREADY_RUN");
 
-        mockQuote.faucet(500e18);
-
         uint16[6] memory baseFees = [
             uint16(25),
             uint16(25),
@@ -311,38 +310,16 @@ contract FortunePublicLifecycleOperator {
             ,
         ) = taxFactory.previewPreparedVanity(address(this), p);
 
-        mockQuote.approve(address(taxFactory), 250e18);
-
-        (
-            FortuneTaxFactory.LaunchInfo memory info,
-            uint256 tokensOut
-        ) = taxFactory.createLaunchPreparedAndBuy(
-            p,
-            salt,
-            250e18,
-            1
-        );
+        FortuneTaxFactory.LaunchInfo memory info =
+            taxFactory.createLaunchPrepared(
+                p,
+                salt
+            );
 
         require(
             info.token == predictedToken &&
                 uint8(uint160(info.token)) == uint8(0xfe),
             "BAD_TAX_TOKEN"
-        );
-        require(
-            tokensOut > 0 &&
-                FortuneTaxToken(info.token).balanceOf(address(this)) >= tokensOut,
-            "TAX_FIRST_BUY_FAILED"
-        );
-
-        FortuneTaxProcessor processor = FortuneTaxProcessor(info.taxProcessor);
-
-        require(
-            FortuneCurve(info.curve).graduationReady(),
-            "TAX_NOT_READY"
-        );
-        require(
-            processor.totalCurveTaxRecorded() > 0,
-            "CURVE_TAX_MISSING"
         );
 
         taxToken = info.token;
@@ -352,6 +329,47 @@ contract FortunePublicLifecycleOperator {
         taxLaunchPassed = true;
 
         return (info.token, info.curve);
+    }
+
+    function runTaxFirstBuy()
+        external
+        returns (uint256 tokensOut)
+    {
+        require(taxFirstBuyPassed, "TAX_FIRST_BUY_FIRST");
+        require(!taxFirstBuyPassed, "TAX_FIRST_BUY_ALREADY_RUN");
+
+        mockQuote.faucet(500e18);
+        mockQuote.approve(taxCurve, 250e18);
+
+        uint256 beforeTokens =
+            FortuneTaxToken(taxToken).balanceOf(address(this));
+
+        tokensOut =
+            FortuneCurve(taxCurve).buy(
+                address(mockQuote),
+                250e18,
+                1
+            );
+
+        require(
+            tokensOut > 0 &&
+                FortuneTaxToken(taxToken).balanceOf(address(this)) >
+                    beforeTokens,
+            "TAX_FIRST_BUY_FAILED"
+        );
+
+        require(
+            FortuneCurve(taxCurve).graduationReady(),
+            "TAX_NOT_READY"
+        );
+
+        require(
+            FortuneTaxProcessor(taxProcessor)
+                .totalCurveTaxRecorded() > 0,
+            "CURVE_TAX_MISSING"
+        );
+
+        taxFirstBuyPassed = true;
     }
 
     function runTaxGraduation()

@@ -502,6 +502,7 @@ export default function PublicTestnetPage() {
       const saved = JSON.parse(raw) as unknown;
       if (isSavedLaunch(saved)) {
         setLaunch(saved);
+        setMode(saved.mode);
         setMessage(
           "Recovered your last Fortune testnet launch from this browser. You can continue its lifecycle below."
         );
@@ -618,8 +619,14 @@ export default function PublicTestnetPage() {
         args: [parseUnits("1000", 18)],
       });
       await publicClient.waitForTransactionReceipt({ hash });
-      await refreshQuoteBalance(active);
-      setMessage("1,000 fUSD test tokens minted to your wallet.");
+      try {
+        await refreshQuoteBalance(active);
+        setMessage("1,000 fUSD test tokens minted to your wallet.");
+      } catch {
+        setMessage(
+          "1,000 fUSD mint transaction confirmed. Balance refresh is temporarily unavailable; do not retry the mint just because the displayed balance is stale."
+        );
+      }
     } catch (error) {
       setMessage(
         error instanceof Error
@@ -908,7 +915,11 @@ export default function PublicTestnetPage() {
           });
           await publicClient.waitForTransactionReceipt({ hash: buyHash });
         } catch (error) {
-          await refreshQuoteBalance(active);
+          try {
+            await refreshQuoteBalance(active);
+          } catch {
+            // The confirmed launch is still authoritative if the balance RPC is unavailable.
+          }
           setMessage(
             "Tax token launch succeeded, but the optional creator first-buy did not complete. " +
               (error instanceof Error ? error.message : "The follow-up transaction failed.") +
@@ -918,7 +929,11 @@ export default function PublicTestnetPage() {
         }
       }
 
-      await refreshQuoteBalance(active);
+      try {
+        await refreshQuoteBalance(active);
+      } catch {
+        // Do not turn a confirmed launch into a false failure because a read RPC hiccupped.
+      }
       setMessage(
         initial > 0n
           ? mode === "tax"
@@ -972,17 +987,29 @@ export default function PublicTestnetPage() {
       });
       await publicClient.waitForTransactionReceipt({ hash: buyHash });
 
-      const ready = await publicClient.readContract({
-        address: launch.curve,
-        abi: curveAbi,
-        functionName: "graduationReady",
-      });
+      let ready: boolean | null = null;
+      try {
+        ready = await publicClient.readContract({
+          address: launch.curve,
+          abi: curveAbi,
+          functionName: "graduationReady",
+        });
+      } catch {
+        // The buy receipt is authoritative; readiness can be checked again later.
+      }
 
-      await refreshQuoteBalance(active);
+      try {
+        await refreshQuoteBalance(active);
+      } catch {
+        // A stale balance must not make a confirmed buy look failed.
+      }
+
       setMessage(
-        ready
-          ? "Curve reached GraduationReady."
-          : "Buy confirmed. This curve has not reached GraduationReady yet."
+        ready === true
+          ? "Buy confirmed. Curve reached GraduationReady."
+          : ready === false
+            ? "Buy confirmed. This curve has not reached GraduationReady yet."
+            : "Buy transaction confirmed, but Fortune could not refresh graduation state from RPC. Do not retry the buy just because this read failed; refresh or try Finalize once RPC is available."
       );
     } catch (error) {
       setMessage(
@@ -1062,18 +1089,27 @@ export default function PublicTestnetPage() {
       const hash = await walletClient.writeContract(simulation.request);
       await publicClient.waitForTransactionReceipt({ hash });
 
-      const [graduated, phase] = await Promise.all([
-        publicClient.readContract({
-          address: launch.curve,
-          abi: curveAbi,
-          functionName: "graduated",
-        }),
-        publicClient.readContract({
-          address: launch.curve,
-          abi: curveAbi,
-          functionName: "phase",
-        }),
-      ]);
+      let graduated: boolean;
+      let phase: number;
+      try {
+        [graduated, phase] = await Promise.all([
+          publicClient.readContract({
+            address: launch.curve,
+            abi: curveAbi,
+            functionName: "graduated",
+          }),
+          publicClient.readContract({
+            address: launch.curve,
+            abi: curveAbi,
+            functionName: "phase",
+          }),
+        ]);
+      } catch {
+        setMessage(
+          "Graduation transaction confirmed, but Fortune could not refresh the final curve state from RPC. Do not resubmit the graduation transaction based on this read error; verify the confirmed transaction on BscScan and refresh."
+        );
+        return;
+      }
 
       if (!graduated || phase !== 2) {
         throw new Error(

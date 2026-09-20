@@ -210,7 +210,10 @@ contract FortuneTest is Test {
             imageURI: "ipfs://image",
             website: "https://fortune.test",
             xProfile: "https://x.com/fortune",
-            telegram: "https://t.me/fortune"
+            telegram: "https://t.me/fortune",
+            github: "https://github.com/fortune",
+            youtube: "https://youtube.com/@fortune",
+            debox: "https://debox.pro/fortune"
         });
     }
 
@@ -1441,7 +1444,10 @@ contract FortuneTest is Test {
                 imageURI: "ipfs://new-image",
                 website: "https://new.example",
                 xProfile: "https://x.com/new",
-                telegram: "https://t.me/new"
+                telegram: "https://t.me/new",
+                github: "https://github.com/new",
+                youtube: "https://youtube.com/@new",
+                debox: "https://debox.pro/new"
             });
 
         metadataRegistry.updateMetadata(info.token, next);

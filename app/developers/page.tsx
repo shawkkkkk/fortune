@@ -9,6 +9,7 @@ const endpoints = [
   ["POST", "/api/public/v1/launches/preview", "Validate a launch before any transaction is built"],
   ["GET", "/api/public/v1/tokens", "Token markets"],
   ["GET", "/api/public/v1/launches", "Launch ledger + health state"],
+  ["GET", "/api/public/v1/transactions/{hash}", "Recover pending/confirmed/reverted state before retrying"],
   ["GET", "/api/public/v1/stats", "Protocol analytics"],
   ["GET", "/api/public/v1/automations", "Automation health"],
   ["GET", "/api/public/v1/revenue", "Revenue and fee-routing aggregates"],

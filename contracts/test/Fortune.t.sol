@@ -7,6 +7,7 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {FortuneAssetRegistry} from "../src/FortuneAssetRegistry.sol";
 import {FortuneFactory} from "../src/FortuneFactory.sol";
 import {FortuneCurve} from "../src/FortuneCurve.sol";
+import {FortuneFeeRouter} from "../src/FortuneFeeRouter.sol";
 import {FortuneToken} from "../src/FortuneToken.sol";
 import {FortuneChainlinkOracle} from "../src/FortuneChainlinkOracle.sol";
 import {MockGraduationAdapter} from "../src/MockGraduationAdapter.sol";
@@ -432,6 +433,32 @@ contract FortuneTest is Test {
         assertEq(token.totalSupply(), token.initialSupply());
         assertEq(token.fortuneFactory(), address(factory));
         assertEq(token.FORTUNE_TOKEN_VERSION(), 1);
+    }
+
+    function testCreatorCanPermanentlySurrenderFeesToHolders() public {
+        FortuneFactory.LaunchInfo memory info =
+            factory.createLaunch(_params(1_000e18));
+        FortuneCurve curve = FortuneCurve(info.curve);
+        FortuneFeeRouter router = FortuneFeeRouter(info.feeRouter);
+
+        router.surrenderCreatorFeesToHolders();
+        assertTrue(router.creatorFeesSurrenderedToHolders());
+
+        vm.expectRevert("ALREADY_SURRENDERED");
+        router.surrenderCreatorFeesToHolders();
+
+        vm.warp(block.timestamp + 16);
+
+        uint256 creatorBefore = usdt.balanceOf(address(this));
+        uint256 holderBefore = usdt.balanceOf(info.holderVault);
+
+        vm.startPrank(user);
+        usdt.approve(address(curve), type(uint256).max);
+        curve.buy(address(usdt), 100e18, 1);
+        vm.stopPrank();
+
+        assertEq(usdt.balanceOf(address(this)), creatorBefore);
+        assertGt(usdt.balanceOf(info.holderVault), holderBefore);
     }
 
     function testEditableMetadataCanUpdateAndFreeze() public {

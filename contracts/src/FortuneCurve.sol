@@ -209,7 +209,13 @@ contract FortuneCurve is ReentrancyGuard {
     }
 
     function currentPriceUsd1e18() public view returns (uint256) {
-        return basePriceUsd1e18 + (slopeUsd1e18 * tokensSold / 1e18);
+        return
+            basePriceUsd1e18 +
+            Math.mulDiv(
+                slopeUsd1e18,
+                tokensSold,
+                1e18
+            );
     }
 
     /// @notice Preview the exact onchain opening-tax, fee, partial-fill and refund behavior.

@@ -21,11 +21,19 @@ function hasBytecode(value: unknown) {
 
 export async function GET() {
   const chainId = Number(process.env.NEXT_PUBLIC_CHAIN_ID || 97);
+  const factoryOverride =
+    process.env.NEXT_PUBLIC_FORTUNE_FACTORY_ADDRESS?.trim() || "";
   const configuredFactory =
-    process.env.NEXT_PUBLIC_FORTUNE_FACTORY_ADDRESS ||
+    factoryOverride ||
     (chainId === PUBLIC_TESTNET.chainId
       ? PUBLIC_TESTNET.contracts.factory
       : "");
+
+  const customTestnetStack =
+    chainId === PUBLIC_TESTNET.chainId &&
+    Boolean(factoryOverride) &&
+    factoryOverride.toLowerCase() !==
+      PUBLIC_TESTNET.contracts.factory.toLowerCase();
 
   const urls = configuredRpcUrls(chainId);
   const redundancyRequired =
@@ -38,21 +46,36 @@ export async function GET() {
 
   const requiredContracts =
     chainId === PUBLIC_TESTNET.chainId
-      ? {
-          factory: PUBLIC_TESTNET.contracts.factory,
-          taxFactory: PUBLIC_TESTNET.contracts.taxFactory,
-          registry: PUBLIC_TESTNET.contracts.registry,
-          poolRegistry: PUBLIC_TESTNET.contracts.poolRegistry,
-          graduationAdapter:
-            PUBLIC_TESTNET.contracts.graduationAdapter,
-          liquidityLocker:
-            PUBLIC_TESTNET.contracts.liquidityLocker,
-          taxGraduationAdapter:
-            PUBLIC_TESTNET.contracts.taxGraduationAdapter,
-          taxLiquidityLocker:
-            PUBLIC_TESTNET.contracts.taxLiquidityLocker,
-          mockQuote: PUBLIC_TESTNET.contracts.mockQuote,
-        }
+      ? customTestnetStack
+        ? {
+            factory: configuredFactory,
+            registry:
+              process.env.NEXT_PUBLIC_FORTUNE_REGISTRY_ADDRESS ||
+              "",
+            graduationAdapter:
+              process.env
+                .NEXT_PUBLIC_FORTUNE_GRADUATION_ADAPTER_ADDRESS ||
+              "",
+            liquidityLocker:
+              process.env
+                .NEXT_PUBLIC_FORTUNE_LIQUIDITY_LOCKER_ADDRESS ||
+              "",
+          }
+        : {
+            factory: PUBLIC_TESTNET.contracts.factory,
+            taxFactory: PUBLIC_TESTNET.contracts.taxFactory,
+            registry: PUBLIC_TESTNET.contracts.registry,
+            poolRegistry: PUBLIC_TESTNET.contracts.poolRegistry,
+            graduationAdapter:
+              PUBLIC_TESTNET.contracts.graduationAdapter,
+            liquidityLocker:
+              PUBLIC_TESTNET.contracts.liquidityLocker,
+            taxGraduationAdapter:
+              PUBLIC_TESTNET.contracts.taxGraduationAdapter,
+            taxLiquidityLocker:
+              PUBLIC_TESTNET.contracts.taxLiquidityLocker,
+            mockQuote: PUBLIC_TESTNET.contracts.mockQuote,
+          }
       : {
           factory: configuredFactory,
         };
@@ -122,7 +145,9 @@ export async function GET() {
       service: "fortune",
       environment:
         chainId === PUBLIC_TESTNET.chainId
-          ? "public-bsc-testnet-alpha"
+          ? customTestnetStack
+            ? "custom-bsc-testnet"
+            : "public-bsc-testnet-alpha"
           : chainId === 56
             ? "bsc-mainnet"
             : "custom",

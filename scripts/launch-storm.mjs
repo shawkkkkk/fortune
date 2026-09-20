@@ -1,3 +1,5 @@
+import { writeFile } from "node:fs/promises";
+
 const base = (process.env.BASE_URL || "").replace(/\/$/, "");
 const p95LimitMs = Number(process.env.P95_LIMIT_MS || 2500);
 const successFloor = Number(process.env.SUCCESS_FLOOR || 0.995);
@@ -167,6 +169,12 @@ const failed = report.stages.some(
 
 console.log("\nFORTUNE_LAUNCH_STORM_REPORT");
 console.log(JSON.stringify(report, null, 2));
+
+const reportPath = process.env.REPORT_PATH;
+if (reportPath) {
+  await writeFile(reportPath, JSON.stringify(report, null, 2) + "\n", "utf8");
+  console.log(`Launch storm report written to ${reportPath}`);
+}
 
 if (failed) {
   console.error(

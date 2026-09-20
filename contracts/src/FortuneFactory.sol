@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {FortuneToken} from "./FortuneToken.sol";
 import {FortuneCurve} from "./FortuneCurve.sol";
@@ -204,6 +205,32 @@ contract FortuneFactory is Ownable2Step {
             p.graduationUsd1e18 == 0
         ) {
             return (false, bytes32("BAD_ECONOMICS"));
+        }
+
+        uint256 maxCurveScalar =
+            uint256(type(uint127).max);
+
+        if (
+            p.basePriceUsd1e18 >
+                maxCurveScalar ||
+            p.slopeUsd1e18 >
+                maxCurveScalar ||
+            p.graduationUsd1e18 >
+                maxCurveScalar
+        ) {
+            return (false, bytes32("ECONOMICS_RANGE"));
+        }
+
+        uint256 maxPrice =
+            p.basePriceUsd1e18 +
+            Math.mulDiv(
+                p.slopeUsd1e18,
+                p.totalSupply,
+                1e18
+            );
+
+        if (maxPrice > maxCurveScalar) {
+            return (false, bytes32("TERMINAL_PRICE_RANGE"));
         }
 
         bytes memory nameBytes = bytes(p.name);

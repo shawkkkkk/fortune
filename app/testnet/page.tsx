@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   createPublicClient,
   createWalletClient,
@@ -9,6 +9,7 @@ import {
   defineChain,
   encodeAbiParameters,
   formatUnits,
+  isAddress,
   parseUnits,
   type Address,
   type EIP1193Provider,
@@ -17,7 +18,9 @@ import {
 import { PUBLIC_TESTNET } from "@/lib/public-testnet";
 import FortuneLogo from "@/components/FortuneLogo";
 
-const launchParamsComponents = [
+type LaunchMode = "standard" | "tax";
+
+const standardParams = [
   { name: "name", type: "string" },
   { name: "symbol", type: "string" },
   { name: "totalSupply", type: "uint256" },
@@ -41,14 +44,39 @@ const launchParamsComponents = [
   { name: "debox", type: "string" },
 ] as const;
 
-const factoryAbi = [
+const taxParams = [
+  { name: "name", type: "string" },
+  { name: "symbol", type: "string" },
+  { name: "totalSupply", type: "uint256" },
+  { name: "quoteAsset", type: "address" },
+  { name: "basePriceUsd1e18", type: "uint256" },
+  { name: "slopeUsd1e18", type: "uint256" },
+  { name: "graduationUsd1e18", type: "uint256" },
+  { name: "feeBps", type: "uint16[6]" },
+  { name: "treasury", type: "address" },
+  { name: "buyTaxBps", type: "uint16" },
+  { name: "sellTaxBps", type: "uint16" },
+  { name: "antiFarmerDuration", type: "uint32" },
+  { name: "minimumDividendBalance", type: "uint256" },
+  { name: "taxAllocationBps", type: "uint16[7]" },
+  { name: "description", type: "string" },
+  { name: "imageURI", type: "string" },
+  { name: "website", type: "string" },
+  { name: "xProfile", type: "string" },
+  { name: "telegram", type: "string" },
+  { name: "github", type: "string" },
+  { name: "youtube", type: "string" },
+  { name: "debox", type: "string" },
+] as const;
+
+const standardFactoryAbi = [
   {
     type: "function",
     name: "previewPreparedVanity",
     stateMutability: "view",
     inputs: [
       { name: "creator", type: "address" },
-      { name: "p", type: "tuple", components: launchParamsComponents },
+      { name: "p", type: "tuple", components: standardParams },
     ],
     outputs: [
       { name: "vanitySalt", type: "bytes32" },
@@ -62,8 +90,20 @@ const factoryAbi = [
     name: "createLaunchPrepared",
     stateMutability: "nonpayable",
     inputs: [
-      { name: "p", type: "tuple", components: launchParamsComponents },
+      { name: "p", type: "tuple", components: standardParams },
       { name: "vanitySalt", type: "bytes32" },
+    ],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "createLaunchPreparedAndBuy",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "p", type: "tuple", components: standardParams },
+      { name: "vanitySalt", type: "bytes32" },
+      { name: "amountIn", type: "uint256" },
+      { name: "minTokensOut", type: "uint256" },
     ],
     outputs: [],
   },
@@ -85,6 +125,70 @@ const factoryAbi = [
       { name: "creator", type: "address", indexed: true },
       { name: "token", type: "address", indexed: true },
       { name: "curve", type: "address", indexed: false },
+      { name: "manifestHash", type: "bytes32", indexed: false },
+    ],
+  },
+] as const;
+
+const taxFactoryAbi = [
+  {
+    type: "function",
+    name: "previewPreparedVanity",
+    stateMutability: "view",
+    inputs: [
+      { name: "creator", type: "address" },
+      { name: "p", type: "tuple", components: taxParams },
+    ],
+    outputs: [
+      { name: "vanitySalt", type: "bytes32" },
+      { name: "predictedToken", type: "address" },
+      { name: "manifestHash", type: "bytes32" },
+      { name: "launchNonce", type: "uint256" },
+    ],
+  },
+  {
+    type: "function",
+    name: "createLaunchPrepared",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "p", type: "tuple", components: taxParams },
+      { name: "vanitySalt", type: "bytes32" },
+    ],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "createLaunchPreparedAndBuy",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "p", type: "tuple", components: taxParams },
+      { name: "vanitySalt", type: "bytes32" },
+      { name: "amountIn", type: "uint256" },
+      { name: "minTokensOut", type: "uint256" },
+    ],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "finalizeGraduation",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "curve", type: "address" },
+      { name: "data", type: "bytes" },
+    ],
+    outputs: [{ name: "success", type: "bool" }],
+  },
+  {
+    type: "event",
+    name: "TaxLaunchCreated",
+    inputs: [
+      { name: "launchId", type: "uint256", indexed: true },
+      { name: "creator", type: "address", indexed: true },
+      { name: "token", type: "address", indexed: true },
+      { name: "curve", type: "address", indexed: false },
+      { name: "quoteAsset", type: "address", indexed: false },
+      { name: "taxProcessor", type: "address", indexed: false },
+      { name: "dividendVault", type: "address", indexed: false },
       { name: "manifestHash", type: "bytes32", indexed: false },
     ],
   },
@@ -162,10 +266,7 @@ const bscTestnet = defineChain({
   },
   rpcUrls: {
     default: {
-      http: [
-        PUBLIC_TESTNET.rpcUrl,
-        PUBLIC_TESTNET.fallbackRpcUrl,
-      ],
+      http: [PUBLIC_TESTNET.rpcUrl, PUBLIC_TESTNET.fallbackRpcUrl],
     },
   },
   blockExplorers: {
@@ -178,10 +279,23 @@ const bscTestnet = defineChain({
 });
 
 type TestLaunch = {
+  mode: LaunchMode;
   token: Address;
   curve: Address;
   transactionHash: Hex;
+  taxProcessor?: Address;
+  dividendVault?: Address;
 };
+
+const allocationLabels = [
+  "Creator",
+  "Direct burn",
+  "Holder dividends",
+  "Buyback + burn",
+  "Liquidity",
+  "Community treasury",
+  "Protocol",
+] as const;
 
 function shorten(value: string) {
   return value.slice(0, 8) + "…" + value.slice(-6);
@@ -191,19 +305,16 @@ function provider() {
   const injected = (
     window as Window & { ethereum?: EIP1193Provider }
   ).ethereum;
-
   if (!injected) {
     throw new Error(
       "No injected EVM wallet found. Install MetaMask or another BSC-compatible wallet."
     );
   }
-
   return injected;
 }
 
 async function connectTestnet() {
   const injected = provider();
-
   const accounts = (await injected.request({
     method: "eth_requestAccounts",
   })) as Address[];
@@ -239,9 +350,7 @@ async function connectTestnet() {
             decimals: 18,
           },
           rpcUrls: [PUBLIC_TESTNET.rpcUrl],
-          blockExplorerUrls: [
-            PUBLIC_TESTNET.explorerUrl,
-          ],
+          blockExplorerUrls: [PUBLIC_TESTNET.explorerUrl],
         },
       ],
     });
@@ -252,12 +361,8 @@ async function connectTestnet() {
 
 function clients(account: Address) {
   const transport = custom(provider());
-
   return {
-    publicClient: createPublicClient({
-      chain: bscTestnet,
-      transport,
-    }),
+    publicClient: createPublicClient({ chain: bscTestnet, transport }),
     walletClient: createWalletClient({
       account,
       chain: bscTestnet,
@@ -269,7 +374,7 @@ function clients(account: Address) {
 async function readQuoteBalance(account: Address) {
   const { publicClient } = clients(account);
   return publicClient.readContract({
-    address: PUBLIC_TESTNET.contracts.mockQuote,
+    address: PUBLIC_TESTNET.contracts.mockQuote as Address,
     abi: quoteAbi,
     functionName: "balanceOf",
     args: [account],
@@ -277,17 +382,46 @@ async function readQuoteBalance(account: Address) {
 }
 
 export default function PublicTestnetPage() {
+  const taxReady = Boolean(
+    PUBLIC_TESTNET.contracts.taxFactory &&
+      PUBLIC_TESTNET.contracts.taxGraduationAdapter &&
+      PUBLIC_TESTNET.contracts.taxLiquidityLocker &&
+      PUBLIC_TESTNET.contracts.poolRegistry
+  );
+
+  const [mode, setMode] = useState<LaunchMode>("standard");
   const [account, setAccount] = useState<Address | null>(null);
   const [name, setName] = useState("Fortune Alpha Token");
   const [symbol, setSymbol] = useState("FALPHA");
   const [description, setDescription] = useState(
-    "Created on the Fortune BSC public testnet alpha."
+    "Created on the Fortune BSC public alpha."
   );
+  const [website, setWebsite] = useState("");
+  const [xProfile, setXProfile] = useState("");
+  const [telegram, setTelegram] = useState("");
+  const [github, setGithub] = useState("");
+  const [youtube, setYoutube] = useState("");
+  const [debox, setDebox] = useState("");
+  const [creatorPurchase, setCreatorPurchase] = useState("0");
+  const [buyTax, setBuyTax] = useState("1");
+  const [sellTax, setSellTax] = useState("1");
+  const [antiFarmerDays, setAntiFarmerDays] = useState("30");
+  const [minimumDividendBalance, setMinimumDividendBalance] =
+    useState("0");
+  const [taxAllocation, setTaxAllocation] = useState([
+    20, 10, 20, 20, 15, 5, 10,
+  ]);
+  const [treasury, setTreasury] = useState("");
   const [launch, setLaunch] = useState<TestLaunch | null>(null);
   const [quoteBalance, setQuoteBalance] = useState("0");
   const [busy, setBusy] = useState("");
   const [message, setMessage] = useState(
     "Connect a testnet wallet to begin."
+  );
+
+  const allocationTotal = useMemo(
+    () => taxAllocation.reduce((sum, value) => sum + value, 0),
+    [taxAllocation]
   );
 
   useEffect(() => {
@@ -312,11 +446,9 @@ export default function PublicTestnetPage() {
       const accounts = (await injected.request({
         method: "eth_accounts",
       })) as Address[];
-
       const chain = (await injected.request({
         method: "eth_chainId",
       })) as string;
-
       const next = accounts?.[0] || null;
       setAccount(next);
 
@@ -339,7 +471,6 @@ export default function PublicTestnetPage() {
     };
 
     const changed = () => void sync();
-
     void sync();
     injected.on?.("accountsChanged", changed);
     injected.on?.("chainChanged", changed);
@@ -359,9 +490,7 @@ export default function PublicTestnetPage() {
   async function refreshQuoteBalance(nextAccount?: Address) {
     const active = nextAccount || account;
     if (!active) return;
-
     const balance = await readQuoteBalance(active);
-
     setQuoteBalance(
       Number(formatUnits(balance, 18)).toLocaleString(
         undefined,
@@ -377,7 +506,7 @@ export default function PublicTestnetPage() {
       setAccount(next);
       await refreshQuoteBalance(next);
       setMessage(
-        "Wallet connected to BSC Testnet. Get tBNB for gas, then use the free fUSD test faucet below."
+        "Wallet connected to BSC Testnet. Get tBNB for gas, then use the free fUSD faucet."
       );
     } catch (error) {
       setMessage(
@@ -394,23 +523,16 @@ export default function PublicTestnetPage() {
     setBusy("faucet");
     try {
       const active = await withAccount();
-      const { publicClient, walletClient } =
-        clients(active);
-
+      const { publicClient, walletClient } = clients(active);
       const hash = await walletClient.writeContract({
-        address: PUBLIC_TESTNET.contracts.mockQuote,
+        address: PUBLIC_TESTNET.contracts.mockQuote as Address,
         abi: quoteAbi,
         functionName: "faucet",
-        args: [parseUnits("250", 18)],
+        args: [parseUnits("1000", 18)],
       });
-
-      await publicClient.waitForTransactionReceipt({
-        hash,
-      });
+      await publicClient.waitForTransactionReceipt({ hash });
       await refreshQuoteBalance(active);
-      setMessage(
-        "250 fUSD test tokens minted to your wallet."
-      );
+      setMessage("1,000 fUSD test tokens minted to your wallet.");
     } catch (error) {
       setMessage(
         error instanceof Error
@@ -422,126 +544,261 @@ export default function PublicTestnetPage() {
     }
   }
 
+  function metadata() {
+    return {
+      description: description.trim().slice(0, 4096),
+      imageURI: "",
+      website: website.trim().slice(0, 512),
+      xProfile: xProfile.trim().slice(0, 512),
+      telegram: telegram.trim().slice(0, 512),
+      github: github.trim().slice(0, 512),
+      youtube: youtube.trim().slice(0, 512),
+      debox: debox.trim().slice(0, 512),
+    };
+  }
+
   async function createLaunch() {
     setBusy("launch");
+    setLaunch(null);
+
     try {
       const active = await withAccount();
       const cleanName = name.trim();
       const cleanSymbol = symbol.trim().toUpperCase();
 
       if (!cleanName || cleanName.length > 64) {
-        throw new Error(
-          "Token name must be 1–64 characters."
-        );
+        throw new Error("Token name must be 1–64 characters.");
       }
       if (!cleanSymbol || cleanSymbol.length > 16) {
+        throw new Error("Ticker must be 1–16 characters.");
+      }
+      if (mode === "tax" && !taxReady) {
         throw new Error(
-          "Ticker must be 1–16 characters."
+          "The public tax-token stack has not been deployed yet."
         );
       }
 
-      const { publicClient, walletClient } =
-        clients(active);
+      const initial = parseUnits(creatorPurchase || "0", 18);
+      const destination =
+        treasury.trim() && isAddress(treasury.trim())
+          ? (treasury.trim() as Address)
+          : active;
+      const { publicClient, walletClient } = clients(active);
+      let hash: Hex;
 
-      const params = {
-        name: cleanName,
-        symbol: cleanSymbol,
-        totalSupply:
-          1_000_000_000n * 10n ** 18n,
-        quoteAssets: [
-          PUBLIC_TESTNET.contracts.mockQuote,
-        ],
-        weightsBps: [10_000],
-        primaryQuote:
-          PUBLIC_TESTNET.contracts.mockQuote,
-        basePriceUsd1e18: 10n ** 15n,
-        slopeUsd1e18: 10n ** 6n,
-        graduationUsd1e18: 10n ** 18n,
-        adaptiveGraduation: true,
-        feeBps: [25, 25, 25, 15, 0, 10] as const,
-        treasury: active,
-        metadataEditable: true,
-        description: description.trim().slice(0, 4096),
-        imageURI: "",
-        website: "",
-        xProfile: "",
-        telegram: "",
-        github: "",
-        youtube: "",
-        debox: "",
-      };
+      if (mode === "standard") {
+        const params = {
+          name: cleanName,
+          symbol: cleanSymbol,
+          totalSupply: 1_000_000_000n * 10n ** 18n,
+          quoteAssets: [PUBLIC_TESTNET.contracts.mockQuote as Address],
+          weightsBps: [10_000],
+          primaryQuote: PUBLIC_TESTNET.contracts.mockQuote as Address,
+          basePriceUsd1e18: 10n ** 15n,
+          slopeUsd1e18: 10n ** 6n,
+          graduationUsd1e18: 10n ** 18n,
+          adaptiveGraduation: true,
+          feeBps: [25, 25, 25, 15, 0, 10] as const,
+          treasury: destination,
+          metadataEditable: true,
+          ...metadata(),
+        };
 
-      setMessage(
-        "Finding your deterministic 0xfe token address…"
-      );
-
-      const [salt] = await publicClient.readContract({
-        address: PUBLIC_TESTNET.contracts.factory,
-        abi: factoryAbi,
-        functionName: "previewPreparedVanity",
-        args: [active, params],
-      });
-
-      setMessage(
-        "Confirm the Fortune launch transaction in your wallet."
-      );
-
-      const hash = await walletClient.writeContract({
-        address: PUBLIC_TESTNET.contracts.factory,
-        abi: factoryAbi,
-        functionName: "createLaunchPrepared",
-        args: [params, salt],
-      });
-
-      const receipt =
-        await publicClient.waitForTransactionReceipt({
-          hash,
+        setMessage("Finding your deterministic 0xfe token address…");
+        const [salt] = await publicClient.readContract({
+          address: PUBLIC_TESTNET.contracts.factory as Address,
+          abi: standardFactoryAbi,
+          functionName: "previewPreparedVanity",
+          args: [active, params],
         });
 
+        if (initial > 0n) {
+          setMessage(
+            "Approve the creator purchase. The next transaction creates the token and executes your first buy atomically."
+          );
+          const approval = await walletClient.writeContract({
+            address: PUBLIC_TESTNET.contracts.mockQuote as Address,
+            abi: quoteAbi,
+            functionName: "approve",
+            args: [PUBLIC_TESTNET.contracts.factory as Address, initial],
+          });
+          await publicClient.waitForTransactionReceipt({ hash: approval });
+
+          hash = await walletClient.writeContract({
+            address: PUBLIC_TESTNET.contracts.factory as Address,
+            abi: standardFactoryAbi,
+            functionName: "createLaunchPreparedAndBuy",
+            args: [params, salt, initial, 1n],
+          });
+        } else {
+          setMessage("Confirm the Fortune launch transaction.");
+          hash = await walletClient.writeContract({
+            address: PUBLIC_TESTNET.contracts.factory as Address,
+            abi: standardFactoryAbi,
+            functionName: "createLaunchPrepared",
+            args: [params, salt],
+          });
+        }
+      } else {
+        const buyTaxBps = Math.round(Number(buyTax) * 100);
+        const sellTaxBps = Math.round(Number(sellTax) * 100);
+        const days = Math.round(Number(antiFarmerDays));
+        const allocationBps = taxAllocation.map((value) =>
+          Math.round(value * 100)
+        ) as [number, number, number, number, number, number, number];
+
+        if (
+          !Number.isFinite(buyTaxBps) ||
+          !Number.isFinite(sellTaxBps) ||
+          buyTaxBps < 0 ||
+          sellTaxBps < 0 ||
+          buyTaxBps > 1000 ||
+          sellTaxBps > 1000 ||
+          buyTaxBps + sellTaxBps === 0
+        ) {
+          throw new Error(
+            "Tax mode requires a buy or sell tax between 0% and 10%."
+          );
+        }
+        if (!Number.isInteger(days) || days < 0 || days > 365) {
+          throw new Error("Anti-farmer duration must be 0–365 days.");
+        }
+        if (allocationTotal !== 100) {
+          throw new Error("Tax allocation must total exactly 100%.");
+        }
+
+        const params = {
+          name: cleanName,
+          symbol: cleanSymbol,
+          totalSupply: 1_000_000_000n * 10n ** 18n,
+          quoteAsset: PUBLIC_TESTNET.contracts.mockQuote as Address,
+          basePriceUsd1e18: 10n ** 15n,
+          slopeUsd1e18: 10n ** 6n,
+          graduationUsd1e18: 10n ** 18n,
+          feeBps: [25, 25, 25, 15, 0, 10] as const,
+          treasury: destination,
+          buyTaxBps,
+          sellTaxBps,
+          antiFarmerDuration: days * 24 * 60 * 60,
+          minimumDividendBalance: parseUnits(
+            minimumDividendBalance || "0",
+            18
+          ),
+          taxAllocationBps: allocationBps,
+          ...metadata(),
+        };
+
+        const taxFactory = PUBLIC_TESTNET.contracts.taxFactory as Address;
+
+        setMessage("Finding your deterministic 0xfe tax-token address…");
+        const [salt] = await publicClient.readContract({
+          address: taxFactory,
+          abi: taxFactoryAbi,
+          functionName: "previewPreparedVanity",
+          args: [active, params],
+        });
+
+        if (initial > 0n) {
+          setMessage(
+            "Approve the creator purchase. The next transaction creates the tax token and executes your first buy atomically."
+          );
+          const approval = await walletClient.writeContract({
+            address: PUBLIC_TESTNET.contracts.mockQuote as Address,
+            abi: quoteAbi,
+            functionName: "approve",
+            args: [taxFactory, initial],
+          });
+          await publicClient.waitForTransactionReceipt({ hash: approval });
+
+          hash = await walletClient.writeContract({
+            address: taxFactory,
+            abi: taxFactoryAbi,
+            functionName: "createLaunchPreparedAndBuy",
+            args: [params, salt, initial, 1n],
+          });
+        } else {
+          setMessage("Confirm the Fortune tax-token launch.");
+          hash = await walletClient.writeContract({
+            address: taxFactory,
+            abi: taxFactoryAbi,
+            functionName: "createLaunchPrepared",
+            args: [params, salt],
+          });
+        }
+      }
+
+      const receipt = await publicClient.waitForTransactionReceipt({ hash });
       let created: TestLaunch | null = null;
 
       for (const log of receipt.logs) {
-        if (
-          log.address.toLowerCase() !==
-          PUBLIC_TESTNET.contracts.factory.toLowerCase()
-        ) {
-          continue;
-        }
-
         try {
-          const decoded = decodeEventLog({
-            abi: factoryAbi,
-            eventName: "LaunchCreated",
-            data: log.data,
-            topics: log.topics,
-          });
+          if (mode === "standard") {
+            if (
+              log.address.toLowerCase() !==
+              PUBLIC_TESTNET.contracts.factory.toLowerCase()
+            ) {
+              continue;
+            }
 
-          created = {
-            token: decoded.args.token,
-            curve: decoded.args.curve,
-            transactionHash: hash,
-          };
+            const decoded = decodeEventLog({
+              abi: standardFactoryAbi,
+              eventName: "LaunchCreated",
+              data: log.data,
+              topics: log.topics,
+            });
+
+            created = {
+              mode,
+              token: decoded.args.token,
+              curve: decoded.args.curve,
+              transactionHash: hash,
+            };
+          } else {
+            if (
+              log.address.toLowerCase() !==
+              PUBLIC_TESTNET.contracts.taxFactory.toLowerCase()
+            ) {
+              continue;
+            }
+
+            const decoded = decodeEventLog({
+              abi: taxFactoryAbi,
+              eventName: "TaxLaunchCreated",
+              data: log.data,
+              topics: log.topics,
+            });
+
+            created = {
+              mode,
+              token: decoded.args.token,
+              curve: decoded.args.curve,
+              taxProcessor: decoded.args.taxProcessor,
+              dividendVault: decoded.args.dividendVault,
+              transactionHash: hash,
+            };
+          }
           break;
         } catch {
-          // Ignore unrelated factory events.
+          // Ignore unrelated logs.
         }
       }
 
       if (!created) {
         throw new Error(
-          "Launch transaction confirmed, but the LaunchCreated event could not be decoded. Check the transaction in BscScan."
+          "Launch confirmed, but Fortune could not decode its creation event."
         );
       }
 
       setLaunch(created);
+      await refreshQuoteBalance(active);
       setMessage(
-        "Launch created. Faucet fUSD if needed, then buy on the curve to drive it to graduation."
+        initial > 0n
+          ? "Launch + creator first-buy confirmed atomically. Continue to graduation when the curve is ready."
+          : "Launch created. Buy fUSD on the curve to move it toward graduation."
       );
     } catch (error) {
       setMessage(
-        error instanceof Error
-          ? error.message
-          : "Launch creation failed."
+        error instanceof Error ? error.message : "Launch creation failed."
       );
     } finally {
       setBusy("");
@@ -554,12 +811,10 @@ export default function PublicTestnetPage() {
     setBusy("buy");
     try {
       const active = await withAccount();
-      const { publicClient, walletClient } =
-        clients(active);
+      const { publicClient, walletClient } = clients(active);
       const amount = parseUnits("250", 18);
-
       const balance = await publicClient.readContract({
-        address: PUBLIC_TESTNET.contracts.mockQuote,
+        address: PUBLIC_TESTNET.contracts.mockQuote as Address,
         abi: quoteAbi,
         functionName: "balanceOf",
         args: [active],
@@ -567,46 +822,25 @@ export default function PublicTestnetPage() {
 
       if (balance < amount) {
         throw new Error(
-          "You need at least 250 fUSD. Use the free fUSD faucet first."
+          "You need at least 250 fUSD. Use the free faucet first."
         );
       }
 
-      setMessage(
-        "Approve 250 fUSD for this curve in your wallet."
-      );
-
-      const approval =
-        await walletClient.writeContract({
-          address:
-            PUBLIC_TESTNET.contracts.mockQuote,
-          abi: quoteAbi,
-          functionName: "approve",
-          args: [launch.curve, amount],
-        });
-
-      await publicClient.waitForTransactionReceipt({
-        hash: approval,
+      const approval = await walletClient.writeContract({
+        address: PUBLIC_TESTNET.contracts.mockQuote as Address,
+        abi: quoteAbi,
+        functionName: "approve",
+        args: [launch.curve, amount],
       });
+      await publicClient.waitForTransactionReceipt({ hash: approval });
 
-      setMessage(
-        "Approval confirmed. Confirm the curve buy."
-      );
-
-      const buyHash =
-        await walletClient.writeContract({
-          address: launch.curve,
-          abi: curveAbi,
-          functionName: "buy",
-          args: [
-            PUBLIC_TESTNET.contracts.mockQuote,
-            amount,
-            1n,
-          ],
-        });
-
-      await publicClient.waitForTransactionReceipt({
-        hash: buyHash,
+      const buyHash = await walletClient.writeContract({
+        address: launch.curve,
+        abi: curveAbi,
+        functionName: "buy",
+        args: [PUBLIC_TESTNET.contracts.mockQuote as Address, amount, 1n],
       });
+      await publicClient.waitForTransactionReceipt({ hash: buyHash });
 
       const ready = await publicClient.readContract({
         address: launch.curve,
@@ -615,17 +849,14 @@ export default function PublicTestnetPage() {
       });
 
       await refreshQuoteBalance(active);
-
       setMessage(
         ready
-          ? "Curve reached GraduationReady. You can now finalize its Pancake V3 graduation."
+          ? "Curve reached GraduationReady."
           : "Buy confirmed. This curve has not reached GraduationReady yet."
       );
     } catch (error) {
       setMessage(
-        error instanceof Error
-          ? error.message
-          : "Curve buy failed."
+        error instanceof Error ? error.message : "Curve buy failed."
       );
     } finally {
       setBusy("");
@@ -638,67 +869,68 @@ export default function PublicTestnetPage() {
     setBusy("finalize");
     try {
       const active = await withAccount();
-      const { publicClient, walletClient } =
-        clients(active);
+      const { publicClient, walletClient } = clients(active);
+      const deadline = BigInt(Math.floor(Date.now() / 1000) + 1200);
 
-      const deadline =
-        BigInt(Math.floor(Date.now() / 1000) + 1200);
+      const plan =
+        launch.mode === "tax"
+          ? encodeAbiParameters(
+              [
+                {
+                  type: "tuple",
+                  components: [
+                    { name: "maxDustBps", type: "uint16" },
+                    { name: "deadline", type: "uint64" },
+                  ],
+                },
+              ],
+              [{ maxDustBps: 100, deadline }]
+            )
+          : encodeAbiParameters(
+              [
+                {
+                  type: "tuple",
+                  components: [
+                    { name: "fees", type: "uint24[]" },
+                    { name: "maxSqrtPriceDeviationBps", type: "uint16" },
+                    { name: "maxDustBps", type: "uint16" },
+                    { name: "deadline", type: "uint64" },
+                  ],
+                },
+              ],
+              [
+                {
+                  fees: [500],
+                  maxSqrtPriceDeviationBps: 100,
+                  maxDustBps: 100,
+                  deadline,
+                },
+              ]
+            );
 
-      const plan = encodeAbiParameters(
-        [
-          {
-            type: "tuple",
-            components: [
-              { name: "fees", type: "uint24[]" },
-              {
-                name: "maxSqrtPriceDeviationBps",
-                type: "uint16",
-              },
-              {
-                name: "maxDustBps",
-                type: "uint16",
-              },
-              { name: "deadline", type: "uint64" },
-            ],
-          },
-        ],
-        [
-          {
-            fees: [500],
-            maxSqrtPriceDeviationBps: 100,
-            maxDustBps: 100,
-            deadline,
-          },
-        ]
-      );
+      const address =
+        launch.mode === "tax"
+          ? (PUBLIC_TESTNET.contracts.taxFactory as Address)
+          : (PUBLIC_TESTNET.contracts.factory as Address);
+      const abi =
+        launch.mode === "tax" ? taxFactoryAbi : standardFactoryAbi;
 
-      const simulation =
-        await publicClient.simulateContract({
-          account: active,
-          address: PUBLIC_TESTNET.contracts.factory,
-          abi: factoryAbi,
-          functionName: "finalizeGraduation",
-          args: [launch.curve, plan],
-        });
+      const simulation = await publicClient.simulateContract({
+        account: active,
+        address,
+        abi,
+        functionName: "finalizeGraduation",
+        args: [launch.curve, plan],
+      });
 
       if (!simulation.result) {
         throw new Error(
-          "Graduation preflight is not ready yet. The launch remains retryable."
+          "Graduation preflight is not ready. The launch remains retryable."
         );
       }
 
-      setMessage(
-        "Confirm the permissionless graduation transaction."
-      );
-
-      const hash =
-        await walletClient.writeContract(
-          simulation.request
-        );
-
-      await publicClient.waitForTransactionReceipt({
-        hash,
-      });
+      const hash = await walletClient.writeContract(simulation.request);
+      await publicClient.waitForTransactionReceipt({ hash });
 
       const [graduated, phase] = await Promise.all([
         publicClient.readContract({
@@ -715,18 +947,18 @@ export default function PublicTestnetPage() {
 
       if (!graduated || phase !== 2) {
         throw new Error(
-          "Transaction confirmed but the curve did not reach PoolCreated. It can be retried."
+          "Transaction confirmed but the curve did not reach PoolCreated."
         );
       }
 
       setMessage(
-        "Graduation complete: Pancake V3 pool created and the LP-position NFT is permanently locked."
+        launch.mode === "tax"
+          ? "Graduation complete: Pancake V2 liquidity is live, LP tokens are permanently locked, and immutable tax/anti-farmer rules are active."
+          : "Graduation complete: Pancake V3 liquidity is live and the LP-position NFT is permanently locked."
       );
     } catch (error) {
       setMessage(
-        error instanceof Error
-          ? error.message
-          : "Graduation failed."
+        error instanceof Error ? error.message : "Graduation failed."
       );
     } finally {
       setBusy("");
@@ -742,15 +974,13 @@ export default function PublicTestnetPage() {
           <div className="testnetBrandLockup">
             <FortuneLogo size="md" />
           </div>
-          <span className="eyebrow">
-            PUBLIC BSC TESTNET ALPHA
-          </span>
-          <h1>Try Fortune onchain.</h1>
+          <span className="eyebrow">PUBLIC BSC TESTNET ALPHA</span>
+          <h1>Build the launch you actually want.</h1>
           <p>
-            Create a real Fortune testnet launch, trade its
-            Basket Curve with free mock fUSD, and graduate it
-            into a real Pancake V3 testnet pool. Test assets
-            have no financial value.
+            Standard tokens graduate into permanently locked Pancake V3
+            liquidity. Tax tokens add immutable buy/sell tax, holder rewards,
+            buyback/burn routing and bounded anti-farmer protection before
+            graduating into permanently locked Pancake V2 liquidity.
           </p>
         </div>
         <div className="pageHeadingActions">
@@ -776,40 +1006,65 @@ export default function PublicTestnetPage() {
       <section className="registryNotice">
         <strong>TESTNET ONLY</strong>
         <span>
-          Chain 97 · never use real BNB or a wallet holding
-          valuable assets. The fUSD faucet below mints a
-          Fortune-owned mock token solely for testing.
+          Chain 97 · fUSD is valueless · use a test-only wallet. Every setting
+          below is exercised through real testnet contracts.
         </span>
       </section>
 
-      <section className="twoColumn">
+      <section className="formCard">
+        <div className="formSectionTitle">
+          <span>01</span>
+          <div>
+            <h2>Launch type</h2>
+            <p>Choose the token architecture before entering economics.</p>
+          </div>
+        </div>
+        <div className="modeRow launchModeRow">
+          <button
+            className={mode === "standard" ? "selectedMode" : ""}
+            onClick={() => {
+              setMode("standard");
+              setLaunch(null);
+            }}
+          >
+            <strong>Standard</strong>
+            <span>0% transfer tax · Pancake V3</span>
+          </button>
+          <button
+            className={mode === "tax" ? "selectedMode" : ""}
+            disabled={!taxReady}
+            onClick={() => {
+              setMode("tax");
+              setLaunch(null);
+            }}
+          >
+            <strong>Tax Token</strong>
+            <span>
+              {taxReady
+                ? "Immutable tax · dividends · anti-farmer · Pancake V2"
+                : "Tax stack awaits one-time public deployment"}
+            </span>
+          </button>
+        </div>
+      </section>
+
+      <section className="twoColumn" style={{ marginTop: 14 }}>
         <div className="formCard">
           <div className="formSectionTitle">
-            <span>01</span>
+            <span>02</span>
             <div>
               <h2>Wallet + test funds</h2>
-              <p>
-                tBNB pays gas. fUSD is the free quote asset
-                used by this alpha deployment.
-              </p>
+              <p>tBNB pays gas. fUSD is the valueless launch quote.</p>
             </div>
           </div>
 
           <div className="previewFacts">
-            <div>
-              <span>Network</span>
-              <strong>BSC Testnet · 97</strong>
-            </div>
+            <div><span>Network</span><strong>BSC Testnet · 97</strong></div>
             <div>
               <span>Wallet</span>
-              <strong>
-                {account ? shorten(account) : "Not connected"}
-              </strong>
+              <strong>{account ? shorten(account) : "Not connected"}</strong>
             </div>
-            <div>
-              <span>fUSD balance</span>
-              <strong>{quoteBalance}</strong>
-            </div>
+            <div><span>fUSD balance</span><strong>{quoteBalance}</strong></div>
           </div>
 
           <div className="heroActions">
@@ -818,93 +1073,208 @@ export default function PublicTestnetPage() {
               onClick={() => void connect()}
               disabled={Boolean(busy)}
             >
-              {busy === "connect"
-                ? "Connecting…"
-                : "Connect / switch testnet"}
+              {busy === "connect" ? "Connecting…" : "Connect / switch testnet"}
             </button>
             <button
               className="primaryCta"
               onClick={() => void faucet()}
               disabled={Boolean(busy)}
             >
-              {busy === "faucet"
-                ? "Minting…"
-                : "Faucet 250 fUSD"}
+              {busy === "faucet" ? "Minting…" : "Faucet 1,000 fUSD"}
             </button>
           </div>
         </div>
 
         <div className="formCard">
           <div className="formSectionTitle">
-            <span>02</span>
+            <span>03</span>
             <div>
-              <h2>Create a launch</h2>
-              <p>
-                The public alpha uses the proven single-asset
-                fUSD path and the live Fortune factory.
-              </p>
+              <h2>Token</h2>
+              <p>Fixed supply. No post-launch mint or blacklist.</p>
             </div>
           </div>
-
           <label>
             Token name
-            <input
-              value={name}
-              maxLength={64}
-              onChange={(event) =>
-                setName(event.target.value)
-              }
-            />
+            <input value={name} maxLength={64} onChange={(e) => setName(e.target.value)} />
           </label>
           <label>
             Ticker
-            <input
-              value={symbol}
-              maxLength={16}
-              onChange={(event) =>
-                setSymbol(event.target.value)
-              }
-            />
+            <input value={symbol} maxLength={16} onChange={(e) => setSymbol(e.target.value)} />
           </label>
           <label>
             Description
-            <textarea
-              value={description}
-              maxLength={4096}
-              onChange={(event) =>
-                setDescription(event.target.value)
-              }
-            />
+            <textarea value={description} maxLength={4096} onChange={(e) => setDescription(e.target.value)} />
           </label>
-
-          <button
-            className="launchButton"
-            onClick={() => void createLaunch()}
-            disabled={Boolean(busy)}
-          >
-            {busy === "launch"
-              ? "Creating launch…"
-              : "Create testnet launch →"}
-          </button>
         </div>
+      </section>
+
+      <section className="formCard" style={{ marginTop: 14 }}>
+        <div className="formSectionTitle">
+          <span>04</span>
+          <div>
+            <h2>Creator first purchase</h2>
+            <p>
+              Optional. Approve fUSD once, then Fortune deploys the token and
+              executes your first curve buy inside the same transaction.
+            </p>
+          </div>
+        </div>
+        <label>
+          Initial creator purchase · fUSD
+          <input
+            value={creatorPurchase}
+            inputMode="decimal"
+            onChange={(e) => setCreatorPurchase(e.target.value)}
+            placeholder="0"
+          />
+        </label>
+      </section>
+
+      {mode === "tax" ? (
+        <>
+          <section className="formCard" style={{ marginTop: 14 }}>
+            <div className="formSectionTitle">
+              <span>05</span>
+              <div>
+                <h2>Tax + anti-farmer protection</h2>
+                <p>
+                  Immutable at launch. Tax cannot later be increased and the
+                  protection window cannot be extended.
+                </p>
+              </div>
+            </div>
+            <div className="fieldGrid">
+              <label>
+                Buy tax · %
+                <input type="number" min="0" max="10" step="0.1" value={buyTax} onChange={(e) => setBuyTax(e.target.value)} />
+              </label>
+              <label>
+                Sell tax · %
+                <input type="number" min="0" max="10" step="0.1" value={sellTax} onChange={(e) => setSellTax(e.target.value)} />
+              </label>
+              <label>
+                Anti-farmer protection · days
+                <input type="number" min="0" max="365" step="1" value={antiFarmerDays} onChange={(e) => setAntiFarmerDays(e.target.value)} />
+                <small className="fieldHint">
+                  0 disables it. During the window, recognized competing pools
+                  from approved AMM factories cannot be used.
+                </small>
+              </label>
+              <label>
+                Minimum dividend balance · tokens
+                <input value={minimumDividendBalance} inputMode="decimal" onChange={(e) => setMinimumDividendBalance(e.target.value)} />
+              </label>
+            </div>
+          </section>
+
+          <section className="formCard" style={{ marginTop: 14 }}>
+            <div className="formSectionTitle">
+              <span>06</span>
+              <div>
+                <h2>Tax allocation</h2>
+                <p>Every percent is committed onchain. Total must equal 100%.</p>
+              </div>
+            </div>
+            <div className={allocationTotal === 100 ? "registryNotice" : "registryNotice statusError"}>
+              <strong>{allocationTotal}% allocated</strong>
+              <span>{100 - allocationTotal}% remaining</span>
+            </div>
+            <div className="taxAllocationGrid">
+              {allocationLabels.map((label, index) => (
+                <label key={label}>
+                  {label}
+                  <div className="taxAllocationInput">
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="1"
+                      value={taxAllocation[index]}
+                      onChange={(event) => {
+                        const next = [...taxAllocation];
+                        next[index] = Math.max(
+                          0,
+                          Math.min(100, Number(event.target.value) || 0)
+                        );
+                        setTaxAllocation(next);
+                      }}
+                    />
+                    <span>%</span>
+                  </div>
+                </label>
+              ))}
+            </div>
+            <label>
+              Community treasury recipient · optional
+              <input
+                value={treasury}
+                onChange={(e) => setTreasury(e.target.value)}
+                placeholder="Defaults to connected creator wallet"
+              />
+            </label>
+          </section>
+        </>
+      ) : null}
+
+      <section className="formCard" style={{ marginTop: 14 }}>
+        <div className="formSectionTitle">
+          <span>{mode === "tax" ? "07" : "05"}</span>
+          <div>
+            <h2>Links</h2>
+            <p>Optional public metadata for the token profile.</p>
+          </div>
+        </div>
+        <div className="fieldGrid">
+          <label>Website<input value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://..." /></label>
+          <label>X / Twitter<input value={xProfile} onChange={(e) => setXProfile(e.target.value)} placeholder="https://x.com/..." /></label>
+          <label>Telegram<input value={telegram} onChange={(e) => setTelegram(e.target.value)} placeholder="https://t.me/..." /></label>
+          <label>GitHub<input value={github} onChange={(e) => setGithub(e.target.value)} placeholder="https://github.com/..." /></label>
+          <label>YouTube<input value={youtube} onChange={(e) => setYoutube(e.target.value)} placeholder="https://youtube.com/..." /></label>
+          <label>DeBox<input value={debox} onChange={(e) => setDebox(e.target.value)} placeholder="https://debox.pro/..." /></label>
+        </div>
+      </section>
+
+      <section className="formCard" style={{ marginTop: 14 }}>
+        <div className="formSectionTitle">
+          <span>{mode === "tax" ? "08" : "06"}</span>
+          <div>
+            <h2>Immutable launch preview</h2>
+            <p>Review before signing.</p>
+          </div>
+        </div>
+        <div className="previewFacts">
+          <div><span>Architecture</span><strong>{mode === "tax" ? "Tax Token · V2" : "Standard · V3"}</strong></div>
+          <div><span>Supply</span><strong>1,000,000,000</strong></div>
+          <div><span>Quote</span><strong>fUSD</strong></div>
+          <div><span>Graduation target</span><strong>$1 mock USD</strong></div>
+          {mode === "tax" ? (
+            <>
+              <div><span>Buy / sell tax</span><strong>{buyTax}% / {sellTax}%</strong></div>
+              <div><span>Anti-farmer</span><strong>{antiFarmerDays} days</strong></div>
+            </>
+          ) : null}
+        </div>
+        <button
+          className="launchButton"
+          onClick={() => void createLaunch()}
+          disabled={Boolean(busy) || (mode === "tax" && (!taxReady || allocationTotal !== 100))}
+        >
+          {busy === "launch"
+            ? "Creating launch…"
+            : "Create " + (mode === "tax" ? "tax token" : "standard token") + " →"}
+        </button>
       </section>
 
       <section className="panel" style={{ marginTop: 14 }}>
         <div className="panelTitle">
           <div>
-            <span className="eyebrow">
-              03 · CURVE → PANCAKE
-            </span>
-            <h2>Complete the testnet lifecycle</h2>
+            <span className="eyebrow">CURVE → PANCAKE</span>
+            <h2>Complete the lifecycle</h2>
           </div>
           {launch ? (
             <a
               className="secondaryCta"
-              href={
-                explorer +
-                "/tx/" +
-                launch.transactionHash
-              }
+              href={explorer + "/tx/" + launch.transactionHash}
               target="_blank"
               rel="noreferrer"
             >
@@ -918,123 +1288,71 @@ export default function PublicTestnetPage() {
             <div className="previewFacts">
               <div>
                 <span>Token</span>
-                <a
-                  href={explorer + "/address/" + launch.token}
-                  target="_blank"
-                  rel="noreferrer"
-                >
+                <a href={explorer + "/address/" + launch.token} target="_blank" rel="noreferrer">
                   <strong>{shorten(launch.token)} ↗</strong>
                 </a>
               </div>
               <div>
                 <span>Curve</span>
-                <a
-                  href={explorer + "/address/" + launch.curve}
-                  target="_blank"
-                  rel="noreferrer"
-                >
+                <a href={explorer + "/address/" + launch.curve} target="_blank" rel="noreferrer">
                   <strong>{shorten(launch.curve)} ↗</strong>
                 </a>
               </div>
-              <div>
-                <span>Graduation target</span>
-                <strong>$1 mock USD</strong>
-              </div>
-              <div>
-                <span>Pancake fee tier</span>
-                <strong>0.05%</strong>
-              </div>
+              <div><span>Graduation DEX</span><strong>{launch.mode === "tax" ? "Pancake V2" : "Pancake V3"}</strong></div>
+              <div><span>LP custody</span><strong>Permanently locked</strong></div>
             </div>
-
             <div className="heroActions">
-              <button
-                className="secondaryCta"
-                onClick={() =>
-                  void buyToGraduation()
-                }
-                disabled={Boolean(busy)}
-              >
-                {busy === "buy"
-                  ? "Buying…"
-                  : "Approve + buy 250 fUSD"}
+              <button className="secondaryCta" onClick={() => void buyToGraduation()} disabled={Boolean(busy)}>
+                {busy === "buy" ? "Buying…" : "Approve + buy 250 fUSD"}
               </button>
-              <button
-                className="primaryCta"
-                onClick={() => void finalize()}
-                disabled={Boolean(busy)}
-              >
+              <button className="primaryCta" onClick={() => void finalize()} disabled={Boolean(busy)}>
                 {busy === "finalize"
                   ? "Graduating…"
-                  : "Finalize Pancake graduation"}
+                  : "Finalize " + (launch.mode === "tax" ? "V2" : "V3") + " graduation"}
               </button>
             </div>
           </>
         ) : (
           <div className="emptyPanel">
-            <strong>
-              Create a launch to unlock the lifecycle test.
-            </strong>
-            <span>
-              You will receive the real testnet token and curve
-              addresses after the LaunchCreated event confirms.
-            </span>
+            <strong>Create a launch to unlock the lifecycle test.</strong>
+            <span>The confirmed token and curve addresses appear here.</span>
           </div>
         )}
       </section>
 
       <section className="panel" style={{ marginTop: 14 }}>
         <span className="eyebrow">TRANSACTION STATUS</span>
-        <p className="launchDescription" style={{ minHeight: 0 }}>
-          {message}
-        </p>
+        <p className="launchDescription" style={{ minHeight: 0 }}>{message}</p>
       </section>
 
       <section className="panel" style={{ marginTop: 14 }}>
         <div className="panelTitle">
           <div>
-            <span className="eyebrow">
-              PUBLIC ALPHA CONTRACTS
-            </span>
+            <span className="eyebrow">PUBLIC ALPHA CONTRACTS</span>
             <h2>Verify everything yourself</h2>
           </div>
-          <a
-            className="secondaryCta"
-            href={
-              explorer +
-              "/address/" +
-              PUBLIC_TESTNET.contracts.factory
-            }
-            target="_blank"
-            rel="noreferrer"
-          >
-            Factory on BscScan ↗
-          </a>
         </div>
         <div className="manifestTable">
           {[
-            ["Fortune Factory", PUBLIC_TESTNET.contracts.factory],
-            ["Asset Registry", PUBLIC_TESTNET.contracts.registry],
-            [
-              "Pancake graduation adapter",
-              PUBLIC_TESTNET.contracts.graduationAdapter,
-            ],
-            [
-              "Permanent LP locker",
-              PUBLIC_TESTNET.contracts.liquidityLocker,
-            ],
+            ["Standard factory", PUBLIC_TESTNET.contracts.factory],
+            ["Tax factory", PUBLIC_TESTNET.contracts.taxFactory],
+            ["Asset registry", PUBLIC_TESTNET.contracts.registry],
+            ["Pool registry", PUBLIC_TESTNET.contracts.poolRegistry],
+            ["V3 graduation adapter", PUBLIC_TESTNET.contracts.graduationAdapter],
+            ["V3 LP locker", PUBLIC_TESTNET.contracts.liquidityLocker],
+            ["V2 tax adapter", PUBLIC_TESTNET.contracts.taxGraduationAdapter],
+            ["V2 LP locker", PUBLIC_TESTNET.contracts.taxLiquidityLocker],
             ["Mock fUSD", PUBLIC_TESTNET.contracts.mockQuote],
-          ].map(([label, address]) => (
-            <div key={label}>
-              <span>{label}</span>
-              <a
-                href={explorer + "/address/" + address}
-                target="_blank"
-                rel="noreferrer"
-              >
-                <strong>{shorten(address)} ↗</strong>
-              </a>
-            </div>
-          ))}
+          ]
+            .filter(([, address]) => Boolean(address))
+            .map(([label, address]) => (
+              <div key={label}>
+                <span>{label}</span>
+                <a href={explorer + "/address/" + address} target="_blank" rel="noreferrer">
+                  <strong>{shorten(address)} ↗</strong>
+                </a>
+              </div>
+            ))}
         </div>
       </section>
     </main>

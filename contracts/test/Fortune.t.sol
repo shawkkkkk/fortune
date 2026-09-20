@@ -183,6 +183,49 @@ contract FortuneTest is Test {
         });
     }
 
+    function testCoreRuntimeContractsStayUnderEip170SizeLimit() public {
+        uint256 eip170Limit = 24_576;
+
+        assertLt(
+            address(factory).code.length,
+            eip170Limit
+        );
+        assertLt(
+            address(registry).code.length,
+            eip170Limit
+        );
+
+        FortuneFactory.LaunchInfo memory info =
+            factory.createLaunch(
+                _params(1_000e18)
+            );
+
+        assertLt(
+            info.token.code.length,
+            eip170Limit
+        );
+        assertLt(
+            info.curve.code.length,
+            eip170Limit
+        );
+        assertLt(
+            info.feeRouter.code.length,
+            eip170Limit
+        );
+        assertLt(
+            info.holderVault.code.length,
+            eip170Limit
+        );
+        assertLt(
+            info.buybackVault.code.length,
+            eip170Limit
+        );
+        assertLt(
+            info.liquidityVault.code.length,
+            eip170Limit
+        );
+    }
+
     function testLaunchPreflightPassesOnlyWithHealthyGraduationStack() public {
         FortuneFactory.LaunchParams memory p = _params(1_000e18);
 

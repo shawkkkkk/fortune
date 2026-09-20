@@ -70,7 +70,7 @@ Production approval should require exact contract verification, oracle coverage,
 
 The UI categories include:
 
-**Majors · BNB Chain · Stablecoins · xStocks · China Stocks · NASDAQ Microcaps · PreStocks · RWAs · DeFi · Memes · BSC 400 · Custom**
+**Majors · BNB Chain · Stablecoins · xStocks · China Stocks · NASDAQ Penny Stocks · PreStocks · RWAs · DeFi · Memes · BSC 400 · Custom**
 
 Only actual compatible BSC contracts can receive onchain capabilities. A ticker existing on another chain is not sufficient.
 
@@ -82,7 +82,7 @@ The Basket Curve reads reserve balances live instead of trusting a static intern
 
 PreStocks are not enabled as BSC quote assets unless an official compatible BSC deployment exists.
 
-## NASDAQ microcaps
+## NASDAQ penny stocks
 
 Fortune includes an any-ticker lookup for real NASDAQ stocks. The launch UI can:
 

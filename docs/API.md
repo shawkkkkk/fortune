@@ -140,6 +140,16 @@ It also returns Fortune's immutable protocol terms:
 The returned `previewId` is an API configuration fingerprint and **not** the
 onchain manifest hash.
 
+### GET /transactions/{hash}
+
+Resolves a transaction directly from the configured BSC RPC and returns one of:
+- `not_found`
+- `pending`
+- `confirmed`
+- `reverted`
+
+The endpoint deliberately returns `safeToBlindlyResubmit: false` in every state. A not-found transaction still requires nonce/propagation recovery before another signed transaction is created.
+
 ### GET /tokens
 ### GET /tokens/{id}
 ### GET /launches

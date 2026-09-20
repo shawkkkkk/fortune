@@ -224,6 +224,25 @@ contract FortuneTest is Test {
         assertGt(usdt.balanceOf(user), before);
     }
 
+    function testGraduationAnchorLocksCurvePriceOnce() public {
+        FortuneFactory.LaunchInfo memory info =
+            factory.createLaunch(_params(50e18));
+        FortuneCurve curve = FortuneCurve(info.curve);
+
+        vm.startPrank(user);
+        usdt.approve(address(curve), type(uint256).max);
+        curve.buy(address(usdt), 100e18, 1);
+        vm.stopPrank();
+
+        assertTrue(curve.graduationReady());
+        uint256 anchor = curve.graduationAnchorPriceUsd1e18();
+        assertGt(anchor, 0);
+
+        // Subsequent keeper checks cannot move the chart anchor.
+        curve.checkGraduation();
+        assertEq(curve.graduationAnchorPriceUsd1e18(), anchor);
+    }
+
     function testGraduationMovesBasketToApprovedAdapter() public {
         FortuneFactory.LaunchInfo memory info = factory.createLaunch(_params(50e18));
         FortuneCurve curve = FortuneCurve(info.curve);

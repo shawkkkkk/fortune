@@ -38,11 +38,32 @@ contract FortuneChainlinkOracle is IFortunePriceOracle, Ownable2Step {
         address feed = feedFor[asset];
         require(feed != address(0), "NO_FEED");
 
-        (, int256 answer,, uint256 timestamp,) = IAggregatorV3(feed).latestRoundData();
+        (
+            uint80 roundId,
+            int256 answer,
+            ,
+            uint256 timestamp,
+            uint80 answeredInRound
+        ) = IAggregatorV3(feed).latestRoundData();
+
         require(answer > 0, "BAD_ANSWER");
+        require(timestamp > 0 && timestamp <= block.timestamp, "BAD_TIMESTAMP");
+        require(answeredInRound >= roundId, "INCOMPLETE_ROUND");
 
         uint8 decimals = IAggregatorV3(feed).decimals();
-        price = uint256(answer) * 1e18 / (10 ** uint256(decimals));
+        require(decimals <= 36, "BAD_FEED_DECIMALS");
+
+        if (decimals <= 18) {
+            price =
+                uint256(answer) *
+                (10 ** uint256(18 - decimals));
+        } else {
+            price =
+                uint256(answer) /
+                (10 ** uint256(decimals - 18));
+        }
+
+        require(price > 0, "NORMALIZED_PRICE_ZERO");
         updatedAt = timestamp;
     }
 }

@@ -5,3 +5,5 @@ This trigger runs bounded real Standard + Tax Token lifecycle proofs against tha
 No mainnet assets. Chain 97 only.
 
 Retry 1: current scripts compile after GraduationStormSetup metadata update.
+
+Retry 2: split tax launch and creator first buy into separate BSC transactions.

@@ -1,38 +1,7 @@
 import { apiError, apiOk } from "@/lib/public-api";
+import { configuredRpcUrls, rpcCall } from "@/lib/bsc-rpc";
 
 export const dynamic = "force-dynamic";
-
-async function rpc(
-  rpcUrl: string,
-  method: string,
-  params: unknown[]
-) {
-  const response = await fetch(rpcUrl, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      jsonrpc: "2.0",
-      id: 1,
-      method,
-      params,
-    }),
-    cache: "no-store",
-  });
-
-  if (!response.ok) {
-    throw new Error("RPC_HTTP_" + response.status);
-  }
-
-  const body = await response.json();
-
-  if (body?.error) {
-    throw new Error(
-      String(body.error?.message || "RPC_ERROR")
-    );
-  }
-
-  return body?.result ?? null;
-}
 
 export async function GET(
   _request: Request,
@@ -52,12 +21,9 @@ export async function GET(
     process.env.NEXT_PUBLIC_CHAIN_ID || 97
   );
 
-  const rpcUrl =
-    chainId === 56
-      ? process.env.BSC_RPC_URL
-      : process.env.BSC_TESTNET_RPC_URL;
+  const rpcUrls = configuredRpcUrls(chainId);
 
-  if (!rpcUrl) {
+  if (!rpcUrls.length) {
     return apiError(
       "protocol_not_configured",
       "No server-side BSC RPC is configured for transaction recovery.",
@@ -67,19 +33,26 @@ export async function GET(
   }
 
   try {
-    const [receipt, transaction] =
+    const [receiptResponse, transactionResponse] =
       await Promise.all([
-        rpc(
-          rpcUrl,
+        rpcCall(
+          chainId,
           "eth_getTransactionReceipt",
           [hash]
         ),
-        rpc(
-          rpcUrl,
+        rpcCall(
+          chainId,
           "eth_getTransactionByHash",
           [hash]
         ),
       ]);
+
+    const receipt = receiptResponse.result;
+    const transaction = transactionResponse.result;
+    const providerIndex = Math.min(
+      receiptResponse.providerIndex,
+      transactionResponse.providerIndex
+    );
 
     if (!receipt && !transaction) {
       return apiOk(
@@ -93,7 +66,9 @@ export async function GET(
         },
         {
           meta: {
-            authoritativeSource: "BSC RPC",
+            authoritativeSource: "BSC RPC failover",
+            providerIndex,
+            configuredProviders: rpcUrls.length,
           },
         }
       );
@@ -112,7 +87,9 @@ export async function GET(
         },
         {
           meta: {
-            authoritativeSource: "BSC RPC",
+            authoritativeSource: "BSC RPC failover",
+            providerIndex,
+            configuredProviders: rpcUrls.length,
           },
         }
       );

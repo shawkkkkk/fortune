@@ -32,6 +32,16 @@ Production preflight should reject:
 - venue/router misconfiguration;
 - incompatible token behavior.
 
+### Final-buy partial fills
+
+The final curve purchase is clamped to the remaining graduation target. Fortune
+charges only the quote amount actually used and returns excess input in the same
+transaction. This prevents a small preceding transaction from making the final
+buyer revert or overfunding the graduation reserve.
+
+The contract's `previewBuy()` returns the exact current shield tax, normal fee,
+quote spent, refund, normalized USD contribution and tokens out.
+
 ### Atomic graduation
 
 Reserve transfers and adapter execution happen in one EVM transaction.
@@ -70,6 +80,16 @@ The chart pipeline must:
 8. aggregate multi-pool price using a liquidity/depth-aware policy rather than blindly averaging tiny pools.
 
 A weird chart is usually a data/integration bug, not something the UI should smooth away cosmetically.
+
+### Failed-graduation rescue
+
+If a launch reaches `GraduationReady` but cannot complete graduation for seven
+days, rescue can be activated permissionlessly. Holders can return circulating
+curve tokens for their pro-rata share of the quote reserves still held by the
+curve.
+
+This path cannot touch a successfully graduated pool and does not make external
+fee/automation vaults withdrawable.
 
 ### Pool health state
 

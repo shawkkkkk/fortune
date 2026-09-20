@@ -5,6 +5,11 @@ import {Script, console2} from "forge-std/Script.sol";
 
 import {FortuneAssetRegistry} from "../src/FortuneAssetRegistry.sol";
 import {FortuneAutomationRegistry} from "../src/FortuneAutomationRegistry.sol";
+import {FortuneMetadataRegistry} from "../src/FortuneMetadataRegistry.sol";
+import {FortuneTokenDeployer} from "../src/deployers/FortuneTokenDeployer.sol";
+import {FortuneVaultDeployer} from "../src/deployers/FortuneVaultDeployer.sol";
+import {FortuneFeeRouterDeployer} from "../src/deployers/FortuneFeeRouterDeployer.sol";
+import {FortuneCurveDeployer} from "../src/deployers/FortuneCurveDeployer.sol";
 import {FortuneCurve} from "../src/FortuneCurve.sol";
 import {FortuneFactory} from "../src/FortuneFactory.sol";
 import {FortunePancakeV3GraduationAdapter} from "../src/FortunePancakeV3GraduationAdapter.sol";
@@ -91,15 +96,36 @@ contract PancakeTestnetDrill is Script {
             new FortuneAutomationRegistry(
                 deployer
             );
+        FortuneMetadataRegistry metadataRegistry =
+            new FortuneMetadataRegistry(
+                deployer
+            );
+        FortuneTokenDeployer tokenDeployer =
+            new FortuneTokenDeployer();
+        FortuneVaultDeployer vaultDeployer =
+            new FortuneVaultDeployer();
+        FortuneFeeRouterDeployer feeRouterDeployer =
+            new FortuneFeeRouterDeployer();
+        FortuneCurveDeployer curveDeployer =
+            new FortuneCurveDeployer();
 
         FortuneFactory factory =
             new FortuneFactory(
                 deployer,
                 address(registry),
                 address(automationRegistry),
+                address(metadataRegistry),
+                address(tokenDeployer),
+                address(vaultDeployer),
+                address(feeRouterDeployer),
+                address(curveDeployer),
                 deployer,
                 deployer
             );
+
+        metadataRegistry.bindFactory(
+            address(factory)
+        );
 
         FortunePermanentLiquidityLocker locker =
             new FortunePermanentLiquidityLocker(

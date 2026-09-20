@@ -1,0 +1,192 @@
+name: Fortune Public Alpha Deploy + Drill
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type DEPLOY_PUBLIC_ALPHA to deploy a fresh BSC Testnet public stack and run both real Pancake lifecycle drills"
+        required: true
+        type: string
+      pancake_v3_factory:
+        description: "PancakeSwap V3 factory on BSC testnet"
+        required: true
+        default: "0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865"
+        type: string
+      pancake_v3_position_manager:
+        description: "PancakeSwap V3 position manager on BSC testnet"
+        required: true
+        default: "0x427bF5b37357632377eCbEC9de3626C71A5396c1"
+        type: string
+      pancake_v2_router:
+        description: "PancakeSwap V2 router on BSC testnet"
+        required: true
+        default: "0x9ac64cc6e4415144c455bd8e4837fea55603e5c3"
+        type: string
+
+jobs:
+  deploy-and-drill:
+    if: ${{ inputs.confirm == 'DEPLOY_PUBLIC_ALPHA' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: contracts
+    env:
+      PRIVATE_KEY: ${{ secrets.FORTUNE_TESTNET_PRIVATE_KEY }}
+      BSC_TESTNET_RPC_URL: ${{ secrets.BSC_TESTNET_RPC_URL }}
+      PANCAKE_V3_FACTORY: ${{ inputs.pancake_v3_factory }}
+      PANCAKE_V3_POSITION_MANAGER: ${{ inputs.pancake_v3_position_manager }}
+      PANCAKE_V2_ROUTER: ${{ inputs.pancake_v2_router }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Require BSC testnet secrets
+        run: |
+          test -n "$PRIVATE_KEY" || (echo "Missing FORTUNE_TESTNET_PRIVATE_KEY secret" && exit 1)
+          test -n "$BSC_TESTNET_RPC_URL" || (echo "Missing BSC_TESTNET_RPC_URL secret" && exit 1)
+
+      - name: Install Solidity libraries
+        run: |
+          forge install OpenZeppelin/openzeppelin-contracts@v5.1.0 --no-commit
+          forge install foundry-rs/forge-std --no-commit
+
+      - name: Verify testnet chain and Pancake dependencies
+        run: |
+          set -euo pipefail
+          CHAIN_ID=$(cast chain-id --rpc-url "$BSC_TESTNET_RPC_URL")
+          test "$CHAIN_ID" = "97" || (echo "Expected BSC Testnet chain 97, got $CHAIN_ID" && exit 1)
+
+          for ADDRESS in "$PANCAKE_V3_FACTORY" "$PANCAKE_V3_POSITION_MANAGER" "$PANCAKE_V2_ROUTER"; do
+            CODE=$(cast code "$ADDRESS" --rpc-url "$BSC_TESTNET_RPC_URL")
+            test "$CODE" != "0x" || (echo "Configured Pancake dependency has no bytecode: $ADDRESS" && exit 1)
+          done
+
+          PANCAKE_V2_FACTORY=$(cast call "$PANCAKE_V2_ROUTER" "factory()(address)" --rpc-url "$BSC_TESTNET_RPC_URL")
+          CODE=$(cast code "$PANCAKE_V2_FACTORY" --rpc-url "$BSC_TESTNET_RPC_URL")
+          test "$CODE" != "0x" || (echo "Router returned a V2 factory with no bytecode" && exit 1)
+          echo "PANCAKE_V2_FACTORY=$PANCAKE_V2_FACTORY" >> "$GITHUB_ENV"
+          echo "Pancake V2 factory: $PANCAKE_V2_FACTORY"
+
+      - name: Require a safe testnet gas budget
+        run: |
+          set -euo pipefail
+          WALLET=$(cast wallet address --private-key "$PRIVATE_KEY")
+          BALANCE=$(cast balance "$WALLET" --rpc-url "$BSC_TESTNET_RPC_URL")
+          REQUIRED=120000000000000000
+          echo "Testnet deployer: $WALLET"
+          echo "tBNB balance (wei): $BALANCE"
+          if [ "$BALANCE" -lt "$REQUIRED" ]; then
+            echo "Need at least 0.12 tBNB for the fresh public stack + both real lifecycle drills."
+            exit 1
+          fi
+
+      - name: Run full local contract suite
+        run: forge test --fuzz-runs 1000 -vvv
+
+      - name: Simulate unified public testnet deployment
+        run: |
+          forge script script/PublicTestnetStack.s.sol:PublicTestnetStack             --rpc-url "$BSC_TESTNET_RPC_URL"             -vvvv
+
+      - name: Broadcast unified public testnet deployment
+        run: |
+          set -o pipefail
+          forge script script/PublicTestnetStack.s.sol:PublicTestnetStack             --rpc-url "$BSC_TESTNET_RPC_URL"             --broadcast             --slow             --with-gas-price 1000000000             --priority-gas-price 1000000000             -vvvv | tee /tmp/fortune-public-alpha-deploy.log
+
+      - name: Export deployed addresses
+        run: |
+          set -euo pipefail
+          LOG=/tmp/fortune-public-alpha-deploy.log
+
+          extract() {
+            grep "$1" "$LOG" | grep -oE '0x[a-fA-F0-9]{40}' | tail -1
+          }
+
+          echo "FORTUNE_FACTORY=$(extract FortuneFactory)" >> "$GITHUB_ENV"
+          echo "FORTUNE_TAX_FACTORY=$(extract FortuneTaxFactory)" >> "$GITHUB_ENV"
+          echo "FORTUNE_REGISTRY=$(extract FortuneAssetRegistry)" >> "$GITHUB_ENV"
+          echo "FORTUNE_POOL_REGISTRY=$(extract FortunePoolRegistry)" >> "$GITHUB_ENV"
+          echo "FORTUNE_V3_ADAPTER=$(extract FortunePancakeV3GraduationAdapter)" >> "$GITHUB_ENV"
+          echo "FORTUNE_V3_LOCKER=$(extract FortunePermanentLiquidityLocker)" >> "$GITHUB_ENV"
+          echo "FORTUNE_V2_TAX_ADAPTER=$(extract FortunePancakeV2TaxGraduationAdapter)" >> "$GITHUB_ENV"
+          echo "FORTUNE_V2_LOCKER=$(extract FortunePermanentV2LiquidityLocker)" >> "$GITHUB_ENV"
+          echo "FORTUNE_MOCK_QUOTE=$(extract MockQuote)" >> "$GITHUB_ENV"
+          echo "FORTUNE_MOCK_ORACLE=$(extract MockUsdOracle)" >> "$GITHUB_ENV"
+
+          for LABEL in             FortuneFactory             FortuneTaxFactory             FortuneAssetRegistry             FortunePoolRegistry             FortunePancakeV3GraduationAdapter             FortunePermanentLiquidityLocker             FortunePancakeV2TaxGraduationAdapter             FortunePermanentV2LiquidityLocker             MockQuote             MockUsdOracle
+          do
+            VALUE=$(extract "$LABEL")
+            test -n "$VALUE" || (echo "Could not parse $LABEL from deployment log" && exit 1)
+            echo "$LABEL=$VALUE"
+          done
+
+      - name: Verify deployed bytecode
+        run: |
+          set -euo pipefail
+          for ADDRESS in             "$FORTUNE_FACTORY"             "$FORTUNE_TAX_FACTORY"             "$FORTUNE_REGISTRY"             "$FORTUNE_POOL_REGISTRY"             "$FORTUNE_V3_ADAPTER"             "$FORTUNE_V3_LOCKER"             "$FORTUNE_V2_TAX_ADAPTER"             "$FORTUNE_V2_LOCKER"             "$FORTUNE_MOCK_QUOTE"             "$FORTUNE_MOCK_ORACLE"
+          do
+            CODE=$(cast code "$ADDRESS" --rpc-url "$BSC_TESTNET_RPC_URL")
+            test "$CODE" != "0x" || (echo "Missing deployed bytecode: $ADDRESS" && exit 1)
+          done
+
+      - name: Simulate standard atomic-first-buy lifecycle
+        run: |
+          forge script script/StandardPublicTestnetDrill.s.sol:StandardPublicTestnetDrill             --rpc-url "$BSC_TESTNET_RPC_URL"             -vvvv
+
+      - name: Broadcast standard V3 lifecycle
+        run: |
+          set -o pipefail
+          forge script script/StandardPublicTestnetDrill.s.sol:StandardPublicTestnetDrill             --rpc-url "$BSC_TESTNET_RPC_URL"             --broadcast             --slow             --with-gas-price 1000000000             --priority-gas-price 1000000000             -vvvv | tee /tmp/fortune-standard-public-alpha-drill.log
+
+      - name: Require standard lifecycle marker
+        run: |
+          grep -q "STANDARD_ONCHAIN_EXECUTION_COMPLETE_AND_SUCCESSFUL" /tmp/fortune-standard-public-alpha-drill.log
+
+      - name: Simulate tax-token lifecycle
+        run: |
+          forge script script/TaxPublicTestnetDrill.s.sol:TaxPublicTestnetDrill             --rpc-url "$BSC_TESTNET_RPC_URL"             -vvvv
+
+      - name: Broadcast tax-token V2 lifecycle
+        run: |
+          set -o pipefail
+          forge script script/TaxPublicTestnetDrill.s.sol:TaxPublicTestnetDrill             --rpc-url "$BSC_TESTNET_RPC_URL"             --broadcast             --slow             --with-gas-price 1000000000             --priority-gas-price 1000000000             -vvvv | tee /tmp/fortune-tax-public-alpha-drill.log
+
+      - name: Require tax lifecycle marker
+        run: |
+          grep -q "TAX_ONCHAIN_EXECUTION_COMPLETE_AND_SUCCESSFUL" /tmp/fortune-tax-public-alpha-drill.log
+
+      - name: Write public-alpha address manifest
+        run: |
+          cat > /tmp/fortune-public-alpha-addresses.txt <<EOF
+          chainId=97
+          factory=$FORTUNE_FACTORY
+          taxFactory=$FORTUNE_TAX_FACTORY
+          registry=$FORTUNE_REGISTRY
+          poolRegistry=$FORTUNE_POOL_REGISTRY
+          v3GraduationAdapter=$FORTUNE_V3_ADAPTER
+          v3LiquidityLocker=$FORTUNE_V3_LOCKER
+          v2TaxGraduationAdapter=$FORTUNE_V2_TAX_ADAPTER
+          v2LiquidityLocker=$FORTUNE_V2_LOCKER
+          mockQuote=$FORTUNE_MOCK_QUOTE
+          mockOracle=$FORTUNE_MOCK_ORACLE
+          pancakeV2Factory=$PANCAKE_V2_FACTORY
+          pancakeV2Router=$PANCAKE_V2_ROUTER
+          pancakeV3Factory=$PANCAKE_V3_FACTORY
+          pancakeV3PositionManager=$PANCAKE_V3_POSITION_MANAGER
+          EOF
+          cat /tmp/fortune-public-alpha-addresses.txt
+
+      - name: Upload public-alpha evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fortune-public-alpha-deploy-and-drill
+          path: |
+            /tmp/fortune-public-alpha-deploy.log
+            /tmp/fortune-standard-public-alpha-drill.log
+            /tmp/fortune-tax-public-alpha-drill.log
+            /tmp/fortune-public-alpha-addresses.txt
+          retention-days: 30

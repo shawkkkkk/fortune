@@ -9,6 +9,18 @@ const LIGHTER_BASES = [
 
 type RawMarket = Record<string, unknown>;
 
+type NormalizedMarket = {
+  marketId: number;
+  symbol: string;
+  active: boolean;
+  markPrice: number | null;
+  indexPrice: number | null;
+  lastTradePrice: number | null;
+  openInterest: number | null;
+  volume24h: number | null;
+  marketConfig: unknown;
+};
+
 function value(record: RawMarket, ...keys: string[]) {
   for (const key of keys) {
     const v = record[key];
@@ -24,7 +36,7 @@ function num(v: unknown) {
   return Number.isFinite(n) ? n : null;
 }
 
-function normalize(raw: RawMarket) {
+function normalize(raw: RawMarket): NormalizedMarket {
   const symbol = String(
     value(raw, "symbol", "market", "name", "ticker", "base_symbol") || ""
   ).toUpperCase();
@@ -61,7 +73,7 @@ function normalize(raw: RawMarket) {
   };
 }
 
-async function loadMarkets() {
+async function loadMarkets(): Promise<{ source: string; markets: NormalizedMarket[] }> {
   let lastError: Error | null = null;
 
   for (const base of LIGHTER_BASES) {

@@ -1,0 +1,230 @@
+name: Fortune Concurrent Graduation Wave
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type RUN_GRADUATION_STORM to confirm real BSC testnet transactions"
+        required: true
+        type: string
+      launch_count:
+        description: "Prepared launches/graduations for this wave (ladder: 10, 25, 50, 100)"
+        required: true
+        default: "10"
+        type: string
+      submission_concurrency:
+        description: "Concurrent graduation submissions"
+        required: true
+        default: "10"
+        type: string
+
+jobs:
+  graduation-wave:
+    if: ${{ inputs.confirm == 'RUN_GRADUATION_STORM' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+
+    env:
+      BSC_TESTNET_RPC_URL: ${{ secrets.BSC_TESTNET_RPC_URL }}
+      PANCAKE_V3_FACTORY: "0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865"
+      PANCAKE_V3_POSITION_MANAGER: "0x427bF5b37357632377eCbEC9de3626C71A5396c1"
+      GAS_PRICE_WEI: "1000000000"
+      BASE_URL: "http://127.0.0.1:3000"
+      SUCCESS_FLOOR: "0.995"
+      P95_LIMIT_MS: "2500"
+      TIMEOUT_MS: "8000"
+      INCLUDE_RPC_CHECKS: "false"
+      STAGES: "500x5000"
+      REPORT_PATH: "/tmp/fortune-launch-storm-report.json"
+      GRADUATION_REPORT_PATH: "/tmp/fortune-graduation-wave-report.json"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Validate inputs, chain and testnet balance
+        env:
+          PRIVATE_KEY: ${{ secrets.FORTUNE_TESTNET_PRIVATE_KEY }}
+          LAUNCH_COUNT: ${{ inputs.launch_count }}
+          SUBMISSION_CONCURRENCY: ${{ inputs.submission_concurrency }}
+        run: |
+          test -n "$BSC_TESTNET_RPC_URL" || (echo "Missing BSC_TESTNET_RPC_URL secret" && exit 1)
+          test -n "$PRIVATE_KEY" || (echo "Missing FORTUNE_TESTNET_PRIVATE_KEY secret" && exit 1)
+
+          case "$LAUNCH_COUNT" in ''|*[!0-9]*) echo "launch_count must be an integer"; exit 1 ;; esac
+          case "$SUBMISSION_CONCURRENCY" in ''|*[!0-9]*) echo "submission_concurrency must be an integer"; exit 1 ;; esac
+
+          test "$LAUNCH_COUNT" -ge 1 && test "$LAUNCH_COUNT" -le 100
+          test "$SUBMISSION_CONCURRENCY" -ge 1 && test "$SUBMISSION_CONCURRENCY" -le "$LAUNCH_COUNT"
+
+          CHAIN_ID=$(cast chain-id --rpc-url "$BSC_TESTNET_RPC_URL")
+          test "$CHAIN_ID" = "97" || (echo "RPC must be BSC testnet chain 97" && exit 1)
+
+          test "$(cast code "$PANCAKE_V3_FACTORY" --rpc-url "$BSC_TESTNET_RPC_URL")" != "0x"
+          test "$(cast code "$PANCAKE_V3_POSITION_MANAGER" --rpc-url "$BSC_TESTNET_RPC_URL")" != "0x"
+
+          WALLET=$(cast wallet address --private-key "$PRIVATE_KEY")
+          BALANCE_WEI=$(cast balance "$WALLET" --rpc-url "$BSC_TESTNET_RPC_URL")
+          SAFETY_WEI=$(python3 -c "print((int('$LAUNCH_COUNT') * 20_000_000 + 50_000_000) * 1_000_000_000)")
+
+          echo "Testnet deployer: $WALLET"
+          echo "Balance: $(cast balance "$WALLET" --ether --rpc-url "$BSC_TESTNET_RPC_URL") tBNB"
+          echo "Conservative safety budget for $LAUNCH_COUNT launches: $(python3 -c "print(int('$SAFETY_WEI')/1e18)") tBNB"
+
+          test "$BALANCE_WEI" -ge "$SAFETY_WEI" || \
+            (echo "Insufficient tBNB for this graduation-wave size. Top up testnet funds or run a smaller ladder step." && exit 1)
+
+      - name: Install Solidity libraries
+        working-directory: contracts
+        run: |
+          forge install OpenZeppelin/openzeppelin-contracts@v5.1.0 --no-commit
+          forge install foundry-rs/forge-std --no-commit
+
+      - name: Run contract suite before wave
+        working-directory: contracts
+        run: forge test --fuzz-runs 1000 -vvv
+
+      - name: Prepare independent graduation-ready launches
+        working-directory: contracts
+        env:
+          PRIVATE_KEY: ${{ secrets.FORTUNE_TESTNET_PRIVATE_KEY }}
+          STORM_LAUNCH_COUNT: ${{ inputs.launch_count }}
+        run: |
+          forge script script/GraduationStormSetup.s.sol:GraduationStormSetup \
+            --rpc-url "$BSC_TESTNET_RPC_URL" \
+            --broadcast \
+            --with-gas-price "$GAS_PRICE_WEI" \
+            --priority-gas-price "$GAS_PRICE_WEI" \
+            -vvv 2>&1 | tee /tmp/graduation-storm-setup.log
+
+          FACTORY=$(awk '/^  StormFactory 0x/{v=$2} END{print v}' /tmp/graduation-storm-setup.log)
+          REGISTRY=$(awk '/^  StormRegistry 0x/{v=$2} END{print v}' /tmp/graduation-storm-setup.log)
+          ADAPTER=$(awk '/^  StormAdapter 0x/{v=$2} END{print v}' /tmp/graduation-storm-setup.log)
+          LOCKER=$(awk '/^  StormLocker 0x/{v=$2} END{print v}' /tmp/graduation-storm-setup.log)
+          QUOTE=$(awk '/^  StormQuote 0x/{v=$2} END{print v}' /tmp/graduation-storm-setup.log)
+          FUNDER=$(awk '/^  StormFunder 0x/{v=$2} END{print v}' /tmp/graduation-storm-setup.log)
+
+          awk '/^  StormCurve 0x/{print $2}' /tmp/graduation-storm-setup.log > /tmp/storm-curves.txt
+          awk '/^  StormToken 0x/{print $2}' /tmp/graduation-storm-setup.log > /tmp/storm-tokens.txt
+
+          EXPECTED="${{ inputs.launch_count }}"
+          test "$(wc -l < /tmp/storm-curves.txt | tr -d ' ')" = "$EXPECTED"
+          test "$(wc -l < /tmp/storm-tokens.txt | tr -d ' ')" = "$EXPECTED"
+
+          for value in "$FACTORY" "$REGISTRY" "$ADAPTER" "$LOCKER" "$QUOTE" "$FUNDER"; do
+            test -n "$value" || (echo "Failed to parse graduation-wave deployment" && exit 1)
+          done
+
+          {
+            echo "STORM_FACTORY=$FACTORY"
+            echo "STORM_REGISTRY=$REGISTRY"
+            echo "STORM_ADAPTER=$ADAPTER"
+            echo "STORM_LOCKER=$LOCKER"
+            echo "STORM_QUOTE=$QUOTE"
+            echo "STORM_FUNDER=$FUNDER"
+            echo "NEXT_PUBLIC_CHAIN_ID=97"
+            echo "NEXT_PUBLIC_FORTUNE_FACTORY_ADDRESS=$FACTORY"
+            echo "NEXT_PUBLIC_FORTUNE_REGISTRY_ADDRESS=$REGISTRY"
+            echo "NEXT_PUBLIC_FORTUNE_GRADUATION_ADAPTER_ADDRESS=$ADAPTER"
+            echo "NEXT_PUBLIC_FORTUNE_LIQUIDITY_LOCKER_ADDRESS=$LOCKER"
+            echo "FORTUNE_REGISTRY=$REGISTRY"
+            echo "FORTUNE_GRADUATION_ADAPTER=$ADAPTER"
+            echo "FORTUNE_LIQUIDITY_LOCKER=$LOCKER"
+          } >> "$GITHUB_ENV"
+
+      - name: Verify every launch is ready before the wave
+        run: |
+          FAIL=0
+          while read -r CURVE; do
+            READY=$(cast call "$CURVE" "graduationReady()(bool)" --rpc-url "$BSC_TESTNET_RPC_URL")
+            GRADUATED=$(cast call "$CURVE" "graduated()(bool)" --rpc-url "$BSC_TESTNET_RPC_URL")
+            if [ "$READY" != "true" ] || [ "$GRADUATED" != "false" ]; then
+              echo "Bad pre-wave state: $CURVE ready=$READY graduated=$GRADUATED"
+              FAIL=1
+            fi
+          done < /tmp/storm-curves.txt
+          test "$FAIL" = "0"
+
+      - name: Build and start Fortune against wave deployment
+        env:
+          BSC_TESTNET_RPC_URL: ${{ secrets.BSC_TESTNET_RPC_URL }}
+        run: |
+          npm install
+          npm run build
+          npm run start -- --hostname 127.0.0.1 --port 3000 > /tmp/fortune-web.log 2>&1 &
+          echo $! > /tmp/fortune-web.pid
+
+          for i in {1..60}; do
+            if curl -fsS "$BASE_URL/api/ready" >/tmp/fortune-ready.json 2>/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          cat /tmp/fortune-ready.json
+          curl -fsS "$BASE_URL/api/ready" >/dev/null
+
+      - name: Run heavy web load and concurrent graduation wave
+        env:
+          RPC_URL: ${{ secrets.BSC_TESTNET_RPC_URL }}
+          FACTORY_ADDRESS: ${{ env.STORM_FACTORY }}
+          LOCKER_ADDRESS: ${{ env.STORM_LOCKER }}
+          POSITION_MANAGER_ADDRESS: ${{ env.PANCAKE_V3_POSITION_MANAGER }}
+          FUNDER_ADDRESS: ${{ env.STORM_FUNDER }}
+          DEPLOYER_PRIVATE_KEY: ${{ secrets.FORTUNE_TESTNET_PRIVATE_KEY }}
+          CURVES_FILE: "/tmp/storm-curves.txt"
+          SUBMISSION_CONCURRENCY: ${{ inputs.submission_concurrency }}
+          REPORT_PATH: ${{ env.GRADUATION_REPORT_PATH }}
+        run: |
+          node scripts/launch-storm.mjs > /tmp/web-storm.log 2>&1 &
+          WEB_PID=$!
+
+          set +e
+          node scripts/graduation-storm.mjs
+          GRAD_EXIT=$?
+          wait "$WEB_PID"
+          WEB_EXIT=$?
+          set -e
+
+          cat /tmp/web-storm.log
+
+          test "$GRAD_EXIT" = "0" || exit "$GRAD_EXIT"
+          test "$WEB_EXIT" = "0" || exit "$WEB_EXIT"
+
+      - name: Post-wave readiness smoke
+        run: |
+          for i in {1..10}; do
+            curl -fsS "$BASE_URL/api/ready" >/dev/null
+            BODY=$(curl -fsS "$BASE_URL/api/public/v1/readiness")
+            node -e 'const x=JSON.parse(process.argv[1]); if (!x.data || x.data.ready !== true) process.exit(1)' "$BODY"
+          done
+
+      - name: Show graduation-wave summary
+        if: always()
+        run: |
+          echo "=== Graduation wave ==="
+          cat "$GRADUATION_REPORT_PATH" 2>/dev/null || true
+          echo "=== Web load ==="
+          cat "$REPORT_PATH" 2>/dev/null || true
+
+      - name: Upload graduation-wave evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fortune-graduation-wave-${{ inputs.launch_count }}
+          path: |
+            /tmp/graduation-storm-setup.log
+            /tmp/storm-curves.txt
+            /tmp/storm-tokens.txt
+            /tmp/fortune-graduation-wave-report.json
+            /tmp/fortune-launch-storm-report.json
+            /tmp/web-storm.log
+            /tmp/fortune-web.log
+          if-no-files-found: warn
+          retention-days: 30

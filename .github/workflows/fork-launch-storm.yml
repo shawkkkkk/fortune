@@ -235,6 +235,7 @@ jobs:
                 --rpc-url "$LOCAL_RPC_URL" \
                 --broadcast \
                 --slow \
+                --sender "$LOCAL_SIGNER" \
                 --with-gas-price 1000000000 \
                 --priority-gas-price 1000000000 \
                 -vvv

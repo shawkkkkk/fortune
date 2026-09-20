@@ -29,6 +29,18 @@ export async function GET(request: Request) {
           responses: { "200": { description: "API metadata" } },
         },
       },
+      "/readiness": {
+        get: {
+          tags: ["Protocol"],
+          summary: "14-point infrastructure readiness gate",
+          responses: {
+            "200": {
+              description:
+                "Factory, RPC redundancy, graduation, LP-lock and Pancake deployment readiness",
+            },
+          },
+        },
+      },
       "/protocol": {
         get: {
           tags: ["Protocol"],

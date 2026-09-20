@@ -1,0 +1,231 @@
+name: Fortune Fork Launch Storm
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type RUN_STORM to confirm the forked full-stack stress drill"
+        required: true
+        type: string
+      stages:
+        description: "HTTP concurrency x request stages"
+        required: true
+        default: "50x500,200x2000,500x5000"
+        type: string
+      p95_limit_ms:
+        description: "Maximum acceptable stage p95 latency"
+        required: true
+        default: "2500"
+        type: string
+      graduation_repeats:
+        description: "Number of end-to-end Pancake graduations to run on the local BSC fork"
+        required: true
+        default: "3"
+        type: string
+
+jobs:
+  storm:
+    if: ${{ inputs.confirm == 'RUN_STORM' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    permissions:
+      contents: read
+
+    env:
+      UPSTREAM_BSC_TESTNET_RPC_URL: ${{ secrets.BSC_TESTNET_RPC_URL }}
+      LOCAL_RPC_URL: "http://127.0.0.1:8545"
+      BASE_URL: "http://127.0.0.1:3000"
+      STAGES: ${{ inputs.stages }}
+      P95_LIMIT_MS: ${{ inputs.p95_limit_ms }}
+      SUCCESS_FLOOR: "0.995"
+      TIMEOUT_MS: "8000"
+      REPORT_PATH: "/tmp/fortune-launch-storm-report.json"
+      PANCAKE_V3_FACTORY: "0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865"
+      PANCAKE_V3_POSITION_MANAGER: "0x427bF5b37357632377eCbEC9de3626C71A5396c1"
+
+      # Local Anvil account only. This key never controls testnet/mainnet funds.
+      PRIVATE_KEY: "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+
+      # Snapshot from the successful 2026-09-20 BSC testnet drill.
+      NEXT_PUBLIC_CHAIN_ID: "97"
+      NEXT_PUBLIC_FORTUNE_FACTORY_ADDRESS: "0x9Eac6c6CdA0A19cbb0f8Abc51Ee968545E6EB415"
+      NEXT_PUBLIC_FORTUNE_REGISTRY_ADDRESS: "0x943176d26A332F4687d52695fe9625866c2c3A67"
+      NEXT_PUBLIC_FORTUNE_GRADUATION_ADAPTER_ADDRESS: "0xF666487e58dEFB8584C7eAa2378DEe1BbAbe012C"
+      NEXT_PUBLIC_FORTUNE_LIQUIDITY_LOCKER_ADDRESS: "0x861Deb497eA845dda8727B11462d11Abe34E2AE8"
+      FORTUNE_REGISTRY: "0x943176d26A332F4687d52695fe9625866c2c3A67"
+      FORTUNE_GRADUATION_ADAPTER: "0xF666487e58dEFB8584C7eAa2378DEe1BbAbe012C"
+      FORTUNE_LIQUIDITY_LOCKER: "0x861Deb497eA845dda8727B11462d11Abe34E2AE8"
+
+      LIVE_CURVE: "0x5E7967bde6286aE030bFd45FbB8650df221F22e9"
+      LIVE_TOKEN: "0xC27aF82E8A228a0167FbE1673CaD13cD35Ee16Fe"
+      LIVE_QUOTE: "0x871356a53Dd988EFDAa82261c9d212Ac08988fd0"
+      LIVE_POOL: "0x5c9fAB9ee5286fE5c071Bd547f9B308a550FA50f"
+      LIVE_LP_TOKEN_ID: "37496"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Validate inputs and RPC secret
+        run: |
+          test -n "$UPSTREAM_BSC_TESTNET_RPC_URL" || (echo "Missing BSC_TESTNET_RPC_URL secret" && exit 1)
+          case "${{ inputs.graduation_repeats }}" in
+            ''|*[!0-9]*) echo "graduation_repeats must be an integer"; exit 1 ;;
+          esac
+          test "${{ inputs.graduation_repeats }}" -ge 1 || (echo "graduation_repeats must be >= 1" && exit 1)
+          test "${{ inputs.graduation_repeats }}" -le 10 || (echo "graduation_repeats must be <= 10" && exit 1)
+
+      - name: Start isolated BSC testnet fork
+        run: |
+          anvil \
+            --fork-url "$UPSTREAM_BSC_TESTNET_RPC_URL" \
+            --chain-id 97 \
+            --host 127.0.0.1 \
+            --port 8545 \
+            --block-time 1 \
+            > /tmp/anvil.log 2>&1 &
+          echo $! > /tmp/anvil.pid
+
+          for i in {1..60}; do
+            if cast chain-id --rpc-url "$LOCAL_RPC_URL" >/tmp/fork-chain-id 2>/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+
+          CHAIN_ID=$(cat /tmp/fork-chain-id)
+          test "$CHAIN_ID" = "97" || (cat /tmp/anvil.log && echo "Fork did not start on chain 97" && exit 1)
+
+          cast rpc --rpc-url "$LOCAL_RPC_URL" anvil_setBalance \
+            0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 \
+            0x3635C9ADC5DEA00000 >/dev/null
+
+          test "$(cast code "$PANCAKE_V3_FACTORY" --rpc-url "$LOCAL_RPC_URL")" != "0x"
+          test "$(cast code "$PANCAKE_V3_POSITION_MANAGER" --rpc-url "$LOCAL_RPC_URL")" != "0x"
+
+      - name: Install Solidity libraries
+        working-directory: contracts
+        run: |
+          forge install OpenZeppelin/openzeppelin-contracts@v5.1.0 --no-commit
+          forge install foundry-rs/forge-std --no-commit
+
+      - name: Run contract suite before storm
+        working-directory: contracts
+        run: forge test --fuzz-runs 1000 -vvv
+
+      - name: Verify successful live-drill state on fork
+        env:
+          RPC_URL: ${{ env.LOCAL_RPC_URL }}
+          CURVE_ADDRESS: ${{ env.LIVE_CURVE }}
+          TOKEN_ADDRESS: ${{ env.LIVE_TOKEN }}
+          QUOTE_ADDRESS: ${{ env.LIVE_QUOTE }}
+          POOL_ADDRESS: ${{ env.LIVE_POOL }}
+          LOCKER_ADDRESS: ${{ env.NEXT_PUBLIC_FORTUNE_LIQUIDITY_LOCKER_ADDRESS }}
+          POSITION_MANAGER_ADDRESS: ${{ env.PANCAKE_V3_POSITION_MANAGER }}
+          LP_TOKEN_ID: ${{ env.LIVE_LP_TOKEN_ID }}
+          MAX_PRICE_DEVIATION_BPS: "100"
+        run: node scripts/verify-graduation-state.mjs
+
+      - name: Install and build Fortune web against fork
+        env:
+          BSC_TESTNET_RPC_URL: ${{ env.LOCAL_RPC_URL }}
+        run: |
+          npm install
+          npm run build
+
+      - name: Start Fortune web
+        env:
+          BSC_TESTNET_RPC_URL: ${{ env.LOCAL_RPC_URL }}
+        run: |
+          npm run start -- --hostname 127.0.0.1 --port 3000 > /tmp/fortune-web.log 2>&1 &
+          echo $! > /tmp/fortune-web.pid
+
+          for i in {1..60}; do
+            if curl -fsS "$BASE_URL/api/ready" >/tmp/fortune-ready.json 2>/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+
+          cat /tmp/fortune-ready.json || true
+          curl -fsS "$BASE_URL/api/ready" >/dev/null || (cat /tmp/fortune-web.log && exit 1)
+
+      - name: Run concurrent web storm and forked Pancake graduations
+        env:
+          BSC_TESTNET_RPC_URL: ${{ env.LOCAL_RPC_URL }}
+        run: |
+          (
+            cd contracts
+            for i in $(seq 1 "${{ inputs.graduation_repeats }}"); do
+              echo "=== Fork graduation $i/${{ inputs.graduation_repeats }} ==="
+              forge script script/PancakeTestnetDrill.s.sol:PancakeTestnetDrill \
+                --rpc-url "$LOCAL_RPC_URL" \
+                --broadcast \
+                --slow \
+                --with-gas-price 1000000000 \
+                --priority-gas-price 1000000000 \
+                -vvv
+            done
+          ) > /tmp/fork-graduations.log 2>&1 &
+          GRAD_PID=$!
+
+          set +e
+          node scripts/launch-storm.mjs
+          STORM_EXIT=$?
+          wait "$GRAD_PID"
+          GRAD_EXIT=$?
+          set -e
+
+          if [ "$GRAD_EXIT" -ne 0 ]; then
+            echo "Forked onchain graduation storm failed."
+            cat /tmp/fork-graduations.log
+            exit "$GRAD_EXIT"
+          fi
+
+          if [ "$STORM_EXIT" -ne 0 ]; then
+            echo "HTTP launch storm missed its release gate."
+            cat "$REPORT_PATH" || true
+            exit "$STORM_EXIT"
+          fi
+
+          grep -q "ONCHAIN EXECUTION COMPLETE & SUCCESSFUL" /tmp/fork-graduations.log || \
+            (echo "No successful forked onchain broadcast marker found" && cat /tmp/fork-graduations.log && exit 1)
+
+      - name: Re-verify live drill invariants after storm
+        env:
+          RPC_URL: ${{ env.LOCAL_RPC_URL }}
+          CURVE_ADDRESS: ${{ env.LIVE_CURVE }}
+          TOKEN_ADDRESS: ${{ env.LIVE_TOKEN }}
+          QUOTE_ADDRESS: ${{ env.LIVE_QUOTE }}
+          POOL_ADDRESS: ${{ env.LIVE_POOL }}
+          LOCKER_ADDRESS: ${{ env.NEXT_PUBLIC_FORTUNE_LIQUIDITY_LOCKER_ADDRESS }}
+          POSITION_MANAGER_ADDRESS: ${{ env.PANCAKE_V3_POSITION_MANAGER }}
+          LP_TOKEN_ID: ${{ env.LIVE_LP_TOKEN_ID }}
+          MAX_PRICE_DEVIATION_BPS: "100"
+        run: node scripts/verify-graduation-state.mjs
+
+      - name: Show storm summary
+        if: always()
+        run: |
+          echo "=== HTTP Launch Storm ==="
+          cat "$REPORT_PATH" 2>/dev/null || true
+          echo "=== Forked graduation markers ==="
+          grep -E "Script ran successfully|ONCHAIN EXECUTION COMPLETE|PancakePoolGraduated|LiquidityPositionLocked" /tmp/fork-graduations.log 2>/dev/null | tail -80 || true
+
+      - name: Upload storm evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fortune-fork-launch-storm
+          path: |
+            /tmp/fortune-launch-storm-report.json
+            /tmp/fork-graduations.log
+            /tmp/fortune-web.log
+            /tmp/anvil.log
+          if-no-files-found: warn
+          retention-days: 14

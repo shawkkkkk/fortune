@@ -59,6 +59,16 @@ contract FortuneFactory is Ownable2Step {
     LaunchInfo[] public launches;
     mapping(address => uint256) public curveIndexPlusOne;
 
+    struct GraduationStatus {
+        uint64 attempts;
+        uint64 failures;
+        uint64 lastAttemptAt;
+        bytes32 lastFailureCode;
+        bool completed;
+    }
+
+    mapping(address => GraduationStatus) public graduationStatus;
+
     event LaunchCreated(
         uint256 indexed launchId,
         address indexed creator,
@@ -75,6 +85,18 @@ contract FortuneFactory is Ownable2Step {
     event GraduationAdapterSet(address indexed adapter);
     event LaunchPauseSet(bool paused);
     event GraduationFinalized(address indexed curve, address indexed adapter);
+    event GraduationPreflightFailed(
+        address indexed curve,
+        address indexed adapter,
+        uint256 indexed attempt,
+        bytes32 reasonCode
+    );
+    event GraduationExecutionFailed(
+        address indexed curve,
+        address indexed adapter,
+        uint256 indexed attempt,
+        bytes32 revertHash
+    );
 
     constructor(
         address initialOwner,
@@ -285,12 +307,68 @@ contract FortuneFactory is Ownable2Step {
     }
 
     /// @notice Permissionless keeper entrypoint. Adapter choice remains protocol-governed.
-    function finalizeGraduation(address curve, bytes calldata data) external {
-        require(graduationAdapter != address(0), "NO_ADAPTER");
+    /// @dev Failures are recorded instead of reverting the outer transaction. The
+    ///      curve's atomic graduation call rolls back all asset transfers on failure,
+    ///      so another keeper may retry safely with corrected adapter data.
+    function finalizeGraduation(address curve, bytes calldata data)
+        external
+        returns (bool success)
+    {
+        address adapter = graduationAdapter;
+        require(adapter != address(0), "NO_ADAPTER");
         require(curveIndexPlusOne[curve] != 0, "UNKNOWN_CURVE");
 
-        FortuneCurve(curve).graduate(graduationAdapter, data);
-        emit GraduationFinalized(curve, graduationAdapter);
+        GraduationStatus storage status = graduationStatus[curve];
+        require(!status.completed, "ALREADY_GRADUATED");
+
+        status.attempts += 1;
+        status.lastAttemptAt = uint64(block.timestamp);
+        uint256 attempt = status.attempts;
+
+        try FortuneCurve(curve).preflightGraduation(adapter, data)
+            returns (bool ready, bytes32 reasonCode)
+        {
+            if (!ready) {
+                status.failures += 1;
+                status.lastFailureCode = reasonCode;
+                emit GraduationPreflightFailed(
+                    curve,
+                    adapter,
+                    attempt,
+                    reasonCode
+                );
+                return false;
+            }
+        } catch (bytes memory preflightError) {
+            bytes32 reasonHash = keccak256(preflightError);
+            status.failures += 1;
+            status.lastFailureCode = reasonHash;
+            emit GraduationPreflightFailed(
+                curve,
+                adapter,
+                attempt,
+                reasonHash
+            );
+            return false;
+        }
+
+        try FortuneCurve(curve).graduate(adapter, data) {
+            status.completed = true;
+            status.lastFailureCode = bytes32(0);
+            emit GraduationFinalized(curve, adapter);
+            return true;
+        } catch (bytes memory executionError) {
+            bytes32 revertHash = keccak256(executionError);
+            status.failures += 1;
+            status.lastFailureCode = revertHash;
+            emit GraduationExecutionFailed(
+                curve,
+                adapter,
+                attempt,
+                revertHash
+            );
+            return false;
+        }
     }
 
     function launchCount() external view returns (uint256) {

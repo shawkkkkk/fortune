@@ -4,7 +4,7 @@ export type AssetCategory =
   | "Stablecoins"
   | "xStocks"
   | "China Stocks"
-  | "NASDAQ Microcaps"
+  | "NASDAQ Penny Stocks"
   | "PreStocks"
   | "RWAs"
   | "DeFi"

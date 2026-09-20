@@ -16,15 +16,25 @@ export default function ExplorePage() {
 
   const contracts = mainnet
     ? [
-        ["Fortune Factory", FORTUNE_NETWORK.contracts.factory],
+        ["Standard FortuneFactory", FORTUNE_NETWORK.contracts.factory],
+        ["Tax FortuneFactory", FORTUNE_NETWORK.contracts.taxFactory],
         ["Asset Registry", FORTUNE_NETWORK.contracts.registry],
+        ["Pool Registry", FORTUNE_NETWORK.contracts.poolRegistry],
         [
-          "Graduation adapter",
+          "V3 graduation adapter",
           FORTUNE_NETWORK.contracts.graduationAdapter,
         ],
         [
-          "Permanent LP locker",
+          "V3 permanent LP locker",
           FORTUNE_NETWORK.contracts.liquidityLocker,
+        ],
+        [
+          "Tax V2 graduation adapter",
+          FORTUNE_NETWORK.contracts.taxGraduationAdapter,
+        ],
+        [
+          "Tax V2 permanent LP locker",
+          FORTUNE_NETWORK.contracts.taxLiquidityLocker,
         ],
         [
           "Primary quote",

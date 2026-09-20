@@ -291,6 +291,91 @@ contract FortuneTest is Test {
         assertGt(usdt.balanceOf(user), before);
     }
 
+    function testFinalCurveBuyPartiallyFillsAndRefundsExcess() public {
+        FortuneFactory.LaunchInfo memory info =
+            factory.createLaunch(_params(50e18));
+        FortuneCurve curve = FortuneCurve(info.curve);
+
+        vm.warp(block.timestamp + 16);
+
+        uint256 before = usdt.balanceOf(user);
+
+        vm.startPrank(user);
+        usdt.approve(address(curve), type(uint256).max);
+
+        (
+            uint256 spent,
+            uint256 refund,
+            ,
+            ,
+            ,
+            ,
+            uint256 previewTokens
+        ) = curve.previewBuy(address(usdt), 100e18);
+
+        uint256 out = curve.buy(address(usdt), 100e18, 1);
+        vm.stopPrank();
+
+        assertGt(refund, 0);
+        assertLt(spent, 100e18);
+        assertEq(out, previewTokens);
+        assertEq(before - usdt.balanceOf(user), spent);
+        assertTrue(curve.graduationReady());
+        assertEq(
+            uint256(curve.phase()),
+            uint256(FortuneCurve.Phase.GraduationReady)
+        );
+    }
+
+    function testFailedGraduationCanEnterPermissionlessRescueAfterSevenDays() public {
+        FortuneFactory.LaunchInfo memory info =
+            factory.createLaunch(_params(50e18));
+        FortuneCurve curve = FortuneCurve(info.curve);
+        FortuneToken token = FortuneToken(info.token);
+
+        vm.warp(block.timestamp + 16);
+
+        vm.startPrank(user);
+        usdt.approve(address(curve), type(uint256).max);
+        curve.buy(address(usdt), 100e18, 1);
+        vm.stopPrank();
+
+        assertTrue(curve.graduationReady());
+
+        vm.expectRevert("RESCUE_DELAY");
+        curve.activateRescue();
+
+        vm.warp(
+            uint256(curve.graduationReadyAt()) +
+                curve.GRADUATION_RESCUE_DELAY()
+        );
+
+        curve.activateRescue();
+
+        assertTrue(curve.rescueActive());
+        assertEq(
+            uint256(curve.phase()),
+            uint256(FortuneCurve.Phase.Rescued)
+        );
+
+        uint256 redeemAmount = token.balanceOf(user);
+        uint256 reserveBefore = usdt.balanceOf(address(curve));
+        uint256 userBefore = usdt.balanceOf(user);
+
+        uint256[] memory minimums = new uint256[](2);
+
+        vm.startPrank(user);
+        token.approve(address(curve), redeemAmount);
+        uint256[] memory received =
+            curve.rescueRedeem(redeemAmount, minimums);
+        vm.stopPrank();
+
+        assertEq(received[0], reserveBefore);
+        assertEq(usdt.balanceOf(user), userBefore + reserveBefore);
+        assertEq(usdt.balanceOf(address(curve)), 0);
+        assertEq(curve.rescueRedeemed(), redeemAmount);
+    }
+
     function testGraduationAnchorLocksCurvePriceOnce() public {
         FortuneFactory.LaunchInfo memory info =
             factory.createLaunch(_params(50e18));

@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {IFortunePriceOracle} from "./interfaces/IFortunePriceOracle.sol";
 
 /// @notice Curated compatibility registry for assets usable by Fortune.
@@ -149,7 +150,12 @@ contract FortuneAssetRegistry is Ownable2Step {
             decimals == registeredDecimals[asset],
             "ASSET_DECIMALS_CHANGED"
         );
-        return amount * price / (10 ** uint256(decimals));
+        return
+            Math.mulDiv(
+                amount,
+                price,
+                10 ** uint256(decimals)
+            );
     }
 
     function tokenAmountForUsd(address asset, uint256 usd1e18) external view returns (uint256 amount) {
@@ -166,7 +172,12 @@ contract FortuneAssetRegistry is Ownable2Step {
             decimals == registeredDecimals[asset],
             "ASSET_DECIMALS_CHANGED"
         );
-        return usd1e18 * (10 ** uint256(decimals)) / price;
+        return
+            Math.mulDiv(
+                usd1e18,
+                10 ** uint256(decimals),
+                price
+            );
     }
 
     function assetCount() external view returns (uint256) {

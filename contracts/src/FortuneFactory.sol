@@ -208,7 +208,7 @@ contract FortuneFactory is Ownable2Step {
         }
 
         uint256 maxCurveScalar =
-            uint256(type(uint127).max);
+            uint256(type(uint120).max);
 
         if (
             p.basePriceUsd1e18 >

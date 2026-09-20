@@ -604,7 +604,10 @@ export default function PublicTestnetPage() {
   }, []);
 
   async function withAccount() {
-    const next = account || (await connectTestnet());
+    // Always re-check the active chain before an onchain action. The cached
+    // account can remain populated after the wallet is switched away from BSC
+    // Testnet, and using it directly would surface a confusing chain mismatch.
+    const next = await connectTestnet();
     setAccount(next);
     return next;
   }

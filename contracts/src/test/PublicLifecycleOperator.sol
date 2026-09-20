@@ -335,7 +335,7 @@ contract FortunePublicLifecycleOperator {
         external
         returns (uint256 tokensOut)
     {
-        require(taxFirstBuyPassed, "TAX_FIRST_BUY_FIRST");
+        require(taxLaunchPassed, "TAX_LAUNCH_FIRST");
         require(!taxFirstBuyPassed, "TAX_FIRST_BUY_ALREADY_RUN");
 
         mockQuote.faucet(500e18);
@@ -376,7 +376,7 @@ contract FortunePublicLifecycleOperator {
         external
         returns (address pool)
     {
-        require(taxLaunchPassed, "TAX_LAUNCH_FIRST");
+        require(taxFirstBuyPassed, "TAX_FIRST_BUY_FIRST");
         require(!taxGraduationPassed, "TAX_GRAD_ALREADY_RUN");
 
         FortunePancakeV2TaxGraduationAdapter.GraduationPlan memory plan =

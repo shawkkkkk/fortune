@@ -8,7 +8,7 @@ export default function PortfolioPage() {
           <span className="eyebrow">PORTFOLIO</span>
           <h1>Indexer pending.</h1>
           <p>
-            Fortune does not yet have a public portfolio indexer, so the beta does
+            Fortune does not yet have a public portfolio indexer, so the alpha does
             not pretend to know your holdings, rewards, or creator earnings.
           </p>
         </div>

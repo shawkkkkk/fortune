@@ -355,12 +355,16 @@ export default function LaunchPage() {
   const equalWeight = Math.floor(100 / selected.length);
   const feeTotal = creatorBps + holderBps + buybackBps + liquidityBps + protocolBps;
 
-  const selectedWeightsBps = selected.map((_, index) => {
-    const base = Math.floor(10_000 / selected.length);
-    return base + (index === selected.length - 1
-      ? 10_000 - base * selected.length
-      : 0);
-  });
+  const selectedWeightsBps = useMemo(
+    () =>
+      selected.map((_, index) => {
+        const base = Math.floor(10_000 / selected.length);
+        return base + (index === selected.length - 1
+          ? 10_000 - base * selected.length
+          : 0);
+      }),
+    [selected]
+  );
 
   useEffect(() => {
     const timer = window.setTimeout(() => {

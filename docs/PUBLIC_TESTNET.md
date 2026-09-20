@@ -1,4 +1,4 @@
-# Fortune Public BSC Testnet Beta
+# Fortune Public BSC Testnet Alpha
 
 Fortune's public testnet is the open validation phase before any production/mainnet launch.
 
@@ -10,7 +10,7 @@ Fortune's public testnet is the open validation phase before any production/main
 
 tBNB and Fortune's mock fUSD are test assets and have no intended financial value.
 
-## Public beta deployment
+## Public alpha deployment
 
 - FortuneFactory: `0x9Eac6c6CdA0A19cbb0f8Abc51Ee968545E6EB415`
 - FortuneAssetRegistry: `0x943176d26A332F4687d52695fe9625866c2c3A67`
@@ -46,21 +46,21 @@ The release drill verified:
 - post-storm readiness checks passed;
 - the reference graduation again passed all 16 state/invariant checks after the storm.
 
-This evidence supports opening a **public testnet beta**. It is not a smart-contract audit and does not establish mainnet safety.
+This evidence supports opening a **public testnet alpha**. It is not a smart-contract audit and does not establish mainnet safety.
 
-## How testers use the beta
+## How testers use the alpha
 
 Open `/testnet` in the Fortune web app.
 
 1. Connect an injected EVM wallet and switch to BSC Testnet.
 2. Obtain a small amount of tBNB from the BNB Chain testnet faucet for gas.
 3. Use Fortune's in-app faucet to mint 250 mock fUSD.
-4. Create a test launch. The beta uses a 1 billion fixed supply, one fUSD quote market, a tiny mock-$1 graduation threshold, and the tested Fee Matrix.
+4. Create a test launch. The alpha uses a 1 billion fixed supply, one fUSD quote market, a tiny mock-$1 graduation threshold, and the tested Fee Matrix.
 5. Approve and buy 250 fUSD on the launch curve.
 6. Once the curve reaches `GraduationReady`, call the permissionless finalize action.
 7. Verify the resulting transaction and contract addresses through BscScan.
 
-The beta page deliberately keeps this path narrow. The larger launch-builder surface contains experimental asset/engine concepts that are not all enabled on the public testnet registry.
+The alpha page deliberately keeps this path narrow. The larger launch-builder surface contains experimental asset/engine concepts that are not all enabled on the public testnet registry.
 
 ## Reporting problems
 
@@ -72,11 +72,11 @@ Potentially exploitable security findings should not be posted publicly.
 
 ## Deferred capacity ladder
 
-The repository also contains the **Fortune Concurrent Graduation Wave** workflow for later 10 → 25 → 50 → 100 concurrent-graduation testing. That exercise is useful for capacity characterization but is not a blocker for opening the current public testnet beta.
+The repository also contains the **Fortune Concurrent Graduation Wave** workflow for later 10 → 25 → 50 → 100 concurrent-graduation testing. That exercise is useful for capacity characterization but is not a blocker for opening the current public testnet alpha.
 
 ## Mainnet remains separately gated
 
-A green public beta does not enable mainnet. Mainnet still requires, at minimum:
+A green public alpha does not enable mainnet. Mainnet still requires, at minimum:
 
 1. independent smart-contract/security review;
 2. economic and MEV review;

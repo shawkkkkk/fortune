@@ -1,3 +1,5 @@
+import { PUBLIC_TESTNET } from "@/lib/public-testnet";
+
 export type RpcCallOptions = {
   timeoutMs?: number;
 };
@@ -17,13 +19,22 @@ export function configuredRpcUrls(chainId: number) {
       ? process.env.BSC_RPC_URL
       : process.env.BSC_TESTNET_RPC_URL;
 
-  return unique([
+  const configured = unique([
     ...(listValue || "")
       .split(",")
       .map((value) => value.trim())
       .filter(Boolean),
     singleValue?.trim(),
   ]);
+
+  if (configured.length || chainId !== PUBLIC_TESTNET.chainId) {
+    return configured;
+  }
+
+  return [
+    PUBLIC_TESTNET.rpcUrl,
+    PUBLIC_TESTNET.fallbackRpcUrl,
+  ];
 }
 
 async function rpcCallUrl(

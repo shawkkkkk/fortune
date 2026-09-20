@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {FortuneAssetRegistry} from "./FortuneAssetRegistry.sol";
@@ -32,6 +33,7 @@ interface IFortuneFungibleLockerApproval {
 ///      immutable tax policy, checkpointed holder dividends, bounded anti-farmer
 ///      protection and a separately frozen V2 graduation adapter.
 contract FortuneTaxFactory is Ownable2Step {
+    using SafeERC20 for IERC20;
     error LaunchPreflightFailed(bytes32 reasonCode);
 
     uint16 public constant BPS = 10_000;
@@ -773,6 +775,116 @@ contract FortuneTaxFactory is Ownable2Step {
             tokenAddress,
             vanitySalt
         );
+    }
+
+    /// @notice Creates a tax-token launch and executes the creator's first buy
+    ///         atomically. The quote allowance is a separate wallet approval, but
+    ///         no external trade can occur between launch creation and this purchase.
+    function createLaunchPreparedAndBuy(
+        TaxLaunchParams calldata p,
+        bytes32 vanitySalt,
+        uint256 amountIn,
+        uint256 minTokensOut
+    )
+        external
+        returns (
+            LaunchInfo memory info,
+            uint256 tokensOut
+        )
+    {
+        require(
+            amountIn > 0,
+            "ZERO_INITIAL_PURCHASE"
+        );
+
+        info =
+            createLaunchPrepared(
+                p,
+                vanitySalt
+            );
+
+        IERC20 quote =
+            IERC20(p.quoteAsset);
+        IERC20 launchToken =
+            IERC20(info.token);
+
+        uint256 quoteBefore =
+            quote.balanceOf(
+                address(this)
+            );
+
+        quote.safeTransferFrom(
+            msg.sender,
+            address(this),
+            amountIn
+        );
+
+        require(
+            quote.balanceOf(
+                address(this)
+            ) ==
+                quoteBefore +
+                amountIn,
+            "NON_STANDARD_QUOTE"
+        );
+
+        quote.forceApprove(
+            info.curve,
+            amountIn
+        );
+
+        uint256 tokenBefore =
+            launchToken.balanceOf(
+                address(this)
+            );
+
+        tokensOut =
+            FortuneCurve(
+                info.curve
+            ).buy(
+                p.quoteAsset,
+                amountIn,
+                minTokensOut
+            );
+
+        quote.forceApprove(
+            info.curve,
+            0
+        );
+
+        uint256 received =
+            launchToken.balanceOf(
+                address(this)
+            ) -
+            tokenBefore;
+
+        require(
+            received ==
+                tokensOut &&
+                received > 0,
+            "INITIAL_BUY_MISMATCH"
+        );
+
+        launchToken.safeTransfer(
+            msg.sender,
+            received
+        );
+
+        uint256 quoteAfter =
+            quote.balanceOf(
+                address(this)
+            );
+
+        if (
+            quoteAfter >
+            quoteBefore
+        ) {
+            quote.safeTransfer(
+                msg.sender,
+                quoteAfter -
+                    quoteBefore
+            );
+        }
     }
 
     function _tokenParams(

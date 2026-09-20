@@ -623,6 +623,7 @@ export default function LaunchPage() {
             <div><span>Primary</span><strong>{selectableAssets.find(a=>a.id===primary)?.symbol}</strong></div>
             <div><span>Graduation</span><strong>{graduation==="adaptive"?"Adaptive":"Fixed"}</strong></div>
             <div><span>Dev buy</span><strong>{devBuy}%</strong></div>
+            <div><span>Contract</span><strong>0x…fe</strong></div>
           </div>
         </aside>
       </div>
@@ -644,6 +645,7 @@ function ManifestRows({
   const rows = [
     ["Launch engine", launchMode==="basket" ? "Basket Curve" : launchMode==="stock-floor" ? "Stock Floor" : "Pre-IPO Perp"],
     ["Token", name + " ($" + symbol + ")"],
+    ["Fortune vanity address", "Every launch token ends in 0xfe"],
     ["Accepted quote assets", assets.join(" · ")],
     ["Primary market", primary],
     ["Graduation model", graduation==="adaptive"?"Demand weighted":"Fixed basket"],

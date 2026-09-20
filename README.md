@@ -31,6 +31,8 @@ Demo market/analytics values are deliberately marked as placeholders until oncha
 - `FortuneFactory` — creates token + curve + immutable fee router and embeds a Launch Manifest hash
 - `FortuneCurve` — experimental shared curve accepting 1–5 quote assets
 - `FortuneFeeRouter` — immutable per-launch absolute-bps Fee Matrix
+- `FortuneAutomationRegistry` — purpose-scoped allowlist for automation adapters
+- `FortuneAutomationVault` — restricted holder-reward / buyback / LP automation vault primitive
 - `IGraduationAdapter` — isolated destination-market adapter interface
 - `MockGraduationAdapter` — test-only graduation target
 - BSC testnet mock oracle/quote assets + deployment script

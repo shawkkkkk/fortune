@@ -13,6 +13,9 @@ import {MockGraduationAdapter} from "../src/MockGraduationAdapter.sol";
 import {FortuneAutomationRegistry} from "../src/FortuneAutomationRegistry.sol";
 import {FortuneAutomationVault} from "../src/FortuneAutomationVault.sol";
 import {MockAutomationAdapter} from "../src/test/MockAutomationAdapter.sol";
+import {FortuneStockFloorVault} from "../src/FortuneStockFloorVault.sol";
+import {FortunePerpReferenceRegistry} from "../src/FortunePerpReferenceRegistry.sol";
+import {MockReferenceOracle} from "../src/test/MockReferenceOracle.sol";
 import {IFortunePriceOracle} from "../src/interfaces/IFortunePriceOracle.sol";
 
 contract MockERC20 is ERC20 {
@@ -331,6 +334,75 @@ contract FortuneTest is Test {
             adapter.lastPurpose(),
             uint8(FortuneAutomationRegistry.Purpose.HolderRewards)
         );
+    }
+
+    function testStockFloorVaultProvidesProRataRedemption() public {
+        FortuneToken meme = new FortuneToken(
+            "Stock Floor Meme",
+            "SFM",
+            1_000e18,
+            keccak256("stock-floor-test")
+        );
+        MockERC20 stock = new MockERC20("Tokenized Stock", "STOCK");
+        FortuneStockFloorVault floor = new FortuneStockFloorVault(
+            address(this),
+            address(meme),
+            address(stock)
+        );
+
+        stock.mint(address(this), 100e18);
+        stock.approve(address(floor), 100e18);
+        floor.fund(100e18);
+
+        meme.transfer(user, 100e18);
+        floor.activateRedemption();
+
+        uint256 redeemAmount = 10e18;
+        uint256 preview = floor.previewRedeem(redeemAmount);
+        assertEq(preview, 1e18);
+
+        vm.startPrank(user);
+        meme.approve(address(floor), redeemAmount);
+        uint256 before = stock.balanceOf(user);
+        uint256 out = floor.redeem(redeemAmount, preview);
+        vm.stopPrank();
+
+        assertEq(out, preview);
+        assertEq(stock.balanceOf(user), before + preview);
+        assertEq(meme.balanceOf(address(floor)), redeemAmount);
+        assertEq(floor.totalRedeemedLaunchTokens(), redeemAmount);
+    }
+
+    function testPerpReferenceRegistryCapsMultiplierAndStaleness() public {
+        MockReferenceOracle referenceOracle = new MockReferenceOracle();
+        FortunePerpReferenceRegistry perpRegistry =
+            new FortunePerpReferenceRegistry(address(this));
+
+        bytes32 marketKey = keccak256("LIGHTER:ANTHROPIC");
+        referenceOracle.setPrice(marketKey, 100e18);
+
+        perpRegistry.configureMarket(
+            marketKey,
+            FortunePerpReferenceRegistry.MarketConfig({
+                oracle: address(referenceOracle),
+                maxOracleAge: 60,
+                maxMultiplierBps: 30_000,
+                lowDepthBps: 2_500,
+                active: true,
+                venue: "Lighter",
+                symbol: "ANTHROPIC"
+            })
+        );
+
+        assertEq(perpRegistry.referencePrice(marketKey, 10_000), 100e18);
+        assertEq(perpRegistry.referencePrice(marketKey, 20_000), 200e18);
+
+        vm.expectRevert("MULTIPLIER_NOT_ALLOWED");
+        perpRegistry.referencePrice(marketKey, 30_001);
+
+        vm.warp(block.timestamp + 61);
+        vm.expectRevert("STALE_REFERENCE");
+        perpRegistry.referencePrice(marketKey, 10_000);
     }
 
     function testPositiveRebaseChangesReserveAndCanTriggerGraduation() public {

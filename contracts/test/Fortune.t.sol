@@ -218,6 +218,54 @@ contract FortuneTest is Test {
         assertEq(reason, bytes32("TREASURY_REQUIRED"));
     }
 
+    function testPreparedVanityLaunchMatchesPreviewWithoutOnchainSearch() public {
+        FortuneFactory.LaunchParams memory p =
+            _params(1_000e18);
+
+        (
+            bytes32 salt,
+            address predicted,
+            bytes32 manifestHash,
+            uint256 launchNonce
+        ) = factory.previewPreparedVanity(
+                address(this),
+                p
+            );
+
+        assertEq(
+            launchNonce,
+            factory.creatorLaunchNonce(
+                address(this)
+            )
+        );
+        assertTrue(
+            factory.hasFortuneSuffix(
+                predicted
+            )
+        );
+
+        FortuneFactory.LaunchInfo memory info =
+            factory.createLaunchPrepared(
+                p,
+                salt
+            );
+
+        assertEq(info.token, predicted);
+        assertEq(
+            info.manifestHash,
+            manifestHash
+        );
+        assertEq(
+            info.vanitySalt,
+            salt
+        );
+        assertTrue(
+            factory.hasFortuneSuffix(
+                info.token
+            )
+        );
+    }
+
     function testEveryFortuneTokenAddressEndsInFe() public {
         FortuneFactory.LaunchInfo memory first =
             factory.createLaunch(_params(1_000e18));

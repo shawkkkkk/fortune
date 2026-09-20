@@ -55,3 +55,19 @@ The launch manifest should expose:
 - adapter version.
 
 No "verified" badge should imply investment quality.
+
+
+### Editable metadata
+
+Fortune display metadata may be creator-editable when that policy is selected at launch. This authority is intentionally limited to presentation fields stored in `FortuneMetadataRegistry`.
+
+Metadata authority cannot change:
+- ERC-20 supply;
+- token contract name/symbol;
+- curve economics;
+- quote assets;
+- fee routing;
+- graduation;
+- automation vaults.
+
+Every metadata edit increments an onchain revision. Creators may permanently freeze the record. Fortune clients should visibly distinguish editable from frozen metadata so users are not surprised by later branding changes.

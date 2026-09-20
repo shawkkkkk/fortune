@@ -257,6 +257,36 @@ contract FortuneTest is Test {
         );
     }
 
+    function testSplitTokenDeployerMintsToFactoryAndRejectsFrontRun() public {
+        uint256 supply = 123e18;
+        bytes32 manifest = keccak256("split-token-regression");
+        bytes32 salt = keccak256("split-token-salt");
+
+        vm.expectRevert("ONLY_FACTORY");
+        tokenDeployer.deploy(
+            address(factory),
+            "Split Token",
+            "SPLIT",
+            supply,
+            manifest,
+            salt
+        );
+
+        vm.prank(address(factory));
+        address deployed = tokenDeployer.deploy(
+            address(factory),
+            "Split Token",
+            "SPLIT",
+            supply,
+            manifest,
+            salt
+        );
+
+        FortuneToken token = FortuneToken(deployed);
+        assertEq(token.balanceOf(address(factory)), supply);
+        assertEq(token.balanceOf(address(tokenDeployer)), 0);
+    }
+
     function testLaunchPreflightPassesOnlyWithHealthyGraduationStack() public {
         FortuneFactory.LaunchParams memory p = _params(1_000e18);
 

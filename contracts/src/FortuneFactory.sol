@@ -13,6 +13,7 @@ import {FortuneAutomationVault} from "./FortuneAutomationVault.sol";
 import {FortuneMetadataRegistry} from "./FortuneMetadataRegistry.sol";
 
 contract FortuneFactory is Ownable2Step {
+    error LaunchPreflightFailed(bytes32 reasonCode);
     uint8 public constant FORTUNE_ADDRESS_SUFFIX = 0xfe;
     uint256 public constant VANITY_SEARCH_LIMIT = 4096;
     struct LaunchParams {
@@ -140,10 +141,129 @@ contract FortuneFactory is Ownable2Step {
         emit LaunchPauseSet(paused);
     }
 
+    /// @notice Full non-mutating launch readiness check. Frontends and integrators
+    ///         should call this immediately before asking a user to sign.
+    function preflightLaunch(LaunchParams calldata p)
+        public
+        view
+        returns (bool ready, bytes32 reasonCode)
+    {
+        if (launchesPaused) {
+            return (false, bytes32("LAUNCHES_PAUSED"));
+        }
+        if (
+            graduationAdapter == address(0) ||
+            graduationAdapter.code.length == 0
+        ) {
+            return (false, bytes32("NO_GRADUATION_ADAPTER"));
+        }
+        if (
+            p.quoteAssets.length < 1 ||
+            p.quoteAssets.length > 5
+        ) {
+            return (false, bytes32("BAD_ASSET_COUNT"));
+        }
+        if (p.quoteAssets.length != p.weightsBps.length) {
+            return (false, bytes32("BAD_WEIGHT_LENGTH"));
+        }
+        if (p.totalSupply == 0) {
+            return (false, bytes32("ZERO_SUPPLY"));
+        }
+        if (
+            p.basePriceUsd1e18 == 0 ||
+            p.graduationUsd1e18 == 0
+        ) {
+            return (false, bytes32("BAD_ECONOMICS"));
+        }
+
+        bytes memory nameBytes = bytes(p.name);
+        bytes memory symbolBytes = bytes(p.symbol);
+        if (nameBytes.length == 0 || nameBytes.length > 64) {
+            return (false, bytes32("BAD_NAME_LENGTH"));
+        }
+        if (symbolBytes.length == 0 || symbolBytes.length > 16) {
+            return (false, bytes32("BAD_SYMBOL_LENGTH"));
+        }
+        if (bytes(p.description).length > 4096) {
+            return (false, bytes32("DESCRIPTION_TOO_LONG"));
+        }
+        if (
+            bytes(p.imageURI).length > 512 ||
+            bytes(p.website).length > 512 ||
+            bytes(p.xProfile).length > 512 ||
+            bytes(p.telegram).length > 512
+        ) {
+            return (false, bytes32("METADATA_TOO_LONG"));
+        }
+
+        uint256 weightSum;
+        bool primaryFound;
+
+        for (uint256 i; i < p.quoteAssets.length; ++i) {
+            address asset = p.quoteAssets[i];
+
+            if (asset == address(0)) {
+                return (false, bytes32("ZERO_QUOTE"));
+            }
+
+            for (uint256 j; j < i; ++j) {
+                if (p.quoteAssets[j] == asset) {
+                    return (false, bytes32("DUPLICATE_QUOTE"));
+                }
+            }
+
+            if (!registry.isQuoteAsset(asset)) {
+                return (false, bytes32("QUOTE_NOT_APPROVED"));
+            }
+            if (!registry.isGraduationAsset(asset)) {
+                return (false, bytes32("GRADUATION_DISABLED"));
+            }
+
+            (
+                bool healthy,
+                bytes32 assetReason,
+                ,
+            ) = registry.assetHealth(asset);
+
+            if (!healthy) {
+                return (false, assetReason);
+            }
+
+            weightSum += p.weightsBps[i];
+            if (asset == p.primaryQuote) {
+                primaryFound = true;
+            }
+        }
+
+        if (!primaryFound) {
+            return (false, bytes32("PRIMARY_NOT_IN_BASKET"));
+        }
+        if (weightSum != 10_000) {
+            return (false, bytes32("BAD_WEIGHTS"));
+        }
+
+        uint256 totalFeeBps;
+        for (uint256 i; i < p.feeBps.length; ++i) {
+            totalFeeBps += p.feeBps[i];
+        }
+
+        if (totalFeeBps == 0 || totalFeeBps > 500) {
+            return (false, bytes32("BAD_TOTAL_FEE"));
+        }
+        if (p.feeBps[4] > 0 && p.treasury == address(0)) {
+            return (false, bytes32("TREASURY_REQUIRED"));
+        }
+
+        return (true, bytes32("OK"));
+    }
+
     function createLaunch(LaunchParams calldata p)
         external
         returns (LaunchInfo memory info)
     {
+        (bool ready, bytes32 reasonCode) = preflightLaunch(p);
+        if (!ready) revert LaunchPreflightFailed(reasonCode);
+
         require(!launchesPaused, "LAUNCHES_PAUSED");
         require(
             p.quoteAssets.length >= 1 && p.quoteAssets.length <= 5,

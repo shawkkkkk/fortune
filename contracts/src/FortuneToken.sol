@@ -29,6 +29,6 @@ contract FortuneToken is ERC20, ERC20Burnable {
         fortuneFactory = fortuneFactory_;
         initialSupply = supply_;
         launchManifest = manifest_;
-        _mint(msg.sender, supply_);
+        _mint(fortuneFactory_, supply_);
     }
 }

@@ -225,6 +225,22 @@ contract FortuneTest is Test {
             address(registry).code.length,
             eip170Limit
         );
+        assertLt(
+            address(tokenDeployer).code.length,
+            eip170Limit
+        );
+        assertLt(
+            address(vaultDeployer).code.length,
+            eip170Limit
+        );
+        assertLt(
+            address(feeRouterDeployer).code.length,
+            eip170Limit
+        );
+        assertLt(
+            address(curveDeployer).code.length,
+            eip170Limit
+        );
 
         FortuneFactory.LaunchInfo memory info =
             factory.createLaunch(

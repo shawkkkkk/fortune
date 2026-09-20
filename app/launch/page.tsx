@@ -214,6 +214,20 @@ const taxFactoryAbi = [
   },
 ] as const;
 
+const curveBuyAbi = [
+  {
+    type: "function",
+    name: "buy",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "quoteAsset", type: "address" },
+      { name: "amountIn", type: "uint256" },
+      { name: "minTokensOut", type: "uint256" },
+    ],
+    outputs: [{ name: "tokensOut", type: "uint256" }],
+  },
+] as const;
+
 const erc20Abi = [
   {
     type: "function",
@@ -694,31 +708,18 @@ export default function LaunchPage() {
           args: [wallet, params],
         });
 
-        if (initial > 0n) {
-          setMessage("Approve the creator purchase, then confirm the atomic tax launch + first buy.");
-          const approveHash = await walletClient.writeContract({
-            address: selected.address,
-            abi: erc20Abi,
-            functionName: "approve",
-            args: [taxFactory, initial],
-          });
-          await publicClient.waitForTransactionReceipt({ hash: approveHash });
+        setMessage(
+          initial > 0n
+            ? "Confirm the tax-token launch. Your creator purchase follows as a separate BSC transaction."
+            : "Confirm the tax-token launch transaction."
+        );
 
-          hash = await walletClient.writeContract({
-            address: taxFactory,
-            abi: taxFactoryAbi,
-            functionName: "createLaunchPreparedAndBuy",
-            args: [params, salt, initial, 1n],
-          });
-        } else {
-          setMessage("Confirm the tax-token launch transaction.");
-          hash = await walletClient.writeContract({
-            address: taxFactory,
-            abi: taxFactoryAbi,
-            functionName: "createLaunchPrepared",
-            args: [params, salt],
-          });
-        }
+        hash = await walletClient.writeContract({
+          address: taxFactory,
+          abi: taxFactoryAbi,
+          functionName: "createLaunchPrepared",
+          args: [params, salt],
+        });
       }
 
       const txReceipt = await publicClient.waitForTransactionReceipt({ hash });
@@ -781,8 +782,35 @@ export default function LaunchPage() {
         );
       }
 
+      if (mode === "tax" && initial > 0n) {
+        setMessage(
+          "Tax launch confirmed. Approve the quote asset, then confirm your creator first purchase."
+        );
+
+        const approveHash = await walletClient.writeContract({
+          address: selected.address,
+          abi: erc20Abi,
+          functionName: "approve",
+          args: [created.curve, initial],
+        });
+        await publicClient.waitForTransactionReceipt({ hash: approveHash });
+
+        const buyHash = await walletClient.writeContract({
+          address: created.curve,
+          abi: curveBuyAbi,
+          functionName: "buy",
+          args: [selected.address, initial, 1n],
+        });
+        await publicClient.waitForTransactionReceipt({ hash: buyHash });
+
+        setMessage(
+          "Tax launch and creator first purchase confirmed on BNB Smart Chain."
+        );
+      } else {
+        setMessage("Launch confirmed on BNB Smart Chain.");
+      }
+
       setReceipt(created);
-      setMessage("Launch confirmed on BNB Smart Chain.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Launch failed.");
     } finally {

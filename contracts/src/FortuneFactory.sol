@@ -218,6 +218,12 @@ contract FortuneFactory is Ownable2Step {
             return (false, bytes32("LAUNCHES_PAUSED"));
         }
         if (
+            metadataRegistry.factory() !=
+                address(this)
+        ) {
+            return (false, bytes32("METADATA_NOT_BOUND"));
+        }
+        if (
             graduationAdapter == address(0) ||
             graduationAdapter.code.length == 0
         ) {
@@ -729,6 +735,11 @@ contract FortuneFactory is Ownable2Step {
                     address(
                         automationRegistry
                     ),
+                    address(metadataRegistry),
+                    address(tokenDeployer),
+                    address(vaultDeployer),
+                    address(feeRouterDeployer),
+                    address(curveDeployer),
                     automationExecutor,
                     graduationAdapter,
                     creator,

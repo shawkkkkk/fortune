@@ -511,7 +511,7 @@ contract FortuneTaxToken is ERC20, ERC20Burnable {
     ) internal view {
         if (
             from != officialPool &&
-            poolRegistry.registeredPool(
+            poolRegistry.isRecognizedPool(
                 from
             )
         ) {
@@ -522,7 +522,7 @@ contract FortuneTaxToken is ERC20, ERC20Burnable {
 
         if (
             to != officialPool &&
-            poolRegistry.registeredPool(
+            poolRegistry.isRecognizedPool(
                 to
             )
         ) {

@@ -17,6 +17,7 @@ declare global {
 const links = [
   ["/", "Explore"],
   ["/launch", "Launch"],
+  ["/registry", "Assets"],
   ["/forum", "Forum"],
   ["/analytics", "Analytics"],
   ["/automations", "Automations"],

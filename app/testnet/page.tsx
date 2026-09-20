@@ -15,6 +15,7 @@ import {
   type Hex,
 } from "viem";
 import { PUBLIC_TESTNET } from "@/lib/public-testnet";
+import FortuneLogo from "@/components/FortuneLogo";
 
 const launchParamsComponents = [
   { name: "name", type: "string" },
@@ -668,6 +669,9 @@ export default function PublicTestnetPage() {
     <main className="page narrowPage">
       <section className="pageHeading">
         <div>
+          <div className="testnetBrandLockup">
+            <FortuneLogo size="md" />
+          </div>
           <span className="eyebrow">
             PUBLIC BSC TESTNET BETA
           </span>

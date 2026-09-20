@@ -13,11 +13,11 @@ export default function RegistryPage() {
       <section className="pageHeading">
         <div>
           <span className="eyebrow">FORTUNE PUBLIC TESTNET REGISTRY</span>
-          <h1>One approved beta quote asset.</h1>
+          <h1>One approved alpha quote asset.</h1>
           <p>
-            The public beta does not expose the old mainnet asset catalog as if it
+            The public alpha does not expose the old mainnet asset catalog as if it
             were launchable on testnet. Only Fortune&apos;s valueless mock fUSD is
-            enabled in the current beta path.
+            enabled in the current alpha path.
           </p>
         </div>
         <Link href="/testnet" className="primaryCta">Use fUSD on testnet →</Link>
@@ -26,7 +26,7 @@ export default function RegistryPage() {
       <section className="registryPanel">
         <div className="registryNotice">
           <strong>TESTNET REGISTRY</strong>
-          <span>Real-value BSC assets are not enabled for this public beta.</span>
+          <span>Real-value BSC assets are not enabled for this public alpha.</span>
         </div>
 
         <div className="registryTable">

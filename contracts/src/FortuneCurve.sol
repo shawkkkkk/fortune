@@ -51,6 +51,9 @@ contract FortuneCurve is ReentrancyGuard {
     bool public rescueActive;
     uint64 public graduationReadyAt;
     uint256 public graduationAnchorPriceUsd1e18;
+    uint256 public graduationReserveUsd1e18;
+    uint256 public graduationLpTokenAmount;
+    uint16[] private _graduationWeightSnapshot;
     uint256 public rescueSupply;
     uint256 public rescueRedeemed;
 
@@ -106,6 +109,11 @@ contract FortuneCurve is ReentrancyGuard {
         uint256 priceUsd1e18,
         uint256 reserveUsd1e18,
         uint256 tokensSold
+    );
+    event GraduationSnapshotLocked(
+        uint256 reserveUsd1e18,
+        uint256 launchTokenAmount,
+        uint16[] weightsBps
     );
     event UnsoldInventoryBurned(uint256 amount);
     event Graduated(address indexed adapter);
@@ -792,6 +800,41 @@ contract FortuneCurve is ReentrancyGuard {
             uint16[] memory weights
         )
     {
+        if (
+            _graduationWeightSnapshot
+                .length ==
+            quoteAssets.length
+        ) {
+            weights =
+                new uint16[](
+                    quoteAssets.length
+                );
+
+            for (
+                uint256 i;
+                i < quoteAssets.length;
+                ++i
+            ) {
+                weights[i] =
+                    _graduationWeightSnapshot[
+                        i
+                    ];
+            }
+
+            return weights;
+        }
+
+        return
+            _calculateGraduationWeights();
+    }
+
+    function _calculateGraduationWeights()
+        internal
+        view
+        returns (
+            uint16[] memory weights
+        )
+    {
         weights =
             new uint16[](
                 quoteAssets.length
@@ -933,20 +976,29 @@ contract FortuneCurve is ReentrancyGuard {
             "NO_GRADUATION_ANCHOR"
         );
 
-        uint256 reserveUsd =
-            netReserveUsd1e18();
-
         uint256 required =
-            Math.mulDiv(
-                reserveUsd,
-                1e18,
-                graduationAnchorPriceUsd1e18
-            );
+            graduationLpTokenAmount;
 
-        require(required > 0, "ZERO_LP_TOKEN_AMOUNT");
+        if (required == 0) {
+            uint256 reserveUsd =
+                netReserveUsd1e18();
+
+            required =
+                Math.mulDiv(
+                    reserveUsd,
+                    1e18,
+                    graduationAnchorPriceUsd1e18
+                );
+        }
+
         require(
-            launchToken.balanceOf(address(this)) >=
-                required,
+            required > 0,
+            "ZERO_LP_TOKEN_AMOUNT"
+        );
+        require(
+            launchToken.balanceOf(
+                address(this)
+            ) >= required,
             "INSUFFICIENT_LP_INVENTORY"
         );
 
@@ -1160,20 +1212,78 @@ contract FortuneCurve is ReentrancyGuard {
     }
 
     function _checkGraduation() internal {
-        if (graduationReady || graduated) return;
+        if (
+            graduationReady ||
+            graduated
+        ) {
+            return;
+        }
 
-        uint256 totalUsd = netReserveUsd1e18();
-        if (totalUsd >= graduationUsd1e18) {
-            uint256 anchorPrice = currentPriceUsd1e18();
+        uint256 totalUsd =
+            netReserveUsd1e18();
+
+        if (
+            totalUsd >=
+            graduationUsd1e18
+        ) {
+            uint256 anchorPrice =
+                currentPriceUsd1e18();
+
+            uint256 lpTokenAmount =
+                Math.mulDiv(
+                    totalUsd,
+                    1e18,
+                    anchorPrice
+                );
+
+            require(
+                lpTokenAmount > 0,
+                "ZERO_LP_TOKEN_AMOUNT"
+            );
+            require(
+                launchToken.balanceOf(
+                    address(this)
+                ) >= lpTokenAmount,
+                "INSUFFICIENT_LP_INVENTORY"
+            );
+
+            uint16[] memory weights =
+                _calculateGraduationWeights();
+
+            delete
+                _graduationWeightSnapshot;
+
+            for (
+                uint256 i;
+                i < weights.length;
+                ++i
+            ) {
+                _graduationWeightSnapshot
+                    .push(weights[i]);
+            }
+
+            graduationReserveUsd1e18 =
+                totalUsd;
+            graduationLpTokenAmount =
+                lpTokenAmount;
             graduationReady = true;
-            graduationReadyAt = uint64(block.timestamp);
-            graduationAnchorPriceUsd1e18 = anchorPrice;
+            graduationReadyAt =
+                uint64(block.timestamp);
+            graduationAnchorPriceUsd1e18 =
+                anchorPrice;
 
-            emit GraduationReady(totalUsd);
+            emit GraduationReady(
+                totalUsd
+            );
             emit GraduationAnchor(
                 anchorPrice,
                 totalUsd,
                 tokensSold
+            );
+            emit GraduationSnapshotLocked(
+                totalUsd,
+                lpTokenAmount,
+                weights
             );
         }
     }

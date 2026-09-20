@@ -158,11 +158,34 @@ contract FortuneAssetRegistry is Ownable2Step {
             );
     }
 
-    function tokenAmountForUsd(address asset, uint256 usd1e18) external view returns (uint256 amount) {
+    function tokenAmountForUsd(address asset, uint256 usd1e18)
+        external
+        view
+        returns (uint256 amount)
+    {
+        return _tokenAmountForUsd(asset, usd1e18, false);
+    }
+
+    /// @notice Smallest base-unit amount whose current USD value is at least
+    ///         the requested amount. Used for exact final-fill accounting.
+    function tokenAmountForUsdCeil(address asset, uint256 usd1e18)
+        external
+        view
+        returns (uint256 amount)
+    {
+        return _tokenAmountForUsd(asset, usd1e18, true);
+    }
+
+    function _tokenAmountForUsd(
+        address asset,
+        uint256 usd1e18,
+        bool roundUp
+    ) internal view returns (uint256 amount) {
         AssetConfig memory config = _assets[asset];
         require(config.active, "ASSET_DISABLED");
 
-        (uint256 price, uint256 updatedAt) = IFortunePriceOracle(config.oracle).priceUsd(asset);
+        (uint256 price, uint256 updatedAt) =
+            IFortunePriceOracle(config.oracle).priceUsd(asset);
         require(price > 0, "BAD_PRICE");
         require(updatedAt > 0 && updatedAt <= block.timestamp, "BAD_TIMESTAMP");
         require(block.timestamp - updatedAt <= config.maxOracleAge, "STALE_PRICE");
@@ -172,12 +195,24 @@ contract FortuneAssetRegistry is Ownable2Step {
             decimals == registeredDecimals[asset],
             "ASSET_DECIMALS_CHANGED"
         );
-        return
+
+        uint256 scale = 10 ** uint256(decimals);
+        amount = Math.mulDiv(
+            usd1e18,
+            scale,
+            price
+        );
+
+        if (
+            roundUp &&
             Math.mulDiv(
-                usd1e18,
-                10 ** uint256(decimals),
-                price
-            );
+                amount,
+                price,
+                scale
+            ) < usd1e18
+        ) {
+            amount += 1;
+        }
     }
 
     function assetCount() external view returns (uint256) {

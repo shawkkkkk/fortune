@@ -609,6 +609,88 @@ contract FortuneCurve is ReentrancyGuard {
         emit Graduated(adapter);
     }
 
+    /// @notice Permissionless recovery if graduation remains impossible for a full week.
+    /// @dev Rescue converts circulating curve tokens into a pro-rata claim on the
+    ///      quote reserves still held by the curve. It cannot touch successfully
+    ///      graduated liquidity or external automation/fee vaults.
+    function activateRescue() external {
+        require(graduationReady && !graduated, "NOT_RESCUABLE");
+        require(!rescueActive, "RESCUE_ACTIVE");
+        require(
+            block.timestamp >=
+                uint256(graduationReadyAt) +
+                    GRADUATION_RESCUE_DELAY,
+            "RESCUE_DELAY"
+        );
+        require(tokensSold > 0, "NO_CIRCULATING_SUPPLY");
+
+        rescueActive = true;
+        rescueSupply = tokensSold;
+
+        emit RescueActivated(
+            rescueSupply,
+            block.timestamp
+        );
+    }
+
+    function rescueRedeem(
+        uint256 tokenAmount,
+        uint256[] calldata minQuoteOut
+    ) external nonReentrant returns (uint256[] memory amountsOut) {
+        require(rescueActive, "RESCUE_INACTIVE");
+        require(tokenAmount > 0, "ZERO_AMOUNT");
+        require(
+            minQuoteOut.length == quoteAssets.length,
+            "MIN_OUT_LENGTH"
+        );
+
+        uint256 remainingSupply =
+            rescueSupply - rescueRedeemed;
+        require(
+            tokenAmount <= remainingSupply,
+            "EXCEEDS_RESCUE_SUPPLY"
+        );
+
+        amountsOut =
+            new uint256[](quoteAssets.length);
+
+        for (uint256 i; i < quoteAssets.length; ++i) {
+            address asset = quoteAssets[i];
+            uint256 amount =
+                IERC20(asset).balanceOf(address(this)) *
+                tokenAmount /
+                remainingSupply;
+
+            require(
+                amount >= minQuoteOut[i],
+                "RESCUE_SLIPPAGE"
+            );
+
+            amountsOut[i] = amount;
+        }
+
+        launchToken.safeTransferFrom(
+            msg.sender,
+            address(this),
+            tokenAmount
+        );
+        rescueRedeemed += tokenAmount;
+
+        for (uint256 i; i < quoteAssets.length; ++i) {
+            if (amountsOut[i] > 0) {
+                IERC20(quoteAssets[i]).safeTransfer(
+                    msg.sender,
+                    amountsOut[i]
+                );
+            }
+        }
+
+        emit RescueRedeemed(
+            msg.sender,
+            tokenAmount
+        );
+    }
+
     function _checkGraduation() internal {
         if (graduationReady || graduated) return;
 

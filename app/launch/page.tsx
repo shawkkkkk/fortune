@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { assetCategories, assets } from "@/data/assets";
-import type { AssetCategory } from "@/lib/types";
+import type { AssetCategory, FortuneAsset } from "@/lib/types";
 
 type BscCandidate = {
   rank: number;
@@ -10,6 +10,16 @@ type BscCandidate = {
   name: string;
   address: string;
   marketCap?: number | null;
+};
+
+type ChinaStockCandidate = {
+  rank: number;
+  company: string;
+  underlyingTicker: string;
+  symbol?: string | null;
+  wrapperAddress?: string | null;
+  pairable: boolean;
+  status: string;
 };
 
 const FACTORY_ADDRESS = process.env.NEXT_PUBLIC_FORTUNE_FACTORY_ADDRESS || "";
@@ -31,7 +41,9 @@ export default function LaunchPage() {
   const [buybackBps, setBuybackBps] = useState(25);
   const [liquidityBps, setLiquidityBps] = useState(15);
   const [bscCandidates, setBscCandidates] = useState<BscCandidate[]>([]);
+  const [chinaStocks, setChinaStocks] = useState<ChinaStockCandidate[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(false);
+  const [chinaLoading, setChinaLoading] = useState(false);
   const protocolBps = 10;
 
   useEffect(() => {
@@ -46,8 +58,44 @@ export default function LaunchPage() {
       .finally(() => setCatalogLoading(false));
   }, [activeCategory, bscCandidates.length]);
 
+  useEffect(() => {
+    if (activeCategory !== "China Stocks" || chinaStocks.length > 0) return;
+
+    setChinaLoading(true);
+    void fetch("/api/registry/china-stocks")
+      .then((response) => response.json())
+      .then((data) =>
+        setChinaStocks(Array.isArray(data.stocks) ? data.stocks : [])
+      )
+      .finally(() => setChinaLoading(false));
+  }, [activeCategory, chinaStocks.length]);
+
+  const chinaAssets = useMemo<FortuneAsset[]>(
+    () =>
+      chinaStocks.map((stock) => ({
+        id: "china:" + stock.rank,
+        symbol: stock.symbol || stock.underlyingTicker,
+        name: stock.company,
+        category: "China Stocks",
+        icon: "CN",
+        chain: "BSC",
+        verification: stock.pairable ? "Verified" : "Unavailable",
+        capabilities: stock.pairable ? ["quote", "graduation"] : [],
+        address: stock.wrapperAddress || undefined,
+        note: stock.pairable
+          ? "Official current wrapped xStock on BNB Chain. Pairing uses the non-rebasing wrapper."
+          : stock.status,
+      })),
+    [chinaStocks]
+  );
+
+  const selectableAssets = useMemo(
+    () => [...assets, ...chinaAssets],
+    [chinaAssets]
+  );
+
   const filtered = useMemo(() => {
-    return assets.filter((asset) => {
+    return selectableAssets.filter((asset) => {
       const matchesCategory =
         activeCategory === "Custom" || activeCategory === "BSC 400"
           ? false
@@ -58,14 +106,14 @@ export default function LaunchPage() {
       const matchesQuery = !needle || asset.symbol.toLowerCase().includes(needle) || asset.name.toLowerCase().includes(needle);
       return matchesCategory && matchesQuery;
     });
-  }, [activeCategory, query]);
+  }, [activeCategory, query, selectableAssets]);
 
-  const selectedAssets = selected.map((id) => assets.find((a) => a.id === id)).filter(Boolean);
+  const selectedAssets = selected.map((id) => selectableAssets.find((a) => a.id === id)).filter(Boolean);
   const equalWeight = Math.floor(100 / selected.length);
   const feeTotal = creatorBps + holderBps + buybackBps + liquidityBps + protocolBps;
 
   function toggleAsset(id: string) {
-    const asset = assets.find((item) => item.id === id);
+    const asset = selectableAssets.find((item) => item.id === id);
     if (!asset || !asset.capabilities.includes("quote")) return;
 
     setSelected((current) => {
@@ -115,7 +163,21 @@ export default function LaunchPage() {
             </div>
             <input className="searchInput" value={query} onChange={(e)=>setQuery(e.target.value)} placeholder="Search approved BSC assets by symbol or name" />
 
+            {activeCategory==="China Stocks" && (
+              <div className="registryNotice">
+                <strong>China blue chips on BNB</strong>
+                <span>
+                  Fortune only enables an equity when the official xStocks BNB deployment has a current non-rebasing wrapper. Native rebasing xStocks stay disabled for curve pairing.
+                </span>
+              </div>
+            )}
+
             <div className="assetPickerGrid">
+              {activeCategory==="China Stocks" && chinaLoading && (
+                <div className="customAssetBox">
+                  <strong>Checking official BNB China-stock deployments…</strong>
+                </div>
+              )}
               {filtered.map((asset) => {
                 const enabled = asset.capabilities.includes("quote");
                 const isSelected = selected.includes(asset.id);
@@ -214,7 +276,7 @@ export default function LaunchPage() {
               name={name || "Untitled token"}
               symbol={symbol || "TOKEN"}
               assets={selectedAssets.map(a=>a?.symbol || "")}
-              primary={assets.find(a=>a.id===primary)?.symbol || "BNB"}
+              primary={selectableAssets.find(a=>a.id===primary)?.symbol || "BNB"}
               reward={rewardMode==="standard"?"None":assets.find(a=>a.id===rewardAsset)?.symbol || "None"}
               devBuy={devBuy}
               fee={(feeTotal/100).toFixed(2)}
@@ -239,7 +301,7 @@ export default function LaunchPage() {
           <p>{description || "A new idea. A new community. It all starts here."}</p>
           <div className="previewFacts">
             <div><span>Markets</span><strong>{selected.length}</strong></div>
-            <div><span>Primary</span><strong>{assets.find(a=>a.id===primary)?.symbol}</strong></div>
+            <div><span>Primary</span><strong>{selectableAssets.find(a=>a.id===primary)?.symbol}</strong></div>
             <div><span>Graduation</span><strong>{graduation==="adaptive"?"Adaptive":"Fixed"}</strong></div>
             <div><span>Dev buy</span><strong>{devBuy}%</strong></div>
           </div>

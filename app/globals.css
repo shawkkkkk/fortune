@@ -1081,3 +1081,38 @@ html[data-theme="dark"] .statusGraduated{
 @media(max-width:760px){
   .themeToggle{width:34px;height:34px}
 }
+
+
+.assetUniverseControls{
+  display:flex;
+  gap:14px;
+  align-items:center;
+  justify-content:space-between;
+  margin:14px 0;
+}
+.assetUniverseControls .filterTabs{
+  flex-wrap:wrap;
+}
+.assetUniverseControls input{
+  width:min(360px,100%);
+}
+.assetUniverseHead,
+.assetUniverseRow{
+  grid-template-columns:minmax(220px,1.4fr) minmax(150px,.8fr) minmax(140px,.75fr) minmax(150px,.75fr);
+}
+.assetUniverseRow>span{
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+@media(max-width:900px){
+  .assetUniverseControls{
+    align-items:stretch;
+    flex-direction:column;
+  }
+  .assetUniverseControls input{width:100%}
+  .assetUniverseHead{display:none}
+  .assetUniverseRow{
+    grid-template-columns:1fr;
+    gap:9px;
+  }
+}

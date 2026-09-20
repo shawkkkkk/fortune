@@ -28,8 +28,15 @@ contract FortuneFeeRouter {
     uint16 public immutable protocolBps;
     uint16 public immutable totalFeeBps;
 
+    bool public creatorFeesSurrenderedToHolders;
+
     event CurveBound(address indexed curve);
     event FeeRouted(address indexed asset, uint256 amount);
+    event CreatorFeesSurrenderedToHolders(
+        address indexed creator,
+        address indexed holderVault,
+        uint16 creatorBps
+    );
 
     constructor(
         address factory_,
@@ -72,6 +79,24 @@ contract FortuneFeeRouter {
         emit CurveBound(curve_);
     }
 
+    /// @notice Permanently redirect the creator's existing fee share to holder rewards.
+    /// @dev This is deliberately one-way: it can reduce creator extraction but can
+    ///      never increase the fee, restore creator routing or change other routes.
+    function surrenderCreatorFeesToHolders() external {
+        require(msg.sender == creator, "ONLY_CREATOR");
+        require(!creatorFeesSurrenderedToHolders, "ALREADY_SURRENDERED");
+        require(creatorBps > 0, "NO_CREATOR_FEE");
+        require(holderVault != address(0), "HOLDER_VAULT_NOT_CONFIGURED");
+
+        creatorFeesSurrenderedToHolders = true;
+
+        emit CreatorFeesSurrenderedToHolders(
+            creator,
+            holderVault,
+            creatorBps
+        );
+    }
+
     function route(address asset, uint256 amount) external {
         require(msg.sender == curve, "ONLY_CURVE");
         require(amount > 0, "ZERO_AMOUNT");
@@ -79,8 +104,21 @@ contract FortuneFeeRouter {
         IERC20 token = IERC20(asset);
         uint256 distributed;
 
-        distributed += _send(token, creator, amount * creatorBps / totalFeeBps);
-        distributed += _send(token, holderVault, amount * holderBps / totalFeeBps);
+        address creatorDestination =
+            creatorFeesSurrenderedToHolders
+                ? holderVault
+                : creator;
+
+        distributed += _send(
+            token,
+            creatorDestination,
+            amount * creatorBps / totalFeeBps
+        );
+        distributed += _send(
+            token,
+            holderVault,
+            amount * holderBps / totalFeeBps
+        );
         distributed += _send(token, buybackVault, amount * buybackBps / totalFeeBps);
         distributed += _send(token, liquidityVault, amount * liquidityBps / totalFeeBps);
         distributed += _send(token, treasury, amount * treasuryBps / totalFeeBps);

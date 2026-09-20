@@ -548,6 +548,27 @@ export default function LaunchPage() {
             </div>
           </section>
 
+          <section className="formCard launchShieldCard">
+            <div className="formSectionTitle"><span>🛡</span><div><h2>Fortune Launch Shield</h2><p>Protocol-level opening protection is enabled on every Fortune curve.</p></div></div>
+            <div className="shieldGrid">
+              <div><span>Opening buy tax</span><strong>99%</strong><small>decays rapidly</small></div>
+              <div><span>Tax ends</span><strong>5 sec</strong><small>cannot be extended</small></div>
+              <div><span>Early wallet cap</span><strong>2%</strong><small>first 15 sec</small></div>
+              <div><span>Shield proceeds</span><strong>LP vault</strong><small>never creator wallet</small></div>
+            </div>
+            <div className="shieldDecay">
+              <span>0s · 99%</span>
+              <span>1s · 24.75%</span>
+              <span>2s · 3.09%</span>
+              <span>3s · 0.38%</span>
+              <span>4s · 0.04%</span>
+              <span>5s · 0%</span>
+            </div>
+            <p className="fieldHint">
+              Buys only. Sells are not subject to the Launch Shield. There are no creator or private-wallet exemptions. Fortune's default UI should wait for the countdown to finish unless a user explicitly chooses to buy during the protected window.
+            </p>
+          </section>
+
           <section className="formCard">
             <div className="formSectionTitle"><span>03</span><div><h2>Route the economics</h2><p>Decide what trading fees do after every trade.</p></div></div>
             <div className="rewardModes">
@@ -646,6 +667,9 @@ function ManifestRows({
     ["Launch engine", launchMode==="basket" ? "Basket Curve" : launchMode==="stock-floor" ? "Stock Floor" : "Pre-IPO Perp"],
     ["Token", name + " ($" + symbol + ")"],
     ["Fortune vanity address", "Every launch token ends in 0xfe"],
+    ["Launch Shield", "99% → 0% over 5 sec · buy-only"],
+    ["Early wallet cap", "2% cumulative buys for first 15 sec"],
+    ["Shield proceeds", "Liquidity reinforcement vault · no exemptions"],
     ["Accepted quote assets", assets.join(" · ")],
     ["Primary market", primary],
     ["Graduation model", graduation==="adaptive"?"Demand weighted":"Fixed basket"],

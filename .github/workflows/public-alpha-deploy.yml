@@ -91,37 +91,11 @@ jobs:
       - name: Run full local contract suite
         run: forge test --fuzz-runs 1000 -vvv
 
-      - name: Broadcast unified public testnet deployment
+      - name: Direct broadcast unified public testnet deployment
         run: |
           set -o pipefail
-          forge script script/PublicTestnetStack.s.sol:PublicTestnetStack             --rpc-url "$BSC_TESTNET_RPC_URL"             --broadcast             --skip-simulation             --slow             --with-gas-price 1000000000             --priority-gas-price 1000000000             -vvvv | tee /tmp/fortune-public-alpha-deploy.log
-
-      - name: Export deployed addresses
-        run: |
-          set -euo pipefail
-          LOG=/tmp/fortune-public-alpha-deploy.log
-
-          extract() {
-            grep "$1" "$LOG" | grep -oE '0x[a-fA-F0-9]{40}' | tail -1
-          }
-
-          echo "FORTUNE_FACTORY=$(extract FortuneFactory)" >> "$GITHUB_ENV"
-          echo "FORTUNE_TAX_FACTORY=$(extract FortuneTaxFactory)" >> "$GITHUB_ENV"
-          echo "FORTUNE_REGISTRY=$(extract FortuneAssetRegistry)" >> "$GITHUB_ENV"
-          echo "FORTUNE_POOL_REGISTRY=$(extract FortunePoolRegistry)" >> "$GITHUB_ENV"
-          echo "FORTUNE_V3_ADAPTER=$(extract FortunePancakeV3GraduationAdapter)" >> "$GITHUB_ENV"
-          echo "FORTUNE_V3_LOCKER=$(extract FortunePermanentLiquidityLocker)" >> "$GITHUB_ENV"
-          echo "FORTUNE_V2_TAX_ADAPTER=$(extract FortunePancakeV2TaxGraduationAdapter)" >> "$GITHUB_ENV"
-          echo "FORTUNE_V2_LOCKER=$(extract FortunePermanentV2LiquidityLocker)" >> "$GITHUB_ENV"
-          echo "FORTUNE_MOCK_QUOTE=$(extract MockQuote)" >> "$GITHUB_ENV"
-          echo "FORTUNE_MOCK_ORACLE=$(extract MockUsdOracle)" >> "$GITHUB_ENV"
-
-          for LABEL in             FortuneFactory             FortuneTaxFactory             FortuneAssetRegistry             FortunePoolRegistry             FortunePancakeV3GraduationAdapter             FortunePermanentLiquidityLocker             FortunePancakeV2TaxGraduationAdapter             FortunePermanentV2LiquidityLocker             MockQuote             MockUsdOracle
-          do
-            VALUE=$(extract "$LABEL")
-            test -n "$VALUE" || (echo "Could not parse $LABEL from deployment log" && exit 1)
-            echo "$LABEL=$VALUE"
-          done
+          bash script/deploy-public-alpha-direct.sh \
+            2>&1 | tee /tmp/fortune-public-alpha-deploy.log
 
       - name: Verify deployed stack invariants
         run: |
@@ -145,23 +119,18 @@ jobs:
 
           echo "Unified public testnet stack invariant checks passed."
 
-      - name: Broadcast standard V3 lifecycle
+      - name: Run real standard + tax onchain lifecycle harnesses
         run: |
           set -o pipefail
-          forge script script/StandardPublicTestnetDrill.s.sol:StandardPublicTestnetDrill             --rpc-url "$BSC_TESTNET_RPC_URL"             --broadcast             --skip-simulation             --slow             --with-gas-price 1000000000             --priority-gas-price 1000000000             -vvvv | tee /tmp/fortune-standard-public-alpha-drill.log
+          bash script/run-public-alpha-harnesses.sh \
+            2>&1 | tee /tmp/fortune-public-alpha-lifecycle.log
+          cp /tmp/fortune-public-alpha-lifecycle.log /tmp/fortune-standard-public-alpha-drill.log
+          cp /tmp/fortune-public-alpha-lifecycle.log /tmp/fortune-tax-public-alpha-drill.log
 
-      - name: Require standard lifecycle marker
+      - name: Require both real lifecycle markers
         run: |
-          grep -q "STANDARD_ONCHAIN_EXECUTION_COMPLETE_AND_SUCCESSFUL" /tmp/fortune-standard-public-alpha-drill.log
-
-      - name: Broadcast tax-token V2 lifecycle
-        run: |
-          set -o pipefail
-          forge script script/TaxPublicTestnetDrill.s.sol:TaxPublicTestnetDrill             --rpc-url "$BSC_TESTNET_RPC_URL"             --broadcast             --skip-simulation             --slow             --with-gas-price 1000000000             --priority-gas-price 1000000000             -vvvv | tee /tmp/fortune-tax-public-alpha-drill.log
-
-      - name: Require tax lifecycle marker
-        run: |
-          grep -q "TAX_ONCHAIN_EXECUTION_COMPLETE_AND_SUCCESSFUL" /tmp/fortune-tax-public-alpha-drill.log
+          grep -q "STANDARD_ONCHAIN_EXECUTION_COMPLETE_AND_SUCCESSFUL" /tmp/fortune-public-alpha-lifecycle.log
+          grep -q "TAX_ONCHAIN_EXECUTION_COMPLETE_AND_SUCCESSFUL" /tmp/fortune-public-alpha-lifecycle.log
 
       - name: Write public-alpha address manifest
         run: |
@@ -188,17 +157,12 @@ jobs:
         run: |
           set -euo pipefail
 
-          STANDARD_TOKEN=$(grep "LaunchToken" /tmp/fortune-standard-public-alpha-drill.log | grep -oE '0x[a-fA-F0-9]{40}' | tail -1)
-          STANDARD_CURVE=$(grep "FortuneCurve" /tmp/fortune-standard-public-alpha-drill.log | grep -oE '0x[a-fA-F0-9]{40}' | tail -1)
-          LP_TOKEN_ID=$(grep "LPPositionTokenId" /tmp/fortune-standard-public-alpha-drill.log | grep -oE '[0-9]+' | tail -1)
-          TAX_TOKEN=$(grep "LaunchToken" /tmp/fortune-tax-public-alpha-drill.log | grep -oE '0x[a-fA-F0-9]{40}' | tail -1)
-          TAX_CURVE=$(grep "FortuneCurve" /tmp/fortune-tax-public-alpha-drill.log | grep -oE '0x[a-fA-F0-9]{40}' | tail -1)
-          TAX_POOL=$(grep "OfficialPancakeV2Pool" /tmp/fortune-tax-public-alpha-drill.log | grep -oE '0x[a-fA-F0-9]{40}' | tail -1)
+          STANDARD_POOL=$(cast call "$PANCAKE_V3_FACTORY" \
+            "getPool(address,address,uint24)(address)" \
+            "$STANDARD_TOKEN" "$FORTUNE_MOCK_QUOTE" 500 \
+            --rpc-url "$BSC_TESTNET_RPC_URL")
 
-          STANDARD_POOL=$(cast call "$PANCAKE_V3_FACTORY"             "getPool(address,address,uint24)(address)"             "$STANDARD_TOKEN" "$FORTUNE_MOCK_QUOTE" 500             --rpc-url "$BSC_TESTNET_RPC_URL")
-
-          export STANDARD_TOKEN STANDARD_CURVE STANDARD_POOL LP_TOKEN_ID
-          export TAX_TOKEN TAX_CURVE TAX_POOL
+          export STANDARD_POOL
 
           python3 - <<'PY'
           import os, re
@@ -237,7 +201,7 @@ jobs:
 
           text, count = re.subn(
               r'(referenceLpTokenId:\s*)\d+',
-              rf'\g<1>{os.environ["LP_TOKEN_ID"]}',
+              rf'\g<1>{os.environ["STANDARD_LP_TOKEN_ID"]}',
               text,
               count=1,
           )
@@ -267,5 +231,8 @@ jobs:
             /tmp/fortune-public-alpha-deploy.log
             /tmp/fortune-standard-public-alpha-drill.log
             /tmp/fortune-tax-public-alpha-drill.log
+            /tmp/fortune-public-alpha-lifecycle.log
             /tmp/fortune-public-alpha-addresses.txt
+            /tmp/fortune-public-alpha-addresses.env
+            /tmp/fortune-public-alpha-lifecycle.env
           retention-days: 30

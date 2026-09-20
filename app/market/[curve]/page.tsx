@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import {
   createPublicClient,
   createWalletClient,
@@ -329,6 +329,8 @@ function short(value: string) {
 
 export default function MarketPage() {
   const params = useParams<{ curve: string }>();
+  const searchParams = useSearchParams();
+  const isTaxMarket = searchParams.get("mode") === "tax";
   const curve =
     typeof params.curve === "string" && isAddress(params.curve)
       ? (params.curve as Address)
@@ -652,35 +654,51 @@ export default function MarketPage() {
         process.env.NEXT_PUBLIC_PANCAKE_V3_FEE_TIER || 500
       );
 
-      const plan = encodeAbiParameters(
-        [
-          {
-            type: "tuple",
-            components: [
-              { name: "fees", type: "uint24[]" },
+      const plan = isTaxMarket
+        ? encodeAbiParameters(
+            [
               {
-                name: "maxSqrtPriceDeviationBps",
-                type: "uint16",
+                type: "tuple",
+                components: [
+                  { name: "maxDustBps", type: "uint16" },
+                  { name: "deadline", type: "uint64" },
+                ],
               },
-              { name: "maxDustBps", type: "uint16" },
-              { name: "deadline", type: "uint64" },
             ],
-          },
-        ],
-        [
-          {
-            fees: market.quotes.map(() => configuredFee),
-            maxSqrtPriceDeviationBps: 100,
-            maxDustBps: 100,
-            deadline,
-          },
-        ]
-      );
+            [{ maxDustBps: 100, deadline }]
+          )
+        : encodeAbiParameters(
+            [
+              {
+                type: "tuple",
+                components: [
+                  { name: "fees", type: "uint24[]" },
+                  {
+                    name: "maxSqrtPriceDeviationBps",
+                    type: "uint16",
+                  },
+                  { name: "maxDustBps", type: "uint16" },
+                  { name: "deadline", type: "uint64" },
+                ],
+              },
+            ],
+            [
+              {
+                fees: market.quotes.map(() => configuredFee),
+                maxSqrtPriceDeviationBps: 100,
+                maxDustBps: 100,
+                deadline,
+              },
+            ]
+          );
 
       const simulation = await publicClient.simulateContract({
         account: accountAddress,
-        address:
-          FORTUNE_NETWORK.contracts.factory as Address,
+        address: (
+          isTaxMarket
+            ? FORTUNE_NETWORK.contracts.taxFactory
+            : FORTUNE_NETWORK.contracts.factory
+        ) as Address,
         abi: factoryAbi,
         functionName: "finalizeGraduation",
         args: [curve, plan],
@@ -692,13 +710,19 @@ export default function MarketPage() {
         );
       }
 
-      setMessage("Confirm the Pancake V3 graduation transaction.");
+      setMessage(
+        isTaxMarket
+          ? "Confirm the Pancake V2 tax-token graduation transaction."
+          : "Confirm the Pancake V3 graduation transaction."
+      );
       const client = walletClient(accountAddress);
       const hash = await client.writeContract(simulation.request);
       await publicClient.waitForTransactionReceipt({ hash });
 
       setMessage(
-        "Graduation confirmed. Curve trading is closed and Pancake V3 liquidity is live."
+        isTaxMarket
+          ? "Graduation confirmed. Curve trading is closed, Pancake V2 liquidity is live, and the fungible LP position is permanently locked."
+          : "Graduation confirmed. Curve trading is closed and Pancake V3 liquidity is live."
       );
       await refresh();
     } catch (error) {
@@ -841,17 +865,21 @@ export default function MarketPage() {
 
       {market.graduated ? (
         <section className="registryNotice" style={{ marginTop: 14 }}>
-          <strong>PANCAKE V3 LIVE</strong>
+          <strong>{isTaxMarket ? "PANCAKE V2 LIVE" : "PANCAKE V3 LIVE"}</strong>
           <span>
-            This launch has graduated. Curve buys and sells are closed; the
-            graduation transaction created and permanently locked the Pancake
-            V3 LP position.
+            {isTaxMarket
+              ? "This tax launch has graduated. Curve trading is closed; Pancake V2 liquidity is live and its fungible LP tokens are permanently locked."
+              : "This launch has graduated. Curve buys and sells are closed; the graduation transaction created and permanently locked the Pancake V3 LP position."}
           </span>
         </section>
       ) : market.graduationReady ? (
         <section className="panel" style={{ marginTop: 14 }}>
           <span className="eyebrow">GRADUATION READY</span>
-          <h2>Move liquidity to Pancake V3</h2>
+          <h2>
+            {isTaxMarket
+              ? "Move liquidity to Pancake V2"
+              : "Move liquidity to Pancake V3"}
+          </h2>
           <p>
             Finalization is permissionless. The adapter preflight checks the
             pool configuration before any reserve transfer can complete.
@@ -863,7 +891,9 @@ export default function MarketPage() {
           >
             {busy === "graduate"
               ? "Finalizing…"
-              : "Finalize Pancake graduation →"}
+              : isTaxMarket
+                ? "Finalize Pancake V2 graduation →"
+                : "Finalize Pancake V3 graduation →"}
           </button>
         </section>
       ) : (

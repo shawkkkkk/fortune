@@ -1116,3 +1116,87 @@ html[data-theme="dark"] .statusGraduated{
     gap:9px;
   }
 }
+
+
+.launchModeRow{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:12px;
+}
+.launchModeRow button{
+  min-height:92px;
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  justify-content:center;
+  gap:7px;
+  padding:16px 18px;
+  text-align:left;
+  border:1px solid #e7d8d9;
+  border-radius:14px;
+  background:#fff;
+  cursor:pointer;
+}
+.launchModeRow button strong{
+  font-size:15px;
+}
+.launchModeRow button span{
+  color:#897a7c;
+  font-size:12px;
+  line-height:1.45;
+}
+.launchModeRow button.selectedMode{
+  border-color:#e1262f;
+  background:#fff3f4;
+  box-shadow:inset 0 0 0 1px rgba(225,38,47,.06);
+}
+.launchModeRow button.selectedMode strong{
+  color:#bd1721;
+}
+.launchModeRow button:disabled{
+  cursor:not-allowed;
+  opacity:.55;
+}
+
+.taxAllocationGrid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:12px;
+  margin:14px 0;
+}
+.taxAllocationInput{
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.taxAllocationInput input{
+  flex:1;
+}
+.taxAllocationInput span{
+  min-width:22px;
+  color:#8a7375;
+  font-weight:800;
+}
+
+html[data-theme="dark"] .launchModeRow button{
+  background:#151212;
+  border-color:#35272a;
+}
+html[data-theme="dark"] .launchModeRow button span,
+html[data-theme="dark"] .taxAllocationInput span{
+  color:#a58f91;
+}
+html[data-theme="dark"] .launchModeRow button.selectedMode{
+  background:#251517;
+  border-color:#d72a34;
+}
+html[data-theme="dark"] .launchModeRow button.selectedMode strong{
+  color:#ff6d74;
+}
+
+@media(max-width:760px){
+  .launchModeRow,
+  .taxAllocationGrid{
+    grid-template-columns:1fr;
+  }
+}

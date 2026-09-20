@@ -1138,13 +1138,17 @@ contract FortuneTest is Test {
 
         (
             bool newLaunchReady,
-            
+            bytes32 newLaunchReason
         ) = factory.preflightLaunch(
                 _params(50e18)
             );
 
         assertFalse(
             newLaunchReady
+        );
+        assertTrue(
+            newLaunchReason !=
+                bytes32("OK")
         );
 
         vm.warp(block.timestamp + 16);

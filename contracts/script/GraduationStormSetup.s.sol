@@ -83,7 +83,10 @@ contract FortuneGraduationStormSeeder {
                 imageURI: "",
                 website: "",
                 xProfile: "",
-                telegram: ""
+                telegram: "",
+                github: "",
+                youtube: "",
+                debox: ""
             });
 
         (bytes32 vanitySalt, , , ) =

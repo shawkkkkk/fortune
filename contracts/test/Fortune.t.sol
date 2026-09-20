@@ -98,7 +98,7 @@ contract FortuneTest is Test {
         p = FortuneFactory.LaunchParams({
             name: "Fortune Test",
             symbol: "FORT",
-            totalSupply: 1_000_000e18,
+            totalSupply: 10_000_000e18,
             quoteAssets: quoteAssets,
             weightsBps: weights,
             primaryQuote: address(wbnb),

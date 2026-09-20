@@ -42,6 +42,7 @@ contract FortuneCurve is ReentrancyGuard {
     address[] public quoteAssets;
     mapping(address => bool) public acceptedQuote;
     mapping(address => uint16) public fixedWeightBps;
+    mapping(address => uint256) private _accountedReserve;
     mapping(address => uint256) public shieldPurchased;
 
     uint256 public tokensSold;
@@ -73,6 +74,11 @@ contract FortuneCurve is ReentrancyGuard {
         uint256 grossQuoteIn,
         uint256 taxAmount,
         uint16 taxBps
+    );
+    event ExcessQuoteSwept(
+        address indexed quoteAsset,
+        uint256 amount,
+        address indexed destination
     );
     event BuyPartialFill(
         address indexed buyer,
@@ -403,6 +409,9 @@ contract FortuneCurve is ReentrancyGuard {
             shieldPurchased[msg.sender] = nextPurchased;
         }
 
+        _accountedReserve[
+            quoteAsset
+        ] += netAmount;
         tokensSold += tokensOut;
 
         launchToken.safeTransfer(msg.sender, tokensOut);
@@ -554,6 +563,9 @@ contract FortuneCurve is ReentrancyGuard {
             tokenAmount
         );
         tokensSold -= tokenAmount;
+        _accountedReserve[
+            quoteAsset
+        ] -= grossQuote;
 
         IERC20 quote = IERC20(quoteAsset);
         if (fee > 0) {
@@ -621,18 +633,99 @@ contract FortuneCurve is ReentrancyGuard {
         return quoteAssets.length;
     }
 
-    /// @notice Live reserve balance. Using balanceOf makes the curve resilient to
-    ///         rebasing-style quote assets and direct balance changes.
-    function reserve(address asset) public view returns (uint256) {
-        require(acceptedQuote[asset], "QUOTE_NOT_ACCEPTED");
-        return IERC20(asset).balanceOf(address(this));
+    /// @notice Protocol-accounted reserve. Unsolicited token transfers do not
+    ///         alter curve price, graduation progress or basket weights.
+    function reserve(address asset)
+        public
+        view
+        returns (uint256)
+    {
+        require(
+            acceptedQuote[asset],
+            "QUOTE_NOT_ACCEPTED"
+        );
+        return _accountedReserve[asset];
     }
 
-    function netReserveUsd1e18() public view returns (uint256 totalUsd) {
-        for (uint256 i; i < quoteAssets.length; ++i) {
-            address asset = quoteAssets[i];
-            uint256 amount = IERC20(asset).balanceOf(address(this));
-            if (amount > 0) totalUsd += registry.usdValue(asset, amount);
+    function rawReserveBalance(address asset)
+        public
+        view
+        returns (uint256)
+    {
+        require(
+            acceptedQuote[asset],
+            "QUOTE_NOT_ACCEPTED"
+        );
+        return
+            IERC20(asset).balanceOf(
+                address(this)
+            );
+    }
+
+    function excessQuoteBalance(address asset)
+        public
+        view
+        returns (uint256)
+    {
+        uint256 raw =
+            rawReserveBalance(asset);
+        uint256 accounted =
+            _accountedReserve[asset];
+
+        return
+            raw > accounted
+                ? raw - accounted
+                : 0;
+    }
+
+    /// @notice Permissionless donation cleanup. Excess quote tokens can never
+    ///         influence the curve; they are redirected to liquidity reinforcement.
+    function sweepExcessQuote(address asset)
+        external
+        nonReentrant
+        returns (uint256 amount)
+    {
+        amount =
+            excessQuoteBalance(asset);
+        require(
+            amount > 0,
+            "NO_EXCESS"
+        );
+
+        IERC20(asset).safeTransfer(
+            shieldVault,
+            amount
+        );
+
+        emit ExcessQuoteSwept(
+            asset,
+            amount,
+            shieldVault
+        );
+    }
+
+    function netReserveUsd1e18()
+        public
+        view
+        returns (uint256 totalUsd)
+    {
+        for (
+            uint256 i;
+            i < quoteAssets.length;
+            ++i
+        ) {
+            address asset =
+                quoteAssets[i];
+            uint256 amount =
+                _accountedReserve[asset];
+
+            if (amount > 0) {
+                totalUsd +=
+                    registry.usdValue(
+                        asset,
+                        amount
+                    );
+            }
         }
     }
 
@@ -928,8 +1021,18 @@ contract FortuneCurve is ReentrancyGuard {
             );
         }
 
-        for (uint256 i; i < reserves.length; ++i) {
-            IERC20(reserves[i].asset).safeTransfer(
+        for (
+            uint256 i;
+            i < reserves.length;
+            ++i
+        ) {
+            _accountedReserve[
+                reserves[i].asset
+            ] = 0;
+
+            IERC20(
+                reserves[i].asset
+            ).safeTransfer(
                 adapter,
                 reserves[i].amount
             );
@@ -1002,10 +1105,16 @@ contract FortuneCurve is ReentrancyGuard {
         amountsOut =
             new uint256[](quoteAssets.length);
 
-        for (uint256 i; i < quoteAssets.length; ++i) {
-            address asset = quoteAssets[i];
+        for (
+            uint256 i;
+            i < quoteAssets.length;
+            ++i
+        ) {
+            address asset =
+                quoteAssets[i];
+
             uint256 amount =
-                IERC20(asset).balanceOf(address(this)) *
+                _accountedReserve[asset] *
                 tokenAmount /
                 remainingSupply;
 
@@ -1024,9 +1133,20 @@ contract FortuneCurve is ReentrancyGuard {
         );
         rescueRedeemed += tokenAmount;
 
-        for (uint256 i; i < quoteAssets.length; ++i) {
+        for (
+            uint256 i;
+            i < quoteAssets.length;
+            ++i
+        ) {
             if (amountsOut[i] > 0) {
-                IERC20(quoteAssets[i]).safeTransfer(
+                address asset =
+                    quoteAssets[i];
+
+                _accountedReserve[
+                    asset
+                ] -= amountsOut[i];
+
+                IERC20(asset).safeTransfer(
                     msg.sender,
                     amountsOut[i]
                 );

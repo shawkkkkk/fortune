@@ -1,8 +1,16 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { assetCategories, assets } from "@/data/assets";
 import type { AssetCategory } from "@/lib/types";
+
+type BscCandidate = {
+  rank: number;
+  symbol: string;
+  name: string;
+  address: string;
+  marketCap?: number | null;
+};
 
 const FACTORY_ADDRESS = process.env.NEXT_PUBLIC_FORTUNE_FACTORY_ADDRESS || "";
 
@@ -22,11 +30,30 @@ export default function LaunchPage() {
   const [holderBps, setHolderBps] = useState(25);
   const [buybackBps, setBuybackBps] = useState(25);
   const [liquidityBps, setLiquidityBps] = useState(15);
+  const [bscCandidates, setBscCandidates] = useState<BscCandidate[]>([]);
+  const [catalogLoading, setCatalogLoading] = useState(false);
   const protocolBps = 10;
+
+  useEffect(() => {
+    if (activeCategory !== "BSC 400" || bscCandidates.length > 0) return;
+
+    setCatalogLoading(true);
+    void fetch("/api/registry/top-bsc")
+      .then((response) => response.json())
+      .then((data) =>
+        setBscCandidates(Array.isArray(data.tokens) ? data.tokens : [])
+      )
+      .finally(() => setCatalogLoading(false));
+  }, [activeCategory, bscCandidates.length]);
 
   const filtered = useMemo(() => {
     return assets.filter((asset) => {
-      const matchesCategory = activeCategory === "Custom" ? false : asset.category === activeCategory;
+      const matchesCategory =
+        activeCategory === "Custom" || activeCategory === "BSC 400"
+          ? false
+          : activeCategory === "BNB Chain"
+            ? asset.chain === "BSC"
+            : asset.category === activeCategory;
       const needle = query.toLowerCase();
       const matchesQuery = !needle || asset.symbol.toLowerCase().includes(needle) || asset.name.toLowerCase().includes(needle);
       return matchesCategory && matchesQuery;
@@ -100,6 +127,31 @@ export default function LaunchPage() {
                   </button>
                 );
               })}
+              {activeCategory==="BSC 400" && (
+                <>
+                  {catalogLoading && (
+                    <div className="customAssetBox">
+                      <strong>Loading ranked BNB ecosystem assets…</strong>
+                    </div>
+                  )}
+                  {!catalogLoading && bscCandidates.slice(0, 80).map((asset) => (
+                    <button
+                      key={asset.address}
+                      className="assetOption assetDisabled"
+                      disabled
+                      title="Candidate asset — Fortune registry approval required before pairing"
+                    >
+                      <span className="assetIconLarge">{asset.symbol.slice(0, 2)}</span>
+                      <span>
+                        <strong>#{asset.rank} {asset.symbol}</strong>
+                        <small>{asset.name}</small>
+                      </span>
+                      <em>Candidate</em>
+                    </button>
+                  ))}
+                </>
+              )}
+
               {activeCategory==="Custom" && (
                 <div className="customAssetBox">
                   <strong>Custom BEP-20</strong>

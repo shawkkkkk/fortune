@@ -190,7 +190,10 @@ contract PancakeTestnetDrill is Script {
                         imageURI: "",
                         website: "",
                         xProfile: "",
-                        telegram: ""
+                        telegram: "",
+                        github: "",
+                        youtube: "",
+                        debox: ""
                     });
 
         (

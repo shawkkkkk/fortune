@@ -51,3 +51,23 @@ Production Fortune should distinguish:
 - **Custom / unverified**
 
 A "verified" badge must never imply investment quality, regulatory approval, safety from loss or issuer endorsement of Fortune.
+
+
+## U.S. listed stocks and microcaps
+
+Fortune may discover a real exchange-listed ticker without treating that ticker as an onchain asset.
+
+For direct pairing, the launch must resolve to an actual BSC tokenized-security contract from a recognized provider and pass the technical + product-eligibility gates above. Fortune does not create synthetic "ticker copies" to fill catalog gaps.
+
+The NASDAQ Microcaps interface is therefore a resolver:
+
+```
+NASDAQ ticker
+  -> verify underlying
+  -> discover BSC tokenized representations
+  -> verify provider / structure / oracle / status
+  -> Fortune Asset Registry
+  -> pairable
+```
+
+Low market capitalization or a sub-$5 share price never relaxes these controls. Market halts and provider restrictions should disable new Fortune interactions for the affected stock token.

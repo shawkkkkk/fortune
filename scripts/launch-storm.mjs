@@ -4,6 +4,7 @@ const base = (process.env.BASE_URL || "").replace(/\/$/, "");
 const p95LimitMs = Number(process.env.P95_LIMIT_MS || 2500);
 const successFloor = Number(process.env.SUCCESS_FLOOR || 0.995);
 const timeoutMs = Number(process.env.TIMEOUT_MS || 8000);
+const includeRpcChecks = process.env.INCLUDE_RPC_CHECKS !== "false";
 
 if (!base) {
   console.error("BASE_URL is required.");
@@ -23,10 +24,14 @@ const targets = [
   { path: "/analytics", weight: 8 },
   { path: "/forum", weight: 5 },
   { path: "/api/health", weight: 15 },
-  { path: "/api/ready", weight: 10 },
   { path: "/api/public/v1/protocol", weight: 10 },
-  { path: "/api/public/v1/readiness", weight: 10 },
   { path: "/api/public/v1/pairs?launchable=true&limit=25", weight: 10 },
+  ...(includeRpcChecks
+    ? [
+        { path: "/api/ready", weight: 10 },
+        { path: "/api/public/v1/readiness", weight: 10 },
+      ]
+    : []),
 ];
 
 const weighted = targets.flatMap((target) =>
@@ -146,6 +151,7 @@ const report = {
     successFloor,
     p95LimitMs,
     timeoutMs,
+    includeRpcChecks,
   },
   stages: [],
 };

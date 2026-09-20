@@ -72,6 +72,7 @@ contract DeployTestnet is Script {
         console2.log("FortuneFactory", address(factory));
         console2.log("FortuneAssetRegistry", address(registry));
         console2.log("FortuneAutomationRegistry", address(automationRegistry));
+        console2.log("FortuneMetadataRegistry", address(factory.metadataRegistry()));
         console2.log("MockGraduationAdapter", address(graduation));
         console2.log("MockUsdOracle", address(oracle));
         console2.log("Mock tUSDT", address(mockUsdt));

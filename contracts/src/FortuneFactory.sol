@@ -314,95 +314,154 @@ contract FortuneFactory is Ownable2Step {
         return (true, bytes32("OK"));
     }
 
+    /// @notice View-only vanity search. Run this through eth_call before the
+    ///         deployment transaction so the expensive salt search never consumes
+    ///         launch gas.
+    function previewPreparedVanity(
+        address creator,
+        LaunchParams calldata p
+    )
+        external
+        view
+        returns (
+            bytes32 vanitySalt,
+            address predictedToken,
+            bytes32 manifestHash,
+            uint256 launchNonce
+        )
+    {
+        require(creator != address(0), "ZERO_CREATOR");
+
+        launchNonce =
+            creatorLaunchNonce[creator];
+        manifestHash =
+            _manifestHash(
+                creator,
+                launchNonce,
+                p
+            );
+
+        bytes32 initCodeHash =
+            _tokenInitCodeHash(
+                p,
+                manifestHash
+            );
+
+        (vanitySalt, predictedToken) =
+            _findFortuneSalt(
+                initCodeHash,
+                manifestHash
+            );
+    }
+
+    /// @notice Research/backward-compatible launch path. Production clients
+    ///         should use createLaunchPrepared so vanity search happens offchain.
     function createLaunch(LaunchParams calldata p)
         external
         returns (LaunchInfo memory info)
     {
-        (bool ready, bytes32 reasonCode) = preflightLaunch(p);
-        if (!ready) revert LaunchPreflightFailed(reasonCode);
-
-        require(!launchesPaused, "LAUNCHES_PAUSED");
-        require(
-            p.quoteAssets.length >= 1 && p.quoteAssets.length <= 5,
-            "BAD_ASSET_COUNT"
-        );
-        require(
-            p.quoteAssets.length == p.weightsBps.length,
-            "BAD_WEIGHT_LENGTH"
-        );
-        require(p.totalSupply > 0, "ZERO_SUPPLY");
-
-        bool primaryFound;
-        uint256 weightSum;
-
-        for (uint256 i; i < p.quoteAssets.length; ++i) {
-            require(
-                registry.isQuoteAsset(p.quoteAssets[i]),
-                "UNAPPROVED_QUOTE"
+        return
+            _createLaunch(
+                p,
+                bytes32(0),
+                false
             );
-            weightSum += p.weightsBps[i];
-            if (p.quoteAssets[i] == p.primaryQuote) primaryFound = true;
+    }
+
+    /// @notice Gas-predictable launch path using a vanity salt computed by
+    ///         previewPreparedVanity in a free eth_call.
+    function createLaunchPrepared(
+        LaunchParams calldata p,
+        bytes32 vanitySalt
+    )
+        external
+        returns (LaunchInfo memory info)
+    {
+        return
+            _createLaunch(
+                p,
+                vanitySalt,
+                true
+            );
+    }
+
+    function _createLaunch(
+        LaunchParams calldata p,
+        bytes32 suppliedSalt,
+        bool prepared
+    )
+        internal
+        returns (LaunchInfo memory info)
+    {
+        (bool ready, bytes32 reasonCode) =
+            preflightLaunch(p);
+
+        if (!ready) {
+            revert LaunchPreflightFailed(
+                reasonCode
+            );
         }
 
-        require(primaryFound, "PRIMARY_NOT_IN_BASKET");
-        require(weightSum == 10_000, "BAD_WEIGHTS");
+        uint256 launchNonce =
+            creatorLaunchNonce[msg.sender];
 
-        uint256 launchNonce = creatorLaunchNonce[msg.sender]++;
-        bytes32 manifestHash = keccak256(
-            abi.encode(
-                block.chainid,
-                address(this),
-                address(registry),
-                address(automationRegistry),
-                automationExecutor,
+        bytes32 manifestHash =
+            _manifestHash(
                 msg.sender,
                 launchNonce,
+                p
+            );
+
+        bytes32 initCodeHash =
+            _tokenInitCodeHash(
+                p,
+                manifestHash
+            );
+
+        bytes32 vanitySalt;
+        address predictedToken;
+
+        if (prepared) {
+            vanitySalt = suppliedSalt;
+            predictedToken =
+                _computeCreate2Address(
+                    vanitySalt,
+                    initCodeHash
+                );
+
+            require(
+                hasFortuneSuffix(predictedToken),
+                "BAD_PREPARED_VANITY"
+            );
+        } else {
+            (
+                vanitySalt,
+                predictedToken
+            ) = _findFortuneSalt(
+                initCodeHash,
+                manifestHash
+            );
+        }
+
+        creatorLaunchNonce[msg.sender] =
+            launchNonce + 1;
+
+        FortuneToken token =
+            new FortuneToken{
+                salt: vanitySalt
+            }(
                 p.name,
                 p.symbol,
                 p.totalSupply,
-                p.quoteAssets,
-                p.weightsBps,
-                p.primaryQuote,
-                p.basePriceUsd1e18,
-                p.slopeUsd1e18,
-                p.graduationUsd1e18,
-                p.adaptiveGraduation,
-                p.feeBps,
-                p.treasury,
-                p.metadataEditable,
-                p.description,
-                p.imageURI,
-                p.website,
-                p.xProfile,
-                p.telegram
-            )
-        );
-
-        bytes32 initCodeHash = keccak256(
-            abi.encodePacked(
-                type(FortuneToken).creationCode,
-                abi.encode(
-                    p.name,
-                    p.symbol,
-                    p.totalSupply,
-                    manifestHash
-                )
-            )
-        );
-
-        (bytes32 vanitySalt, address predictedToken) =
-            _findFortuneSalt(initCodeHash, manifestHash);
-
-        FortuneToken token = new FortuneToken{salt: vanitySalt}(
-            p.name,
-            p.symbol,
-            p.totalSupply,
-            manifestHash
-        );
+                manifestHash
+            );
 
         require(
-            address(token) == predictedToken &&
-                hasFortuneSuffix(address(token)),
+            address(token) ==
+                predictedToken &&
+                hasFortuneSuffix(
+                    address(token)
+                ),
             "FORTUNE_VANITY_MISMATCH"
         );
 
@@ -421,57 +480,72 @@ contract FortuneFactory is Ownable2Step {
             })
         );
 
-        // Create a holder vault whenever holder rewards are configured OR the
-        // creator has a fee share, so creators can later surrender their own
-        // share to holders without deploying a new mutable destination.
-        address holderVault = _automationVault(
-            p.feeBps[1] > 0 || p.feeBps[0] > 0
-                ? uint16(1)
-                : uint16(0),
-            FortuneAutomationRegistry.Purpose.HolderRewards,
-            address(token)
-        );
-        address buybackVault = _automationVault(
-            p.feeBps[2],
-            FortuneAutomationRegistry.Purpose.BuybackBurn,
-            address(token)
-        );
-        // Launch Shield always has a non-creator destination for temporary
-        // anti-snipe tax proceeds, even when normal LP reinforcement is 0 bps.
-        address liquidityVault = _automationVault(
-            p.feeBps[3] > 0 ? p.feeBps[3] : uint16(1),
-            FortuneAutomationRegistry.Purpose.LiquidityReinforcement,
-            address(token)
-        );
+        address holderVault =
+            _automationVault(
+                p.feeBps[1] > 0 ||
+                        p.feeBps[0] > 0
+                    ? uint16(1)
+                    : uint16(0),
+                FortuneAutomationRegistry
+                    .Purpose
+                    .HolderRewards,
+                address(token)
+            );
 
-        FortuneFeeRouter router = new FortuneFeeRouter(
-            address(this),
-            msg.sender,
-            holderVault,
-            buybackVault,
-            liquidityVault,
-            p.treasury,
-            protocolTreasury,
-            p.feeBps
-        );
+        address buybackVault =
+            _automationVault(
+                p.feeBps[2],
+                FortuneAutomationRegistry
+                    .Purpose
+                    .BuybackBurn,
+                address(token)
+            );
 
-        FortuneCurve curve = new FortuneCurve(
-            address(this),
-            address(token),
-            address(registry),
-            address(router),
-            liquidityVault,
-            p.quoteAssets,
-            p.weightsBps,
-            p.basePriceUsd1e18,
-            p.slopeUsd1e18,
-            p.graduationUsd1e18,
-            p.adaptiveGraduation
-        );
+        address liquidityVault =
+            _automationVault(
+                p.feeBps[3] > 0
+                    ? p.feeBps[3]
+                    : uint16(1),
+                FortuneAutomationRegistry
+                    .Purpose
+                    .LiquidityReinforcement,
+                address(token)
+            );
+
+        FortuneFeeRouter router =
+            new FortuneFeeRouter(
+                address(this),
+                msg.sender,
+                holderVault,
+                buybackVault,
+                liquidityVault,
+                p.treasury,
+                protocolTreasury,
+                p.feeBps
+            );
+
+        FortuneCurve curve =
+            new FortuneCurve(
+                address(this),
+                address(token),
+                address(registry),
+                address(router),
+                liquidityVault,
+                p.quoteAssets,
+                p.weightsBps,
+                p.basePriceUsd1e18,
+                p.slopeUsd1e18,
+                p.graduationUsd1e18,
+                p.adaptiveGraduation
+            );
 
         router.setCurve(address(curve));
+
         require(
-            token.transfer(address(curve), p.totalSupply),
+            token.transfer(
+                address(curve),
+                p.totalSupply
+            ),
             "TOKEN_FUND_FAILED"
         );
 
@@ -489,8 +563,11 @@ contract FortuneFactory is Ownable2Step {
         });
 
         launches.push(info);
-        uint256 launchId = launches.length - 1;
-        curveIndexPlusOne[address(curve)] = launches.length;
+        uint256 launchId =
+            launches.length - 1;
+        curveIndexPlusOne[
+            address(curve)
+        ] = launches.length;
 
         emit LaunchCreated(
             launchId,
@@ -499,17 +576,77 @@ contract FortuneFactory is Ownable2Step {
             address(curve),
             manifestHash
         );
+
         emit FortuneVanityAddress(
             launchId,
             address(token),
             vanitySalt
         );
+
         emit LaunchAutomationVaults(
             launchId,
             holderVault,
             buybackVault,
             liquidityVault
         );
+    }
+
+    function _manifestHash(
+        address creator,
+        uint256 launchNonce,
+        LaunchParams calldata p
+    ) internal view returns (bytes32) {
+        return
+            keccak256(
+                abi.encode(
+                    block.chainid,
+                    address(this),
+                    address(registry),
+                    address(
+                        automationRegistry
+                    ),
+                    automationExecutor,
+                    creator,
+                    launchNonce,
+                    p.name,
+                    p.symbol,
+                    p.totalSupply,
+                    p.quoteAssets,
+                    p.weightsBps,
+                    p.primaryQuote,
+                    p.basePriceUsd1e18,
+                    p.slopeUsd1e18,
+                    p.graduationUsd1e18,
+                    p.adaptiveGraduation,
+                    p.feeBps,
+                    p.treasury,
+                    p.metadataEditable,
+                    p.description,
+                    p.imageURI,
+                    p.website,
+                    p.xProfile,
+                    p.telegram
+                )
+            );
+    }
+
+    function _tokenInitCodeHash(
+        LaunchParams calldata p,
+        bytes32 manifestHash
+    ) internal pure returns (bytes32) {
+        return
+            keccak256(
+                abi.encodePacked(
+                    type(FortuneToken)
+                        .creationCode,
+                    abi.encode(
+                        p.name,
+                        p.symbol,
+                        p.totalSupply,
+                        manifestHash
+                    )
+                )
+            );
     }
 
     /// @notice Every Fortune-created launch token is deployed with CREATE2

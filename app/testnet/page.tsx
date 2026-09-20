@@ -72,6 +72,16 @@ const taxParams = [
 const standardFactoryAbi = [
   {
     type: "function",
+    name: "preflightLaunch",
+    stateMutability: "view",
+    inputs: [{ name: "p", type: "tuple", components: standardParams }],
+    outputs: [
+      { name: "ready", type: "bool" },
+      { name: "reasonCode", type: "bytes32" },
+    ],
+  },
+  {
+    type: "function",
     name: "previewPreparedVanity",
     stateMutability: "view",
     inputs: [
@@ -131,6 +141,16 @@ const standardFactoryAbi = [
 ] as const;
 
 const taxFactoryAbi = [
+  {
+    type: "function",
+    name: "preflightLaunch",
+    stateMutability: "view",
+    inputs: [{ name: "p", type: "tuple", components: taxParams }],
+    outputs: [
+      { name: "ready", type: "bool" },
+      { name: "reasonCode", type: "bytes32" },
+    ],
+  },
   {
     type: "function",
     name: "previewPreparedVanity",
@@ -334,6 +354,20 @@ const allocationLabels = [
 
 function shorten(value: string) {
   return value.slice(0, 8) + "…" + value.slice(-6);
+}
+
+function decodeReason(value: Hex) {
+  try {
+    const raw = value.slice(2);
+    const bytes = raw.match(/.{2}/g) || [];
+    return bytes
+      .map((byte) => String.fromCharCode(parseInt(byte, 16)))
+      .join("")
+      .replace(/\0/g, "")
+      .trim();
+  } catch {
+    return value;
+  }
 }
 
 function parseTokenAmount(label: string, value: string) {
@@ -714,6 +748,20 @@ export default function PublicTestnetPage() {
           ...metadata(),
         };
 
+        setMessage("Running onchain launch preflight…");
+        const [ready, reasonCode] = await publicClient.readContract({
+          address: PUBLIC_TESTNET.contracts.factory as Address,
+          abi: standardFactoryAbi,
+          functionName: "preflightLaunch",
+          args: [params],
+        });
+        if (!ready) {
+          throw new Error(
+            "Launch preflight failed: " +
+              (decodeReason(reasonCode) || reasonCode)
+          );
+        }
+
         setMessage("Finding your deterministic 0xfe token address…");
         const [salt] = await publicClient.readContract({
           address: PUBLIC_TESTNET.contracts.factory as Address,
@@ -799,6 +847,20 @@ export default function PublicTestnetPage() {
         };
 
         const taxFactory = PUBLIC_TESTNET.contracts.taxFactory as Address;
+
+        setMessage("Running tax-token launch preflight…");
+        const [ready, reasonCode] = await publicClient.readContract({
+          address: taxFactory,
+          abi: taxFactoryAbi,
+          functionName: "preflightLaunch",
+          args: [params],
+        });
+        if (!ready) {
+          throw new Error(
+            "Tax launch preflight failed: " +
+              (decodeReason(reasonCode) || reasonCode)
+          );
+        }
 
         setMessage("Finding your deterministic 0xfe tax-token address…");
         const [salt] = await publicClient.readContract({

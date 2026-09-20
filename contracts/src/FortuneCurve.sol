@@ -17,10 +17,19 @@ contract FortuneCurve is ReentrancyGuard {
 
     uint16 public constant BPS = 10_000;
 
+    // Fortune Launch Shield. The opening tax applies only to buys and decays
+    // rapidly to zero. It is routed to liquidity reinforcement, never the creator.
+    uint16 public constant SNIPE_TAX_START_BPS = 9_900;
+    uint32 public constant SNIPE_TAX_SECONDS = 5;
+    uint16 public constant EARLY_WALLET_CAP_BPS = 200; // 2% of supply
+    uint32 public constant EARLY_WALLET_CAP_SECONDS = 15;
+
     address public immutable factory;
     IERC20 public immutable launchToken;
     FortuneAssetRegistry public immutable registry;
     FortuneFeeRouter public immutable feeRouter;
+    address public immutable shieldVault;
+    uint64 public immutable launchTimestamp;
 
     uint256 public immutable basePriceUsd1e18;
     uint256 public immutable slopeUsd1e18;
@@ -30,12 +39,27 @@ contract FortuneCurve is ReentrancyGuard {
     address[] public quoteAssets;
     mapping(address => bool) public acceptedQuote;
     mapping(address => uint16) public fixedWeightBps;
+    mapping(address => uint256) public shieldPurchased;
 
     uint256 public tokensSold;
     bool public graduationReady;
     bool public graduated;
     uint256 public graduationAnchorPriceUsd1e18;
 
+    event LaunchShieldConfigured(
+        uint16 startTaxBps,
+        uint32 taxDurationSeconds,
+        uint16 walletCapBps,
+        uint32 walletCapDurationSeconds,
+        address indexed shieldVault
+    );
+    event SnipeTaxCharged(
+        address indexed buyer,
+        address indexed quoteAsset,
+        uint256 grossQuoteIn,
+        uint256 taxAmount,
+        uint16 taxBps
+    );
     event Bought(
         address indexed buyer,
         address indexed quoteAsset,
@@ -68,6 +92,7 @@ contract FortuneCurve is ReentrancyGuard {
         address launchToken_,
         address registry_,
         address feeRouter_,
+        address shieldVault_,
         address[] memory quoteAssets_,
         uint16[] memory weightsBps_,
         uint256 basePriceUsd1e18_,
@@ -75,7 +100,12 @@ contract FortuneCurve is ReentrancyGuard {
         uint256 graduationUsd1e18_,
         bool adaptiveGraduation_
     ) {
-        require(factory_ != address(0) && launchToken_ != address(0), "ZERO_ADDRESS");
+        require(
+            factory_ != address(0) &&
+                launchToken_ != address(0) &&
+                shieldVault_ != address(0),
+            "ZERO_ADDRESS"
+        );
         require(quoteAssets_.length >= 1 && quoteAssets_.length <= 5, "BAD_ASSET_COUNT");
         require(quoteAssets_.length == weightsBps_.length, "WEIGHT_LENGTH");
         require(basePriceUsd1e18_ > 0 && graduationUsd1e18_ > 0, "BAD_ECONOMICS");
@@ -98,10 +128,42 @@ contract FortuneCurve is ReentrancyGuard {
         launchToken = IERC20(launchToken_);
         registry = FortuneAssetRegistry(registry_);
         feeRouter = FortuneFeeRouter(feeRouter_);
+        shieldVault = shieldVault_;
+        launchTimestamp = uint64(block.timestamp);
         basePriceUsd1e18 = basePriceUsd1e18_;
         slopeUsd1e18 = slopeUsd1e18_;
         graduationUsd1e18 = graduationUsd1e18_;
         adaptiveGraduation = adaptiveGraduation_;
+
+        emit LaunchShieldConfigured(
+            SNIPE_TAX_START_BPS,
+            SNIPE_TAX_SECONDS,
+            EARLY_WALLET_CAP_BPS,
+            EARLY_WALLET_CAP_SECONDS,
+            shieldVault_
+        );
+    }
+
+    function launchElapsedSeconds() public view returns (uint256) {
+        return block.timestamp > launchTimestamp
+            ? block.timestamp - launchTimestamp
+            : 0;
+    }
+
+    /// @notice Pons-style fast decay: 99% at launch, then rapidly trends to 0
+    ///         and is guaranteed to be zero after 5 seconds.
+    function currentSnipeTaxBps() public view returns (uint16) {
+        uint256 elapsed = launchElapsedSeconds();
+        if (elapsed >= SNIPE_TAX_SECONDS) return 0;
+
+        uint256 shift = elapsed * 14 / SNIPE_TAX_SECONDS;
+        if (shift >= 14) return 0;
+
+        return uint16(uint256(SNIPE_TAX_START_BPS) >> shift);
+    }
+
+    function launchShieldActive() external view returns (bool) {
+        return launchElapsedSeconds() < EARLY_WALLET_CAP_SECONDS;
     }
 
     function currentPriceUsd1e18() public view returns (uint256) {
@@ -126,8 +188,24 @@ contract FortuneCurve is ReentrancyGuard {
         // accounting rather than silently giving the buyer a bad quote.
         require(received == amountIn, "NON_STANDARD_QUOTE_TOKEN");
 
-        uint256 fee = received * feeRouter.totalFeeBps() / BPS;
-        uint256 netAmount = received - fee;
+        uint16 snipeTaxBps = currentSnipeTaxBps();
+        uint256 snipeTax = received * snipeTaxBps / BPS;
+        uint256 afterShield = received - snipeTax;
+
+        // Normal Fortune fees are charged only after the temporary launch tax.
+        uint256 fee = afterShield * feeRouter.totalFeeBps() / BPS;
+        uint256 netAmount = afterShield - fee;
+
+        if (snipeTax > 0) {
+            quote.safeTransfer(shieldVault, snipeTax);
+            emit SnipeTaxCharged(
+                msg.sender,
+                quoteAsset,
+                received,
+                snipeTax,
+                snipeTaxBps
+            );
+        }
 
         if (fee > 0) {
             quote.safeTransfer(address(feeRouter), fee);
@@ -139,7 +217,24 @@ contract FortuneCurve is ReentrancyGuard {
         tokensOut = usdIn * 1e18 / price;
 
         require(tokensOut >= minTokensOut && tokensOut > 0, "SLIPPAGE");
-        require(launchToken.balanceOf(address(this)) >= tokensOut, "INSUFFICIENT_CURVE_TOKENS");
+        require(
+            launchToken.balanceOf(address(this)) >= tokensOut,
+            "INSUFFICIENT_CURVE_TOKENS"
+        );
+
+        if (launchElapsedSeconds() < EARLY_WALLET_CAP_SECONDS) {
+            uint256 walletCap =
+                launchToken.totalSupply() * EARLY_WALLET_CAP_BPS / BPS;
+            uint256 nextPurchased =
+                shieldPurchased[msg.sender] + tokensOut;
+
+            require(
+                nextPurchased <= walletCap,
+                "LAUNCH_SHIELD_WALLET_CAP"
+            );
+
+            shieldPurchased[msg.sender] = nextPurchased;
+        }
 
         tokensSold += tokensOut;
 

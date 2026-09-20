@@ -729,3 +729,355 @@ a{
   .fortuneBrand-lg{font-size:55px}
   .heroBrandLockup{margin-bottom:20px}
 }
+
+
+/* Dark mode: charcoal surfaces with the same Fortune red brand accents. */
+.themeToggle{
+  width:38px;
+  height:38px;
+  display:grid;
+  place-items:center;
+  border:1px solid #e3d4d4;
+  border-radius:11px;
+  background:#fff;
+  color:#8a7375;
+  font-size:17px;
+  cursor:pointer;
+  box-shadow:0 4px 14px rgba(65,20,23,.04);
+}
+.themeToggle:hover{
+  color:#bd1721;
+  border-color:#e1262f;
+  background:#fff5f5;
+}
+
+html[data-theme="dark"]{
+  background:#0f0d0d;
+  color-scheme:dark;
+}
+
+html[data-theme="dark"] body{
+  background:
+    radial-gradient(circle at 12% -10%,rgba(225,38,47,.14),transparent 30rem),
+    radial-gradient(circle at 88% 18%,rgba(225,38,47,.08),transparent 26rem),
+    #0f0d0d;
+  color:#f7f2f2;
+}
+
+html[data-theme="dark"] h1,
+html[data-theme="dark"] h2,
+html[data-theme="dark"] h3,
+html[data-theme="dark"] h4,
+html[data-theme="dark"] h5,
+html[data-theme="dark"] h6,
+html[data-theme="dark"] strong,
+html[data-theme="dark"] b{
+  color:#fff8f8;
+}
+
+html[data-theme="dark"] .fortuneBrandWord{
+  color:#fff8f8;
+}
+
+html[data-theme="dark"] .networkBar{
+  background:#171112;
+  border-bottom-color:#352426;
+  color:#d8c2c4;
+}
+
+html[data-theme="dark"] .networkNote{
+  color:#987d80;
+}
+
+html[data-theme="dark"] .siteHeader{
+  background:rgba(15,13,13,.92);
+  border-bottom-color:#302326;
+  box-shadow:0 10px 30px rgba(0,0,0,.22);
+}
+
+html[data-theme="dark"] .navLinks a{
+  color:#bfaeb0;
+}
+html[data-theme="dark"] .navLinks a:hover,
+html[data-theme="dark"] .navLinks .navActive{
+  color:#ff5961;
+  background:#241517;
+}
+
+html[data-theme="dark"] .themeToggle,
+html[data-theme="dark"] .languageSwitch{
+  border-color:#3d2a2d;
+  background:#171313;
+  color:#bca8aa;
+  box-shadow:none;
+}
+html[data-theme="dark"] .themeToggle:hover{
+  background:#251719;
+  color:#ff636b;
+  border-color:#8e3036;
+}
+html[data-theme="dark"] .languageSwitch button{
+  color:#a99294;
+}
+html[data-theme="dark"] .languageSwitch button:hover{
+  color:#ff676f;
+}
+html[data-theme="dark"] .languageSwitch .languageActive{
+  background:#2a1719;
+  color:#ff6b72;
+}
+
+html[data-theme="dark"] .secondaryCta,
+html[data-theme="dark"] .iconButton{
+  background:#171313;
+  border-color:#3d2b2e;
+  color:#e5d7d8!important;
+}
+html[data-theme="dark"] .secondaryCta:hover,
+html[data-theme="dark"] .iconButton:hover{
+  background:#251719;
+  border-color:#8e3036;
+  color:#ff6c73!important;
+}
+
+html[data-theme="dark"] .panel,
+html[data-theme="dark"] .formCard,
+html[data-theme="dark"] .launchPreview,
+html[data-theme="dark"] .sidebarCard,
+html[data-theme="dark"] .automationCard,
+html[data-theme="dark"] .automationHero,
+html[data-theme="dark"] .metricsGrid,
+html[data-theme="dark"] .registryStrip,
+html[data-theme="dark"] .registryPanel,
+html[data-theme="dark"] .launchCard,
+html[data-theme="dark"] .categoryTabs,
+html[data-theme="dark"] .selectedBasket,
+html[data-theme="dark"] .feeMatrix,
+html[data-theme="dark"] .apiEndpointTable,
+html[data-theme="dark"] .registryTable,
+html[data-theme="dark"] .metadataPolicy,
+html[data-theme="dark"] .launchEngine,
+html[data-theme="dark"] .engineSettings,
+html[data-theme="dark"] .launchShieldCard,
+html[data-theme="dark"] .customAssetBox,
+html[data-theme="dark"] .heroManifest{
+  background:#151212;
+  border-color:#302426;
+  color:#f3ecec;
+  box-shadow:0 16px 40px rgba(0,0,0,.14);
+}
+
+html[data-theme="dark"] .heroManifest,
+html[data-theme="dark"] .registryStrip,
+html[data-theme="dark"] .launchShieldCard{
+  background:linear-gradient(145deg,#171313,#211416);
+}
+
+html[data-theme="dark"] .pageHeading,
+html[data-theme="dark"] .panelTitle,
+html[data-theme="dark"] .manifestTable,
+html[data-theme="dark"] .statRows>div,
+html[data-theme="dark"] .previewFacts>div,
+html[data-theme="dark"] .ledgerRow,
+html[data-theme="dark"] .metric{
+  border-color:#302426;
+}
+
+html[data-theme="dark"] .pageHeading p,
+html[data-theme="dark"] .panel p,
+html[data-theme="dark"] .formCard p,
+html[data-theme="dark"] .launchDescription,
+html[data-theme="dark"] .dataDisclaimer,
+html[data-theme="dark"] .fieldHint,
+html[data-theme="dark"] .launchWarning,
+html[data-theme="dark"] .automationCard>p,
+html[data-theme="dark"] .automationHero p{
+  color:#a99597!important;
+}
+
+html[data-theme="dark"] .manifestRows span,
+html[data-theme="dark"] .statRows span,
+html[data-theme="dark"] .previewFacts span,
+html[data-theme="dark"] .manifestTable span,
+html[data-theme="dark"] .metric span,
+html[data-theme="dark"] .metric small{
+  color:#a28e90;
+}
+
+html[data-theme="dark"] .bigBasket span,
+html[data-theme="dark"] .automationFlow span,
+html[data-theme="dark"] .registryNotice,
+html[data-theme="dark"] .shieldTradeNotice,
+html[data-theme="dark"] .capabilityList em,
+html[data-theme="dark"] .assetChip{
+  background:#241517;
+  border-color:#4a292d;
+  color:#ff737a;
+}
+
+html[data-theme="dark"] .registryNotice span,
+html[data-theme="dark"] .shieldTradeNotice span{
+  color:#b59da0;
+}
+
+html[data-theme="dark"] input,
+html[data-theme="dark"] textarea,
+html[data-theme="dark"] select{
+  background:#100e0e;
+  border-color:#3b2b2d;
+  color:#fff8f8;
+}
+html[data-theme="dark"] input::placeholder,
+html[data-theme="dark"] textarea::placeholder{
+  color:#756466;
+}
+html[data-theme="dark"] input:focus,
+html[data-theme="dark"] textarea:focus,
+html[data-theme="dark"] select:focus{
+  border-color:#e1262f;
+  box-shadow:0 0 0 3px rgba(225,38,47,.13);
+}
+
+html[data-theme="dark"] .formCard>label,
+html[data-theme="dark"] .tradePanel label{
+  color:#c8b8ba;
+}
+
+html[data-theme="dark"] .filterTabs button,
+html[data-theme="dark"] .forumTabs button,
+html[data-theme="dark"] .chartTabs button,
+html[data-theme="dark"] .graduationToggle button,
+html[data-theme="dark"] .categoryTabs button,
+html[data-theme="dark"] .rewardModes button,
+html[data-theme="dark"] .modeRow button{
+  color:#a79193;
+}
+html[data-theme="dark"] .filterTabs .tabActive,
+html[data-theme="dark"] .forumTabs .tabActive,
+html[data-theme="dark"] .chartTabs .tabActive,
+html[data-theme="dark"] .graduationToggle .tabActive,
+html[data-theme="dark"] .categoryTabs .tabActive,
+html[data-theme="dark"] .selectedMode{
+  background:#2a1719!important;
+  color:#ff7077!important;
+  border-color:#673035!important;
+}
+
+html[data-theme="dark"] .registryTableHead,
+html[data-theme="dark"] .selectedBasketHeader,
+html[data-theme="dark"] .feeMatrixHeader{
+  background:#1d1516;
+  color:#a58f91;
+}
+html[data-theme="dark"] .registryRow,
+html[data-theme="dark"] .feeRow,
+html[data-theme="dark"] .basketAllocation{
+  border-color:#302426;
+  color:#b7a5a7;
+}
+html[data-theme="dark"] .registryAsset strong{
+  color:#fff5f5;
+}
+html[data-theme="dark"] .registryAsset small{
+  color:#8f7c7e;
+}
+
+html[data-theme="dark"] .emptyPanel{
+  color:#99878a;
+}
+html[data-theme="dark"] .emptyPanel strong{
+  color:#f3e8e9;
+}
+
+html[data-theme="dark"] .apiCode{
+  background:#100e0e;
+  border-color:#332326;
+  color:#e7d5d7;
+}
+html[data-theme="dark"] .apiPrinciples>div{
+  background:#171313;
+  border-color:#332629;
+}
+html[data-theme="dark"] .apiPrinciples strong{
+  color:#f9eeee;
+}
+html[data-theme="dark"] .apiPrinciples span,
+html[data-theme="dark"] .apiEndpointRow>span{
+  color:#ad999b;
+}
+html[data-theme="dark"] .apiEndpointRow{
+  border-color:#302426;
+}
+html[data-theme="dark"] .apiEndpointRow code{
+  color:#ead8da;
+}
+
+html[data-theme="dark"] .launchEngine{
+  background:#151212;
+}
+html[data-theme="dark"] .launchEngine:hover{
+  border-color:#71343a;
+}
+html[data-theme="dark"] .launchEngine strong{
+  color:#fff3f3;
+}
+html[data-theme="dark"] .launchEngine span{
+  color:#a38e90;
+}
+html[data-theme="dark"] .launchEngine.selectedEngine{
+  background:#251517;
+  border-color:#d92a34;
+}
+html[data-theme="dark"] .engineSettings,
+html[data-theme="dark"] .metadataPolicy{
+  background:#131010;
+  border-color:#342629;
+}
+html[data-theme="dark"] .metadataPolicy>div:first-child>strong{
+  color:#fff1f1;
+}
+html[data-theme="dark"] .metadataPolicy>div:first-child>small{
+  color:#9f898c;
+}
+
+html[data-theme="dark"] .previewArt{
+  background:radial-gradient(circle at center,rgba(225,38,47,.16),transparent 44%),#151010;
+  border-color:#46292d;
+}
+html[data-theme="dark"] .launchPreview>p{
+  color:#a08b8d;
+}
+
+html[data-theme="dark"] .progressTrack,
+html[data-theme="dark"] .mixList>div>div{
+  background:#352628;
+}
+
+html[data-theme="dark"] .tokenAvatar,
+html[data-theme="dark"] .assetIconLarge{
+  background:#241517;
+  border-color:#4a292d;
+  color:#ff6971;
+}
+
+html[data-theme="dark"] .assetOption{
+  background:#151212;
+  border-color:#302426;
+}
+html[data-theme="dark"] .assetOption:hover{
+  border-color:#673036;
+}
+html[data-theme="dark"] .assetSelected{
+  background:#251517;
+  border-color:#d52a34;
+}
+
+html[data-theme="dark"] .healthBadge,
+html[data-theme="dark"] .statusGraduated{
+  color:#ff6d74;
+  border-color:#713139;
+}
+
+@media(max-width:760px){
+  .themeToggle{width:34px;height:34px}
+}

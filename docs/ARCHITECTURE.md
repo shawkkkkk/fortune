@@ -123,3 +123,22 @@ The factory:
 6. verifies the resulting address before continuing the launch.
 
 The suffix is branding only. It does not grant security, verification, or special EVM privileges. Users should still verify that a token was emitted by the canonical FortuneFactory.
+
+
+## Permanent graduation liquidity
+
+Production PancakeSwap graduation adapters should transfer each LP-position NFT into `FortunePermanentLiquidityLocker` in the same atomic graduation transaction.
+
+The locker:
+- accepts positions only from protocol-approved depositors;
+- records launch token, pool identity and an immutable fee recipient;
+- exposes no NFT withdrawal or transfer function;
+- permits anyone to harvest accrued LP fees, but only to the registered fee recipient.
+
+This prevents a creator from removing launch liquidity while keeping fee harvesting permissionless and observable.
+
+## Creator fee surrender
+
+`FortuneFeeRouter` keeps total trade fees and route basis points fixed. A creator may only make one economic change after launch: permanently surrender the existing creator share to the launch's purpose-locked holder-reward vault.
+
+The operation cannot be reversed, cannot increase total fees and cannot redirect any other route.

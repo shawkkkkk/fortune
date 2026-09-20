@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
@@ -10,6 +11,7 @@ import {FortuneToken} from "./FortuneToken.sol";
 import {FortuneFeeRouter} from "./FortuneFeeRouter.sol";
 import {IGraduationAdapter} from "./interfaces/IGraduationAdapter.sol";
 import {IGraduationPreflight} from "./interfaces/IGraduationPreflight.sol";
+import {IFortunePriceOracle} from "./interfaces/IFortunePriceOracle.sol";
 
 /// @notice Experimental shared curve accepting 1–5 quote assets.
 /// @dev Economic formula is intentionally simple for testnet research and MUST be
@@ -42,6 +44,9 @@ contract FortuneCurve is ReentrancyGuard {
     address[] public quoteAssets;
     mapping(address => bool) public acceptedQuote;
     mapping(address => uint16) public fixedWeightBps;
+    mapping(address => address) public oracleFor;
+    mapping(address => uint32) public maxOracleAgeFor;
+    mapping(address => uint8) public decimalsFor;
     mapping(address => uint256) private _accountedReserve;
     mapping(address => uint256) public shieldPurchased;
 
@@ -64,6 +69,12 @@ contract FortuneCurve is ReentrancyGuard {
         Rescued
     }
 
+    event QuotePricingSnapshot(
+        address indexed quoteAsset,
+        address indexed oracle,
+        uint32 maxOracleAge,
+        uint8 decimals
+    );
     event LaunchShieldConfigured(
         uint16 startTaxBps,
         uint32 taxDurationSeconds,
@@ -164,10 +175,49 @@ contract FortuneCurve is ReentrancyGuard {
             address asset = quoteAssets_[i];
             require(asset != address(0), "ZERO_QUOTE");
             require(!acceptedQuote[asset], "DUPLICATE_QUOTE");
-            require(FortuneAssetRegistry(registry_).isQuoteAsset(asset), "UNAPPROVED_QUOTE");
+            FortuneAssetRegistry registryContract =
+                FortuneAssetRegistry(registry_);
+
+            require(
+                registryContract.isQuoteAsset(asset),
+                "UNAPPROVED_QUOTE"
+            );
+
+            FortuneAssetRegistry.AssetConfig
+                memory config =
+                    registryContract.assetConfig(
+                        asset
+                    );
+
+            uint8 snappedDecimals =
+                registryContract
+                    .registeredDecimals(
+                        asset
+                    );
+
+            require(
+                config.oracle != address(0),
+                "ZERO_ORACLE"
+            );
+            require(
+                snappedDecimals <= 36,
+                "BAD_DECIMALS"
+            );
 
             acceptedQuote[asset] = true;
             fixedWeightBps[asset] = weightsBps_[i];
+            oracleFor[asset] = config.oracle;
+            maxOracleAgeFor[asset] =
+                config.maxOracleAge;
+            decimalsFor[asset] =
+                snappedDecimals;
+
+            emit QuotePricingSnapshot(
+                asset,
+                config.oracle,
+                config.maxOracleAge,
+                snappedDecimals
+            );
             quoteAssets.push(asset);
             weightSum += weightsBps_[i];
         }
@@ -191,6 +241,112 @@ contract FortuneCurve is ReentrancyGuard {
             EARLY_WALLET_CAP_SECONDS,
             shieldVault_
         );
+    }
+
+    /// @notice Each curve snapshots pricing infrastructure at launch so later
+    ///         registry edits cannot silently change or brick existing economics.
+    function _priceUsd(address asset)
+        internal
+        view
+        returns (
+            uint256 price,
+            uint256 updatedAt
+        )
+    {
+        address oracle =
+            oracleFor[asset];
+        require(
+            oracle != address(0),
+            "NO_SNAPSHOTTED_ORACLE"
+        );
+
+        (
+            price,
+            updatedAt
+        ) = IFortunePriceOracle(
+                oracle
+            ).priceUsd(asset);
+
+        require(
+            price > 0,
+            "BAD_PRICE"
+        );
+        require(
+            updatedAt > 0 &&
+                updatedAt <= block.timestamp,
+            "BAD_TIMESTAMP"
+        );
+        require(
+            block.timestamp -
+                updatedAt <=
+                maxOracleAgeFor[asset],
+            "STALE_PRICE"
+        );
+
+        uint8 currentDecimals =
+            IERC20Metadata(asset)
+                .decimals();
+
+        require(
+            currentDecimals ==
+                decimalsFor[asset],
+            "ASSET_DECIMALS_CHANGED"
+        );
+    }
+
+    function _usdValue(
+        address asset,
+        uint256 amount
+    ) internal view returns (uint256) {
+        (
+            uint256 price,
+            
+        ) = _priceUsd(asset);
+
+        return
+            Math.mulDiv(
+                amount,
+                price,
+                10 **
+                    uint256(
+                        decimalsFor[asset]
+                    )
+            );
+    }
+
+    function _tokenAmountForUsd(
+        address asset,
+        uint256 usd1e18,
+        bool roundUp
+    ) internal view returns (uint256 amount) {
+        (
+            uint256 price,
+            
+        ) = _priceUsd(asset);
+
+        uint256 scale =
+            10 **
+                uint256(
+                    decimalsFor[asset]
+                );
+
+        amount =
+            Math.mulDiv(
+                usd1e18,
+                scale,
+                price
+            );
+
+        if (
+            roundUp &&
+            Math.mulDiv(
+                amount,
+                price,
+                scale
+            ) < usd1e18
+        ) {
+            amount += 1;
+        }
     }
 
     function launchElapsedSeconds() public view returns (uint256) {
@@ -267,7 +423,7 @@ contract FortuneCurve is ReentrancyGuard {
             normalFee,
             netQuote
         ) = _feesForGross(quoteSpent, shieldBps, feeBps);
-        usdIn = registry.usdValue(quoteAsset, netQuote);
+        usdIn = _usdValue(quoteAsset, netQuote);
 
         uint256 remainingUsd =
             graduationUsd1e18 -
@@ -279,7 +435,7 @@ contract FortuneCurve is ReentrancyGuard {
                     quoteAsset
                 );
             uint256 assetUsdBefore =
-                registry.usdValue(
+                _usdValue(
                     quoteAsset,
                     reserve(quoteAsset)
                 );
@@ -305,9 +461,10 @@ contract FortuneCurve is ReentrancyGuard {
 
         if (usdIn > remainingUsd) {
             uint256 targetNetQuote =
-                registry.tokenAmountForUsdCeil(
+                _tokenAmountForUsd(
                     quoteAsset,
-                    remainingUsd
+                    remainingUsd,
+                    true
                 );
 
             quoteSpent = _grossForNet(
@@ -340,7 +497,7 @@ contract FortuneCurve is ReentrancyGuard {
                 );
             }
 
-            usdIn = registry.usdValue(quoteAsset, netQuote);
+            usdIn = _usdValue(quoteAsset, netQuote);
         }
 
         quoteRefund = amountIn - quoteSpent;
@@ -526,9 +683,10 @@ contract FortuneCurve is ReentrancyGuard {
                 2e18
             );
         grossQuote =
-            registry.tokenAmountForUsd(
+            _tokenAmountForUsd(
                 quoteAsset,
-                usdGross
+                usdGross,
+                false
             );
 
         require(
@@ -729,7 +887,7 @@ contract FortuneCurve is ReentrancyGuard {
 
             if (amount > 0) {
                 totalUsd +=
-                    registry.usdValue(
+                    _usdValue(
                         asset,
                         amount
                     );
@@ -879,7 +1037,7 @@ contract FortuneCurve is ReentrancyGuard {
             }
 
             values[i] =
-                registry.usdValue(
+                _usdValue(
                     quoteAssets[i],
                     amount
                 );

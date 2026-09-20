@@ -4,54 +4,12 @@ import {
   apiOk,
   normalizeAddress,
 } from "@/lib/public-api";
+import {
+  configuredRpcUrls,
+  rpcCall,
+} from "@/lib/bsc-rpc";
 
 export const dynamic = "force-dynamic";
-
-type RpcResponse = {
-  result?: string | null;
-  error?: { message?: string };
-};
-
-async function rpc(
-  rpcUrl: string,
-  method: string,
-  params: unknown[]
-) {
-  const response = await fetch(rpcUrl, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      jsonrpc: "2.0",
-      id: 1,
-      method,
-      params,
-    }),
-    cache: "no-store",
-  });
-
-  if (!response.ok) {
-    throw new Error("RPC_HTTP_" + response.status);
-  }
-
-  const body = (await response.json()) as RpcResponse;
-  if (body.error) {
-    throw new Error(body.error.message || "RPC_ERROR");
-  }
-
-  return body.result ?? null;
-}
-
-async function ethCall(
-  rpcUrl: string,
-  to: string,
-  data: string
-) {
-  return rpc(
-    rpcUrl,
-    "eth_call",
-    [{ to, data }, "latest"]
-  );
-}
 
 function decodeUint(hex: string | null) {
   if (!hex || hex === "0x") return null;
@@ -141,8 +99,9 @@ export async function POST(request: Request) {
     );
   }
 
-  const rpcUrl = process.env.BSC_RPC_URL;
-  if (!rpcUrl) {
+  const chainId = 56;
+  const rpcUrls = configuredRpcUrls(chainId);
+  if (!rpcUrls.length) {
     return apiError(
       "protocol_not_configured",
       "BSC_RPC_URL is required for custom-token compatibility checks.",
@@ -151,38 +110,33 @@ export async function POST(request: Request) {
   }
 
   try {
+    const call = async (data: string) =>
+      (
+        await rpcCall(
+          chainId,
+          "eth_call",
+          [{ to: address, data }, "latest"]
+        )
+      ).result as string | null;
+
     const [
-      code,
+      codeResponse,
       decimalsRaw,
       symbolRaw,
       nameRaw,
       supplyRaw,
     ] = await Promise.all([
-      rpc(rpcUrl, "eth_getCode", [
+      rpcCall(chainId, "eth_getCode", [
         address,
         "latest",
       ]),
-      ethCall(
-        rpcUrl,
-        address,
-        "0x313ce567"
-      ).catch(() => null),
-      ethCall(
-        rpcUrl,
-        address,
-        "0x95d89b41"
-      ).catch(() => null),
-      ethCall(
-        rpcUrl,
-        address,
-        "0x06fdde03"
-      ).catch(() => null),
-      ethCall(
-        rpcUrl,
-        address,
-        "0x18160ddd"
-      ).catch(() => null),
+      call("0x313ce567").catch(() => null),
+      call("0x95d89b41").catch(() => null),
+      call("0x06fdde03").catch(() => null),
+      call("0x18160ddd").catch(() => null),
     ]);
+
+    const code = codeResponse.result as string | null;
 
     const decimalsText =
       decodeUint(decimalsRaw);
@@ -248,7 +202,11 @@ export async function POST(request: Request) {
       );
 
     return apiOk({
-      chainId: 56,
+      chainId,
+      rpc: {
+        configuredProviders: rpcUrls.length,
+        providerIndex: codeResponse.providerIndex,
+      },
       address,
       metadata: {
         name,

@@ -7,3 +7,5 @@ No mainnet assets. Chain 97 only.
 Retry 1: current scripts compile after GraduationStormSetup metadata update.
 
 Retry 2: split tax launch and creator first buy into separate BSC transactions.
+
+Retry 3: precompute vanity salts via eth_call so launch transactions stay below BSC gas cap.

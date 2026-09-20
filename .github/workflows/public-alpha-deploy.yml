@@ -1,6 +1,10 @@
 name: Fortune Public Alpha Deploy + Drill
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "contracts/public-alpha-deploy.trigger"
   workflow_dispatch:
     inputs:
       confirm:
@@ -25,7 +29,7 @@ on:
 
 jobs:
   deploy-and-drill:
-    if: ${{ inputs.confirm == 'DEPLOY_PUBLIC_ALPHA' }}
+    if: ${{ github.event_name == 'push' || inputs.confirm == 'DEPLOY_PUBLIC_ALPHA' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write

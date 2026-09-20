@@ -5,6 +5,7 @@ const endpoints = [
   ["GET", "/api/public/v1/protocol", "Canonical chain + protocol configuration"],
   ["GET", "/api/public/v1/assets", "Registry catalog with capability state"],
   ["GET", "/api/public/v1/pairs?launchable=true", "Only statically launchable quote assets"],
+  ["GET", "/api/public/v1/stocks", "BSC tokenized-stock provider universe"],
   ["POST", "/api/public/v1/launches/preview", "Validate a launch before any transaction is built"],
   ["GET", "/api/public/v1/tokens", "Token markets"],
   ["GET", "/api/public/v1/launches", "Launch ledger + health state"],

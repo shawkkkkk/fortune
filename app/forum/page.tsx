@@ -9,7 +9,7 @@ export default function ForumPage() {
           <h1>Not live yet.</h1>
           <p>
             The earlier forum feed was a product mockup. It has been removed from
-            the public beta so nobody mistakes generated posts, votes, or activity
+            the public alpha so nobody mistakes generated posts, votes, or activity
             for real users.
           </p>
         </div>
@@ -18,7 +18,7 @@ export default function ForumPage() {
 
       <section className="panel">
         <div className="emptyPanel">
-          <strong>Community features come after the onchain beta.</strong>
+          <strong>Community features come after the onchain alpha.</strong>
           <span>
             The first public release is intentionally focused on real wallet,
             curve, graduation, Pancake V3, and LP-lock behavior.

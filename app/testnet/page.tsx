@@ -698,33 +698,18 @@ export default function PublicTestnetPage() {
           args: [active, params],
         });
 
-        if (initial > 0n) {
-          setMessage(
-            "Approve the creator purchase. The next transaction creates the tax token and executes your first buy atomically."
-          );
-          const approval = await walletClient.writeContract({
-            address: PUBLIC_TESTNET.contracts.mockQuote as Address,
-            abi: quoteAbi,
-            functionName: "approve",
-            args: [taxFactory, initial],
-          });
-          await publicClient.waitForTransactionReceipt({ hash: approval });
+        setMessage(
+          initial > 0n
+            ? "Confirm the tax-token launch. Your creator purchase follows as a separate BSC transaction."
+            : "Confirm the Fortune tax-token launch."
+        );
 
-          hash = await walletClient.writeContract({
-            address: taxFactory,
-            abi: taxFactoryAbi,
-            functionName: "createLaunchPreparedAndBuy",
-            args: [params, salt, initial, 1n],
-          });
-        } else {
-          setMessage("Confirm the Fortune tax-token launch.");
-          hash = await walletClient.writeContract({
-            address: taxFactory,
-            abi: taxFactoryAbi,
-            functionName: "createLaunchPrepared",
-            args: [params, salt],
-          });
-        }
+        hash = await walletClient.writeContract({
+          address: taxFactory,
+          abi: taxFactoryAbi,
+          functionName: "createLaunchPrepared",
+          args: [params, salt],
+        });
       }
 
       const receipt = await publicClient.waitForTransactionReceipt({ hash });
@@ -789,11 +774,39 @@ export default function PublicTestnetPage() {
         );
       }
 
+      if (mode === "tax" && initial > 0n) {
+        setMessage(
+          "Tax launch confirmed. Approve fUSD for the curve, then confirm your creator first purchase."
+        );
+
+        const approval = await walletClient.writeContract({
+          address: PUBLIC_TESTNET.contracts.mockQuote as Address,
+          abi: quoteAbi,
+          functionName: "approve",
+          args: [created.curve, initial],
+        });
+        await publicClient.waitForTransactionReceipt({ hash: approval });
+
+        const buyHash = await walletClient.writeContract({
+          address: created.curve,
+          abi: curveAbi,
+          functionName: "buy",
+          args: [
+            PUBLIC_TESTNET.contracts.mockQuote as Address,
+            initial,
+            1n,
+          ],
+        });
+        await publicClient.waitForTransactionReceipt({ hash: buyHash });
+      }
+
       setLaunch(created);
       await refreshQuoteBalance(active);
       setMessage(
         initial > 0n
-          ? "Launch + creator first-buy confirmed atomically. Continue to graduation when the curve is ready."
+          ? mode === "tax"
+            ? "Tax launch + creator first-buy confirmed in two BSC-safe transactions. Continue to graduation when the curve is ready."
+            : "Launch + creator first-buy confirmed atomically. Continue to graduation when the curve is ready."
           : "Launch created. Buy fUSD on the curve to move it toward graduation."
       );
     } catch (error) {
@@ -1114,8 +1127,9 @@ export default function PublicTestnetPage() {
           <div>
             <h2>Creator first purchase</h2>
             <p>
-              Optional. Approve fUSD once, then Fortune deploys the token and
-              executes your first curve buy inside the same transaction.
+              {mode === "tax"
+                ? "Optional. Tax-token deployment and the creator first buy use two BSC-safe transactions so the launch stays below the network gas cap."
+                : "Optional. Approve fUSD once, then Fortune deploys the token and executes your first curve buy inside the same transaction."}
             </p>
           </div>
         </div>

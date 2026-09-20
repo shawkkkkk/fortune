@@ -21,7 +21,7 @@ export type FortuneAsset = {
   category: AssetCategory;
   icon: string;
   chain: "BSC" | "Solana" | "Other";
-  verification: "Canonical" | "Verified" | "Approved" | "Unverified" | "Unavailable";
+  verification: "Canonical" | "Verified" | "Provider Verified" | "Approved" | "Unverified" | "Unavailable";
   capabilities: AssetCapability[];
   address?: string;
   note?: string;

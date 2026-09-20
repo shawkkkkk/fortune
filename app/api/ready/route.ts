@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { PUBLIC_TESTNET } from "@/lib/public-testnet";
 import {
   configuredRpcUrls,
   probeRpcEndpoints,
@@ -13,7 +14,10 @@ export async function GET() {
     process.env.NEXT_PUBLIC_CHAIN_ID || 97
   );
   const factory =
-    process.env.NEXT_PUBLIC_FORTUNE_FACTORY_ADDRESS || "";
+    process.env.NEXT_PUBLIC_FORTUNE_FACTORY_ADDRESS ||
+    (chainId === PUBLIC_TESTNET.chainId
+      ? PUBLIC_TESTNET.contracts.factory
+      : "");
   const urls = configuredRpcUrls(chainId);
   const redundancyRequired =
     chainId === 56 ||

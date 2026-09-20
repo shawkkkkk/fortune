@@ -89,7 +89,7 @@ jobs:
           test "$STANDARD_PHASE" = "2"
           test "${STANDARD_LP_OWNER,,}" = "${FORTUNE_V3_LOCKER,,}"
           test "$STANDARD_POOL" != "0x0000000000000000000000000000000000000000"
-          test "$STANDARD_ANCHOR" -gt 0
+          test "$STANDARD_ANCHOR" != "0"
 
           TAX_TOKEN=$(cast call "$LIFECYCLE_OPERATOR" "taxToken()(address)" --rpc-url "$RPC")
           TAX_CURVE=$(cast call "$LIFECYCLE_OPERATOR" "taxCurve()(address)" --rpc-url "$RPC")
@@ -114,11 +114,11 @@ jobs:
           test "${TAX_OFFICIAL_POOL,,}" = "${TAX_POOL,,}"
           test "$TAX_ANTI_FARMER" = "true"
           test "$TAX_RECOGNIZED" = "true"
-          test "$TAX_LOCKED_LP" -gt 0
-          test "$CURVE_TAX" -gt 0
-          test "$DEX_PROCESSED" -gt 0
-          test "$TOKENS_BURNED" -gt 0
-          test "$DIVIDEND_EPOCHS" -gt 0
+          test "$TAX_LOCKED_LP" != "0"
+          test "$CURVE_TAX" != "0"
+          test "$DEX_PROCESSED" != "0"
+          test "$TOKENS_BURNED" != "0"
+          test "$DIVIDEND_EPOCHS" != "0"
 
           echo "STANDARD_ONCHAIN_EXECUTION_COMPLETE_AND_SUCCESSFUL"
           echo "TAX_ONCHAIN_EXECUTION_COMPLETE_AND_SUCCESSFUL"

@@ -474,9 +474,30 @@ async function connectTestnet() {
         },
       ],
     });
+
+    await injected.request({
+      method: "wallet_switchEthereumChain",
+      params: [{ chainId: PUBLIC_TESTNET.chainHex }],
+    });
   }
 
-  return accounts[0];
+  const activeChain = (await injected.request({
+    method: "eth_chainId",
+  })) as string;
+  if (activeChain !== PUBLIC_TESTNET.chainHex) {
+    throw new Error(
+      "Wallet did not switch to BSC Testnet (chain 97). No transaction was submitted."
+    );
+  }
+
+  const activeAccounts = (await injected.request({
+    method: "eth_accounts",
+  })) as Address[];
+  if (!activeAccounts?.[0]) {
+    throw new Error("Wallet account is no longer available.");
+  }
+
+  return activeAccounts[0];
 }
 
 function clients(account: Address) {

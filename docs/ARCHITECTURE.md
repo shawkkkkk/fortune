@@ -88,6 +88,12 @@ Fortune treats operational automation as public protocol state:
 
 The UI has a dedicated Automations surface rather than hiding these actions in backend jobs.
 
+### Automation vault primitive
+
+`FortuneAutomationVault` declares one immutable purpose (holder rewards, buyback/burn or LP reinforcement), launch token and executor. The executor cannot choose an arbitrary destination: it may only invoke an adapter approved for that purpose by `FortuneAutomationRegistry`.
+
+The vault intentionally has no generalized owner sweep. Production registry ownership should sit behind a multisig/timelock, and each adapter must validate its own execution data and slippage rules.
+
 ## Data and indexing
 
 Onchain events are the source of truth for production analytics. A future indexer should consume:

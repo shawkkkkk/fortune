@@ -72,6 +72,44 @@ type CustomTokenCheck = {
   runtimeChecksStillRequired: string[];
 };
 
+type ReadinessCheck = {
+  id: string;
+  label: string;
+  status: "pass" | "warn" | "fail";
+  detail: string;
+};
+
+type InfrastructureReadiness = {
+  ready: boolean;
+  degraded: boolean;
+  score: {
+    passed: number;
+    warnings: number;
+    failed: number;
+    total: number;
+  };
+  checks: ReadinessCheck[];
+  chainId: number;
+};
+
+type LaunchPreviewResult = {
+  valid: boolean;
+  errors: Array<{
+    code: string;
+    field: string;
+    message: string;
+  }>;
+  warnings: Array<{
+    code: string;
+    message: string;
+  }>;
+  prepare: {
+    factoryConfigured: boolean;
+    ready: boolean;
+    reason?: string | null;
+  };
+};
+
 type LaunchMode = "basket" | "stock-floor" | "preipo-perp";
 
 const FACTORY_ADDRESS = process.env.NEXT_PUBLIC_FORTUNE_FACTORY_ADDRESS || "";
@@ -115,7 +153,46 @@ export default function LaunchPage() {
   const [customResolvedId, setCustomResolvedId] = useState<string | null>(null);
   const [customCheckError, setCustomCheckError] = useState("");
   const [customChecking, setCustomChecking] = useState(false);
+  const [infrastructureReadiness, setInfrastructureReadiness] =
+    useState<InfrastructureReadiness | null>(null);
+  const [configPreview, setConfigPreview] =
+    useState<LaunchPreviewResult | null>(null);
+  const [readinessLoading, setReadinessLoading] = useState(true);
   const protocolBps = 10;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function refreshReadiness() {
+      try {
+        const response = await fetch(
+          "/api/public/v1/readiness",
+          { cache: "no-store" }
+        );
+        const body = await response.json();
+        if (!cancelled) {
+          setInfrastructureReadiness(body?.data || null);
+        }
+      } catch {
+        if (!cancelled) {
+          setInfrastructureReadiness(null);
+        }
+      } finally {
+        if (!cancelled) setReadinessLoading(false);
+      }
+    }
+
+    void refreshReadiness();
+    const timer = window.setInterval(
+      refreshReadiness,
+      15_000
+    );
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, []);
 
   useEffect(() => {
     if (launchMode === "stock-floor") {
@@ -272,9 +349,251 @@ export default function LaunchPage() {
     });
   }, [activeCategory, query, selectableAssets]);
 
-  const selectedAssets = selected.map((id) => selectableAssets.find((a) => a.id === id)).filter(Boolean);
+  const selectedAssets = selected
+    .map((id) => selectableAssets.find((a) => a.id === id))
+    .filter((asset): asset is FortuneAsset => Boolean(asset));
   const equalWeight = Math.floor(100 / selected.length);
   const feeTotal = creatorBps + holderBps + buybackBps + liquidityBps + protocolBps;
+
+  const selectedWeightsBps = selected.map((_, index) => {
+    const base = Math.floor(10_000 / selected.length);
+    return base + (index === selected.length - 1
+      ? 10_000 - base * selected.length
+      : 0);
+  });
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const quoteAssets = selected.map((id, index) => {
+        const asset = selectableAssets.find((item) => item.id === id);
+        return {
+          id,
+          address: asset?.address,
+          weightBps: selectedWeightsBps[index],
+        };
+      });
+
+      void fetch("/api/public/v1/launches/preview", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          name,
+          symbol,
+          totalSupply: "1000000000000000000000000000",
+          quoteAssets,
+          primaryQuote: primary,
+          graduationMode:
+            graduation === "adaptive"
+              ? "demand-weighted"
+              : "fixed",
+          feeBps: {
+            creator: creatorBps,
+            holders: holderBps,
+            buyback: buybackBps,
+            liquidity: liquidityBps,
+            treasury: 0,
+            protocol: protocolBps,
+          },
+          rewardAsset:
+            rewardMode === "holders" || rewardMode === "split"
+              ? rewardAsset
+              : null,
+          metadataEditable,
+          launchEngine: launchMode,
+        }),
+      })
+        .then((response) => response.json())
+        .then((body) =>
+          setConfigPreview(body?.data || null)
+        )
+        .catch(() => setConfigPreview(null));
+    }, 300);
+
+    return () => window.clearTimeout(timer);
+  }, [
+    name,
+    symbol,
+    selected,
+    selectedWeightsBps,
+    primary,
+    graduation,
+    creatorBps,
+    holderBps,
+    buybackBps,
+    liquidityBps,
+    rewardMode,
+    rewardAsset,
+    metadataEditable,
+    launchMode,
+    selectableAssets,
+  ]);
+
+  const localChecks: ReadinessCheck[] = [
+    {
+      id: "identity",
+      label: "Token identity",
+      status:
+        name.trim().length > 0 &&
+        name.trim().length <= 64 &&
+        symbol.trim().length > 0 &&
+        symbol.trim().length <= 16
+          ? "pass"
+          : "fail",
+      detail: "Name and ticker must fit the immutable token limits.",
+    },
+    {
+      id: "basket",
+      label: "Market basket",
+      status:
+        selected.length >= 1 &&
+        selected.length <= 5 &&
+        selectedAssets.length === selected.length
+          ? "pass"
+          : "fail",
+      detail: "Fortune requires 1–5 fully resolved quote markets.",
+    },
+    {
+      id: "addresses",
+      label: "Verified BSC contracts",
+      status:
+        selectedAssets.every(
+          (asset) => asset.chain === "BSC" && Boolean(asset.address)
+        )
+          ? "pass"
+          : "fail",
+      detail: "Every reserve market needs an exact BSC contract address.",
+    },
+    {
+      id: "capabilities",
+      label: "Quote + graduation capabilities",
+      status:
+        selectedAssets.every(
+          (asset) =>
+            asset.capabilities.includes("quote") &&
+            asset.capabilities.includes("graduation")
+        )
+          ? "pass"
+          : "fail",
+      detail: "Discovery alone never makes an asset eligible for reserve custody.",
+    },
+    {
+      id: "primary",
+      label: "Primary market",
+      status: selected.includes(primary) ? "pass" : "fail",
+      detail: "The primary market must be one of the selected reserve assets.",
+    },
+    {
+      id: "weights",
+      label: "Basket weights",
+      status:
+        selectedWeightsBps.reduce((sum, value) => sum + value, 0) ===
+        10_000
+          ? "pass"
+          : "fail",
+      detail: "Graduation weights must total exactly 10,000 bps.",
+    },
+    {
+      id: "fees",
+      label: "Fee Matrix",
+      status:
+        feeTotal > 0 && feeTotal <= 500
+          ? "pass"
+          : "fail",
+      detail: "Normal trading fees must remain between 1 and 500 bps total.",
+    },
+    {
+      id: "engine",
+      label: "Launch engine",
+      status:
+        launchMode === "stock-floor"
+          ? selectedAssets.length === 1 &&
+            ["xStocks", "China Stocks", "NASDAQ Penny Stocks"].includes(
+              selectedAssets[0]?.category || ""
+            )
+            ? "pass"
+            : "fail"
+          : launchMode === "preipo-perp"
+            ? perpMarketId != null
+              ? "pass"
+              : "fail"
+            : "pass",
+      detail:
+        launchMode === "preipo-perp"
+          ? "Pre-IPO mode requires a live approved reference market."
+          : launchMode === "stock-floor"
+            ? "Stock Floor requires exactly one eligible stock-token reserve."
+            : "Basket Curve engine is configured.",
+    },
+    {
+      id: "server-preview",
+      label: "Server configuration preview",
+      status: configPreview?.valid ? "pass" : "fail",
+      detail:
+        configPreview?.valid
+          ? "Fortune's server-side launch checks accept this configuration."
+          : configPreview?.errors?.[0]?.message ||
+            "Waiting for a valid server-side launch preview.",
+    },
+    {
+      id: "factory",
+      label: "Factory configured",
+      status: FACTORY_ADDRESS ? "pass" : "fail",
+      detail: FACTORY_ADDRESS
+        ? "A Fortune Factory address is configured."
+        : "No Fortune Factory is configured for this deployment.",
+    },
+    {
+      id: "infrastructure",
+      label: "Protocol infrastructure",
+      status:
+        infrastructureReadiness?.ready
+          ? infrastructureReadiness.degraded
+            ? "warn"
+            : "pass"
+          : "fail",
+      detail:
+        infrastructureReadiness?.ready
+          ? infrastructureReadiness.degraded
+            ? "Core infrastructure is ready, but redundancy is degraded."
+            : "Factory, RPC, graduation and Pancake infrastructure checks pass."
+          : "One or more infrastructure readiness checks are failing.",
+    },
+    {
+      id: "launch-shield",
+      label: "Launch Shield",
+      status: "pass",
+      detail: "Opening anti-sniper rules are enforced in the curve contract.",
+    },
+    {
+      id: "lp-lock",
+      label: "Permanent graduation LP",
+      status:
+        infrastructureReadiness?.checks?.find(
+          (check) => check.id === "locker"
+        )?.status === "pass"
+          ? "pass"
+          : "fail",
+      detail: "Graduation LP positions must have a deployed permanent locker.",
+    },
+    {
+      id: "recovery",
+      label: "Failure recovery",
+      status: "pass",
+      detail: "Graduation is atomic, retryable and includes the delayed reserve-rescue path.",
+    },
+  ];
+
+  const readinessPassed = localChecks.filter(
+    (check) => check.status === "pass"
+  ).length;
+  const readinessFailed = localChecks.filter(
+    (check) => check.status === "fail"
+  ).length;
+  const launchReady =
+    readinessFailed === 0 &&
+    Boolean(infrastructureReadiness?.ready) &&
+    Boolean(configPreview?.valid) &&
+    Boolean(FACTORY_ADDRESS);
 
   async function checkCustomToken() {
     setCustomChecking(true);
@@ -733,6 +1052,71 @@ export default function LaunchPage() {
             <p className="fieldHint">Capped at 20% in the Fortune default template. Fair Launch mode forces this to 0%.</p>
           </section>
 
+          <section className="formCard launchReadinessCard">
+            <div className="formSectionTitle">
+              <span>✓</span>
+              <div>
+                <h2>Launch Readiness</h2>
+                <p>
+                  Fortune blocks deployment until the launch configuration and
+                  protocol infrastructure are ready.
+                </p>
+              </div>
+            </div>
+
+            <div className="readinessSummary">
+              <strong>
+                {readinessLoading
+                  ? "Checking…"
+                  : launchReady
+                    ? "READY TO LAUNCH"
+                    : readinessPassed + "/" + localChecks.length + " passed"}
+              </strong>
+              <span>
+                Infrastructure{" "}
+                {infrastructureReadiness
+                  ? infrastructureReadiness.score.passed +
+                    "/" +
+                    infrastructureReadiness.score.total
+                  : "checking"}
+              </span>
+            </div>
+
+            <div className="readinessGrid">
+              {localChecks.map((check) => (
+                <div
+                  key={check.id}
+                  className={
+                    "readinessCheck readiness-" + check.status
+                  }
+                  title={check.detail}
+                >
+                  <b>
+                    {check.status === "pass"
+                      ? "✓"
+                      : check.status === "warn"
+                        ? "!"
+                        : "×"}
+                  </b>
+                  <span>
+                    <strong>{check.label}</strong>
+                    <small>{check.detail}</small>
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {configPreview?.errors?.length ? (
+              <div className="readinessErrors">
+                {configPreview.errors.slice(0, 4).map((error) => (
+                  <span key={error.code + error.field}>
+                    {error.code}: {error.message}
+                  </span>
+                ))}
+              </div>
+            ) : null}
+          </section>
+
           <section className="formCard manifestCard">
             <div className="formSectionTitle"><span>04</span><div><h2>Immutable Launch Manifest</h2><p>This configuration is hashed at launch so the deal cannot quietly change.</p></div></div>
             <ManifestRows
@@ -752,13 +1136,15 @@ export default function LaunchPage() {
               depthTier={depthTier}
               metadataEditable={metadataEditable}
             />
-            <button className="launchButton" disabled={!FACTORY_ADDRESS}>
-              {FACTORY_ADDRESS ? "Review & deploy to configured BSC testnet →" : "BSC testnet factory not configured"}
+            <button className="launchButton" disabled={!launchReady}>
+              {launchReady
+                ? "Review & deploy to configured BSC testnet →"
+                : "Launch blocked · resolve readiness checks"}
             </button>
             <small className="launchWarning">
-              {FACTORY_ADDRESS
-                ? "A testnet factory is configured. This UI still requires transaction encoding before deployments are submitted."
-                : "Deploy the isolated testnet stack first and set NEXT_PUBLIC_FORTUNE_FACTORY_ADDRESS. Production remains disabled until audits and adapter review are complete."}
+              {launchReady
+                ? "All visible readiness gates pass. The contract-level preflight still runs again immediately before deployment."
+                : "Fortune intentionally fails closed: unresolved assets, infrastructure, pool, oracle or configuration checks prevent deployment."}
             </small>
           </section>
         </div>

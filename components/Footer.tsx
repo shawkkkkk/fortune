@@ -3,7 +3,7 @@
 import Link from "next/link";
 import FortuneLogo from "@/components/FortuneLogo";
 import { useLanguage } from "@/components/LanguageProvider";
-import { PUBLIC_TESTNET } from "@/lib/public-testnet";
+import { FORTUNE_NETWORK } from "@/lib/fortune-network";
 
 export default function Footer() {
   const { language } = useLanguage();
@@ -15,21 +15,30 @@ export default function Footer() {
         <div className="siteFooterBrand">
           <FortuneLogo size="sm" />
           <p>
-            {zh
-              ? "BSC 测试网上的公开 Alpha。仅限无价值测试资产，主网尚未开放。"
-              : "Public alpha on BSC Testnet. Valueless test assets only; mainnet is not enabled."}
+            {FORTUNE_NETWORK.isMainnet
+              ? zh
+                ? "Fortune 已配置在 BNB Smart Chain 主网。所有交易都会使用真实资产。"
+                : "Fortune is configured on BNB Smart Chain mainnet. Transactions use real assets."
+              : zh
+                ? "BSC 测试网上的公开 Alpha。仅限无价值测试资产，主网尚未开放。"
+                : "Public alpha on BSC Testnet. Valueless test assets only; mainnet is not enabled."}
           </p>
         </div>
 
         <div className="siteFooterLinks">
-          <Link href="/testnet">{zh ? "公开 Alpha" : "Public Alpha"}</Link>
+          <Link href="/markets">{zh ? "市场" : "Markets"}</Link>
+          <Link href={FORTUNE_NETWORK.isMainnet ? "/launch" : "/testnet"}>
+            {FORTUNE_NETWORK.isMainnet
+              ? zh ? "发行" : "Launch"
+              : zh ? "公开 Alpha" : "Public Alpha"}
+          </Link>
           <Link href="/status">{zh ? "系统状态" : "Status"}</Link>
           <Link href="/developers">{zh ? "开发者 API" : "Developer API"}</Link>
           <a
             href={
-              PUBLIC_TESTNET.explorerUrl +
+              FORTUNE_NETWORK.explorerUrl +
               "/address/" +
-              PUBLIC_TESTNET.contracts.factory
+              FORTUNE_NETWORK.contracts.factory
             }
             target="_blank"
             rel="noreferrer"
@@ -47,11 +56,17 @@ export default function Footer() {
       </div>
 
       <div className="siteFooterBottom">
-        <span>Fortune · BSC Testnet · Chain 97</span>
         <span>
-          {zh
-            ? "预审计软件 · 请勿使用真实资金"
-            : "Pre-audit software · do not use real funds"}
+          Fortune · {FORTUNE_NETWORK.chainName} · Chain {FORTUNE_NETWORK.chainId}
+        </span>
+        <span>
+          {FORTUNE_NETWORK.isMainnet
+            ? zh
+              ? "真实资产网络 · 请在签名前检查所有交易"
+              : "Real-value network · review every transaction before signing"
+            : zh
+              ? "预审计软件 · 请勿使用真实资金"
+              : "Pre-audit software · do not use real funds"}
         </span>
       </div>
     </footer>

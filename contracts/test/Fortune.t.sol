@@ -425,6 +425,8 @@ contract FortuneTest is Test {
 
         assertEq(token.launchManifest(), info.manifestHash);
         assertEq(token.totalSupply(), token.initialSupply());
+        assertEq(token.fortuneFactory(), address(factory));
+        assertEq(token.FORTUNE_TOKEN_VERSION(), 1);
     }
 
     function testEditableMetadataCanUpdateAndFreeze() public {

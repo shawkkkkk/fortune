@@ -104,13 +104,79 @@ export async function GET() {
       tokens: ranked,
     });
   } catch (error) {
-    return NextResponse.json(
-      {
+    // Public market-data APIs can rate-limit serverless egress. Fall back to
+    // PancakeSwap's BSC token list so the catalog remains useful, but mark the
+    // result as unranked rather than inventing a ranking.
+    try {
+      const fallback = await fetch(
+        "https://tokens.pancakeswap.finance/pancakeswap-extended.json",
+        {
+          headers: { accept: "application/json" },
+          next: { revalidate: 3600 },
+        }
+      );
+      if (!fallback.ok) throw new Error("PancakeSwap fallback unavailable");
+
+      const data = await fallback.json();
+      const seen = new Set<string>();
+      const tokens = (Array.isArray(data?.tokens) ? data.tokens : [])
+        .filter((token: { chainId?: number }) => token.chainId === 56)
+        .filter((token: { address?: string }) => {
+          if (!token.address) return false;
+          const key = token.address.toLowerCase();
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        })
+        .slice(0, 400)
+        .map(
+          (
+            token: {
+              symbol?: string;
+              name?: string;
+              address: string;
+              logoURI?: string;
+              decimals?: number;
+            },
+            index: number
+          ) => ({
+            rank: index + 1,
+            id: null,
+            symbol: token.symbol || "TOKEN",
+            name: token.name || token.symbol || "BSC Token",
+            address: token.address,
+            image: token.logoURI || null,
+            priceUsd: null,
+            marketCap: null,
+            marketCapRank: null,
+            volume24h: null,
+            category: "BNB Chain discovery",
+            fortuneStatus: "candidate",
+            capabilities: [],
+          })
+        );
+
+      return NextResponse.json({
+        chainId: 56,
+        category: CATEGORY,
+        rankedBy: null,
+        count: tokens.length,
+        source: "PancakeSwap extended token list fallback",
+        warning:
+          "CoinGecko ranking was unavailable. This fallback order is not a market-cap ranking.",
         error:
           error instanceof Error ? error.message : "Top BSC discovery failed",
-        tokens: [],
-      },
-      { status: 502 }
-    );
+        tokens,
+      });
+    } catch {
+      return NextResponse.json(
+        {
+          error:
+            error instanceof Error ? error.message : "Top BSC discovery failed",
+          tokens: [],
+        },
+        { status: 502 }
+      );
+    }
   }
 }

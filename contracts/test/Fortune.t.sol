@@ -15,6 +15,8 @@ import {FortuneAutomationRegistry} from "../src/FortuneAutomationRegistry.sol";
 import {FortuneAutomationVault} from "../src/FortuneAutomationVault.sol";
 import {MockAutomationAdapter} from "../src/test/MockAutomationAdapter.sol";
 import {FortuneStockFloorVault} from "../src/FortuneStockFloorVault.sol";
+import {FortunePermanentLiquidityLocker} from "../src/FortunePermanentLiquidityLocker.sol";
+import {MockPositionManager} from "../src/test/MockPositionManager.sol";
 import {FortunePerpReferenceRegistry} from "../src/FortunePerpReferenceRegistry.sol";
 import {FortuneMetadataRegistry} from "../src/FortuneMetadataRegistry.sol";
 import {MockReferenceOracle} from "../src/test/MockReferenceOracle.sol";
@@ -634,6 +636,57 @@ contract FortuneTest is Test {
             adapter.lastPurpose(),
             uint8(FortuneAutomationRegistry.Purpose.HolderRewards)
         );
+    }
+
+    function testPermanentLiquidityLockerCannotReleasePosition() public {
+        MockPositionManager manager = new MockPositionManager();
+        FortunePermanentLiquidityLocker locker =
+            new FortunePermanentLiquidityLocker(
+                address(this),
+                address(manager)
+            );
+
+        locker.setApprovedDepositor(address(this), true);
+
+        uint256 tokenId = 7;
+        manager.mint(address(this), tokenId);
+        manager.safeTransferFrom(
+            address(this),
+            address(locker),
+            tokenId
+        );
+
+        locker.registerPosition(
+            tokenId,
+            address(usdt),
+            treasury,
+            keccak256("FORT/USDT")
+        );
+
+        assertEq(manager.ownerOf(tokenId), address(locker));
+        assertEq(locker.lockedPositionCount(), 1);
+
+        (
+            address launchToken,
+            address feeRecipient,
+            bytes32 poolKeyHash,
+            ,
+            bool registered
+        ) = locker.position(tokenId);
+
+        assertEq(launchToken, address(usdt));
+        assertEq(feeRecipient, treasury);
+        assertEq(poolKeyHash, keccak256("FORT/USDT"));
+        assertTrue(registered);
+
+        manager.setCollectAmounts(11, 22);
+        (uint256 amount0, uint256 amount1) =
+            locker.collectFees(tokenId);
+
+        assertEq(amount0, 11);
+        assertEq(amount1, 22);
+        assertEq(manager.lastCollectRecipient(), treasury);
+        assertEq(manager.ownerOf(tokenId), address(locker));
     }
 
     function testStockFloorVaultProvidesProRataRedemption() public {

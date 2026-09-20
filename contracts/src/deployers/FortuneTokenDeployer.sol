@@ -13,6 +13,7 @@ contract FortuneTokenDeployer is IFortuneTokenDeployer {
         bytes32 manifest,
         bytes32 salt
     ) external returns (address token) {
+        require(msg.sender == fortuneFactory, "ONLY_FACTORY");
         token = address(
             new FortuneToken{salt: salt}(
                 fortuneFactory,

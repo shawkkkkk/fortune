@@ -212,6 +212,12 @@ export default function LaunchPage() {
   const [name, setName] = useState("");
   const [symbol, setSymbol] = useState("");
   const [description, setDescription] = useState("");
+  const [website, setWebsite] = useState("");
+  const [xProfile, setXProfile] = useState("");
+  const [telegram, setTelegram] = useState("");
+  const [github, setGithub] = useState("");
+  const [youtube, setYoutube] = useState("");
+  const [debox, setDebox] = useState("");
   const [totalSupply, setTotalSupply] = useState("1000000000");
   const [basePrice, setBasePrice] = useState("");
   const [slope, setSlope] = useState("0");
@@ -315,12 +321,12 @@ export default function LaunchPage() {
         metadataEditable: true,
         description: description.trim().slice(0, 4096),
         imageURI: "",
-        website: "",
-        xProfile: "",
-        telegram: "",
-        github: "",
-        youtube: "",
-        debox: "",
+        website: website.trim().slice(0, 512),
+        xProfile: xProfile.trim().slice(0, 512),
+        telegram: telegram.trim().slice(0, 512),
+        github: github.trim().slice(0, 512),
+        youtube: youtube.trim().slice(0, 512),
+        debox: debox.trim().slice(0, 512),
       };
 
       setMessage("Running onchain launch preflight…");
@@ -505,6 +511,76 @@ export default function LaunchPage() {
       <section className="formCard" style={{ marginTop: 14 }}>
         <div className="formSectionTitle">
           <span>02</span>
+          <div>
+            <h2>Links</h2>
+            <p>
+              Optional public links are written into Fortune&apos;s onchain
+              metadata registry and can be edited or permanently frozen later.
+            </p>
+          </div>
+        </div>
+
+        <div className="fieldGrid">
+          <label>
+            Website
+            <input
+              value={website}
+              maxLength={512}
+              onChange={(event) => setWebsite(event.target.value)}
+              placeholder="https://..."
+            />
+          </label>
+          <label>
+            X / Twitter
+            <input
+              value={xProfile}
+              maxLength={512}
+              onChange={(event) => setXProfile(event.target.value)}
+              placeholder="https://x.com/..."
+            />
+          </label>
+          <label>
+            Telegram
+            <input
+              value={telegram}
+              maxLength={512}
+              onChange={(event) => setTelegram(event.target.value)}
+              placeholder="https://t.me/..."
+            />
+          </label>
+          <label>
+            GitHub
+            <input
+              value={github}
+              maxLength={512}
+              onChange={(event) => setGithub(event.target.value)}
+              placeholder="https://github.com/..."
+            />
+          </label>
+          <label>
+            YouTube
+            <input
+              value={youtube}
+              maxLength={512}
+              onChange={(event) => setYoutube(event.target.value)}
+              placeholder="https://youtube.com/..."
+            />
+          </label>
+          <label>
+            DeBox
+            <input
+              value={debox}
+              maxLength={512}
+              onChange={(event) => setDebox(event.target.value)}
+              placeholder="https://debox.pro/..."
+            />
+          </label>
+        </div>
+      </section>
+
+      <section className="formCard" style={{ marginTop: 14 }}>
+        <div className="formSectionTitle">
+          <span>03</span>
           <div>
             <h2>Curve economics</h2>
             <p>

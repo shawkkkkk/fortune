@@ -7,6 +7,7 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 import {FortuneAssetRegistry} from "./FortuneAssetRegistry.sol";
 import {FortuneFeeRouter} from "./FortuneFeeRouter.sol";
 import {IGraduationAdapter} from "./interfaces/IGraduationAdapter.sol";
+import {IGraduationPreflight} from "./interfaces/IGraduationPreflight.sol";
 
 /// @notice Experimental shared curve accepting 1–5 quote assets.
 /// @dev Economic formula is intentionally simple for testnet research and MUST be
@@ -236,29 +237,82 @@ contract FortuneCurve is ReentrancyGuard {
         }
     }
 
+    /// @notice Snapshot used by keepers/UIs to preflight graduation without moving funds.
+    function graduationSnapshot()
+        public
+        view
+        returns (
+            uint256 launchTokenAmount,
+            IGraduationAdapter.AssetReserve[] memory reserves
+        )
+    {
+        uint16[] memory weights = graduationWeights();
+        reserves = new IGraduationAdapter.AssetReserve[](quoteAssets.length);
+
+        for (uint256 i; i < quoteAssets.length; ++i) {
+            address asset = quoteAssets[i];
+            reserves[i] = IGraduationAdapter.AssetReserve({
+                asset: asset,
+                amount: reserve(asset),
+                weightBps: weights[i]
+            });
+        }
+
+        launchTokenAmount = launchToken.balanceOf(address(this));
+    }
+
+    function preflightGraduation(address adapter, bytes calldata data)
+        external
+        view
+        returns (bool ready, bytes32 reasonCode)
+    {
+        require(graduationReady && !graduated, "NOT_READY");
+        require(adapter != address(0), "ZERO_ADAPTER");
+
+        (
+            uint256 tokenAmount,
+            IGraduationAdapter.AssetReserve[] memory reserves
+        ) = graduationSnapshot();
+
+        return IGraduationPreflight(adapter).preflight(
+            address(launchToken),
+            tokenAmount,
+            reserves,
+            data
+        );
+    }
+
     /// @notice Factory hands all remaining reserves to a separately approved adapter.
+    /// @dev All transfers + adapter execution are atomic. If the adapter reverts,
+    ///      the entire transaction rolls back and the launch remains retryable.
     function graduate(address adapter, bytes calldata data) external nonReentrant {
         require(msg.sender == factory, "ONLY_FACTORY");
         require(graduationReady && !graduated, "NOT_READY");
         require(adapter != address(0), "ZERO_ADAPTER");
 
-        graduated = true;
-        uint16[] memory weights = graduationWeights();
-        IGraduationAdapter.AssetReserve[] memory reserves =
-            new IGraduationAdapter.AssetReserve[](quoteAssets.length);
+        (
+            uint256 tokenAmount,
+            IGraduationAdapter.AssetReserve[] memory reserves
+        ) = graduationSnapshot();
 
-        for (uint256 i; i < quoteAssets.length; ++i) {
-            address asset = quoteAssets[i];
-            uint256 amount = reserve(asset);
-            IERC20(asset).safeTransfer(adapter, amount);
-            reserves[i] = IGraduationAdapter.AssetReserve({
-                asset: asset,
-                amount: amount,
-                weightBps: weights[i]
-            });
+        (bool ready, bytes32 reasonCode) =
+            IGraduationPreflight(adapter).preflight(
+                address(launchToken),
+                tokenAmount,
+                reserves,
+                data
+            );
+        require(ready, string(abi.encodePacked("PREFLIGHT_FAILED:", reasonCode)));
+
+        graduated = true;
+
+        for (uint256 i; i < reserves.length; ++i) {
+            IERC20(reserves[i].asset).safeTransfer(
+                adapter,
+                reserves[i].amount
+            );
         }
 
-        uint256 tokenAmount = launchToken.balanceOf(address(this));
         launchToken.safeTransfer(adapter, tokenAmount);
 
         IGraduationAdapter(adapter).graduate(

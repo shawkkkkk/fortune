@@ -223,8 +223,7 @@ function signedBinanceHeaders(method: string, pathWithQuery: string) {
 }
 
 async function searchBinanceRwa(ticker: string) {
-  const path =
-    "/api/v1/dex/market/rwa/search?keyword=" + encodeURIComponent(ticker);
+  const path = "/api/v1/dex/market/rwa/tokens?binanceChainId=56";
   const headers = signedBinanceHeaders("GET", path);
   if (!headers) return { configured: false, results: [] };
 
@@ -237,26 +236,43 @@ async function searchBinanceRwa(ticker: string) {
 
     const body = await response.json();
     const rows = Array.isArray(body?.data) ? body.data : [];
-    const results = rows.flatMap(
-      (row: {
-        ticker?: string;
-        companyName?: string;
-        assets?: Array<{
-          platformId?: string;
+    const needle = ticker.toUpperCase();
+
+    const results = rows
+      .filter(
+        (asset: {
+          underlyingTicker?: string;
           binanceChainId?: string;
+          assetType?: number;
+          tokenContractAddress?: string;
+        }) =>
+          String(asset.underlyingTicker || "").toUpperCase() === needle &&
+          String(asset.binanceChainId) === "56" &&
+          Number(asset.assetType) === 1 &&
+          Boolean(asset.tokenContractAddress)
+      )
+      .map(
+        (asset: {
+          platformId?: string;
           tokenContractAddress?: string;
           tokenSymbol?: string;
-          assetType?: number;
-        }>;
-      }) =>
-        (row.assets || [])
-          .filter(
-            (asset) =>
-              String(asset.binanceChainId) === "56" &&
-              Number(asset.assetType) === 1 &&
-              Boolean(asset.tokenContractAddress)
-          )
-          .map((asset) => ({
+          tokenName?: string;
+          underlyingName?: string;
+          referencePrice?: string;
+          marketCap?: string;
+          statusInfo?: {
+            marketStatus?: string;
+            reasonCode?: string | null;
+            reasonMsg?: string | null;
+          };
+        }) => {
+          const reason = asset.statusInfo?.reasonCode || null;
+          const halted =
+            reason === "ASSET_PAUSED" ||
+            reason === "MARKET_PAUSED" ||
+            reason === "UNSUPPORTED";
+
+          return {
             provider:
               asset.platformId === "bstock"
                 ? "bStocks"
@@ -268,12 +284,19 @@ async function searchBinanceRwa(ticker: string) {
             pairingAddress: asset.tokenContractAddress || null,
             structure: asset.platformId || "tokenized-stock",
             chainId: 56,
-            halted: false,
-            providerPairable: true,
-            note:
-              "BSC tokenized stock returned by Binance Web3 RWA search. Fortune registry approval and eligibility checks are still required.",
-          }))
-    );
+            halted,
+            providerPairable: !halted,
+            providerReferencePrice:
+              numberFromPrice(asset.referencePrice) ?? null,
+            providerMarketCap:
+              numberFromPrice(asset.marketCap) ?? null,
+            marketStatus: asset.statusInfo?.marketStatus || null,
+            note: halted
+              ? "Provider currently reports this stock token as paused or unsupported."
+              : "BSC tokenized stock returned by Binance Web3 RWA data. Fortune registry approval and user eligibility checks are still required.",
+          };
+        }
+      );
 
     return { configured: true, results };
   } catch {

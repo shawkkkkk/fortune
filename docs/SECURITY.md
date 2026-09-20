@@ -71,3 +71,19 @@ Metadata authority cannot change:
 - automation vaults.
 
 Every metadata edit increments an onchain revision. Creators may permanently freeze the record. Fortune clients should visibly distinguish editable from frozen metadata so users are not surprised by later branding changes.
+
+
+### Launch Shield
+
+The current FortuneCurve version enforces a buy-only launch shield: the opening
+tax starts at 99% and reaches zero after five seconds, while cumulative buys by
+one wallet are capped at 2% of supply for the first 15 seconds.
+
+The shield has no creator/private-wallet exemption and its tax goes to the
+liquidity-reinforcement vault. Only net post-shield quote value advances the
+curve.
+
+Because the opening tax is intentionally severe, production clients must show
+the exact current tax before signing and should default to waiting until it
+expires. The tax window is fixed by the deployed contract and cannot be
+extended or reactivated.

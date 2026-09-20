@@ -32,7 +32,7 @@ type PreviewBody = {
     | "preipo-perp";
 };
 
-function stableJson(value: unknown) {
+function stableJson(value: unknown): string {
   if (Array.isArray(value)) {
     return "[" + value.map(stableJson).join(",") + "]";
   }

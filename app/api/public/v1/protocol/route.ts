@@ -22,9 +22,11 @@ export async function GET() {
         environment:
           chainId === PUBLIC_TESTNET.chainId && factory
             ? "public-testnet-alpha"
-            : factory
-              ? "configured"
-              : "not-deployed",
+            : factory && chainId === 56
+              ? "mainnet-production"
+              : factory
+                ? "configured"
+                : "not-deployed",
       },
       token: {
         fixedSupply: true,
@@ -68,7 +70,9 @@ export async function GET() {
         destination:
           chainId === PUBLIC_TESTNET.chainId
             ? "Pancake V3 testnet adapter + permanent LP locker"
-            : "approved IGraduationAdapter; production adapter requires audit",
+            : chainId === 56 && factory
+              ? "Pancake V3 production adapter + permanent LP locker"
+              : "approved IGraduationAdapter",
       },
       api: {
         basePath: "/api/public/v1",

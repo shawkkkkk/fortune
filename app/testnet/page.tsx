@@ -301,6 +301,41 @@ function shorten(value: string) {
   return value.slice(0, 8) + "…" + value.slice(-6);
 }
 
+function parseTokenAmount(label: string, value: string) {
+  const clean = value.trim() || "0";
+  if (!/^\d+(?:\.\d{1,18})?$/.test(clean)) {
+    throw new Error(`${label} must be a non-negative number with at most 18 decimals.`);
+  }
+  return parseUnits(clean, 18);
+}
+
+function publicMetadataUrl(
+  label: string,
+  value: string,
+  options?: { allowIpfs?: boolean }
+) {
+  const clean = value.trim();
+  if (!clean) return "";
+  if (clean.length > 512) {
+    throw new Error(`${label} must be 512 characters or fewer.`);
+  }
+  if (options?.allowIpfs && clean.toLowerCase().startsWith("ipfs://")) {
+    return clean;
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(clean);
+  } catch {
+    throw new Error(`${label} must be a valid http(s) URL${options?.allowIpfs ? " or ipfs:// URI" : ""}.`);
+  }
+
+  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+    throw new Error(`${label} must use http:// or https://${options?.allowIpfs ? " (image metadata may also use ipfs://)" : ""}.`);
+  }
+  return clean;
+}
+
 function provider() {
   const injected = (
     window as Window & { ethereum?: EIP1193Provider }
@@ -396,6 +431,7 @@ export default function PublicTestnetPage() {
   const [description, setDescription] = useState(
     "Created on the Fortune BSC public alpha."
   );
+  const [imageURI, setImageURI] = useState("");
   const [website, setWebsite] = useState("");
   const [xProfile, setXProfile] = useState("");
   const [telegram, setTelegram] = useState("");
@@ -547,13 +583,13 @@ export default function PublicTestnetPage() {
   function metadata() {
     return {
       description: description.trim().slice(0, 4096),
-      imageURI: "",
-      website: website.trim().slice(0, 512),
-      xProfile: xProfile.trim().slice(0, 512),
-      telegram: telegram.trim().slice(0, 512),
-      github: github.trim().slice(0, 512),
-      youtube: youtube.trim().slice(0, 512),
-      debox: debox.trim().slice(0, 512),
+      imageURI: publicMetadataUrl("Image", imageURI, { allowIpfs: true }),
+      website: publicMetadataUrl("Website", website),
+      xProfile: publicMetadataUrl("X / Twitter", xProfile),
+      telegram: publicMetadataUrl("Telegram", telegram),
+      github: publicMetadataUrl("GitHub", github),
+      youtube: publicMetadataUrl("YouTube", youtube),
+      debox: publicMetadataUrl("DeBox", debox),
     };
   }
 
@@ -578,11 +614,19 @@ export default function PublicTestnetPage() {
         );
       }
 
-      const initial = parseUnits(creatorPurchase || "0", 18);
-      const destination =
-        treasury.trim() && isAddress(treasury.trim())
-          ? (treasury.trim() as Address)
-          : active;
+      const initial = parseTokenAmount(
+        "Initial creator purchase",
+        creatorPurchase
+      );
+      const treasuryInput = treasury.trim();
+      if (treasuryInput && !isAddress(treasuryInput)) {
+        throw new Error(
+          "Community treasury recipient must be a valid EVM address."
+        );
+      }
+      const destination = treasuryInput
+        ? (treasuryInput as Address)
+        : active;
       const { publicClient, walletClient } = clients(active);
       let hash: Hex;
 
@@ -680,9 +724,9 @@ export default function PublicTestnetPage() {
           buyTaxBps,
           sellTaxBps,
           antiFarmerDuration: days * 24 * 60 * 60,
-          minimumDividendBalance: parseUnits(
-            minimumDividendBalance || "0",
-            18
+          minimumDividendBalance: parseTokenAmount(
+            "Minimum dividend balance",
+            minimumDividendBalance
           ),
           taxAllocationBps: allocationBps,
           ...metadata(),
@@ -1239,6 +1283,17 @@ export default function PublicTestnetPage() {
           </div>
         </div>
         <div className="fieldGrid">
+          <label>
+            Token image
+            <input
+              value={imageURI}
+              onChange={(e) => setImageURI(e.target.value)}
+              placeholder="https://... or ipfs://..."
+            />
+            <small className="fieldHint">
+              Public image URL or IPFS URI. Stored as token metadata; Fortune never needs your private keys.
+            </small>
+          </label>
           <label>Website<input value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://..." /></label>
           <label>X / Twitter<input value={xProfile} onChange={(e) => setXProfile(e.target.value)} placeholder="https://x.com/..." /></label>
           <label>Telegram<input value={telegram} onChange={(e) => setTelegram(e.target.value)} placeholder="https://t.me/..." /></label>

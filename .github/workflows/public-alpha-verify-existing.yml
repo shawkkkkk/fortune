@@ -129,8 +129,8 @@ jobs:
           BALANCE=$(cast balance "$WALLET" --rpc-url "$BSC_TESTNET_RPC_URL")
           echo "Lifecycle verifier wallet: $WALLET"
           echo "Remaining tBNB balance (wei): $BALANCE"
-          test "$BALANCE" -ge 30000000000000000 || (
-            echo "Need at least 0.03 tBNB to run both bounded lifecycle proofs."
+          test "$BALANCE" -ge 12000000000000000 || (
+            echo "Need at least 0.012 tBNB to run both bounded lifecycle proofs at the current BSC Testnet verifier gas price."
             exit 1
           )
 

@@ -26,6 +26,7 @@ Demo market/analytics values are deliberately marked as placeholders until oncha
 ### Contracts
 
 - `FortuneToken` — fixed supply; no owner mint, blacklist or mutable token tax
+- `FortuneMetadataRegistry` — optional revisioned display metadata with irreversible creator freeze
 - `FortuneAssetRegistry` — explicit quote/reward/graduation capability registry
 - `FortuneChainlinkOracle` — configurable USD feed adapter
 - `FortuneFactory` — creates token + curve + immutable fee router and embeds a Launch Manifest hash

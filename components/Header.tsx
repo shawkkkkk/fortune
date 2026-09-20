@@ -15,15 +15,9 @@ declare global {
 }
 
 const links = [
-  ["/", "Explore"],
-  ["/launch", "Launch"],
-  ["/registry", "Assets"],
-  ["/forum", "Forum"],
-  ["/analytics", "Analytics"],
-  ["/automations", "Automations"],
-  ["/portfolio", "Portfolio"],
+  ["/", "Overview"],
+  ["/testnet", "Public Testnet"],
   ["/developers", "API"],
-  ["/testnet", "Testnet"],
 ] as const;
 
 function short(address: string) {
@@ -38,14 +32,18 @@ export default function Header() {
 
   useEffect(() => {
     if (!window.ethereum) return;
-    void Promise.all([
-      window.ethereum.request({ method: "eth_accounts" }),
-      window.ethereum.request({ method: "eth_chainId" }),
-    ]).then(([accounts, chain]) => {
+
+    const refresh = async () => {
+      const [accounts, chain] = await Promise.all([
+        window.ethereum!.request({ method: "eth_accounts" }),
+        window.ethereum!.request({ method: "eth_chainId" }),
+      ]);
       const list = accounts as string[];
-      if (list?.[0]) setAccount(list[0]);
-      if (typeof chain === "string") setChainId(chain);
-    });
+      setAccount(list?.[0] || "");
+      setChainId(typeof chain === "string" ? chain : "");
+    };
+
+    void refresh();
   }, []);
 
   async function connect() {
@@ -53,6 +51,7 @@ export default function Header() {
       window.alert("Install a BSC-compatible EVM wallet to connect.");
       return;
     }
+
     setConnecting(true);
     try {
       const accounts = (await window.ethereum.request({
@@ -68,30 +67,26 @@ export default function Header() {
     }
   }
 
-  const configuredChainId = Number(
-    process.env.NEXT_PUBLIC_CHAIN_ID || 97
-  );
-  const configuredChainHex =
-    "0x" + configuredChainId.toString(16);
-  const onConfiguredChain =
-    chainId === configuredChainHex;
+  const onTestnet = chainId === "0x61";
 
   return (
     <>
       <div className="networkBar">
-        <span className={"networkDot " + (account && !onConfiguredChain ? "networkWarn" : "")} />
+        <span className={"networkDot " + (account && !onTestnet ? "networkWarn" : "")} />
         {account
-          ? onConfiguredChain
-            ? "Fortune public testnet wallet connected"
+          ? onTestnet
+            ? "BSC Testnet wallet connected"
             : "Wallet connected · switch to BSC Testnet"
-          : "Fortune · BSC public testnet beta"}
+          : "Fortune · public BSC Testnet beta"}
         <span className="networkNote">Test assets only · no real funds</span>
       </div>
+
       <header className="siteHeader">
         <Link href="/" className="logo">
           <span className="logoMark">F</span>
           <span>FORTUNE</span>
         </Link>
+
         <nav className="navLinks">
           {links.map(([href, label]) => (
             <Link
@@ -103,9 +98,13 @@ export default function Header() {
             </Link>
           ))}
         </nav>
+
         <div className="headerActions">
-          <button className="iconButton" aria-label="Search">⌕</button>
-          <button className="walletButton" onClick={() => void connect()} disabled={connecting}>
+          <button
+            className="walletButton"
+            onClick={() => void connect()}
+            disabled={connecting}
+          >
             {connecting ? "Connecting…" : account ? short(account) : "Connect wallet"}
           </button>
         </div>

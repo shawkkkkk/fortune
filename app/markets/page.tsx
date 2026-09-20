@@ -7,6 +7,7 @@ import { FORTUNE_NETWORK } from "@/lib/fortune-network";
 
 type Launch = {
   id: string;
+  mode: "standard" | "tax";
   creator: string;
   token: string;
   curve: string;
@@ -158,7 +159,11 @@ export default function MarketsPage() {
         <div className="launchGrid">
           {launches.map((launch) => (
             <Link
-              href={"/market/" + launch.curve}
+              href={
+                "/market/" +
+                launch.curve +
+                (launch.mode === "tax" ? "?mode=tax" : "")
+              }
               className="launchCard"
               key={launch.curve}
             >
@@ -172,7 +177,7 @@ export default function MarketsPage() {
                     <span>{launch.symbol}</span>
                   </div>
                   <div className="mutedSmall">
-                    by {short(launch.creator)} · launch #{launch.id}
+                    by {short(launch.creator)} · {launch.mode === "tax" ? "tax" : "standard"} · {launch.id}
                   </div>
                 </div>
                 <span

@@ -7,7 +7,7 @@ export async function GET() {
     {
       ok: true,
       service: "fortune-web",
-      chainId: 56,
+      chainId: Number(process.env.NEXT_PUBLIC_CHAIN_ID || 97),
       timestamp: new Date().toISOString(),
       testnetFactoryConfigured: Boolean(
         process.env.NEXT_PUBLIC_FORTUNE_FACTORY_ADDRESS

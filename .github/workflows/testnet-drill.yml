@@ -8,12 +8,14 @@ on:
         required: true
         type: string
       pancake_v3_factory:
-        description: "Verified PancakeSwap V3 factory address on BSC testnet"
+        description: "PancakeSwap V3 factory on BSC testnet (verify before every run)"
         required: true
+        default: "0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865"
         type: string
       pancake_v3_position_manager:
-        description: "Verified PancakeSwap V3 position manager address on BSC testnet"
+        description: "PancakeSwap V3 NonfungiblePositionManager on BSC testnet (verify before every run)"
         required: true
+        default: "0x427bF5b37357632377eCbEC9de3626C71A5396c1"
         type: string
 
 jobs:

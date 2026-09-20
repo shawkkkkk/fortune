@@ -70,7 +70,7 @@ Production approval should require exact contract verification, oracle coverage,
 
 The UI categories include:
 
-**Majors · BNB Chain · Stablecoins · xStocks · PreStocks · RWAs · DeFi · Memes · BSC 400 · Custom**
+**Majors · BNB Chain · Stablecoins · xStocks · China Stocks · NASDAQ Microcaps · PreStocks · RWAs · DeFi · Memes · BSC 400 · Custom**
 
 Only actual compatible BSC contracts can receive onchain capabilities. A ticker existing on another chain is not sufficient.
 
@@ -81,6 +81,23 @@ Fortune's registry architecture is designed to support real BSC-deployed tokeniz
 The Basket Curve reads reserve balances live instead of trusting a static internal reserve counter, allowing the accounting layer to tolerate rebasing-style reserve balance changes. This does **not** make every rebasing or restricted token automatically safe or eligible.
 
 PreStocks are not enabled as BSC quote assets unless an official compatible BSC deployment exists.
+
+## NASDAQ microcaps
+
+Fortune includes an any-ticker lookup for real NASDAQ stocks. The launch UI can:
+
+1. verify that the ticker resolves as a NASDAQ-listed stock;
+2. classify it as a penny stock when the observed last-sale price is below $5;
+3. search recognized tokenized-stock providers for a BSC representation;
+4. expose the real BSC token address when one exists.
+
+A stock ticker is **not** itself an onchain asset. Fortune does not synthesize an unbacked token merely because a ticker exists.
+
+Provider discovery currently supports:
+- public xStocks metadata;
+- Binance Web3 RWA search for Ondo and bStocks when server API credentials are configured.
+
+Even a provider-returned token remains subject to the Fortune onchain Asset Registry, oracle, compatibility and eligibility gates.
 
 ## Fee Matrix
 

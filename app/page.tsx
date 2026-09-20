@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { PUBLIC_TESTNET } from "@/lib/public-testnet";
+import FortuneLogo from "@/components/FortuneLogo";
 
 function short(value: string) {
   return value.slice(0, 8) + "…" + value.slice(-6);
@@ -12,6 +13,9 @@ export default function ExplorePage() {
     <main className="page">
       <section className="heroSection">
         <div>
+          <div className="heroBrandLockup">
+            <FortuneLogo size="lg" />
+          </div>
           <div className="eyebrow">FORTUNE PUBLIC BSC TESTNET BETA</div>
           <h1>Launch against anything. Test it for real.</h1>
           <p>

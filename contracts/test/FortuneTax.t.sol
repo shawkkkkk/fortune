@@ -9,6 +9,7 @@ import {FortuneAssetRegistry} from "../src/FortuneAssetRegistry.sol";
 import {FortuneAutomationRegistry} from "../src/FortuneAutomationRegistry.sol";
 import {FortunePoolRegistry} from "../src/FortunePoolRegistry.sol";
 import {FortuneTaxFactory} from "../src/FortuneTaxFactory.sol";
+import {FortuneCurve} from "../src/FortuneCurve.sol";
 import {FortuneTaxToken} from "../src/FortuneTaxToken.sol";
 import {FortuneTaxProcessor} from "../src/FortuneTaxProcessor.sol";
 import {FortuneTokenDeployer} from "../src/deployers/FortuneTokenDeployer.sol";
@@ -361,6 +362,78 @@ contract FortuneTaxFactoryTest is Test {
         assertEq(
             taxToken.minimumDividendBalance(),
             100e18
+        );
+    }
+
+    function testTaxPartialFillBuyUsesExactSeparateFeeRounding()
+        public
+    {
+        FortuneTaxFactory
+            .TaxLaunchParams
+            memory p =
+                params();
+
+        // Reproduce the public-alpha case: a tiny graduation target makes
+        // the first 250-unit buy partially fill. The resulting quoteSpent is
+        // not necessarily divisible by 10,000, so combined-rate rounding can
+        // differ from the sum of protocol-fee and launch-tax rounding.
+        p.graduationUsd1e18 =
+            1e18;
+
+        (
+            bytes32 salt,
+            ,
+            ,
+        ) =
+            taxFactory
+                .previewPreparedVanity(
+                    user,
+                    p
+                );
+
+        vm.prank(user);
+        FortuneTaxFactory.LaunchInfo
+            memory info =
+                taxFactory
+                    .createLaunchPrepared(
+                        p,
+                        salt
+                    );
+
+        vm.warp(
+            block.timestamp + 6
+        );
+
+        vm.startPrank(user);
+        quote.approve(
+            info.curve,
+            250e18
+        );
+
+        uint256 tokensOut =
+            FortuneCurve(
+                info.curve
+            ).buy(
+                address(quote),
+                250e18,
+                1
+            );
+        vm.stopPrank();
+
+        assertGt(
+            tokensOut,
+            0
+        );
+        assertTrue(
+            FortuneCurve(
+                info.curve
+            ).graduationReady()
+        );
+        assertGt(
+            FortuneTaxProcessor(
+                info.taxProcessor
+            ).totalCurveTaxRecorded(),
+            0
         );
     }
 

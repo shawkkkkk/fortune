@@ -1,0 +1,57 @@
+# Fortune security model
+
+Fortune is pre-audit research software.
+
+## Default invariants
+
+Fortune-created tokens are designed to have:
+
+- fixed supply;
+- no post-launch mint function;
+- no arbitrary blacklist;
+- no mutable transfer tax;
+- no creator withdrawal function for curve reserves;
+- launch manifest hash embedded in the token;
+- per-launch fee routing fixed at creation.
+
+## High-risk areas before mainnet
+
+### Oracle manipulation
+A multi-asset curve is only as strong as its normalization layer. Each quote asset needs an appropriate, liquid, manipulation-resistant feed with a strict freshness bound.
+
+### Fee-on-transfer / rebasing / non-standard tokens
+The prototype assumes ordinary ERC-20 accounting. Production must detect or reject tokens whose observed balance changes differ from requested transfers.
+
+### Cross-reserve sells
+A user may buy through one reserve and sell into another. This is a feature, but it creates reserve-drain and oracle-arbitrage surfaces that need quantitative limits and simulations.
+
+### Graduation
+The production DEX adapter will temporarily control all remaining curve reserves. It needs a dedicated audit and should have no generalized arbitrary-call surface.
+
+### Automation vaults
+Reward/buyback/liquidity vaults must:
+- enforce approved swap routers;
+- cap slippage;
+- avoid unbounded approvals;
+- expose failures;
+- be pausable independently of curve trading where possible.
+
+### Tokenized securities / RWAs
+Technical compatibility is not sufficient. Availability may depend on issuer restrictions, jurisdiction, transfer permissions and legal/compliance requirements.
+
+## Launch safety UI
+
+The launch manifest should expose:
+
+- supply;
+- dev buy;
+- accepted quote assets;
+- primary market;
+- graduation mode and weights;
+- total fee and each route;
+- reward asset;
+- admin powers that exist/do not exist;
+- oracle sources;
+- adapter version.
+
+No "verified" badge should imply investment quality.

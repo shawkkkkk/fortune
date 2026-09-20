@@ -87,7 +87,7 @@ export default function RegistryPage() {
   }, [candidates, query]);
 
   useEffect(() => {
-    if (active !== "NASDAQ Microcaps") return;
+    if (active !== "NASDAQ Penny Stocks") return;
     const ticker = query.trim().toUpperCase();
 
     if (!ticker) {
@@ -112,7 +112,7 @@ export default function RegistryPage() {
 
   const showingCandidates = active === "BSC 400";
   const showingXstocks = active === "xStocks" && xstocks.length > 0;
-  const showingNasdaq = active === "NASDAQ Microcaps";
+  const showingNasdaq = active === "NASDAQ Penny Stocks";
 
   return (
     <main className="page">

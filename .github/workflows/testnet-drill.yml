@@ -75,4 +75,6 @@ jobs:
             --rpc-url "$BSC_TESTNET_RPC_URL" \
             --broadcast \
             --slow \
+            --with-gas-price 1000000000 \
+            --priority-gas-price 1000000000 \
             -vvvv

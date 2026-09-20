@@ -1,11 +1,20 @@
 import type { Metadata } from "next";
 import "@/app/globals.css";
 import Header from "@/components/Header";
+import Footer from "@/components/Footer";
 import { LanguageProvider } from "@/components/LanguageProvider";
 
 export const metadata: Metadata = {
-  title: "Fortune — Launch against anything",
-  description: "A configurable BNB Chain launch protocol with multi-asset basket curves."
+  title: {
+    default: "Fortune — Public Alpha on BSC Testnet",
+    template: "%s · Fortune",
+  },
+  description:
+    "Fortune is a non-custodial launch protocol running a public alpha on BNB Smart Chain Testnet.",
+  applicationName: "Fortune",
+  icons: {
+    icon: "/icon.svg",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -15,6 +24,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <LanguageProvider>
           <Header />
           {children}
+          <Footer />
         </LanguageProvider>
       </body>
     </html>

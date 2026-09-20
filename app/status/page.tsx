@@ -37,12 +37,18 @@ const zhLabels: Record<string, string> = {
   chain: "BNB Chain 配置",
   rpc: "BSC RPC 健康状态",
   redundancy: "RPC 故障切换",
-  factory: "Fortune 工厂字节码",
+  factory: "Fortune 标准工厂字节码",
+  "tax-factory": "Fortune 税费代币工厂字节码",
   registry: "资产注册表字节码",
-  adapter: "毕业适配器字节码",
-  locker: "永久 LP 锁仓",
+  "pool-registry": "池注册表字节码",
+  adapter: "V3 毕业适配器字节码",
+  locker: "V3 永久 LP 锁仓",
+  "tax-adapter": "V2 税费代币毕业适配器",
+  "tax-locker": "V2 永久 LP 锁仓",
   "pancake-factory": "Pancake V3 工厂",
-  "position-manager": "Pancake 仓位管理器",
+  "position-manager": "Pancake V3 仓位管理器",
+  "pancake-v2-router": "Pancake V2 路由器",
+  "pancake-v2-factory": "Pancake V2 工厂",
   "launch-shield": "Launch Shield",
   "atomic-graduation": "原子化毕业",
   recovery: "毕业恢复机制",
@@ -119,7 +125,7 @@ export default function StatusPage() {
                 : "此页面直接检查 Fortune 的 BSC 测试网 RPC、核心合约和 Pancake V3 依赖。"
               : FORTUNE_NETWORK.isMainnet
                 ? "This page directly checks Fortune's BNB Smart Chain mainnet RPC, core contracts, and Pancake V3 dependencies."
-                : "This page directly checks Fortune's BSC Testnet RPC, core contracts, and Pancake V3 dependencies."}
+                : "This page directly checks Fortune's BSC Testnet RPC, standard + tax-token contracts, and Pancake V3/V2 dependencies."}
           </p>
         </div>
 
@@ -283,10 +289,14 @@ export default function StatusPage() {
           </span>
           <div className="statRows">
             {[
-              [zh ? "工厂" : "Factory", FORTUNE_NETWORK.contracts.factory],
-              [zh ? "资产注册表" : "Registry", FORTUNE_NETWORK.contracts.registry],
-              [zh ? "毕业适配器" : "Graduation adapter", FORTUNE_NETWORK.contracts.graduationAdapter],
-              [zh ? "永久 LP 锁仓" : "Permanent LP locker", FORTUNE_NETWORK.contracts.liquidityLocker],
+              [zh ? "标准工厂" : "Standard factory", FORTUNE_NETWORK.contracts.factory],
+              [zh ? "税费代币工厂" : "Tax-token factory", FORTUNE_NETWORK.contracts.taxFactory],
+              [zh ? "资产注册表" : "Asset registry", FORTUNE_NETWORK.contracts.registry],
+              [zh ? "池注册表" : "Pool registry", FORTUNE_NETWORK.contracts.poolRegistry],
+              [zh ? "V3 毕业适配器" : "V3 graduation adapter", FORTUNE_NETWORK.contracts.graduationAdapter],
+              [zh ? "V3 永久 LP 锁仓" : "V3 permanent LP locker", FORTUNE_NETWORK.contracts.liquidityLocker],
+              [zh ? "V2 税费适配器" : "Tax V2 graduation adapter", FORTUNE_NETWORK.contracts.taxGraduationAdapter],
+              [zh ? "V2 永久 LP 锁仓" : "Tax V2 permanent LP locker", FORTUNE_NETWORK.contracts.taxLiquidityLocker],
             ].map(([label, address]) => (
               <div key={label}>
                 <span>{label}</span>

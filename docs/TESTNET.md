@@ -90,3 +90,15 @@ Before any mainnet candidate:
 10. run the web load test while buys and graduation are occurring.
 
 No mainnet release should proceed until all drills are repeatable.
+
+
+## Current official BSC testnet Pancake V3 references
+
+Verified against PancakeSwap's official developer address page on 2026-09-20:
+
+- PancakeV3Factory: `0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865`
+- NonfungiblePositionManager (BSC testnet): `0x427bF5b37357632377eCbEC9de3626C71A5396c1`
+
+Source: `https://developer.pancakeswap.finance/contracts/v3/addresses`
+
+These values are workflow defaults only, not protocol constants. The testnet drill checks that both addresses contain bytecode before simulation and broadcast. Re-verify the official PancakeSwap documentation before every real drill or mainnet deployment.

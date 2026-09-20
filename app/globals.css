@@ -199,3 +199,15 @@ input,textarea,select{width:100%;border:1px solid #323832;background:#0e1110;col
 .customCheckResult{border:1px solid #313a2f;border-radius:12px;background:#0f130e;padding:11px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
 .customCheckResult>div{display:flex;flex-direction:column;gap:3px}.customCheckResult span{font-size:8px;color:#727d70}.customCheckResult strong{font-size:10px;color:#e3e8df}.customCheckResult>small{grid-column:1/-1;font-size:8px;line-height:1.5;color:#7c8678}
 @media(max-width:760px){.customCheckRow,.customCheckResult{grid-template-columns:1fr}}
+
+
+.launchReadinessCard{border-color:#39452f;background:linear-gradient(145deg,rgba(15,20,13,.98),rgba(10,13,10,.98))}
+.readinessSummary{display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid #30382c;border-radius:13px;background:#0d110c;padding:12px 14px;margin-bottom:12px}
+.readinessSummary strong{font-size:14px;color:var(--lime);letter-spacing:.03em}.readinessSummary span{font-size:8px;color:#7a8576}
+.readinessGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.readinessCheck{display:grid;grid-template-columns:24px 1fr;gap:8px;align-items:start;border:1px solid #2a3028;border-radius:11px;background:#10130f;padding:10px}
+.readinessCheck>b{display:grid;place-items:center;width:22px;height:22px;border-radius:999px;font-size:10px;border:1px solid #3a4236}
+.readinessCheck>span{display:flex;flex-direction:column;gap:3px}.readinessCheck strong{font-size:9px}.readinessCheck small{font-size:7px;line-height:1.4;color:#6f786c}
+.readiness-pass>b{color:var(--lime);border-color:#58713b;background:#172010}.readiness-warn>b{color:var(--gold);border-color:#695d37;background:#1e1a0f}.readiness-fail>b{color:#f08f8f;border-color:#704040;background:#211111}
+.readinessErrors{display:flex;flex-direction:column;gap:5px;margin-top:10px;border-top:1px solid #2a3028;padding-top:10px}.readinessErrors span{font-size:8px;color:#c98787}
+@media(max-width:760px){.readinessGrid{grid-template-columns:1fr}.readinessSummary{align-items:flex-start;flex-direction:column}}

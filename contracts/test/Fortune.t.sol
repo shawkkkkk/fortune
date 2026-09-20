@@ -65,6 +65,7 @@ contract MockFortuneOracle is IFortunePriceOracle {
 contract FortuneTest is Test {
     FortuneAssetRegistry registry;
     FortuneFactory factory;
+    FortuneAutomationRegistry factoryAutomationRegistry;
     MockFortuneOracle oracle;
     MockERC20 usdt;
     MockERC20 wbnb;
@@ -99,7 +100,15 @@ contract FortuneTest is Test {
         registry.configureAsset(address(usdt), config);
         registry.configureAsset(address(wbnb), config);
 
-        factory = new FortuneFactory(address(this), address(registry), protocol);
+        factoryAutomationRegistry =
+            new FortuneAutomationRegistry(address(this));
+        factory = new FortuneFactory(
+            address(this),
+            address(registry),
+            address(factoryAutomationRegistry),
+            address(this),
+            protocol
+        );
         factory.setGraduationAdapter(address(new MockGraduationAdapter()));
 
         usdt.mint(user, 10_000e18);
@@ -140,9 +149,6 @@ contract FortuneTest is Test {
             graduationUsd1e18: graduationUsd,
             adaptiveGraduation: true,
             feeBps: fees,
-            holderVault: holderVault,
-            buybackVault: buybackVault,
-            liquidityVault: liquidityVault,
             treasury: treasury
         });
     }

@@ -1,4 +1,3 @@
-import { analytics } from "@/data/mock";
 import { apiOk } from "@/lib/public-api";
 
 export const revalidate = 60;
@@ -6,25 +5,23 @@ export const revalidate = 60;
 export async function GET() {
   return apiOk(
     {
-      protocolRevenueUsd:
-        analytics.protocolRevenue,
-      rewardsDistributedUsd:
-        analytics.rewardsDistributed,
-      buybacksUsd: analytics.buybacks,
+      liveRevenueAggregatesAvailable: false,
+      protocolRevenueUsd: null,
+      rewardsDistributedUsd: null,
+      buybacksUsd: null,
       accounting: {
         creatorFeesIncludedInProtocolRevenue: false,
         shieldTaxIncludedInProtocolRevenue: false,
-        shieldTaxClassification:
-          "liquidity reinforcement",
+        shieldTaxClassification: "liquidity reinforcement",
       },
     },
     {
       cacheSeconds: 60,
       staleSeconds: 300,
       meta: {
-        dataMode: "demo",
-        productionSource:
-          "FeeRouted + automation execution events",
+        dataMode: "indexer_pending",
+        note:
+          "Fortune does not publish placeholder revenue. Aggregates will be derived from public fee-routing and automation events.",
       },
     }
   );

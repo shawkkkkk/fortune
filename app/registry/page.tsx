@@ -32,7 +32,7 @@ export default function RegistryPage() {
 
   useEffect(() => {
     void Promise.all([
-      fetch("/api/registry/bsc")
+      fetch("/api/registry/top-bsc")
         .then((response) => response.json())
         .then((data) => setCandidates(Array.isArray(data.tokens) ? data.tokens : [])),
       fetch("/api/registry/xstocks")
@@ -123,8 +123,9 @@ export default function RegistryPage() {
           <div className="registryNotice">
             <strong>BSC discovery catalog</strong>
             <span>
-              PancakeSwap-listed BSC tokens can appear here as candidates. Candidate
-              status alone does not grant Fortune pairing or reward permissions.
+              The catalog ranks BNB Chain ecosystem assets by market cap when CoinGecko
+              metadata includes a BSC contract. Candidate status alone does not
+              grant Fortune pairing or reward permissions.
             </span>
           </div>
         )}
@@ -158,7 +159,7 @@ export default function RegistryPage() {
                       <span className="assetIconLarge">{asset.symbol.slice(0, 2)}</span>
                       <span><strong>{asset.symbol}</strong><small>{asset.name}</small></span>
                     </div>
-                    <span>PancakeSwap BSC discovery</span>
+                    <span>BNB ecosystem market-cap discovery</span>
                     <div className="capabilityList"><em>Pending review</em></div>
                     <span className="candidateBadge">Candidate</span>
                   </div>

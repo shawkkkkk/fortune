@@ -1,0 +1,76 @@
+name: Fortune BSC Testnet Drill
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type RUN_TESTNET to confirm a real BSC testnet pool will be created"
+        required: true
+        type: string
+      pancake_v3_factory:
+        description: "Verified PancakeSwap V3 factory address on BSC testnet"
+        required: true
+        type: string
+      pancake_v3_position_manager:
+        description: "Verified PancakeSwap V3 position manager address on BSC testnet"
+        required: true
+        type: string
+
+jobs:
+  drill:
+    if: ${{ inputs.confirm == 'RUN_TESTNET' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: contracts
+    env:
+      PRIVATE_KEY: ${{ secrets.FORTUNE_TESTNET_PRIVATE_KEY }}
+      BSC_TESTNET_RPC_URL: ${{ secrets.BSC_TESTNET_RPC_URL }}
+      PANCAKE_V3_FACTORY: ${{ inputs.pancake_v3_factory }}
+      PANCAKE_V3_POSITION_MANAGER: ${{ inputs.pancake_v3_position_manager }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Require testnet secrets
+        run: |
+          test -n "$PRIVATE_KEY" || (echo "Missing FORTUNE_TESTNET_PRIVATE_KEY secret" && exit 1)
+          test -n "$BSC_TESTNET_RPC_URL" || (echo "Missing BSC_TESTNET_RPC_URL secret" && exit 1)
+
+      - name: Install Solidity libraries
+        run: |
+          forge install OpenZeppelin/openzeppelin-contracts@v5.1.0 --no-commit
+          forge install foundry-rs/forge-std --no-commit
+
+      - name: Confirm BSC testnet chain id
+        run: |
+          CHAIN_ID=$(cast chain-id --rpc-url "$BSC_TESTNET_RPC_URL")
+          test "$CHAIN_ID" = "97" || (echo "Refusing to run: expected BSC testnet chain id 97, got $CHAIN_ID" && exit 1)
+
+      - name: Verify configured Pancake contracts have bytecode
+        run: |
+          FACTORY_CODE=$(cast code "$PANCAKE_V3_FACTORY" --rpc-url "$BSC_TESTNET_RPC_URL")
+          MANAGER_CODE=$(cast code "$PANCAKE_V3_POSITION_MANAGER" --rpc-url "$BSC_TESTNET_RPC_URL")
+          test "$FACTORY_CODE" != "0x" || (echo "Pancake factory has no code" && exit 1)
+          test "$MANAGER_CODE" != "0x" || (echo "Position manager has no code" && exit 1)
+
+      - name: Run local contract suite before broadcast
+        run: forge test --fuzz-runs 1000 -vvv
+
+      - name: Simulate full testnet drill
+        run: |
+          forge script script/PancakeTestnetDrill.s.sol:PancakeTestnetDrill \
+            --rpc-url "$BSC_TESTNET_RPC_URL" \
+            -vvvv
+
+      - name: Broadcast full testnet drill
+        run: |
+          forge script script/PancakeTestnetDrill.s.sol:PancakeTestnetDrill \
+            --rpc-url "$BSC_TESTNET_RPC_URL" \
+            --broadcast \
+            --slow \
+            -vvvv

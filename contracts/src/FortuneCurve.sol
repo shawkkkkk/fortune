@@ -13,6 +13,13 @@ import {IGraduationAdapter} from "./interfaces/IGraduationAdapter.sol";
 import {IGraduationPreflight} from "./interfaces/IGraduationPreflight.sol";
 import {IFortunePriceOracle} from "./interfaces/IFortunePriceOracle.sol";
 
+interface IFortuneCurveTaxProcessor {
+    function recordQuoteTax(
+        address asset,
+        uint256 amount
+    ) external;
+}
+
 /// @notice Experimental shared curve accepting 1–5 quote assets.
 /// @dev Economic formula is intentionally simple for testnet research and MUST be
 ///      independently reviewed before any production use.
@@ -34,6 +41,9 @@ contract FortuneCurve is ReentrancyGuard {
     FortuneAssetRegistry public immutable registry;
     FortuneFeeRouter public immutable feeRouter;
     address public immutable shieldVault;
+    address public immutable taxProcessor;
+    uint16 public immutable curveBuyTaxBps;
+    uint16 public immutable curveSellTaxBps;
     uint64 public immutable launchTimestamp;
 
     uint256 public immutable basePriceUsd1e18;
@@ -158,7 +168,10 @@ contract FortuneCurve is ReentrancyGuard {
         uint256 basePriceUsd1e18_,
         uint256 slopeUsd1e18_,
         uint256 graduationUsd1e18_,
-        bool adaptiveGraduation_
+        bool adaptiveGraduation_,
+        address taxProcessor_,
+        uint16 curveBuyTaxBps_,
+        uint16 curveSellTaxBps_
     ) {
         require(
             factory_ != address(0) &&
@@ -169,6 +182,31 @@ contract FortuneCurve is ReentrancyGuard {
         require(quoteAssets_.length >= 1 && quoteAssets_.length <= 5, "BAD_ASSET_COUNT");
         require(quoteAssets_.length == weightsBps_.length, "WEIGHT_LENGTH");
         require(basePriceUsd1e18_ > 0 && graduationUsd1e18_ > 0, "BAD_ECONOMICS");
+        require(
+            curveBuyTaxBps_ <= 1_000 &&
+                curveSellTaxBps_ <= 1_000,
+            "TAX_TOO_HIGH"
+        );
+
+        if (
+            curveBuyTaxBps_ > 0 ||
+            curveSellTaxBps_ > 0
+        ) {
+            require(
+                taxProcessor_ != address(0) &&
+                    taxProcessor_.code.length > 0,
+                "TAX_PROCESSOR_REQUIRED"
+            );
+            require(
+                quoteAssets_.length == 1,
+                "TAX_SINGLE_QUOTE_ONLY"
+            );
+        } else {
+            require(
+                taxProcessor_ == address(0),
+                "UNUSED_TAX_PROCESSOR"
+            );
+        }
 
         uint256 weightSum;
         for (uint256 i; i < quoteAssets_.length; ++i) {
@@ -228,6 +266,9 @@ contract FortuneCurve is ReentrancyGuard {
         registry = FortuneAssetRegistry(registry_);
         feeRouter = FortuneFeeRouter(feeRouter_);
         shieldVault = shieldVault_;
+        taxProcessor = taxProcessor_;
+        curveBuyTaxBps = curveBuyTaxBps_;
+        curveSellTaxBps = curveSellTaxBps_;
         launchTimestamp = uint64(block.timestamp);
         basePriceUsd1e18 = basePriceUsd1e18_;
         slopeUsd1e18 = slopeUsd1e18_;
@@ -423,7 +464,9 @@ contract FortuneCurve is ReentrancyGuard {
         );
 
         uint16 shieldBps = currentSnipeTaxBps();
-        uint16 feeBps = feeRouter.totalFeeBps();
+        uint16 feeBps =
+            feeRouter.totalFeeBps() +
+            curveBuyTaxBps;
 
         quoteSpent = amountIn;
         (
@@ -552,9 +595,46 @@ contract FortuneCurve is ReentrancyGuard {
             );
         }
 
-        if (fee > 0) {
-            quote.safeTransfer(address(feeRouter), fee);
-            feeRouter.route(quoteAsset, fee);
+        uint256 afterShield =
+            quoteSpent - snipeTax;
+        uint256 protocolFee =
+            afterShield *
+            feeRouter.totalFeeBps() /
+            BPS;
+        uint256 launchTax =
+            afterShield *
+            curveBuyTaxBps /
+            BPS;
+
+        require(
+            protocolFee +
+                launchTax ==
+                fee,
+            "BUY_FEE_ACCOUNTING"
+        );
+
+        if (protocolFee > 0) {
+            quote.safeTransfer(
+                address(feeRouter),
+                protocolFee
+            );
+            feeRouter.route(
+                quoteAsset,
+                protocolFee
+            );
+        }
+
+        if (launchTax > 0) {
+            quote.safeTransfer(
+                taxProcessor,
+                launchTax
+            );
+            IFortuneCurveTaxProcessor(
+                taxProcessor
+            ).recordQuoteTax(
+                quoteAsset,
+                launchTax
+            );
         }
 
         if (quoteRefund > 0) {
@@ -704,7 +784,15 @@ contract FortuneCurve is ReentrancyGuard {
 
         normalFee =
             grossQuote *
-            feeRouter.totalFeeBps() /
+            (
+                uint256(
+                    feeRouter
+                        .totalFeeBps()
+                ) +
+                uint256(
+                    curveSellTaxBps
+                )
+            ) /
             BPS;
         quoteOut = grossQuote - normalFee;
     }
@@ -742,16 +830,47 @@ contract FortuneCurve is ReentrancyGuard {
         ] -= grossQuote;
 
         IERC20 quote = IERC20(quoteAsset);
-        if (fee > 0) {
+
+        uint256 protocolFee =
+            grossQuote *
+            feeRouter.totalFeeBps() /
+            BPS;
+        uint256 launchTax =
+            grossQuote *
+            curveSellTaxBps /
+            BPS;
+
+        require(
+            protocolFee +
+                launchTax ==
+                fee,
+            "SELL_FEE_ACCOUNTING"
+        );
+
+        if (protocolFee > 0) {
             quote.safeTransfer(
                 address(feeRouter),
-                fee
+                protocolFee
             );
             feeRouter.route(
                 quoteAsset,
-                fee
+                protocolFee
             );
         }
+
+        if (launchTax > 0) {
+            quote.safeTransfer(
+                taxProcessor,
+                launchTax
+            );
+            IFortuneCurveTaxProcessor(
+                taxProcessor
+            ).recordQuoteTax(
+                quoteAsset,
+                launchTax
+            );
+        }
+
         quote.safeTransfer(
             msg.sender,
             quoteOut

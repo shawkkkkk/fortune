@@ -668,7 +668,10 @@ contract FortuneFactory is Ownable2Step {
                         basePriceUsd1e18: p.basePriceUsd1e18,
                         slopeUsd1e18: p.slopeUsd1e18,
                         graduationUsd1e18: p.graduationUsd1e18,
-                        adaptiveGraduation: p.adaptiveGraduation
+                        adaptiveGraduation: p.adaptiveGraduation,
+                        taxProcessor: address(0),
+                        curveBuyTaxBps: 0,
+                        curveSellTaxBps: 0
                     })
             );
 

@@ -286,6 +286,10 @@ contract FortuneFactory is Ownable2Step {
                 return (false, assetReason);
             }
 
+            if (p.weightsBps[i] == 0) {
+                return (false, bytes32("ZERO_WEIGHT"));
+            }
+
             weightSum += p.weightsBps[i];
             if (asset == p.primaryQuote) {
                 primaryFound = true;

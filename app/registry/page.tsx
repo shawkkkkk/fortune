@@ -14,17 +14,32 @@ type Candidate = {
   warning: string;
 };
 
+type XStockCandidate = {
+  id: string | null;
+  symbol: string | null;
+  name: string;
+  logo: string | null;
+  isTradingHalted: boolean;
+  deployments: Array<{ resolvedAddress?: string | null; [key: string]: unknown }>;
+};
+
 export default function RegistryPage() {
   const [active, setActive] = useState<AssetCategory | "Approved">("Approved");
   const [query, setQuery] = useState("");
   const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [xstocks, setXstocks] = useState<XStockCandidate[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    void fetch("/api/registry/bsc")
-      .then((response) => response.json())
-      .then((data) => setCandidates(Array.isArray(data.tokens) ? data.tokens : []))
-      .finally(() => setLoading(false));
+    void Promise.all([
+      fetch("/api/registry/bsc")
+        .then((response) => response.json())
+        .then((data) => setCandidates(Array.isArray(data.tokens) ? data.tokens : [])),
+      fetch("/api/registry/xstocks")
+        .then((response) => response.json())
+        .then((data) => setXstocks(Array.isArray(data.assets) ? data.assets : []))
+        .catch(() => setXstocks([])),
+    ]).finally(() => setLoading(false));
   }, []);
 
   const filteredApproved = useMemo(() => {
@@ -52,6 +67,7 @@ export default function RegistryPage() {
   }, [candidates, query]);
 
   const showingCandidates = active === "BSC 400";
+  const showingXstocks = active === "xStocks" && xstocks.length > 0;
 
   return (
     <main className="page">
@@ -92,6 +108,17 @@ export default function RegistryPage() {
           placeholder="Search symbol, name or BSC contract"
         />
 
+        {showingXstocks && (
+          <div className="registryNotice">
+            <strong>Official xStocks metadata</strong>
+            <span>
+              BNB deployments shown here come from the xStocks public Assets API.
+              Fortune capabilities still require registry approval, oracle review
+              and eligibility controls.
+            </span>
+          </div>
+        )}
+
         {showingCandidates && (
           <div className="registryNotice">
             <strong>BSC discovery catalog</strong>
@@ -107,7 +134,22 @@ export default function RegistryPage() {
             <span>Asset</span><span>Category / source</span><span>Capabilities</span><span>Status</span>
           </div>
 
-          {showingCandidates
+          {showingXstocks
+            ? xstocks.map((asset) => {
+                const address = asset.deployments[0]?.resolvedAddress || "Deployment found";
+                return (
+                  <div className="registryRow" key={asset.id || asset.symbol || address}>
+                    <div className="registryAsset">
+                      <span className="assetIconLarge">{(asset.symbol || "x").slice(0, 2)}</span>
+                      <span><strong>{asset.symbol || "xStock"}</strong><small>{asset.name}</small></span>
+                    </div>
+                    <span>Official xStocks API · BNB</span>
+                    <div className="capabilityList"><em>Awaiting Fortune approval</em></div>
+                    <span className="candidateBadge">{asset.isTradingHalted ? "Trading halted" : "Discovered"}</span>
+                  </div>
+                );
+              })
+            : showingCandidates
             ? loading
               ? <div className="registryEmpty">Loading BSC catalog…</div>
               : filteredCandidates.map((asset) => (

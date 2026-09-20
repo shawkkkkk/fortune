@@ -68,6 +68,22 @@ Every Fortune curve starts with protocol-level anti-sniper protection:
 
 See `docs/LAUNCH_SHIELD.md`.
 
+## Reliability-first graduation
+
+Fortune curves support **partial-fill final buys**: the purchase that reaches
+the graduation target spends only what is needed and refunds the excess in the
+same transaction.
+
+Graduation then uses a full-plan preflight and atomic adapter call. Failed
+graduations remain retryable. If a launch is still unable to graduate after
+seven days, holders can activate a permissionless pro-rata reserve rescue rather
+than remaining stuck indefinitely.
+
+Fortune exposes explicit market phases: `CurveActive`,
+`GraduationReady`, `PoolCreated`, and `Rescued`.
+
+See `docs/RELIABILITY.md` and `docs/COMPETITOR_LESSONS.md`.
+
 ## Core idea
 
 Traditional launchpads usually bind a launch to one quote token. Fortune introduces a **Basket Curve**:

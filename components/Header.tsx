@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useLanguage } from "@/components/LanguageProvider";
+import FortuneLogo from "@/components/FortuneLogo";
 
 type InjectedEthereum = {
   request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
@@ -84,10 +85,7 @@ export default function Header() {
       </div>
 
       <header className="siteHeader">
-        <Link href="/" className="logo">
-          <span className="logoMark">F</span>
-          <span>FORTUNE</span>
-        </Link>
+        <FortuneLogo size="sm" />
 
         <nav className="navLinks">
           {links.map(([href, label]) => (

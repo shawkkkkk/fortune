@@ -11,6 +11,7 @@ import {FortuneAssetRegistry} from "./FortuneAssetRegistry.sol";
 import {FortuneAutomationRegistry} from "./FortuneAutomationRegistry.sol";
 import {FortuneAutomationVault} from "./FortuneAutomationVault.sol";
 import {FortuneMetadataRegistry} from "./FortuneMetadataRegistry.sol";
+import {FortunePermanentLiquidityLocker} from "./FortunePermanentLiquidityLocker.sol";
 
 contract FortuneFactory is Ownable2Step {
     error LaunchPreflightFailed(bytes32 reasonCode);
@@ -93,6 +94,11 @@ contract FortuneFactory is Ownable2Step {
         address liquidityVault
     );
     event GraduationAdapterSet(address indexed adapter);
+    event LiquidityLockerDepositorSet(
+        address indexed locker,
+        address indexed depositor,
+        bool approved
+    );
     event LaunchPauseSet(bool paused);
     event GraduationFinalized(address indexed curve, address indexed adapter);
     event GraduationPreflightFailed(
@@ -134,6 +140,30 @@ contract FortuneFactory is Ownable2Step {
         require(adapter != address(0), "ZERO_ADAPTER");
         graduationAdapter = adapter;
         emit GraduationAdapterSet(adapter);
+    }
+
+    function setLiquidityLockerDepositor(
+        address locker,
+        address depositor,
+        bool approved
+    ) external onlyOwner {
+        require(
+            locker != address(0) &&
+                depositor != address(0),
+            "ZERO_ADDRESS"
+        );
+
+        FortunePermanentLiquidityLocker(locker)
+            .setApprovedDepositor(
+                depositor,
+                approved
+            );
+
+        emit LiquidityLockerDepositorSet(
+            locker,
+            depositor,
+            approved
+        );
     }
 
     function setLaunchesPaused(bool paused) external onlyOwner {
@@ -593,6 +623,20 @@ contract FortuneFactory is Ownable2Step {
             );
             return false;
         }
+    }
+
+    function liquidityVaultForCurve(address curve)
+        external
+        view
+        returns (address)
+    {
+        uint256 indexPlusOne =
+            curveIndexPlusOne[curve];
+        require(indexPlusOne != 0, "UNKNOWN_CURVE");
+
+        return
+            launches[indexPlusOne - 1]
+                .liquidityVault;
     }
 
     function launchCount() external view returns (uint256) {

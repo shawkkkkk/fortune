@@ -52,6 +52,26 @@ type LighterMarket = {
   volume24h?: number | null;
 };
 
+type CustomTokenCheck = {
+  address: string;
+  metadata: {
+    name?: string | null;
+    symbol?: string | null;
+    decimals?: number | null;
+  };
+  staticChecks: {
+    staticErc20Compatible: boolean;
+    reasonCodes: string[];
+  };
+  launchability: {
+    fortuneApproved: boolean;
+    quoteEnabled: boolean;
+    graduationEnabled: boolean;
+    launchableNow: boolean;
+  };
+  runtimeChecksStillRequired: string[];
+};
+
 type LaunchMode = "basket" | "stock-floor" | "preipo-perp";
 
 const FACTORY_ADDRESS = process.env.NEXT_PUBLIC_FORTUNE_FACTORY_ADDRESS || "";
@@ -90,6 +110,10 @@ export default function LaunchPage() {
   const [perpMarketId, setPerpMarketId] = useState<number | null>(null);
   const [referenceMultiplier, setReferenceMultiplier] = useState(1);
   const [depthTier, setDepthTier] = useState<"low" | "standard">("low");
+  const [customAddress, setCustomAddress] = useState("");
+  const [customCheck, setCustomCheck] = useState<CustomTokenCheck | null>(null);
+  const [customCheckError, setCustomCheckError] = useState("");
+  const [customChecking, setCustomChecking] = useState(false);
   const protocolBps = 10;
 
   useEffect(() => {
@@ -250,6 +274,34 @@ export default function LaunchPage() {
   const selectedAssets = selected.map((id) => selectableAssets.find((a) => a.id === id)).filter(Boolean);
   const equalWeight = Math.floor(100 / selected.length);
   const feeTotal = creatorBps + holderBps + buybackBps + liquidityBps + protocolBps;
+
+  async function checkCustomToken() {
+    setCustomChecking(true);
+    setCustomCheck(null);
+    setCustomCheckError("");
+
+    try {
+      const response = await fetch("/api/public/v1/assets/check", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ address: customAddress }),
+      });
+      const body = await response.json();
+
+      if (!response.ok) {
+        setCustomCheckError(
+          body?.error?.message || "Token compatibility check failed."
+        );
+        return;
+      }
+
+      setCustomCheck(body.data || null);
+    } catch {
+      setCustomCheckError("Token compatibility check failed.");
+    } finally {
+      setCustomChecking(false);
+    }
+  }
 
   function toggleAsset(id: string) {
     const asset = selectableAssets.find((item) => item.id === id);
@@ -527,10 +579,65 @@ export default function LaunchPage() {
               )}
 
               {activeCategory==="Custom" && (
-                <div className="customAssetBox">
-                  <strong>Custom BEP-20</strong>
-                  <p>Custom assets require contract compatibility checks, liquidity checks and explicit warnings before entering a Fortune Basket.</p>
-                  <input placeholder="0x token contract" />
+                <div className="customAssetBox customCompatibilityBox">
+                  <strong>Custom BSC token</strong>
+                  <p>
+                    Paste any BEP-20 address. Fortune checks contract code, metadata,
+                    decimals and current Fortune approval before it can ever hold
+                    launch reserves.
+                  </p>
+                  <div className="customCheckRow">
+                    <input
+                      value={customAddress}
+                      onChange={(event)=>setCustomAddress(event.target.value)}
+                      placeholder="0x token contract"
+                    />
+                    <button
+                      type="button"
+                      className="secondaryCta"
+                      onClick={checkCustomToken}
+                      disabled={customChecking || !customAddress.trim()}
+                    >
+                      {customChecking ? "Checking…" : "Check token"}
+                    </button>
+                  </div>
+
+                  {customCheckError && (
+                    <div className="registryNotice">
+                      <strong>Check failed</strong>
+                      <span>{customCheckError}</span>
+                    </div>
+                  )}
+
+                  {customCheck && (
+                    <div className="customCheckResult">
+                      <div>
+                        <span>Token</span>
+                        <strong>
+                          {customCheck.metadata.symbol || "Unknown"} · {customCheck.metadata.name || "Unnamed"}
+                        </strong>
+                      </div>
+                      <div>
+                        <span>Static ERC-20 checks</span>
+                        <strong>{customCheck.staticChecks.staticErc20Compatible ? "Pass" : "Fail"}</strong>
+                      </div>
+                      <div>
+                        <span>Fortune Registry</span>
+                        <strong>{customCheck.launchability.fortuneApproved ? "Approved" : "Not approved"}</strong>
+                      </div>
+                      <div>
+                        <span>Pairable now</span>
+                        <strong>{customCheck.launchability.launchableNow ? "Yes" : "No"}</strong>
+                      </div>
+                      {!customCheck.launchability.launchableNow && (
+                        <small>
+                          Fortune does not treat “contract exists” as safe enough for
+                          reserve custody. Transfer behavior, oracle, liquidity and
+                          graduation compatibility still have to pass.
+                        </small>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </div>

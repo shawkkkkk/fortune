@@ -7,3 +7,5 @@ Assets: valueless test assets only.
 Workflow safety: chain-id, bytecode, balance, full contract suite, simulation, and lifecycle checks run before/around broadcast.
 
 Retry 1: push-trigger defaults fixed for Pancake addresses.
+
+Retry 2: direct broadcast with skip-simulation and live invariant verification.

@@ -461,6 +461,167 @@ contract FortuneTest is Test {
         assertGt(usdt.balanceOf(user), before);
     }
 
+    function testFixedBasketCapsEachReserveToItsGraduationTarget() public {
+        FortuneFactory.LaunchParams memory p =
+            _params(100e18);
+        p.adaptiveGraduation = false;
+
+        FortuneFactory.LaunchInfo memory info =
+            factory.createLaunch(p);
+        FortuneCurve curve =
+            FortuneCurve(info.curve);
+
+        vm.warp(block.timestamp + 16);
+
+        vm.startPrank(user);
+        wbnb.approve(
+            address(curve),
+            type(uint256).max
+        );
+        usdt.approve(
+            address(curve),
+            type(uint256).max
+        );
+
+        uint256 wbnbTarget =
+            curve.fixedTargetReserveUsd(
+                address(wbnb)
+            );
+        assertEq(wbnbTarget, 60e18);
+
+        curve.buy(
+            address(wbnb),
+            1e18,
+            1
+        );
+
+        assertGe(
+            registry.usdValue(
+                address(wbnb),
+                curve.reserve(
+                    address(wbnb)
+                )
+            ),
+            60e18
+        );
+
+        vm.expectRevert(
+            "FIXED_ASSET_FILLED"
+        );
+        curve.buy(
+            address(wbnb),
+            1e18,
+            1
+        );
+
+        curve.buy(
+            address(usdt),
+            100e18,
+            1
+        );
+
+        vm.stopPrank();
+
+        assertTrue(
+            curve.graduationReady()
+        );
+        assertGe(
+            curve.netReserveUsd1e18(),
+            100e18
+        );
+    }
+
+    function testAdaptiveWeightsNeverAssignRoundingToEmptyReserve() public {
+        MockERC20 third =
+            new MockERC20(
+                "Third",
+                "THIRD"
+            );
+
+        oracle.setPrice(
+            address(third),
+            1e18
+        );
+
+        FortuneAssetRegistry.AssetConfig
+            memory config =
+                FortuneAssetRegistry
+                    .AssetConfig({
+                        oracle: address(oracle),
+                        maxOracleAge: 1 hours,
+                        quoteEnabled: true,
+                        rewardEnabled: true,
+                        graduationEnabled: true,
+                        active: true,
+                        category: "test"
+                    });
+
+        registry.configureAsset(
+            address(third),
+            config
+        );
+
+        FortuneFactory.LaunchParams memory p =
+            _params(1_000e18);
+
+        address[] memory quoteAssets =
+            new address[](3);
+        quoteAssets[0] = address(wbnb);
+        quoteAssets[1] = address(usdt);
+        quoteAssets[2] = address(third);
+        p.quoteAssets = quoteAssets;
+
+        uint16[] memory weights =
+            new uint16[](3);
+        weights[0] = 3_333;
+        weights[1] = 3_333;
+        weights[2] = 3_334;
+        p.weightsBps = weights;
+
+        FortuneFactory.LaunchInfo memory info =
+            factory.createLaunch(p);
+        FortuneCurve curve =
+            FortuneCurve(info.curve);
+
+        vm.warp(block.timestamp + 16);
+
+        vm.startPrank(user);
+        wbnb.approve(
+            address(curve),
+            type(uint256).max
+        );
+        usdt.approve(
+            address(curve),
+            type(uint256).max
+        );
+
+        curve.buy(
+            address(wbnb),
+            5e17,
+            1
+        );
+        curve.buy(
+            address(usdt),
+            800e18,
+            1
+        );
+        vm.stopPrank();
+
+        assertTrue(
+            curve.graduationReady()
+        );
+
+        uint16[] memory liveWeights =
+            curve.graduationWeights();
+
+        assertEq(liveWeights[2], 0);
+        assertEq(
+            uint256(liveWeights[0]) +
+                uint256(liveWeights[1]),
+            10_000
+        );
+    }
+
     function testFinalCurveBuyPartiallyFillsAndRefundsExcess() public {
         FortuneFactory.LaunchInfo memory info =
             factory.createLaunch(_params(50e18));

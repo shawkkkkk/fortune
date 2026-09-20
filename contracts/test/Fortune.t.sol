@@ -15,6 +15,7 @@ import {FortuneAutomationVault} from "../src/FortuneAutomationVault.sol";
 import {MockAutomationAdapter} from "../src/test/MockAutomationAdapter.sol";
 import {FortuneStockFloorVault} from "../src/FortuneStockFloorVault.sol";
 import {FortunePerpReferenceRegistry} from "../src/FortunePerpReferenceRegistry.sol";
+import {FortuneMetadataRegistry} from "../src/FortuneMetadataRegistry.sol";
 import {MockReferenceOracle} from "../src/test/MockReferenceOracle.sol";
 import {IFortunePriceOracle} from "../src/interfaces/IFortunePriceOracle.sol";
 
@@ -152,7 +153,13 @@ contract FortuneTest is Test {
             graduationUsd1e18: graduationUsd,
             adaptiveGraduation: true,
             feeBps: fees,
-            treasury: treasury
+            treasury: treasury,
+            metadataEditable: true,
+            description: "Initial description",
+            imageURI: "ipfs://image",
+            website: "https://fortune.test",
+            xProfile: "https://x.com/fortune",
+            telegram: "https://t.me/fortune"
         });
     }
 
@@ -227,6 +234,74 @@ contract FortuneTest is Test {
 
         assertEq(token.launchManifest(), info.manifestHash);
         assertEq(token.totalSupply(), token.initialSupply());
+    }
+
+    function testEditableMetadataCanUpdateAndFreeze() public {
+        FortuneFactory.LaunchInfo memory info =
+            factory.createLaunch(_params(1_000e18));
+
+        FortuneMetadataRegistry metadataRegistry = factory.metadataRegistry();
+
+        (
+            address creator,
+            bool editable,
+            bool frozen,
+            uint64 revision
+        ) = metadataRegistry.record(info.token);
+
+        assertEq(creator, address(this));
+        assertTrue(editable);
+        assertFalse(frozen);
+        assertEq(revision, 1);
+
+        FortuneMetadataRegistry.Metadata memory next =
+            FortuneMetadataRegistry.Metadata({
+                displayName: "New Display Name",
+                displaySymbol: "NEW",
+                description: "Updated description",
+                imageURI: "ipfs://new-image",
+                website: "https://new.example",
+                xProfile: "https://x.com/new",
+                telegram: "https://t.me/new"
+            });
+
+        metadataRegistry.updateMetadata(info.token, next);
+
+        FortuneMetadataRegistry.Metadata memory stored =
+            metadataRegistry.metadata(info.token);
+
+        assertEq(stored.displayName, "New Display Name");
+        assertEq(stored.displaySymbol, "NEW");
+
+        (, , , revision) = metadataRegistry.record(info.token);
+        assertEq(revision, 2);
+
+        metadataRegistry.freezeMetadata(info.token);
+        (, , frozen, ) = metadataRegistry.record(info.token);
+        assertTrue(frozen);
+
+        vm.expectRevert("METADATA_FROZEN");
+        metadataRegistry.updateMetadata(info.token, next);
+
+        // ERC-20 identity does not silently change.
+        FortuneToken token = FortuneToken(info.token);
+        assertEq(token.name(), "Fortune Test");
+        assertEq(token.symbol(), "FORT");
+    }
+
+    function testImmutableMetadataStartsFrozen() public {
+        FortuneFactory.LaunchParams memory p = _params(1_000e18);
+        p.metadataEditable = false;
+
+        FortuneFactory.LaunchInfo memory info = factory.createLaunch(p);
+        FortuneMetadataRegistry metadataRegistry = factory.metadataRegistry();
+
+        (, bool editable, bool frozen, uint64 revision) =
+            metadataRegistry.record(info.token);
+
+        assertFalse(editable);
+        assertTrue(frozen);
+        assertEq(revision, 1);
     }
 
     function testFeeOnTransferQuoteIsRejected() public {

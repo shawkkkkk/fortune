@@ -417,37 +417,111 @@ contract FortuneCurve is ReentrancyGuard {
             : (numerator - 1) / denominator + 1;
     }
 
+    /// @notice Preview the sell side separately from buys. Launch Shield never
+    ///         applies to sells and normal fees are taken from quote output.
+    function previewSell(
+        address quoteAsset,
+        uint256 tokenAmount
+    )
+        public
+        view
+        returns (
+            uint256 grossQuote,
+            uint256 normalFee,
+            uint256 quoteOut,
+            uint256 usdGross
+        )
+    {
+        require(acceptedQuote[quoteAsset], "QUOTE_NOT_ACCEPTED");
+        require(
+            tokenAmount > 0 &&
+                tokenAmount <= tokensSold,
+            "BAD_TOKEN_AMOUNT"
+        );
+        require(
+            !graduationReady &&
+                !graduated &&
+                !rescueActive,
+            "TRADING_CLOSED"
+        );
+
+        uint256 nextSold = tokensSold - tokenAmount;
+        uint256 sellPrice =
+            basePriceUsd1e18 +
+            (slopeUsd1e18 * nextSold / 1e18);
+
+        usdGross =
+            tokenAmount * sellPrice / 1e18;
+        grossQuote =
+            registry.tokenAmountForUsd(
+                quoteAsset,
+                usdGross
+            );
+
+        require(
+            reserve(quoteAsset) >= grossQuote,
+            "INSUFFICIENT_QUOTE_RESERVE"
+        );
+
+        normalFee =
+            grossQuote *
+            feeRouter.totalFeeBps() /
+            BPS;
+        quoteOut = grossQuote - normalFee;
+    }
+
     /// @notice Sell launch tokens into any accepted quote reserve with enough depth.
     function sell(
         address quoteAsset,
         uint256 tokenAmount,
         uint256 minQuoteOut
     ) external nonReentrant tradingOpen returns (uint256 quoteOut) {
-        require(acceptedQuote[quoteAsset], "QUOTE_NOT_ACCEPTED");
-        require(tokenAmount > 0 && tokenAmount <= tokensSold, "BAD_TOKEN_AMOUNT");
+        (
+            ,
+            uint256 fee,
+            uint256 previewQuoteOut,
+            uint256 usdGross
+        ) = previewSell(
+            quoteAsset,
+            tokenAmount
+        );
 
-        uint256 nextSold = tokensSold - tokenAmount;
-        uint256 sellPrice = basePriceUsd1e18 + (slopeUsd1e18 * nextSold / 1e18);
-        uint256 usdGross = tokenAmount * sellPrice / 1e18;
-        uint256 grossQuote = registry.tokenAmountForUsd(quoteAsset, usdGross);
+        quoteOut = previewQuoteOut;
+        require(
+            quoteOut >= minQuoteOut,
+            "SLIPPAGE"
+        );
 
-        require(reserve(quoteAsset) >= grossQuote, "INSUFFICIENT_QUOTE_RESERVE");
-
-        uint256 fee = grossQuote * feeRouter.totalFeeBps() / BPS;
-        quoteOut = grossQuote - fee;
-        require(quoteOut >= minQuoteOut, "SLIPPAGE");
-
-        launchToken.safeTransferFrom(msg.sender, address(this), tokenAmount);
-        tokensSold = nextSold;
+        launchToken.safeTransferFrom(
+            msg.sender,
+            address(this),
+            tokenAmount
+        );
+        tokensSold -= tokenAmount;
 
         IERC20 quote = IERC20(quoteAsset);
         if (fee > 0) {
-            quote.safeTransfer(address(feeRouter), fee);
-            feeRouter.route(quoteAsset, fee);
+            quote.safeTransfer(
+                address(feeRouter),
+                fee
+            );
+            feeRouter.route(
+                quoteAsset,
+                fee
+            );
         }
-        quote.safeTransfer(msg.sender, quoteOut);
+        quote.safeTransfer(
+            msg.sender,
+            quoteOut
+        );
 
-        emit Sold(msg.sender, quoteAsset, tokenAmount, quoteOut, usdGross);
+        emit Sold(
+            msg.sender,
+            quoteAsset,
+            tokenAmount,
+            quoteOut,
+            usdGross
+        );
     }
 
     function quoteAssetCount() external view returns (uint256) {

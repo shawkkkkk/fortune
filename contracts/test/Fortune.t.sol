@@ -327,7 +327,7 @@ contract FortuneTest is Test {
         );
     }
 
-    function testFailedGraduationCanEnterPermissionlessRescueAfterSevenDays() public {
+    function testGraduationFailureCanEnterPermissionlessRescueAfterSevenDays() public {
         FortuneFactory.LaunchInfo memory info =
             factory.createLaunch(_params(50e18));
         FortuneCurve curve = FortuneCurve(info.curve);

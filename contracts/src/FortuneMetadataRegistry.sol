@@ -23,8 +23,11 @@ contract FortuneMetadataRegistry {
         Metadata metadata;
     }
 
-    address public immutable factory;
+    address public immutable binder;
+    address public factory;
     mapping(address => Record) private _records;
+
+    event FactoryBound(address indexed factory);
 
     event MetadataRegistered(
         address indexed token,
@@ -45,9 +48,28 @@ contract FortuneMetadataRegistry {
         uint64 revision
     );
 
-    constructor(address factory_) {
-        require(factory_ != address(0), "ZERO_FACTORY");
+    constructor(address binder_) {
+        require(
+            binder_ != address(0),
+            "ZERO_BINDER"
+        );
+        binder = binder_;
+    }
+
+    /// @notice One-time factory binding permits the registry to be deployed
+    ///         before FortuneFactory, avoiding circular deployment and oversized
+    ///         factory runtime bytecode.
+    function bindFactory(address factory_) external {
+        require(msg.sender == binder, "ONLY_BINDER");
+        require(factory == address(0), "FACTORY_ALREADY_BOUND");
+        require(
+            factory_ != address(0) &&
+                factory_.code.length > 0,
+            "BAD_FACTORY"
+        );
+
         factory = factory_;
+        emit FactoryBound(factory_);
     }
 
     function registerToken(

@@ -3,7 +3,7 @@ import Link from "next/link";
 const endpoints = [
   ["GET", "/api/ready", "Live BSC Testnet service readiness"],
   ["GET", "/api/public/v1/readiness", "Full protocol + Pancake infrastructure readiness"],
-  ["GET", "/api/public/v1/protocol", "Published public-beta protocol configuration"],
+  ["GET", "/api/public/v1/protocol", "Published public-alpha protocol configuration"],
   ["GET", "/api/public/v1/stats", "Measured release-validation results"],
   ["POST", "/api/public/v1/launches/preview", "Validate a launch configuration"],
   ["GET", "/api/public/v1/transactions/{hash}", "Resolve transaction status before retrying"],
@@ -21,7 +21,7 @@ export default function DevelopersPage() {
     <main className="page narrowPage">
       <section className="pageHeading">
         <div>
-          <span className="eyebrow">FORTUNE PUBLIC API · BETA</span>
+          <span className="eyebrow">FORTUNE PUBLIC API · ALPHA</span>
           <h1>Real data or no data.</h1>
           <p>
             Readiness and protocol configuration come from the deployed BSC
@@ -53,7 +53,7 @@ export default function DevelopersPage() {
       <section className="panel">
         <div className="panelTitle">
           <div>
-            <span className="eyebrow">HONEST BETA ENDPOINTS</span>
+            <span className="eyebrow">HONEST ALPHA ENDPOINTS</span>
             <h2>Public API</h2>
           </div>
           <Link href="/api/public/v1/openapi" className="secondaryCta">

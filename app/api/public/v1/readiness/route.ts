@@ -1,4 +1,9 @@
 import { apiOk } from "@/lib/public-api";
+import {
+  decodeFunctionResult,
+  encodeFunctionData,
+  type Address,
+} from "viem";
 import { PUBLIC_TESTNET } from "@/lib/public-testnet";
 import {
   configuredRpcUrls,
@@ -16,6 +21,69 @@ type ReadinessCheck = {
   status: CheckStatus;
   detail: string;
 };
+
+
+const ownableAbi = [
+  {
+    type: "function",
+    name: "owner",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ type: "address" }],
+  },
+] as const;
+
+const factoryStateAbi = [
+  {
+    type: "function",
+    name: "launchesPaused",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ type: "bool" }],
+  },
+] as const;
+
+const registryHealthAbi = [
+  {
+    type: "function",
+    name: "assetHealth",
+    stateMutability: "view",
+    inputs: [{ name: "asset", type: "address" }],
+    outputs: [
+      { name: "healthy", type: "bool" },
+      { name: "reasonCode", type: "bytes32" },
+      { name: "priceUsd1e18", type: "uint256" },
+      { name: "updatedAt", type: "uint256" },
+    ],
+  },
+] as const;
+
+async function readContractView<T>(
+  chainId: number,
+  address: string,
+  abi: readonly unknown[],
+  functionName: string,
+  args: readonly unknown[] = []
+): Promise<T> {
+  const data = encodeFunctionData({
+    abi: abi as never,
+    functionName: functionName as never,
+    args: args as never,
+  });
+
+  const response = await rpcCall(
+    chainId,
+    "eth_call",
+    [{ to: address, data }, "latest"],
+    { timeoutMs: 2500 }
+  );
+
+  return decodeFunctionResult({
+    abi: abi as never,
+    functionName: functionName as never,
+    data: String(response.result || "0x") as `0x${string}`,
+  }) as T;
+}
 
 async function hasCode(
   chainId: number,
@@ -98,6 +166,63 @@ export async function GET() {
     hasCode(chainId, pancakeFactory),
     hasCode(chainId, positionManager),
   ]);
+
+  const primaryQuote =
+    process.env.NEXT_PUBLIC_FORTUNE_PRIMARY_QUOTE_ADDRESS || "";
+  const governance =
+    process.env.FORTUNE_GOVERNANCE || "";
+  const releaseApproved =
+    process.env.FORTUNE_MAINNET_RELEASE_APPROVED === "true";
+
+  let factoryPaused: boolean | null = null;
+  let factoryOwner: string | null = null;
+  let primaryQuoteHealthy: boolean | null = null;
+
+  if (chainId === 56 && factoryCode && factory) {
+    try {
+      factoryPaused = await readContractView<boolean>(
+        chainId,
+        factory,
+        factoryStateAbi,
+        "launchesPaused"
+      );
+    } catch {
+      factoryPaused = null;
+    }
+
+    try {
+      factoryOwner = await readContractView<Address>(
+        chainId,
+        factory,
+        ownableAbi,
+        "owner"
+      );
+    } catch {
+      factoryOwner = null;
+    }
+  }
+
+  if (
+    chainId === 56 &&
+    registryCode &&
+    registry &&
+    /^0x[a-fA-F0-9]{40}$/.test(primaryQuote)
+  ) {
+    try {
+      const health = await readContractView<
+        readonly [boolean, `0x${string}`, bigint, bigint]
+      >(
+        chainId,
+        registry,
+        registryHealthAbi,
+        "assetHealth",
+        [primaryQuote as Address]
+      );
+      primaryQuoteHealthy = Boolean(health[0]);
+    } catch {
+      primaryQuoteHealthy = false;
+    }
+  }
 
   const redundancyRequired =
     chainId === 56 ||
@@ -215,6 +340,53 @@ export async function GET() {
       status: rpc.healthy >= 1 ? "pass" : "fail",
       detail: "Unknown transaction outcomes are resolved from BSC RPC before any retry is attempted.",
     },
+    ...(chainId === 56
+      ? [
+          {
+            id: "mainnet-release-approval",
+            label: "Mainnet release approval",
+            status: releaseApproved ? "pass" : "fail",
+            detail: releaseApproved
+              ? "Operator release approval is explicitly enabled."
+              : "FORTUNE_MAINNET_RELEASE_APPROVED must remain false until independent security review and final release approval are complete.",
+          } satisfies ReadinessCheck,
+          {
+            id: "governance-owner",
+            label: "Governance ownership",
+            status:
+              governance &&
+              factoryOwner &&
+              governance.toLowerCase() === factoryOwner.toLowerCase()
+                ? "pass"
+                : "fail",
+            detail:
+              governance &&
+              factoryOwner &&
+              governance.toLowerCase() === factoryOwner.toLowerCase()
+                ? "FortuneFactory ownership matches the configured production governance address."
+                : "Factory ownership must be accepted by the configured production governance address.",
+          } satisfies ReadinessCheck,
+          {
+            id: "primary-quote",
+            label: "Primary production quote asset",
+            status: primaryQuoteHealthy ? "pass" : "fail",
+            detail: primaryQuoteHealthy
+              ? "The configured primary quote asset passes the live Fortune registry/oracle health check."
+              : "Configure an approved primary quote asset with a healthy production oracle.",
+          } satisfies ReadinessCheck,
+          {
+            id: "launch-activation",
+            label: "Mainnet launch activation",
+            status: factoryPaused === false ? "pass" : "fail",
+            detail:
+              factoryPaused === false
+                ? "FortuneFactory launch creation is active."
+                : factoryPaused === true
+                  ? "Production deployment is intentionally paused. Run the explicit governance activation only after all release gates pass."
+                  : "Could not read the production launch pause state.",
+          } satisfies ReadinessCheck,
+        ]
+      : []),
   ];
 
   const failed = checks.filter(

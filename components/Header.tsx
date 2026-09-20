@@ -61,7 +61,7 @@ async function switchToNetwork(ethereum: InjectedEthereum) {
           chainId: FORTUNE_NETWORK.chainHex,
           chainName: FORTUNE_NETWORK.chainName,
           nativeCurrency: {
-            name: "Test BNB",
+            name: FORTUNE_NETWORK.isMainnet ? "BNB" : "Test BNB",
             symbol: FORTUNE_NETWORK.nativeSymbol,
             decimals: 18,
           },

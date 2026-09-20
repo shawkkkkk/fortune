@@ -2,11 +2,13 @@
 pragma solidity ^0.8.24;
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {ERC20Burnable} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 
 /// @notice Fixed-supply ERC-20 created by FortuneFactory.
-/// @dev No owner, mint, blacklist or fee mutation surface exists after construction.
-contract FortuneToken is ERC20 {
-    uint16 public constant FORTUNE_TOKEN_VERSION = 1;
+/// @dev No owner, post-launch mint, blacklist or fee mutation surface exists after construction.
+///      Holders may burn their own tokens; FortuneCurve burns unsold inventory at successful graduation.
+contract FortuneToken is ERC20, ERC20Burnable {
+    uint16 public constant FORTUNE_TOKEN_VERSION = 2;
 
     address public immutable fortuneFactory;
     uint256 public immutable initialSupply;

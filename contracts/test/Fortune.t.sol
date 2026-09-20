@@ -262,6 +262,39 @@ contract FortuneTest is Test {
         vm.stopPrank();
     }
 
+    function testFactoryDeploysPurposeLockedAutomationVaults() public {
+        FortuneFactory.LaunchInfo memory info =
+            factory.createLaunch(_params(1_000e18));
+
+        assertTrue(info.holderVault != address(0));
+        assertTrue(info.buybackVault != address(0));
+        assertTrue(info.liquidityVault != address(0));
+
+        FortuneAutomationVault holder =
+            FortuneAutomationVault(info.holderVault);
+        FortuneAutomationVault buyback =
+            FortuneAutomationVault(info.buybackVault);
+        FortuneAutomationVault liquidity =
+            FortuneAutomationVault(info.liquidityVault);
+
+        assertEq(holder.launchToken(), info.token);
+        assertEq(buyback.launchToken(), info.token);
+        assertEq(liquidity.launchToken(), info.token);
+
+        assertEq(
+            uint8(holder.purpose()),
+            uint8(FortuneAutomationRegistry.Purpose.HolderRewards)
+        );
+        assertEq(
+            uint8(buyback.purpose()),
+            uint8(FortuneAutomationRegistry.Purpose.BuybackBurn)
+        );
+        assertEq(
+            uint8(liquidity.purpose()),
+            uint8(FortuneAutomationRegistry.Purpose.LiquidityReinforcement)
+        );
+    }
+
     function testAutomationVaultOnlyUsesApprovedPurposeAdapter() public {
         FortuneFactory.LaunchInfo memory info = factory.createLaunch(_params(1_000e18));
 

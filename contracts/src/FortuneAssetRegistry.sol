@@ -81,12 +81,67 @@ contract FortuneAssetRegistry is Ownable2Step {
         return config.active && config.graduationEnabled;
     }
 
+    /// @notice Non-reverting health probe used before a launch is allowed to exist.
+    /// @dev Runtime transfers still require exact balance accounting inside FortuneCurve.
+    function assetHealth(address asset)
+        external
+        view
+        returns (
+            bool healthy,
+            bytes32 reasonCode,
+            uint256 priceUsd1e18,
+            uint256 updatedAt
+        )
+    {
+        AssetConfig memory config = _assets[asset];
+
+        if (!config.active) {
+            return (false, bytes32("ASSET_DISABLED"), 0, 0);
+        }
+        if (!config.quoteEnabled) {
+            return (false, bytes32("QUOTE_DISABLED"), 0, 0);
+        }
+        if (!config.graduationEnabled) {
+            return (false, bytes32("GRADUATION_DISABLED"), 0, 0);
+        }
+
+        try IERC20Metadata(asset).decimals() returns (uint8 decimals) {
+            if (decimals > 36) {
+                return (false, bytes32("UNSUPPORTED_DECIMALS"), 0, 0);
+            }
+            if (decimals != registeredDecimals[asset]) {
+                return (false, bytes32("DECIMALS_CHANGED"), 0, 0);
+            }
+        } catch {
+            return (false, bytes32("DECIMALS_UNREADABLE"), 0, 0);
+        }
+
+        try IFortunePriceOracle(config.oracle).priceUsd(asset)
+            returns (uint256 price, uint256 timestamp)
+        {
+            if (price == 0) {
+                return (false, bytes32("BAD_PRICE"), price, timestamp);
+            }
+            if (timestamp == 0 || timestamp > block.timestamp) {
+                return (false, bytes32("BAD_TIMESTAMP"), price, timestamp);
+            }
+            if (block.timestamp - timestamp > config.maxOracleAge) {
+                return (false, bytes32("STALE_PRICE"), price, timestamp);
+            }
+
+            return (true, bytes32("OK"), price, timestamp);
+        } catch {
+            return (false, bytes32("ORACLE_REVERT"), 0, 0);
+        }
+    }
+
     function usdValue(address asset, uint256 amount) public view returns (uint256 value1e18) {
         AssetConfig memory config = _assets[asset];
         require(config.active, "ASSET_DISABLED");
 
         (uint256 price, uint256 updatedAt) = IFortunePriceOracle(config.oracle).priceUsd(asset);
         require(price > 0, "BAD_PRICE");
+        require(updatedAt > 0 && updatedAt <= block.timestamp, "BAD_TIMESTAMP");
         require(block.timestamp - updatedAt <= config.maxOracleAge, "STALE_PRICE");
 
         uint8 decimals = IERC20Metadata(asset).decimals();
@@ -103,6 +158,7 @@ contract FortuneAssetRegistry is Ownable2Step {
 
         (uint256 price, uint256 updatedAt) = IFortunePriceOracle(config.oracle).priceUsd(asset);
         require(price > 0, "BAD_PRICE");
+        require(updatedAt > 0 && updatedAt <= block.timestamp, "BAD_TIMESTAMP");
         require(block.timestamp - updatedAt <= config.maxOracleAge, "STALE_PRICE");
 
         uint8 decimals = IERC20Metadata(asset).decimals();

@@ -111,6 +111,12 @@ Quote-asset view of the registry.
 
 Each row explicitly distinguishes static readiness from runtime checks.
 
+### GET /stocks
+
+Discovers BSC stock-token representations from supported provider metadata.
+
+A returned `pairableCandidate` means the API resolved a real active BSC representation; it does **not** bypass Fortune Asset Registry, oracle, compatibility or product-eligibility gates.
+
 ### POST /launches/preview
 
 Validates:

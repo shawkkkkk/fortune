@@ -17,6 +17,36 @@ contract MockERC20 is ERC20 {
     function mint(address to, uint256 amount) external { _mint(to, amount); }
 }
 
+contract MockFeeToken is ERC20 {
+    constructor() ERC20("Fee Token", "FEE") {}
+
+    function mint(address to, uint256 amount) external {
+        _mint(to, amount);
+    }
+
+    function _update(address from, address to, uint256 value) internal override {
+        if (from != address(0) && to != address(0)) {
+            uint256 fee = value / 100;
+            super._update(from, address(0xdead), fee);
+            super._update(from, to, value - fee);
+        } else {
+            super._update(from, to, value);
+        }
+    }
+}
+
+contract MockRebaseToken is ERC20 {
+    constructor() ERC20("Rebase Token", "RBS") {}
+
+    function mint(address to, uint256 amount) external {
+        _mint(to, amount);
+    }
+
+    function positiveRebase(address holder, uint256 amount) external {
+        _mint(holder, amount);
+    }
+}
+
 contract MockFortuneOracle is IFortunePriceOracle {
     mapping(address => uint256) public prices;
 
@@ -185,5 +215,86 @@ contract FortuneTest is Test {
 
         assertEq(token.launchManifest(), info.manifestHash);
         assertEq(token.totalSupply(), token.initialSupply());
+    }
+
+    function testFeeOnTransferQuoteIsRejected() public {
+        MockFeeToken feeToken = new MockFeeToken();
+        oracle.setPrice(address(feeToken), 1e18);
+
+        FortuneAssetRegistry.AssetConfig memory config =
+            FortuneAssetRegistry.AssetConfig({
+                oracle: address(oracle),
+                maxOracleAge: 1 hours,
+                quoteEnabled: true,
+                rewardEnabled: true,
+                graduationEnabled: true,
+                active: true,
+                category: "test"
+            });
+        registry.configureAsset(address(feeToken), config);
+
+        FortuneFactory.LaunchParams memory p = _params(1_000e18);
+        address[] memory quotes = new address[](1);
+        quotes[0] = address(feeToken);
+        uint16[] memory weights = new uint16[](1);
+        weights[0] = 10_000;
+        p.quoteAssets = quotes;
+        p.weightsBps = weights;
+        p.primaryQuote = address(feeToken);
+
+        FortuneFactory.LaunchInfo memory info = factory.createLaunch(p);
+        FortuneCurve curve = FortuneCurve(info.curve);
+
+        feeToken.mint(user, 100e18);
+        vm.startPrank(user);
+        feeToken.approve(address(curve), type(uint256).max);
+        vm.expectRevert("NON_STANDARD_QUOTE_TOKEN");
+        curve.buy(address(feeToken), 10e18, 1);
+        vm.stopPrank();
+    }
+
+    function testPositiveRebaseChangesReserveAndCanTriggerGraduation() public {
+        MockRebaseToken rebaseToken = new MockRebaseToken();
+        oracle.setPrice(address(rebaseToken), 1e18);
+
+        FortuneAssetRegistry.AssetConfig memory config =
+            FortuneAssetRegistry.AssetConfig({
+                oracle: address(oracle),
+                maxOracleAge: 1 hours,
+                quoteEnabled: true,
+                rewardEnabled: true,
+                graduationEnabled: true,
+                active: true,
+                category: "test"
+            });
+        registry.configureAsset(address(rebaseToken), config);
+
+        FortuneFactory.LaunchParams memory p = _params(100e18);
+        address[] memory quotes = new address[](1);
+        quotes[0] = address(rebaseToken);
+        uint16[] memory weights = new uint16[](1);
+        weights[0] = 10_000;
+        p.quoteAssets = quotes;
+        p.weightsBps = weights;
+        p.primaryQuote = address(rebaseToken);
+
+        FortuneFactory.LaunchInfo memory info = factory.createLaunch(p);
+        FortuneCurve curve = FortuneCurve(info.curve);
+
+        rebaseToken.mint(user, 60e18);
+        vm.startPrank(user);
+        rebaseToken.approve(address(curve), type(uint256).max);
+        curve.buy(address(rebaseToken), 50e18, 1);
+        vm.stopPrank();
+
+        assertFalse(curve.graduationReady());
+        uint256 beforeReserve = curve.reserve(address(rebaseToken));
+
+        // Simulate a positive rebase increasing the curve's actual balance.
+        rebaseToken.positiveRebase(address(curve), 60e18);
+        assertEq(curve.reserve(address(rebaseToken)), beforeReserve + 60e18);
+
+        curve.checkGraduation();
+        assertTrue(curve.graduationReady());
     }
 }

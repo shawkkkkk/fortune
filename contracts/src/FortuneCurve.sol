@@ -112,10 +112,15 @@ contract FortuneCurve is ReentrancyGuard {
         require(amountIn > 0, "ZERO_AMOUNT");
 
         IERC20 quote = IERC20(quoteAsset);
+        uint256 balanceBefore = quote.balanceOf(address(this));
         quote.safeTransferFrom(msg.sender, address(this), amountIn);
+        uint256 received = quote.balanceOf(address(this)) - balanceBefore;
+        // Fortune v1 deliberately rejects fee-on-transfer / non-standard
+        // accounting rather than silently giving the buyer a bad quote.
+        require(received == amountIn, "NON_STANDARD_QUOTE_TOKEN");
 
-        uint256 fee = amountIn * feeRouter.totalFeeBps() / BPS;
-        uint256 netAmount = amountIn - fee;
+        uint256 fee = received * feeRouter.totalFeeBps() / BPS;
+        uint256 netAmount = received - fee;
 
         if (fee > 0) {
             quote.safeTransfer(address(feeRouter), fee);

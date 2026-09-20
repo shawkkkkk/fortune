@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { assetCategories, assets } from "@/data/assets";
 import type { AssetCategory, FortuneAsset } from "@/lib/types";
+import { PUBLIC_TESTNET } from "@/lib/public-testnet";
 
 type BscCandidate = {
   rank: number;
@@ -112,7 +113,9 @@ type LaunchPreviewResult = {
 
 type LaunchMode = "basket" | "stock-floor" | "preipo-perp";
 
-const FACTORY_ADDRESS = process.env.NEXT_PUBLIC_FORTUNE_FACTORY_ADDRESS || "";
+const FACTORY_ADDRESS =
+  process.env.NEXT_PUBLIC_FORTUNE_FACTORY_ADDRESS ||
+  PUBLIC_TESTNET.contracts.factory;
 
 export default function LaunchPage() {
   const [launchMode, setLaunchMode] = useState<LaunchMode>("basket");

@@ -3,6 +3,7 @@ export type AssetCategory =
   | "BNB Chain"
   | "Stablecoins"
   | "xStocks"
+  | "China Stocks"
   | "PreStocks"
   | "RWAs"
   | "DeFi"

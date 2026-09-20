@@ -254,8 +254,10 @@ contract FortuneFactory is Ownable2Step {
             FortuneAutomationRegistry.Purpose.BuybackBurn,
             address(token)
         );
+        // Launch Shield always has a non-creator destination for temporary
+        // anti-snipe tax proceeds, even when normal LP reinforcement is 0 bps.
         address liquidityVault = _automationVault(
-            p.feeBps[3],
+            p.feeBps[3] > 0 ? p.feeBps[3] : uint16(1),
             FortuneAutomationRegistry.Purpose.LiquidityReinforcement,
             address(token)
         );
@@ -276,6 +278,7 @@ contract FortuneFactory is Ownable2Step {
             address(token),
             address(registry),
             address(router),
+            liquidityVault,
             p.quoteAssets,
             p.weightsBps,
             p.basePriceUsd1e18,

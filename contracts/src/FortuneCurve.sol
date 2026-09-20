@@ -34,6 +34,7 @@ contract FortuneCurve is ReentrancyGuard {
     uint256 public tokensSold;
     bool public graduationReady;
     bool public graduated;
+    uint256 public graduationAnchorPriceUsd1e18;
 
     event Bought(
         address indexed buyer,
@@ -50,6 +51,11 @@ contract FortuneCurve is ReentrancyGuard {
         uint256 usdValue
     );
     event GraduationReady(uint256 reserveUsd);
+    event GraduationAnchor(
+        uint256 priceUsd1e18,
+        uint256 reserveUsd1e18,
+        uint256 tokensSold
+    );
     event Graduated(address indexed adapter);
 
     modifier tradingOpen() {
@@ -326,10 +332,20 @@ contract FortuneCurve is ReentrancyGuard {
     }
 
     function _checkGraduation() internal {
+        if (graduationReady || graduated) return;
+
         uint256 totalUsd = netReserveUsd1e18();
         if (totalUsd >= graduationUsd1e18) {
+            uint256 anchorPrice = currentPriceUsd1e18();
             graduationReady = true;
+            graduationAnchorPriceUsd1e18 = anchorPrice;
+
             emit GraduationReady(totalUsd);
+            emit GraduationAnchor(
+                anchorPrice,
+                totalUsd,
+                tokensSold
+            );
         }
     }
 }

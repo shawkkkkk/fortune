@@ -7,7 +7,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 
 import {IPancakeV3FactoryLike} from "../interfaces/IPancakeV3FactoryLike.sol";
 import {IPancakeV3PoolLike} from "../interfaces/IPancakeV3PoolLike.sol";
-import {IPancakeV3PositionManagerLike} from "../interfaces/IPancakeV3PositionManagerLike.sol";
+
 
 contract MockPancakeV3Pool is IPancakeV3PoolLike {
     uint160 public sqrtPriceX96;
@@ -94,10 +94,27 @@ contract MockPancakeV3Factory is IPancakeV3FactoryLike {
     }
 }
 
-contract MockPancakeV3PositionManager is
-    ERC721,
-    IPancakeV3PositionManagerLike
-{
+contract MockPancakeV3PositionManager is ERC721 {
+    struct CollectParams {
+        uint256 tokenId;
+        address recipient;
+        uint128 amount0Max;
+        uint128 amount1Max;
+    }
+
+    struct MintParams {
+        address token0;
+        address token1;
+        uint24 fee;
+        int24 tickLower;
+        int24 tickUpper;
+        uint256 amount0Desired;
+        uint256 amount1Desired;
+        uint256 amount0Min;
+        uint256 amount1Min;
+        address recipient;
+        uint256 deadline;
+    }
     using SafeERC20 for IERC20;
 
     MockPancakeV3Factory public immutable factory;
@@ -107,26 +124,6 @@ contract MockPancakeV3PositionManager is
         ERC721("Mock Pancake Position", "MPV3")
     {
         factory = MockPancakeV3Factory(factory_);
-    }
-
-    function ownerOf(uint256 tokenId)
-        public
-        view
-        override(ERC721, IPancakeV3PositionManagerLike)
-        returns (address)
-    {
-        return super.ownerOf(tokenId);
-    }
-
-    function safeTransferFrom(
-        address from,
-        address to,
-        uint256 tokenId
-    )
-        public
-        override(ERC721, IPancakeV3PositionManagerLike)
-    {
-        super.safeTransferFrom(from, to, tokenId);
     }
 
     function createAndInitializePoolIfNecessary(

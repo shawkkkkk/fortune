@@ -25,7 +25,7 @@ Demo market/analytics values are deliberately marked as placeholders until oncha
 
 ### Contracts
 
-- `FortuneToken` — fixed supply; no owner mint, blacklist or mutable token tax
+- `FortuneToken` — fixed supply; no owner mint, blacklist or mutable token tax; every Fortune-created token is CREATE2-deployed with a `0xfe` vanity suffix
 - `FortuneMetadataRegistry` — optional revisioned display metadata with irreversible creator freeze
 - `FortuneAssetRegistry` — explicit quote/reward/graduation capability registry
 - `FortuneChainlinkOracle` — configurable USD feed adapter
@@ -41,6 +41,20 @@ Demo market/analytics values are deliberately marked as placeholders until oncha
 - BSC testnet mock oracle/quote assets + deployment script
 
 CI builds the Next.js application and runs the Foundry test suite.
+
+## Fortune vanity addresses
+
+Every token created through `FortuneFactory` is deployed with CREATE2 and must end in the hex byte `fe`.
+
+Example:
+
+```
+0x8B54...91fe
+```
+
+The factory searches deterministic CREATE2 salts during launch and rejects any deployment that does not satisfy the suffix. Because `fe` is one byte, a matching salt takes roughly 256 trials on average. A creator-specific launch nonce is included in the manifest so repeated launches with identical settings still receive different token addresses.
+
+Address letter casing is only a display/checksum convention; Fortune renders the suffix as lowercase `fe`.
 
 ## Core idea
 

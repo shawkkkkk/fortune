@@ -9,53 +9,106 @@ import {
 
 export const dynamic = "force-dynamic";
 
+type StackProbe = {
+  configured: boolean;
+  hasCode: boolean;
+};
+
+function hasBytecode(value: unknown) {
+  const code = String(value || "");
+  return code !== "" && code !== "0x" && code !== "0x0";
+}
+
 export async function GET() {
-  const chainId = Number(
-    process.env.NEXT_PUBLIC_CHAIN_ID || 97
-  );
-  const factory =
+  const chainId = Number(process.env.NEXT_PUBLIC_CHAIN_ID || 97);
+  const configuredFactory =
     process.env.NEXT_PUBLIC_FORTUNE_FACTORY_ADDRESS ||
     (chainId === PUBLIC_TESTNET.chainId
       ? PUBLIC_TESTNET.contracts.factory
       : "");
+
   const urls = configuredRpcUrls(chainId);
   const redundancyRequired =
     chainId === 56 ||
     process.env.FORTUNE_REQUIRE_RPC_REDUNDANCY === "true";
 
   const rpc = await probeRpcEndpoints(chainId);
-
-  let factoryHasCode = false;
-  let factoryProbeError: string | null = null;
-
-  if (factory && rpc.healthy > 0) {
-    try {
-      const response = await rpcCall(
-        chainId,
-        "eth_getCode",
-        [factory, "latest"],
-        { timeoutMs: 2500 }
-      );
-
-      const code = String(response.result || "");
-      factoryHasCode =
-        code !== "" &&
-        code !== "0x" &&
-        code !== "0x0";
-    } catch (error) {
-      factoryProbeError =
-        error instanceof Error
-          ? error.message
-          : "FACTORY_PROBE_FAILED";
-    }
-  }
-
   const redundancyConfigured =
     !redundancyRequired || urls.length >= 2;
 
+  const requiredContracts =
+    chainId === PUBLIC_TESTNET.chainId
+      ? {
+          factory: PUBLIC_TESTNET.contracts.factory,
+          taxFactory: PUBLIC_TESTNET.contracts.taxFactory,
+          registry: PUBLIC_TESTNET.contracts.registry,
+          poolRegistry: PUBLIC_TESTNET.contracts.poolRegistry,
+          graduationAdapter:
+            PUBLIC_TESTNET.contracts.graduationAdapter,
+          liquidityLocker:
+            PUBLIC_TESTNET.contracts.liquidityLocker,
+          taxGraduationAdapter:
+            PUBLIC_TESTNET.contracts.taxGraduationAdapter,
+          taxLiquidityLocker:
+            PUBLIC_TESTNET.contracts.taxLiquidityLocker,
+          mockQuote: PUBLIC_TESTNET.contracts.mockQuote,
+        }
+      : {
+          factory: configuredFactory,
+        };
+
+  const entries = Object.entries(requiredContracts);
+  const stack: Record<string, StackProbe> = {};
+
+  if (rpc.healthy > 0) {
+    await Promise.all(
+      entries.map(async ([label, address]) => {
+        if (!address) {
+          stack[label] = {
+            configured: false,
+            hasCode: false,
+          };
+          return;
+        }
+
+        try {
+          const response = await rpcCall(
+            chainId,
+            "eth_getCode",
+            [address, "latest"],
+            { timeoutMs: 2500 }
+          );
+
+          stack[label] = {
+            configured: true,
+            hasCode: hasBytecode(response.result),
+          };
+        } catch {
+          stack[label] = {
+            configured: true,
+            hasCode: false,
+          };
+        }
+      })
+    );
+  } else {
+    for (const [label, address] of entries) {
+      stack[label] = {
+        configured: Boolean(address),
+        hasCode: false,
+      };
+    }
+  }
+
+  const stackReady =
+    entries.length > 0 &&
+    entries.every(([label]) => {
+      const probe = stack[label];
+      return probe?.configured && probe.hasCode;
+    });
+
   const ready =
-    Boolean(factory) &&
-    factoryHasCode &&
+    stackReady &&
     rpc.healthy >= 1 &&
     redundancyConfigured;
 
@@ -67,12 +120,15 @@ export async function GET() {
       ready,
       degraded,
       service: "fortune",
+      environment:
+        chainId === PUBLIC_TESTNET.chainId
+          ? "public-bsc-testnet-alpha"
+          : chainId === 56
+            ? "bsc-mainnet"
+            : "custom",
       chainId,
-      factory: {
-        configured: Boolean(factory),
-        hasCode: factoryHasCode,
-        probeError: factoryProbeError,
-      },
+      stackReady,
+      stack,
       rpc: {
         configured: rpc.configured,
         healthy: rpc.healthy,

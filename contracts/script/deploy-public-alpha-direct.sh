@@ -12,6 +12,10 @@ RPC="$BSC_TESTNET_RPC_URL"
 DEPLOYER="$(cast wallet address --private-key "$PRIVATE_KEY")"
 GAS_PRICE=1000000000
 
+pending_nonce() {
+  cast nonce "$DEPLOYER" --block pending --rpc-url "$RPC"
+}
+
 log() {
   printf '\n==> %s\n' "$*"
 }
@@ -27,42 +31,75 @@ deploy() {
 
   log "Deploying $label"
 
-  local output
-  if [ "$#" -gt 0 ]; then
-    output="$(
-      forge create "$contract" \
-        --rpc-url "$RPC" \
-        --private-key "$PRIVATE_KEY" \
-        --broadcast \
-        --legacy \
-        --gas-price "$GAS_PRICE" \
-        --gas-limit 16000000 \
-        --constructor-args "$@" 2>&1
-    )"
-  else
-    output="$(
-      forge create "$contract" \
-        --rpc-url "$RPC" \
-        --private-key "$PRIVATE_KEY" \
-        --broadcast \
-        --legacy \
-        --gas-price "$GAS_PRICE" \
-        --gas-limit 16000000 2>&1
-    )"
-  fi
+  local output=""
+  local address=""
+  local attempt
+  local nonce
 
-  printf '%s\n' "$output" >&2
+  for attempt in 1 2 3 4 5; do
+    nonce="$(pending_nonce)"
+    echo "Using pending nonce $nonce (attempt $attempt)" >&2
 
-  local address
-  address="$(printf '%s\n' "$output" | extract_deployed)"
+    set +e
+    if [ "$#" -gt 0 ]; then
+      output="$(
+        forge create "$contract" \
+          --rpc-url "$RPC" \
+          --private-key "$PRIVATE_KEY" \
+          --broadcast \
+          --legacy \
+          --gas-price "$GAS_PRICE" \
+          --gas-limit 16000000 \
+          --nonce "$nonce" \
+          --constructor-args "$@" 2>&1
+      )"
+    else
+      output="$(
+        forge create "$contract" \
+          --rpc-url "$RPC" \
+          --private-key "$PRIVATE_KEY" \
+          --broadcast \
+          --legacy \
+          --gas-price "$GAS_PRICE" \
+          --gas-limit 16000000 \
+          --nonce "$nonce" 2>&1
+      )"
+    fi
+    local exit_code=$?
+    set -e
+
+    printf '%s\n' "$output" >&2
+
+    if [ "$exit_code" -eq 0 ]; then
+      address="$(printf '%s\n' "$output" | extract_deployed)"
+      if [ -n "$address" ]; then
+        break
+      fi
+    fi
+
+    if printf '%s\n' "$output" | grep -qiE 'nonce too low|already known|replacement transaction underpriced'; then
+      sleep $((attempt * 2))
+      continue
+    fi
+
+    echo "Deployment failed for $label" >&2
+    exit "$exit_code"
+  done
 
   if [ -z "$address" ]; then
-    echo "Could not parse deployed address for $label" >&2
+    echo "Could not parse deployed address for $label after nonce retries" >&2
     exit 1
   fi
 
-  local code
-  code="$(cast code "$address" --rpc-url "$RPC")"
+  local code=""
+  for attempt in 1 2 3 4 5; do
+    code="$(cast code "$address" --rpc-url "$RPC")"
+    if [ "$code" != "0x" ]; then
+      break
+    fi
+    sleep 2
+  done
+
   if [ "$code" = "0x" ]; then
     echo "$label deployed without runtime bytecode: $address" >&2
     exit 1
@@ -79,14 +116,45 @@ send_tx() {
 
   log "$label"
 
-  cast send "$to" "$sig" "$@" \
-    --rpc-url "$RPC" \
-    --private-key "$PRIVATE_KEY" \
-    --legacy \
-    --gas-price "$GAS_PRICE" \
-    --gas-limit 5000000 >/tmp/fortune-last-send.json
+  local output=""
+  local attempt
+  local nonce
 
-  cat /tmp/fortune-last-send.json
+  for attempt in 1 2 3 4 5; do
+    nonce="$(pending_nonce)"
+    echo "Using pending nonce $nonce (attempt $attempt)"
+
+    set +e
+    output="$(
+      cast send "$to" "$sig" "$@" \
+        --rpc-url "$RPC" \
+        --private-key "$PRIVATE_KEY" \
+        --legacy \
+        --gas-price "$GAS_PRICE" \
+        --gas-limit 5000000 \
+        --nonce "$nonce" 2>&1
+    )"
+    local exit_code=$?
+    set -e
+
+    printf '%s\n' "$output"
+
+    if [ "$exit_code" -eq 0 ]; then
+      printf '%s\n' "$output" > /tmp/fortune-last-send.json
+      return 0
+    fi
+
+    if printf '%s\n' "$output" | grep -qiE 'nonce too low|already known|replacement transaction underpriced'; then
+      sleep $((attempt * 2))
+      continue
+    fi
+
+    echo "Transaction failed: $label" >&2
+    exit "$exit_code"
+  done
+
+  echo "Transaction failed after nonce retries: $label" >&2
+  exit 1
 }
 
 log "Direct BSC Testnet deployment"

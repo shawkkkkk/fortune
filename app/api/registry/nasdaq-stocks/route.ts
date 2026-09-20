@@ -306,6 +306,7 @@ export async function GET(request: Request) {
     ...asset,
     pairable:
       nasdaq.verified &&
+      nasdaq.isPenny === true &&
       asset.providerPairable &&
       !asset.halted,
     pennyStock:
@@ -324,7 +325,7 @@ export async function GET(request: Request) {
     policy: {
       syntheticTokensAllowed: false,
       rule:
-        "Fortune may pair only with an actual BSC tokenized representation from a recognized provider. A real NASDAQ ticker by itself is not an onchain asset.",
+        "The NASDAQ Penny Stocks category enables direct pairing only when the underlying is verified as NASDAQ-listed, its observed last-sale price is below $5, and a recognized provider exposes an actual BSC tokenized representation. A ticker by itself is not an onchain asset.",
       pennyDefinition:
         "UI classification uses a last sale price below $5 when Nasdaq quote data is available.",
     },

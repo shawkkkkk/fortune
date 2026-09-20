@@ -11,3 +11,5 @@ Retry 1: push-trigger defaults fixed for Pancake addresses.
 Retry 2: direct broadcast with skip-simulation and live invariant verification.
 
 Retry 3: trace-free direct deployment + live lifecycle harnesses.
+
+Retry 4: respect BSC testnet 16,777,216 transaction gas cap.

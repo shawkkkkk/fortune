@@ -17,7 +17,7 @@ set -euo pipefail
 
 RPC="$BSC_TESTNET_RPC_URL"
 DEPLOYER="$(cast wallet address --private-key "$PRIVATE_KEY")"
-GAS_PRICE=1000000000
+GAS_PRICE=100000000
 MAX_GAS=16000000
 
 pending_nonce() {

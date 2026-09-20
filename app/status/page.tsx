@@ -48,6 +48,10 @@ const zhLabels: Record<string, string> = {
   recovery: "毕业恢复机制",
   "chart-anchor": "图表连续性锚点",
   "transaction-recovery": "交易恢复机制",
+  "mainnet-release-approval": "主网发布批准",
+  "governance-owner": "治理所有权",
+  "primary-quote": "正式版主要计价资产",
+  "launch-activation": "主网发行激活",
 };
 
 export default function StatusPage() {

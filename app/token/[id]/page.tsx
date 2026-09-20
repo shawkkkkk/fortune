@@ -39,12 +39,16 @@ export default async function TokenPage({ params }: { params: Promise<{ id: stri
           <div className="poolRows">{launch.quoteAssets.map((asset,i)=><div key={asset}><strong>{asset}</strong><span>{i===0?"Primary market":"Basket market"}</span><b>{Math.floor(100/launch.quoteAssets.length)}%</b></div>)}</div>
         </section>
         <section className="panel">
-          <span className="eyebrow">LAUNCH MANIFEST</span>
+          <div className="panelTitle">
+            <div><span className="eyebrow">LAUNCH MANIFEST</span><h2>Token controls</h2></div>
+            <Link href="/metadata" className="secondaryCta">Manage metadata</Link>
+          </div>
           <div className="statRows">
             <div><span>Creator fee</span><strong>{(launch.creatorFeeBps/100).toFixed(2)}%</strong></div>
             <div><span>Holder reward</span><strong>{launch.rewardAsset || "None"}</strong></div>
             <div><span>Post-launch mint</span><strong>Disabled</strong></div>
-            <div><span>Manifest</span><strong>Immutable</strong></div>
+            <div><span>Economic manifest</span><strong>Immutable</strong></div>
+            <div><span>Display metadata</span><strong>Editable · rev. 1</strong></div>
           </div>
         </section>
       </div>

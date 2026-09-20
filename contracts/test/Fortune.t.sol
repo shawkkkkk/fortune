@@ -592,8 +592,10 @@ contract FortuneTest is Test {
             MockPancakeV3Factory pancake,
             MockPancakeV3PositionManager manager,
             FortunePermanentLiquidityLocker locker,
-            
+            FortunePancakeV3GraduationAdapter adapter
         ) = _installPancakeGraduation();
+
+        assertTrue(address(adapter) != address(0));
 
         FortuneFactory.LaunchInfo memory info =
             factory.createLaunch(_params(50e18));
@@ -659,8 +661,10 @@ contract FortuneTest is Test {
             MockPancakeV3Factory pancake,
             MockPancakeV3PositionManager manager,
             FortunePermanentLiquidityLocker locker,
-            
+            FortunePancakeV3GraduationAdapter adapter
         ) = _installPancakeGraduation();
+
+        assertTrue(address(adapter) != address(0));
 
         // Silence unused-local warnings while retaining typed setup.
         assertTrue(address(locker) != address(0));

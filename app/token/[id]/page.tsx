@@ -9,7 +9,7 @@ export default async function TokenPage() {
           <h1>Onchain indexer pending.</h1>
           <p>
             The old token page used demo market data and has been removed from the
-            public beta. Tokens created through the beta are real BSC Testnet
+            public alpha. Tokens created through the alpha are real BSC Testnet
             contracts and are linked directly to BscScan from the testnet flow.
           </p>
         </div>

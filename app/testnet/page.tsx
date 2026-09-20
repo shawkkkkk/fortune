@@ -1754,11 +1754,23 @@ export default function PublicTestnetPage() {
         <button
           className="launchButton"
           onClick={() => void createLaunch()}
-          disabled={Boolean(busy) || (mode === "tax" && (!taxReady || allocationTotal !== 100))}
+          disabled={
+            Boolean(busy) ||
+            serviceHealth === "checking" ||
+            serviceHealth === "unavailable" ||
+            (mode === "tax" &&
+              (!taxReady || allocationTotal !== 100))
+          }
         >
           {busy === "launch"
             ? "Creating launch…"
-            : "Create " + (mode === "tax" ? "tax token" : "standard token") + " →"}
+            : serviceHealth === "checking"
+              ? "Checking launch readiness…"
+              : serviceHealth === "unavailable"
+                ? "Launch temporarily unavailable"
+                : "Create " +
+                  (mode === "tax" ? "tax token" : "standard token") +
+                  " →"}
         </button>
       </section>
 

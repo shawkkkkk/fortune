@@ -345,6 +345,67 @@ contract FortuneTest is Test {
         assertGt(out, 0);
     }
 
+    function testDirectQuoteDonationCannotManipulateCurveOrGraduation() public {
+        FortuneFactory.LaunchInfo memory info =
+            factory.createLaunch(
+                _params(100e18)
+            );
+        FortuneCurve curve =
+            FortuneCurve(info.curve);
+
+        uint256 vaultBefore =
+            usdt.balanceOf(
+                info.liquidityVault
+            );
+
+        vm.prank(user);
+        usdt.transfer(
+            address(curve),
+            500e18
+        );
+
+        assertEq(
+            curve.rawReserveBalance(
+                address(usdt)
+            ),
+            500e18
+        );
+        assertEq(
+            curve.reserve(
+                address(usdt)
+            ),
+            0
+        );
+        assertEq(
+            curve.netReserveUsd1e18(),
+            0
+        );
+
+        curve.checkGraduation();
+        assertFalse(
+            curve.graduationReady()
+        );
+
+        uint256 swept =
+            curve.sweepExcessQuote(
+                address(usdt)
+            );
+
+        assertEq(swept, 500e18);
+        assertEq(
+            curve.rawReserveBalance(
+                address(usdt)
+            ),
+            0
+        );
+        assertEq(
+            usdt.balanceOf(
+                info.liquidityVault
+            ),
+            vaultBefore + 500e18
+        );
+    }
+
     function testFuzzBuyPreviewConservesInput(uint96 rawAmount) public {
         uint256 amountIn = bound(
             uint256(rawAmount),

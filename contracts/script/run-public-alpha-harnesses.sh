@@ -68,7 +68,7 @@ deploy_harness() {
 }
 
 STANDARD_HARNESS="$(
-  deploy_harness     "FortuneStandardLifecycleHarness"     "src/test/PublicLifecycleHarnesses.sol:FortuneStandardLifecycleHarness"     "50000000"     "$FORTUNE_FACTORY"     "$FORTUNE_MOCK_QUOTE"     "$FORTUNE_V3_LOCKER"     "$FORTUNE_V3_ADAPTER"     "$PANCAKE_V3_POSITION_MANAGER"
+  deploy_harness     "FortuneStandardLifecycleHarness"     "src/test/PublicLifecycleHarnesses.sol:FortuneStandardLifecycleHarness"     "16000000"     "$FORTUNE_FACTORY"     "$FORTUNE_MOCK_QUOTE"     "$FORTUNE_V3_LOCKER"     "$FORTUNE_V3_ADAPTER"     "$PANCAKE_V3_POSITION_MANAGER"
 )"
 
 STANDARD_TOKEN="$(
@@ -92,7 +92,7 @@ echo "LPPositionTokenId=$STANDARD_LP_TOKEN_ID"
 echo "GraduationAnchorUsd1e18=$STANDARD_ANCHOR"
 
 TAX_HARNESS="$(
-  deploy_harness     "FortuneTaxLifecycleHarness"     "src/test/PublicLifecycleHarnesses.sol:FortuneTaxLifecycleHarness"     "65000000"     "$FORTUNE_TAX_FACTORY"     "$FORTUNE_MOCK_QUOTE"     "$FORTUNE_POOL_REGISTRY"     "$FORTUNE_V2_LOCKER"     "$FORTUNE_V2_TAX_ADAPTER"     "$PANCAKE_V2_ROUTER"
+  deploy_harness     "FortuneTaxLifecycleHarness"     "src/test/PublicLifecycleHarnesses.sol:FortuneTaxLifecycleHarness"     "16000000"     "$FORTUNE_TAX_FACTORY"     "$FORTUNE_MOCK_QUOTE"     "$FORTUNE_POOL_REGISTRY"     "$FORTUNE_V2_LOCKER"     "$FORTUNE_V2_TAX_ADAPTER"     "$PANCAKE_V2_ROUTER"
 )"
 
 TAX_TOKEN="$(

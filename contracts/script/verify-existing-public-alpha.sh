@@ -189,7 +189,7 @@ echo "LPPositionTokenId=$STANDARD_LP_TOKEN_ID"
 echo "GraduationAnchorUsd1e18=$STANDARD_ANCHOR"
 
 send_tx \
-  "Tax-token launch + atomic creator first buy" \
+  "Tax-token launch" \
   "$OPERATOR" \
   "runTaxLaunch()(address,address)" \
   "$MAX_GAS"
@@ -201,6 +201,18 @@ TAX_DIVIDEND_VAULT="$(cast call "$OPERATOR" "taxDividendVault()(address)" --rpc-
 TAX_READY="$(cast call "$OPERATOR" "taxLaunchPassed()(bool)" --rpc-url "$RPC")"
 test "$TAX_READY" = "true" || {
   echo "Tax launch proof flag is false" >&2
+  exit 1
+}
+
+send_tx \
+  "Tax-token creator first buy" \
+  "$OPERATOR" \
+  "runTaxFirstBuy()(uint256)" \
+  "5000000"
+
+TAX_FIRST_BUY="$(cast call "$OPERATOR" "taxFirstBuyPassed()(bool)" --rpc-url "$RPC")"
+test "$TAX_FIRST_BUY" = "true" || {
+  echo "Tax first-buy proof flag is false" >&2
   exit 1
 }
 

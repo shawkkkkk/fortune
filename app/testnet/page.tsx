@@ -36,6 +36,9 @@ const launchParamsComponents = [
   { name: "website", type: "string" },
   { name: "xProfile", type: "string" },
   { name: "telegram", type: "string" },
+  { name: "github", type: "string" },
+  { name: "youtube", type: "string" },
+  { name: "debox", type: "string" },
 ] as const;
 
 const factoryAbi = [
@@ -463,6 +466,9 @@ export default function PublicTestnetPage() {
         website: "",
         xProfile: "",
         telegram: "",
+        github: "",
+        youtube: "",
+        debox: "",
       };
 
       setMessage(

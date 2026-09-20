@@ -1,0 +1,11 @@
+.next
+node_modules
+.env
+.env.local
+coverage
+out
+.DS_Store
+contracts/cache
+contracts/out
+contracts/broadcast
+contracts/lib

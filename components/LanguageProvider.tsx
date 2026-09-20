@@ -1,0 +1,380 @@
+"use client";
+
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+
+type Language = "en" | "zh";
+
+type LanguageContextValue = {
+  language: Language;
+  setLanguage: (language: Language) => void;
+};
+
+const LanguageContext = createContext<LanguageContextValue | null>(null);
+
+const ZH: Record<string, string> = {
+  "Overview": "概览",
+  "Public Testnet": "公开测试网",
+  "API": "开发接口",
+  "Connect wallet": "连接钱包",
+  "Connecting…": "连接中…",
+  "BSC Testnet wallet connected": "BSC 测试网钱包已连接",
+  "Wallet connected · switch to BSC Testnet": "钱包已连接 · 请切换到 BSC 测试网",
+  "Fortune · public BSC Testnet beta": "Fortune · BSC 公开测试版",
+  "Test assets only · no real funds": "仅限测试资产 · 请勿使用真实资金",
+
+  "FORTUNE PUBLIC BSC TESTNET BETA": "FORTUNE BSC 公开测试版",
+  "Launch against anything. Test it for real.": "万物皆可发行。现在真实测试。",
+  "Fortune is now running an onchain public beta on BNB Smart Chain Testnet. Create a real Fortune test token, trade its curve with valueless mock fUSD, and graduate it into a real Pancake V3 testnet pool.": "Fortune 现已在 BNB Smart Chain 测试网上开放公开测试。你可以创建真实的 Fortune 测试代币，用无价值的模拟 fUSD 在曲线上交易，并将代币毕业到真实的 Pancake V3 测试网池。",
+  "Open public testnet →": "进入公开测试网 →",
+  "Developer API": "开发者 API",
+  "Public beta only. The contracts are pre-audit and mainnet remains disabled. Do not use real funds.": "仅限公开测试版。合约尚未完成独立审计，主网仍未开放。请勿使用真实资金。",
+  "RELEASE GATE · PASSED": "发布测试 · 已通过",
+  "39/39 tests": "39/39 项测试",
+  "1,000 fuzz runs": "1,000 次模糊测试",
+  "7,500/7,500 requests": "7,500/7,500 次请求",
+  "3 real graduations": "3 次真实毕业",
+  "Peak measured throughput": "实测峰值吞吐量",
+  "500-concurrent p95": "500 并发 p95",
+  "Release p95 limit": "发布 p95 上限",
+  "Post-storm invariants": "压力测试后不变量",
+  "16/16 passed": "16/16 通过",
+  "WHAT IS LIVE": "当前已上线",
+  "One narrow, real beta path.": "一条精简但真实的测试路径。",
+  "Create": "创建",
+  "Create an actual Fortune token through the deployed BSC Testnet factory. Every Fortune token is CREATE2-deployed with the required 0xfe suffix.": "通过已部署的 BSC 测试网工厂创建真实的 Fortune 测试代币。每个 Fortune 代币都通过 CREATE2 部署，并带有规定的 0xfe 地址后缀。",
+  "Wallet-signed": "钱包签名",
+  "Trade": "交易",
+  "Mint valueless mock fUSD, approve the new curve, and make an onchain test purchase against Fortune's canonical curve.": "铸造无价值的模拟 fUSD，授权新曲线，然后在 Fortune 的标准曲线上进行链上测试买入。",
+  "Real testnet txs": "真实测试网交易",
+  "Graduate": "毕业",
+  "Permissionlessly finalize the launch into Pancake V3 testnet and permanently custody the resulting LP-position NFT in the Fortune locker.": "无需许可即可将发行毕业到 Pancake V3 测试网，并把生成的 LP 仓位 NFT 永久锁入 Fortune 锁仓合约。",
+  "Pancake V3": "Pancake V3",
+  "PUBLIC BETA DEPLOYMENT": "公开测试版部署",
+  "Verify the contracts yourself.": "你可以自行验证所有合约。",
+  "Factory on BscScan ↗": "在 BscScan 查看工厂 ↗",
+  "Fortune Factory": "Fortune 工厂",
+  "Asset Registry": "资产注册表",
+  "Graduation adapter": "毕业适配器",
+  "Permanent LP locker": "永久 LP 锁仓",
+  "Mock fUSD": "模拟 fUSD",
+  "Reference Pancake pool": "参考 Pancake 池",
+  "BETA SCOPE": "测试版范围",
+  "No fake markets or fake volume.": "不展示虚假市场或虚假交易量。",
+  "Real testnet contracts": "真实测试网合约",
+  "Real wallet signatures": "真实钱包签名",
+  "Real Pancake V3 testnet": "真实 Pancake V3 测试网",
+  "Valueless test assets": "无价值测试资产",
+  "Indexer/social features coming later": "索引器和社交功能稍后上线",
+
+  "Try Fortune onchain.": "在链上体验 Fortune。",
+  "Create a real Fortune testnet launch, trade its Basket Curve with free mock fUSD, and graduate it into a real Pancake V3 testnet pool. Test assets have no financial value.": "创建真实的 Fortune 测试网发行，用免费的模拟 fUSD 在篮子曲线上交易，并毕业到真实的 Pancake V3 测试网池。测试资产没有金融价值。",
+  "Get tBNB gas ↗": "获取 tBNB Gas ↗",
+  "TESTNET ONLY": "仅限测试网",
+  "Chain 97 · never use real BNB or a wallet holding valuable assets. The fUSD faucet below mints a Fortune-owned mock token solely for testing.": "链 ID 97 · 不要使用真实 BNB，也不要使用持有有价值资产的钱包。下面的 fUSD 水龙头只会铸造 Fortune 的测试代币。",
+  "Wallet + test funds": "钱包 + 测试资金",
+  "tBNB pays gas. fUSD is the free quote asset used by this beta deployment.": "tBNB 用于支付 Gas。fUSD 是此测试版使用的免费计价资产。",
+  "Network": "网络",
+  "BSC Testnet · 97": "BSC 测试网 · 97",
+  "Wallet": "钱包",
+  "Not connected": "未连接",
+  "fUSD balance": "fUSD 余额",
+  "Connect / switch testnet": "连接 / 切换测试网",
+  "Faucet 250 fUSD": "领取 250 fUSD",
+  "Minting…": "铸造中…",
+  "Create a launch": "创建发行",
+  "The public beta uses the proven single-asset fUSD path and the live Fortune factory.": "公开测试版使用已验证的单资产 fUSD 路径和真实 Fortune 工厂。",
+  "Token name": "代币名称",
+  "Ticker": "代码",
+  "Description": "简介",
+  "Create testnet launch →": "创建测试网发行 →",
+  "Creating launch…": "创建中…",
+  "03 · CURVE → PANCAKE": "03 · 曲线 → PANCAKE",
+  "Complete the testnet lifecycle": "完成完整测试网流程",
+  "Launch transaction ↗": "发行交易 ↗",
+  "Token": "代币",
+  "Curve": "曲线",
+  "Graduation target": "毕业目标",
+  "$1 mock USD": "1 美元模拟价值",
+  "Pancake fee tier": "Pancake 费率档",
+  "Approve + buy 250 fUSD": "授权并买入 250 fUSD",
+  "Buying…": "买入中…",
+  "Finalize Pancake graduation": "完成 Pancake 毕业",
+  "Graduating…": "毕业中…",
+  "Create a launch to unlock the lifecycle test.": "先创建发行，才能进行完整流程测试。",
+  "You will receive the real testnet token and curve addresses after the LaunchCreated event confirms.": "LaunchCreated 事件确认后，你会获得真实的测试网代币地址和曲线地址。",
+  "TRANSACTION STATUS": "交易状态",
+  "PUBLIC BETA CONTRACTS": "公开测试版合约",
+  "Verify everything yourself": "自行验证全部内容",
+  "Pancake graduation adapter": "Pancake 毕业适配器",
+
+  "Connect a testnet wallet to begin.": "连接测试网钱包以开始。",
+  "Wallet connected to BSC Testnet. Get tBNB for gas, then use the free fUSD test faucet below.": "钱包已连接到 BSC 测试网。先获取 tBNB 支付 Gas，再使用下方免费的 fUSD 测试水龙头。",
+  "Wallet connection failed.": "钱包连接失败。",
+  "250 fUSD test tokens minted to your wallet.": "已向你的钱包铸造 250 fUSD 测试代币。",
+  "fUSD faucet transaction failed.": "fUSD 水龙头交易失败。",
+  "Token name must be 1–64 characters.": "代币名称必须为 1–64 个字符。",
+  "Ticker must be 1–16 characters.": "代币代码必须为 1–16 个字符。",
+  "Finding your deterministic 0xfe token address…": "正在寻找确定性的 0xfe 代币地址…",
+  "Confirm the Fortune launch transaction in your wallet.": "请在钱包中确认 Fortune 发行交易。",
+  "Launch transaction confirmed, but the LaunchCreated event could not be decoded. Check the transaction in BscScan.": "发行交易已确认，但无法解析 LaunchCreated 事件。请在 BscScan 中查看交易。",
+  "Launch created. Faucet fUSD if needed, then buy on the curve to drive it to graduation.": "发行已创建。如有需要先领取 fUSD，然后在曲线上买入以推动毕业。",
+  "Approve 250 fUSD for this curve in your wallet.": "请在钱包中为此曲线授权 250 fUSD。",
+  "Approval confirmed. Confirm the curve buy.": "授权已确认。请确认曲线买入交易。",
+  "Curve reached GraduationReady. You can now finalize its Pancake V3 graduation.": "曲线已达到 GraduationReady。现在可以完成 Pancake V3 毕业。",
+  "Buy confirmed. This curve has not reached GraduationReady yet.": "买入已确认。此曲线尚未达到 GraduationReady。",
+  "Curve buy failed.": "曲线买入失败。",
+  "Graduation preflight is not ready yet. The launch remains retryable.": "毕业预检查尚未通过。发行仍可稍后重试。",
+  "Confirm the permissionless graduation transaction.": "请确认无需许可的毕业交易。",
+  "Transaction confirmed but the curve did not reach PoolCreated. It can be retried.": "交易已确认，但曲线未达到 PoolCreated。可以重试。",
+  "Graduation complete: Pancake V3 pool created and the LP-position NFT is permanently locked.": "毕业完成：Pancake V3 池已创建，LP 仓位 NFT 已永久锁定。",
+  "Graduation failed.": "毕业失败。",
+  "No injected EVM wallet found. Install MetaMask or another BSC-compatible wallet.": "未检测到 EVM 钱包。请安装 MetaMask 或其他兼容 BSC 的钱包。",
+  "Wallet did not return an account.": "钱包未返回账户。",
+
+  "VERIFIED RELEASE EVIDENCE": "已验证的发布证据",
+  "Testnet performance": "测试网性能",
+  "These are release-test results, not invented live market metrics. A public onchain indexer is not enabled yet.": "这些是发布测试的真实结果，不是虚构的实时市场数据。公开链上索引器尚未启用。",
+  "HTTP requests": "HTTP 请求",
+  "7,500 successful": "7,500 次全部成功",
+  "Peak concurrency": "峰值并发",
+  "5,000-request stage": "5,000 请求阶段",
+  "Peak throughput": "峰值吞吐量",
+  "Measured in release storm": "来自发布压力测试",
+  "Real graduations": "真实毕业",
+  "While web load was active": "与网页压力测试同时进行",
+  "CONTRACT VERIFICATION": "合约验证",
+  "Foundry suite": "Foundry 测试套件",
+  "Fuzz runs": "模糊测试次数",
+  "Pre-storm graduation checks": "压力测试前毕业检查",
+  "Post-storm graduation checks": "压力测试后毕业检查",
+  "LOAD STAGES": "负载阶段",
+  "Success floor": "成功率",
+  "100% observed": "实测 100%",
+  "Live volume, market cap, creator counts, rewards and revenue are intentionally not displayed until Fortune has an onchain indexer that can reproduce them from public events.": "在 Fortune 上线可从公开事件复现数据的链上索引器之前，我们不会显示实时交易量、市值、创建者数量、奖励或收入。",
+
+  "FORTUNE FORUM": "FORTUNE 社区",
+  "Not live yet.": "尚未上线。",
+  "The earlier forum feed was a product mockup. It has been removed from the public beta so nobody mistakes generated posts, votes, or activity for real users.": "之前的社区内容只是产品模型，现已从公开测试版移除，避免任何人把生成的帖子、投票或活动误认为真实用户数据。",
+  "Test Fortune onchain →": "链上测试 Fortune →",
+  "Community features come after the onchain beta.": "社区功能将在链上测试版之后上线。",
+  "The first public release is intentionally focused on real wallet, curve, graduation, Pancake V3, and LP-lock behavior.": "首个公开版本专注于真实的钱包、曲线、毕业、Pancake V3 和 LP 锁仓功能。",
+
+  "PROTOCOL OPERATIONS": "协议运行状态",
+  "Automation state": "自动化状态",
+  "Only behavior that exists in deployed contracts is shown here.": "这里仅展示已部署合约中真实存在的行为。",
+  "PUBLIC BETA": "公开测试版",
+  "What actually runs today": "当前真实运行的功能",
+  "No fake dollar totals": "不展示虚假金额",
+  "Permanent LP custody": "永久 LP 托管",
+  "Permissionless graduation": "无需许可的毕业",
+  "Retryable failure path": "可重试失败路径",
+  "Seven-day reserve rescue": "七天储备救援",
+  "Public automation activity index": "公开自动化活动索引",
+  "Live": "已上线",
+  "Pending": "待上线",
+
+  "PORTFOLIO": "资产组合",
+  "Indexer pending.": "索引器待上线。",
+  "Fortune does not yet have a public portfolio indexer, so the beta does not pretend to know your holdings, rewards, or creator earnings.": "Fortune 目前还没有公开资产组合索引器，因此测试版不会假装知道你的持仓、奖励或创建者收入。",
+  "Your wallet remains the source of truth.": "你的钱包仍是最终数据来源。",
+  "For now, use the public testnet page and BscScan links to inspect the test tokens and transactions you create. Portfolio aggregation will return when it is backed by real indexed chain data.": "目前请通过公开测试网页面和 BscScan 链接查看你创建的测试代币与交易。等真实链上索引数据就绪后，资产组合功能会重新上线。",
+
+  "FORTUNE PUBLIC TESTNET REGISTRY": "FORTUNE 公开测试网资产注册表",
+  "One approved beta quote asset.": "当前只有一个已批准的测试计价资产。",
+  "The public beta does not expose the old mainnet asset catalog as if it were launchable on testnet. Only Fortune's valueless mock fUSD is enabled in the current beta path.": "公开测试版不会把旧的主网资产目录伪装成可在测试网上使用。当前测试路径只启用 Fortune 的无价值模拟 fUSD。",
+  "Use fUSD on testnet →": "在测试网使用 fUSD →",
+  "TESTNET REGISTRY": "测试网注册表",
+  "Real-value BSC assets are not enabled for this public beta.": "此公开测试版未启用具有真实价值的 BSC 资产。",
+  "Asset": "资产",
+  "Capabilities": "功能",
+  "Status": "状态",
+  "quote": "计价",
+  "reward": "奖励",
+  "graduation": "毕业",
+  "Live test contract ↗": "查看真实测试合约 ↗",
+
+  "TOKEN MARKET PAGE": "代币市场页面",
+  "Onchain indexer pending.": "链上索引器待上线。",
+  "The old token page used demo market data and has been removed from the public beta. Tokens created through the beta are real BSC Testnet contracts and are linked directly to BscScan from the testnet flow.": "旧代币页面使用演示市场数据，现已从公开测试版移除。通过测试版创建的代币是真实 BSC 测试网合约，可从测试流程直接打开 BscScan。",
+  "Create a real test launch →": "创建真实测试发行 →",
+  "No synthetic chart or market-cap data.": "不展示模拟图表或市值数据。",
+  "Token pages will return once curve events, graduation events and Pancake V3 swaps are indexed into a reproducible canonical chart.": "当曲线事件、毕业事件和 Pancake V3 交易被索引为可复现的标准图表后，代币页面会重新上线。",
+
+  "FORTUNE PUBLIC API · BETA": "FORTUNE 公共 API · 测试版",
+  "Real data or no data.": "只展示真实数据，否则不展示。",
+  "Readiness and protocol configuration come from the deployed BSC Testnet stack. Indexed market endpoints deliberately return no synthetic activity until the event indexer is live.": "就绪状态和协议配置来自已部署的 BSC 测试网。市场索引接口在事件索引器上线前不会返回任何模拟活动数据。",
+  "Open public testnet →": "进入公开测试网 →",
+  "NON-CUSTODIAL": "非托管",
+  "Wallets authorize writes.": "写入操作由钱包授权。",
+  "The dedicated testnet UI signs transactions in the user's wallet. Private keys never touch Fortune servers.": "专用测试网界面会在用户钱包中签署交易。私钥绝不会进入 Fortune 服务器。",
+  "Preview": "预览",
+  "Wallet signs": "钱包签名",
+  "Chain confirms": "链上确认",
+  "HONEST BETA ENDPOINTS": "真实测试版接口",
+  "Public API": "公共 API",
+  "OpenAPI JSON": "OpenAPI JSON",
+  "QUICKSTART": "快速开始",
+  "Check the live deployment.": "检查实时部署。",
+  "INDEXER BOUNDARY": "索引器边界",
+  "No fake market feed.": "不提供虚假市场数据。",
+  "Token discovery, charts, volume, revenue, portfolio aggregation and social activity remain unavailable until they are reproducible from public onchain events. This is intentional.": "代币发现、图表、交易量、收入、资产组合聚合和社交活动会保持关闭，直到它们能从公开链上事件中可靠复现。这是有意的设计。",
+};
+
+function translateText(input: string) {
+  const leading = input.match(/^\s*/)?.[0] || "";
+  const trailing = input.match(/\s*$/)?.[0] || "";
+  const normalized = input.trim().replace(/\s+/g, " ");
+
+  if (!normalized) return input;
+
+  const exact = ZH[normalized];
+  if (exact) return leading + exact + trailing;
+
+  let output = normalized;
+  const replacements = Object.entries(ZH)
+    .filter(([key]) => key.length >= 12 && output.includes(key))
+    .sort((a, b) => b[0].length - a[0].length);
+
+  for (const [english, chinese] of replacements) {
+    output = output.replaceAll(english, chinese);
+  }
+
+  return leading + output + trailing;
+}
+
+export function LanguageProvider({ children }: { children: ReactNode }) {
+  const [language, setLanguageState] = useState<Language>("en");
+  const originals = useRef(new WeakMap<Text, string>());
+  const attributeOriginals = useRef(
+    new WeakMap<Element, Map<string, string>>()
+  );
+  const applying = useRef(false);
+
+  const setLanguage = useCallback((next: Language) => {
+    setLanguageState(next);
+    try {
+      window.localStorage.setItem("fortune-language", next);
+    } catch {
+      // Storage is optional.
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem("fortune-language");
+      if (stored === "zh" || stored === "en") {
+        setLanguageState(stored);
+      }
+    } catch {
+      // English remains the default.
+    }
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.lang = language === "zh" ? "zh-CN" : "en";
+
+    const translateNode = (node: Node) => {
+      if (node.nodeType === Node.TEXT_NODE) {
+        const text = node as Text;
+        const current = text.nodeValue || "";
+
+        if (!originals.current.has(text)) {
+          originals.current.set(text, current);
+        }
+
+        const original = originals.current.get(text) || current;
+        const next = language === "zh" ? translateText(original) : original;
+
+        if (text.nodeValue !== next) {
+          text.nodeValue = next;
+        }
+        return;
+      }
+
+      if (!(node instanceof Element)) return;
+
+      for (const attr of ["placeholder", "title", "aria-label"]) {
+        const current = node.getAttribute(attr);
+        if (!current) continue;
+
+        let map = attributeOriginals.current.get(node);
+        if (!map) {
+          map = new Map<string, string>();
+          attributeOriginals.current.set(node, map);
+        }
+        if (!map.has(attr)) map.set(attr, current);
+
+        const original = map.get(attr) || current;
+        const next = language === "zh" ? translateText(original) : original;
+        if (current !== next) node.setAttribute(attr, next);
+      }
+
+      node.childNodes.forEach(translateNode);
+    };
+
+    const apply = () => {
+      applying.current = true;
+      translateNode(document.body);
+      applying.current = false;
+    };
+
+    apply();
+
+    const observer = new MutationObserver((mutations) => {
+      if (applying.current) return;
+
+      applying.current = true;
+      for (const mutation of mutations) {
+        if (mutation.type === "characterData") {
+          const text = mutation.target as Text;
+          originals.current.set(text, text.nodeValue || "");
+          translateNode(text);
+        }
+
+        mutation.addedNodes.forEach((node) => {
+          if (node.nodeType === Node.TEXT_NODE) {
+            originals.current.set(node as Text, node.nodeValue || "");
+          }
+          translateNode(node);
+        });
+      }
+      applying.current = false;
+    });
+
+    observer.observe(document.body, {
+      subtree: true,
+      childList: true,
+      characterData: true,
+    });
+
+    return () => observer.disconnect();
+  }, [language]);
+
+  const value = useMemo(
+    () => ({ language, setLanguage }),
+    [language, setLanguage]
+  );
+
+  return (
+    <LanguageContext.Provider value={value}>
+      {children}
+    </LanguageContext.Provider>
+  );
+}
+
+export function useLanguage() {
+  const value = useContext(LanguageContext);
+  if (!value) {
+    throw new Error("useLanguage must be used inside LanguageProvider");
+  }
+  return value;
+}

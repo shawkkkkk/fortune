@@ -83,10 +83,59 @@ jobs:
           MAX_PRICE_DEVIATION_BPS: "100"
         run: node scripts/verify-graduation-state.mjs
 
+      - name: Select fork-capable BSC testnet RPC
+        run: |
+          CANDIDATES=(
+            "$UPSTREAM_BSC_TESTNET_RPC_URL"
+            "https://data-seed-prebsc-1-s1.bnbchain.org:8545"
+            "https://data-seed-prebsc-2-s1.bnbchain.org:8545"
+            "https://data-seed-prebsc-1-s2.bnbchain.org:8545"
+            "https://data-seed-prebsc-2-s2.bnbchain.org:8545"
+            "https://data-seed-prebsc-1-s3.bnbchain.org:8545"
+            "https://data-seed-prebsc-2-s3.bnbchain.org:8545"
+          )
+
+          SELECTED=""
+          INDEX=0
+          for candidate in "${CANDIDATES[@]}"; do
+            INDEX=$((INDEX + 1))
+            LATEST=$(cast block-number --rpc-url "$candidate" 2>/dev/null || true)
+            case "$LATEST" in
+              ''|*[!0-9]*) continue ;;
+            esac
+
+            if [ "$LATEST" -le 2000 ]; then
+              continue
+            fi
+
+            PROBE_BLOCK=$((LATEST - 2000))
+            CODE=$(cast code "$PANCAKE_V3_FACTORY" --block "$PROBE_BLOCK" --rpc-url "$candidate" 2>/dev/null || true)
+
+            if [ -n "$CODE" ] && [ "$CODE" != "0x" ] && [ "$CODE" != "0x0" ]; then
+              SELECTED="$candidate"
+              echo "Selected fork-capable BSC testnet RPC candidate $INDEX after historical-state probe."
+              break
+            fi
+          done
+
+          test -n "$SELECTED" || (echo "No BSC testnet RPC candidate could serve recent historical state required for Anvil forking." && exit 1)
+          echo "::add-mask::$SELECTED"
+          echo "FORK_RPC_URL=$SELECTED" >> "$GITHUB_ENV"
+
+      - name: Install Solidity libraries
+        working-directory: contracts
+        run: |
+          forge install OpenZeppelin/openzeppelin-contracts@v5.1.0 --no-commit
+          forge install foundry-rs/forge-std --no-commit
+
+      - name: Run contract suite before storm
+        working-directory: contracts
+        run: forge test --fuzz-runs 1000 -vvv
+
       - name: Start isolated BSC testnet fork
         run: |
           anvil \
-            --fork-url "$UPSTREAM_BSC_TESTNET_RPC_URL" \
+            --fork-url "$FORK_RPC_URL" \
             --chain-id 97 \
             --host 127.0.0.1 \
             --port 8545 \
@@ -127,6 +176,12 @@ jobs:
           cast rpc --rpc-url "$LOCAL_RPC_URL" anvil_setCode "$CREATE2_DEPLOYER" "$CREATE2_RUNTIME" >/dev/null
           cast rpc --rpc-url "$LOCAL_RPC_URL" anvil_setNonce "$CREATE2_DEPLOYER" 0x1 >/dev/null
 
+          # Forge deploys the script itself at this deterministic in-memory address.
+          # Localize it in Anvil so the fork never asks the upstream node for it.
+          FORGE_SCRIPT_ACCOUNT=0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519
+          cast rpc --rpc-url "$LOCAL_RPC_URL" anvil_setBalance "$FORGE_SCRIPT_ACCOUNT" 0x1 >/dev/null
+          cast rpc --rpc-url "$LOCAL_RPC_URL" anvil_setNonce "$FORGE_SCRIPT_ACCOUNT" 0x0 >/dev/null
+
           echo "::add-mask::$LOCAL_KEY"
           {
             echo "PRIVATE_KEY=$LOCAL_KEY"
@@ -137,16 +192,6 @@ jobs:
 
           test "$(cast code "$PANCAKE_V3_FACTORY" --rpc-url "$LOCAL_RPC_URL")" != "0x"
           test "$(cast code "$PANCAKE_V3_POSITION_MANAGER" --rpc-url "$LOCAL_RPC_URL")" != "0x"
-
-      - name: Install Solidity libraries
-        working-directory: contracts
-        run: |
-          forge install OpenZeppelin/openzeppelin-contracts@v5.1.0 --no-commit
-          forge install foundry-rs/forge-std --no-commit
-
-      - name: Run contract suite before storm
-        working-directory: contracts
-        run: forge test --fuzz-runs 1000 -vvv
 
       - name: Seed a fresh graduated Fortune launch on the fork
         working-directory: contracts

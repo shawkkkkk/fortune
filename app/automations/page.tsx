@@ -22,7 +22,7 @@ export default function AutomationsPage() {
 
       <section className="panel">
         <div className="panelTitle">
-          <div><span className="eyebrow">PUBLIC BETA</span><h2>What actually runs today</h2></div>
+          <div><span className="eyebrow">PUBLIC ALPHA</span><h2>What actually runs today</h2></div>
           <span>No fake dollar totals</span>
         </div>
         <div className="manifestTable">

@@ -197,6 +197,21 @@ contract FortuneTest is Test {
         assertEq(reason, bytes32("STALE_PRICE"));
     }
 
+    function testLaunchPreflightRejectsSupplyThatCannotFundCurveAndLp() public {
+        FortuneFactory.LaunchParams memory p =
+            _params(1_000e18);
+        p.totalSupply = 1e18;
+
+        (bool ready, bytes32 reason) =
+            factory.preflightLaunch(p);
+
+        assertFalse(ready);
+        assertEq(
+            reason,
+            bytes32("SUPPLY_TOO_SMALL")
+        );
+    }
+
     function testLaunchPreflightRejectsDuplicateQuoteAssets() public {
         FortuneFactory.LaunchParams memory p = _params(1_000e18);
         p.quoteAssets[1] = p.quoteAssets[0];
@@ -771,6 +786,79 @@ contract FortuneTest is Test {
         assertEq(usdt.balanceOf(user), userBefore + reserveBefore);
         assertEq(usdt.balanceOf(address(curve)), 0);
         assertEq(curve.rescueRedeemed(), redeemAmount);
+    }
+
+    function testGraduationSnapshotDoesNotMoveWhenOracleMovesLater() public {
+        FortuneFactory.LaunchInfo memory info =
+            factory.createLaunch(
+                _params(1_000e18)
+            );
+        FortuneCurve curve =
+            FortuneCurve(info.curve);
+
+        vm.warp(block.timestamp + 16);
+
+        vm.startPrank(user);
+        wbnb.approve(
+            address(curve),
+            type(uint256).max
+        );
+        usdt.approve(
+            address(curve),
+            type(uint256).max
+        );
+
+        curve.buy(
+            address(wbnb),
+            5e17,
+            1
+        );
+        curve.buy(
+            address(usdt),
+            800e18,
+            1
+        );
+        vm.stopPrank();
+
+        assertTrue(
+            curve.graduationReady()
+        );
+
+        uint16[] memory beforeWeights =
+            curve.graduationWeights();
+        uint256 beforeLp =
+            curve.requiredLaunchTokensForGraduation();
+        uint256 beforeReserveUsd =
+            curve.graduationReserveUsd1e18();
+
+        oracle.setPrice(
+            address(wbnb),
+            1_200e18
+        );
+        oracle.setPrice(
+            address(usdt),
+            9e17
+        );
+
+        uint16[] memory afterWeights =
+            curve.graduationWeights();
+
+        assertEq(
+            afterWeights[0],
+            beforeWeights[0]
+        );
+        assertEq(
+            afterWeights[1],
+            beforeWeights[1]
+        );
+        assertEq(
+            curve.requiredLaunchTokensForGraduation(),
+            beforeLp
+        );
+        assertEq(
+            curve.graduationReserveUsd1e18(),
+            beforeReserveUsd
+        );
     }
 
     function testGraduationAnchorLocksCurvePriceOnce() public {

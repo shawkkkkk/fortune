@@ -362,6 +362,408 @@ function short(value: string) {
   return value.slice(0, 8) + "…" + value.slice(-6);
 }
 
+function parseTokenAmount(label: string, value: string, decimals: number) {
+  const clean = value.trim() || "0";
+  const pattern = new RegExp(`^\\d+(?:\\.\\d{1,${decimals}})?"use client";
+
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import {
+  createPublicClient,
+  createWalletClient,
+  custom,
+  decodeEventLog,
+  defineChain,
+  isAddress,
+  parseUnits,
+  type Address,
+  type EIP1193Provider,
+  type Hex,
+} from "viem";
+import {
+  FORTUNE_NETWORK,
+  FORTUNE_NETWORK_CONFIGURED,
+  FORTUNE_TAX_NETWORK_CONFIGURED,
+} from "@/lib/fortune-network";
+import FortuneLogo from "@/components/FortuneLogo";
+
+type LaunchMode = "standard" | "tax";
+
+type LaunchAsset = {
+  address: Address;
+  name: string;
+  symbol: string;
+  decimals: number;
+  category: string;
+  healthy: boolean;
+  launchable: boolean;
+};
+
+type LaunchReceipt = {
+  mode: LaunchMode;
+  token: Address;
+  curve: Address;
+  transactionHash: Hex;
+};
+
+const standardParams = [
+  { name: "name", type: "string" },
+  { name: "symbol", type: "string" },
+  { name: "totalSupply", type: "uint256" },
+  { name: "quoteAssets", type: "address[]" },
+  { name: "weightsBps", type: "uint16[]" },
+  { name: "primaryQuote", type: "address" },
+  { name: "basePriceUsd1e18", type: "uint256" },
+  { name: "slopeUsd1e18", type: "uint256" },
+  { name: "graduationUsd1e18", type: "uint256" },
+  { name: "adaptiveGraduation", type: "bool" },
+  { name: "feeBps", type: "uint16[6]" },
+  { name: "treasury", type: "address" },
+  { name: "metadataEditable", type: "bool" },
+  { name: "description", type: "string" },
+  { name: "imageURI", type: "string" },
+  { name: "website", type: "string" },
+  { name: "xProfile", type: "string" },
+  { name: "telegram", type: "string" },
+  { name: "github", type: "string" },
+  { name: "youtube", type: "string" },
+  { name: "debox", type: "string" },
+] as const;
+
+const taxParams = [
+  { name: "name", type: "string" },
+  { name: "symbol", type: "string" },
+  { name: "totalSupply", type: "uint256" },
+  { name: "quoteAsset", type: "address" },
+  { name: "basePriceUsd1e18", type: "uint256" },
+  { name: "slopeUsd1e18", type: "uint256" },
+  { name: "graduationUsd1e18", type: "uint256" },
+  { name: "feeBps", type: "uint16[6]" },
+  { name: "treasury", type: "address" },
+  { name: "buyTaxBps", type: "uint16" },
+  { name: "sellTaxBps", type: "uint16" },
+  { name: "antiFarmerDuration", type: "uint32" },
+  { name: "minimumDividendBalance", type: "uint256" },
+  { name: "taxAllocationBps", type: "uint16[7]" },
+  { name: "description", type: "string" },
+  { name: "imageURI", type: "string" },
+  { name: "website", type: "string" },
+  { name: "xProfile", type: "string" },
+  { name: "telegram", type: "string" },
+  { name: "github", type: "string" },
+  { name: "youtube", type: "string" },
+  { name: "debox", type: "string" },
+] as const;
+
+const standardFactoryAbi = [
+  {
+    type: "function",
+    name: "preflightLaunch",
+    stateMutability: "view",
+    inputs: [{ name: "p", type: "tuple", components: standardParams }],
+    outputs: [
+      { name: "ready", type: "bool" },
+      { name: "reasonCode", type: "bytes32" },
+    ],
+  },
+  {
+    type: "function",
+    name: "previewPreparedVanity",
+    stateMutability: "view",
+    inputs: [
+      { name: "creator", type: "address" },
+      { name: "p", type: "tuple", components: standardParams },
+    ],
+    outputs: [
+      { name: "vanitySalt", type: "bytes32" },
+      { name: "predictedToken", type: "address" },
+      { name: "manifestHash", type: "bytes32" },
+      { name: "launchNonce", type: "uint256" },
+    ],
+  },
+  {
+    type: "function",
+    name: "createLaunchPrepared",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "p", type: "tuple", components: standardParams },
+      { name: "vanitySalt", type: "bytes32" },
+    ],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "createLaunchPreparedAndBuy",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "p", type: "tuple", components: standardParams },
+      { name: "vanitySalt", type: "bytes32" },
+      { name: "amountIn", type: "uint256" },
+      { name: "minTokensOut", type: "uint256" },
+    ],
+    outputs: [],
+  },
+  {
+    type: "event",
+    name: "LaunchCreated",
+    inputs: [
+      { name: "launchId", type: "uint256", indexed: true },
+      { name: "creator", type: "address", indexed: true },
+      { name: "token", type: "address", indexed: true },
+      { name: "curve", type: "address", indexed: false },
+      { name: "manifestHash", type: "bytes32", indexed: false },
+    ],
+  },
+] as const;
+
+const taxFactoryAbi = [
+  {
+    type: "function",
+    name: "preflightLaunch",
+    stateMutability: "view",
+    inputs: [{ name: "p", type: "tuple", components: taxParams }],
+    outputs: [
+      { name: "ready", type: "bool" },
+      { name: "reasonCode", type: "bytes32" },
+    ],
+  },
+  {
+    type: "function",
+    name: "previewPreparedVanity",
+    stateMutability: "view",
+    inputs: [
+      { name: "creator", type: "address" },
+      { name: "p", type: "tuple", components: taxParams },
+    ],
+    outputs: [
+      { name: "vanitySalt", type: "bytes32" },
+      { name: "predictedToken", type: "address" },
+      { name: "manifestHash", type: "bytes32" },
+      { name: "launchNonce", type: "uint256" },
+    ],
+  },
+  {
+    type: "function",
+    name: "createLaunchPrepared",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "p", type: "tuple", components: taxParams },
+      { name: "vanitySalt", type: "bytes32" },
+    ],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "createLaunchPreparedAndBuy",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "p", type: "tuple", components: taxParams },
+      { name: "vanitySalt", type: "bytes32" },
+      { name: "amountIn", type: "uint256" },
+      { name: "minTokensOut", type: "uint256" },
+    ],
+    outputs: [],
+  },
+  {
+    type: "event",
+    name: "TaxLaunchCreated",
+    inputs: [
+      { name: "launchId", type: "uint256", indexed: true },
+      { name: "creator", type: "address", indexed: true },
+      { name: "token", type: "address", indexed: true },
+      { name: "curve", type: "address", indexed: false },
+      { name: "quoteAsset", type: "address", indexed: false },
+      { name: "taxProcessor", type: "address", indexed: false },
+      { name: "dividendVault", type: "address", indexed: false },
+      { name: "manifestHash", type: "bytes32", indexed: false },
+    ],
+  },
+] as const;
+
+const curveBuyAbi = [
+  {
+    type: "function",
+    name: "buy",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "quoteAsset", type: "address" },
+      { name: "amountIn", type: "uint256" },
+      { name: "minTokensOut", type: "uint256" },
+    ],
+    outputs: [{ name: "tokensOut", type: "uint256" }],
+  },
+] as const;
+
+const erc20Abi = [
+  {
+    type: "function",
+    name: "approve",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "spender", type: "address" },
+      { name: "amount", type: "uint256" },
+    ],
+    outputs: [{ type: "bool" }],
+  },
+] as const;
+
+const chain = defineChain({
+  id: FORTUNE_NETWORK.chainId,
+  name: FORTUNE_NETWORK.chainName,
+  nativeCurrency: {
+    name: FORTUNE_NETWORK.nativeSymbol,
+    symbol: FORTUNE_NETWORK.nativeSymbol,
+    decimals: 18,
+  },
+  rpcUrls: {
+    default: { http: [FORTUNE_NETWORK.publicRpcUrl] },
+  },
+  blockExplorers: {
+    default: {
+      name: "BscScan",
+      url: FORTUNE_NETWORK.explorerUrl,
+    },
+  },
+  testnet: !FORTUNE_NETWORK.isMainnet,
+});
+
+const allocationLabels = [
+  "Creator",
+  "Direct burn",
+  "Holder dividends",
+  "Buyback + burn",
+  "Liquidity",
+  "Community treasury",
+  "Protocol",
+] as const;
+
+function provider() {
+  const injected = (
+    window as Window & { ethereum?: EIP1193Provider }
+  ).ethereum;
+
+  if (!injected) {
+    throw new Error(
+      "No EVM wallet found. Install MetaMask or another BNB Chain compatible wallet."
+    );
+  }
+
+  return injected;
+}
+
+async function connectNetwork() {
+  const ethereum = provider();
+  const accounts = (await ethereum.request({
+    method: "eth_requestAccounts",
+  })) as Address[];
+
+  if (!accounts?.[0]) {
+    throw new Error("Wallet did not return an account.");
+  }
+
+  try {
+    await ethereum.request({
+      method: "wallet_switchEthereumChain",
+      params: [{ chainId: FORTUNE_NETWORK.chainHex }],
+    });
+  } catch (error) {
+    const code =
+      typeof error === "object" &&
+      error &&
+      "code" in error
+        ? Number((error as { code?: number }).code)
+        : 0;
+
+    if (code !== 4902) throw error;
+
+    await ethereum.request({
+      method: "wallet_addEthereumChain",
+      params: [
+        {
+          chainId: FORTUNE_NETWORK.chainHex,
+          chainName: FORTUNE_NETWORK.chainName,
+          nativeCurrency: {
+            name: FORTUNE_NETWORK.nativeSymbol,
+            symbol: FORTUNE_NETWORK.nativeSymbol,
+            decimals: 18,
+          },
+          rpcUrls: [FORTUNE_NETWORK.publicRpcUrl],
+          blockExplorerUrls: [FORTUNE_NETWORK.explorerUrl],
+        },
+      ],
+    });
+  }
+
+  return accounts[0];
+}
+
+function clients(account: Address) {
+  const transport = custom(provider());
+
+  return {
+    publicClient: createPublicClient({ chain, transport }),
+    walletClient: createWalletClient({
+      account,
+      chain,
+      transport,
+    }),
+  };
+}
+
+function decodeReason(value: Hex) {
+  try {
+    const raw = value.slice(2);
+    const bytes = raw.match(/.{2}/g) || [];
+    return bytes
+      .map((byte) => String.fromCharCode(parseInt(byte, 16)))
+      .join("")
+      .replace(/\0/g, "")
+      .trim();
+  } catch {
+    return value;
+  }
+}
+
+);
+  if (!pattern.test(clean)) {
+    throw new Error(
+      `${label} must be a non-negative number with at most ${decimals} decimals.`
+    );
+  }
+  return parseUnits(clean, decimals);
+}
+
+function publicMetadataUrl(
+  label: string,
+  value: string,
+  options?: { allowIpfs?: boolean }
+) {
+  const clean = value.trim();
+  if (!clean) return "";
+  if (clean.length > 512) {
+    throw new Error(`${label} must be 512 characters or fewer.`);
+  }
+  if (options?.allowIpfs && clean.toLowerCase().startsWith("ipfs://")) {
+    return clean;
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(clean);
+  } catch {
+    throw new Error(
+      `${label} must be a valid http(s) URL${options?.allowIpfs ? " or ipfs:// URI" : ""}.`
+    );
+  }
+
+  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+    throw new Error(
+      `${label} must use http:// or https://${options?.allowIpfs ? " (image metadata may also use ipfs://)" : ""}.`
+    );
+  }
+  return clean;
+}
+
 export default function LaunchPage() {
   const [mode, setMode] = useState<LaunchMode>("standard");
   const [account, setAccount] = useState<Address | null>(null);
@@ -372,6 +774,7 @@ export default function LaunchPage() {
   const [name, setName] = useState("");
   const [symbol, setSymbol] = useState("");
   const [description, setDescription] = useState("");
+  const [imageURI, setImageURI] = useState("");
   const [totalSupply, setTotalSupply] = useState("1000000000");
   const [basePrice, setBasePrice] = useState("");
   const [slope, setSlope] = useState("0");
@@ -548,23 +951,29 @@ export default function LaunchPage() {
         throw new Error("The production tax-token stack is not activated.");
       }
 
-      const destination =
-        treasury.trim() && isAddress(treasury.trim())
-          ? (treasury.trim() as Address)
-          : wallet;
-      const initial = parseUnits(
-        creatorPurchase || "0",
+      const treasuryInput = treasury.trim();
+      if (treasuryInput && !isAddress(treasuryInput)) {
+        throw new Error(
+          "Community treasury recipient must be a valid EVM address."
+        );
+      }
+      const destination = treasuryInput
+        ? (treasuryInput as Address)
+        : wallet;
+      const initial = parseTokenAmount(
+        "Creator first purchase",
+        creatorPurchase,
         selected.decimals
       );
       const meta = {
         description: description.trim().slice(0, 4096),
-        imageURI: "",
-        website: website.trim().slice(0, 512),
-        xProfile: xProfile.trim().slice(0, 512),
-        telegram: telegram.trim().slice(0, 512),
-        github: github.trim().slice(0, 512),
-        youtube: youtube.trim().slice(0, 512),
-        debox: debox.trim().slice(0, 512),
+        imageURI: publicMetadataUrl("Image", imageURI, { allowIpfs: true }),
+        website: publicMetadataUrl("Website", website),
+        xProfile: publicMetadataUrl("X / Twitter", xProfile),
+        telegram: publicMetadataUrl("Telegram", telegram),
+        github: publicMetadataUrl("GitHub", github),
+        youtube: publicMetadataUrl("YouTube", youtube),
+        debox: publicMetadataUrl("DeBox", debox),
       };
 
       const { publicClient, walletClient } = clients(wallet);
@@ -674,8 +1083,9 @@ export default function LaunchPage() {
           buyTaxBps,
           sellTaxBps,
           antiFarmerDuration: days * 24 * 60 * 60,
-          minimumDividendBalance: parseUnits(
-            minimumDividendBalance || "0",
+          minimumDividendBalance: parseTokenAmount(
+            "Minimum dividend balance",
+            minimumDividendBalance,
             18
           ),
           taxAllocationBps: allocationBps,
@@ -782,35 +1192,49 @@ export default function LaunchPage() {
         );
       }
 
+      // The launch itself is final before any optional tax-token follow-up buy.
+      // Surface it immediately so a rejected second transaction cannot make the
+      // successfully created token appear lost.
+      setReceipt(created);
+
       if (mode === "tax" && initial > 0n) {
-        setMessage(
-          "Tax launch confirmed. Approve the quote asset, then confirm your creator first purchase."
-        );
+        try {
+          setMessage(
+            "Tax launch confirmed. Approve the quote asset, then confirm your creator first purchase."
+          );
 
-        const approveHash = await walletClient.writeContract({
-          address: selected.address,
-          abi: erc20Abi,
-          functionName: "approve",
-          args: [created.curve, initial],
-        });
-        await publicClient.waitForTransactionReceipt({ hash: approveHash });
+          const approveHash = await walletClient.writeContract({
+            address: selected.address,
+            abi: erc20Abi,
+            functionName: "approve",
+            args: [created.curve, initial],
+          });
+          await publicClient.waitForTransactionReceipt({ hash: approveHash });
 
-        const buyHash = await walletClient.writeContract({
-          address: created.curve,
-          abi: curveBuyAbi,
-          functionName: "buy",
-          args: [selected.address, initial, 1n],
-        });
-        await publicClient.waitForTransactionReceipt({ hash: buyHash });
+          const buyHash = await walletClient.writeContract({
+            address: created.curve,
+            abi: curveBuyAbi,
+            functionName: "buy",
+            args: [selected.address, initial, 1n],
+          });
+          await publicClient.waitForTransactionReceipt({ hash: buyHash });
 
-        setMessage(
-          "Tax launch and creator first purchase confirmed on BNB Smart Chain."
-        );
+          setMessage(
+            "Tax launch and creator first purchase confirmed on BNB Smart Chain."
+          );
+        } catch (error) {
+          setMessage(
+            "Tax token launch succeeded, but the optional creator first purchase did not complete. " +
+              (error instanceof Error
+                ? error.message
+                : "The follow-up transaction failed.") +
+              " The confirmed token remains available below."
+          );
+          return;
+        }
       } else {
         setMessage("Launch confirmed on BNB Smart Chain.");
       }
-
-      setReceipt(created);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Launch failed.");
     } finally {
@@ -1143,6 +1567,17 @@ export default function LaunchPage() {
           </div>
         </div>
         <div className="fieldGrid">
+          <label>
+            Token image
+            <input
+              value={imageURI}
+              onChange={(e) => setImageURI(e.target.value)}
+              placeholder="https://... or ipfs://..."
+            />
+            <small className="fieldHint">
+              Public image URL or IPFS URI. A direct device uploader will use a dedicated storage backend rather than embedding image bytes onchain.
+            </small>
+          </label>
           <label>Website<input value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://..." /></label>
           <label>X / Twitter<input value={xProfile} onChange={(e) => setXProfile(e.target.value)} placeholder="https://x.com/..." /></label>
           <label>Telegram<input value={telegram} onChange={(e) => setTelegram(e.target.value)} placeholder="https://t.me/..." /></label>

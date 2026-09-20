@@ -179,6 +179,68 @@ contract FortuneTest is Test {
         assertTrue(first.vanitySalt != second.vanitySalt);
     }
 
+    function testLaunchShieldStartsAt99PercentAndDecaysToZero() public {
+        FortuneFactory.LaunchInfo memory info =
+            factory.createLaunch(_params(1_000_000e18));
+        FortuneCurve curve = FortuneCurve(info.curve);
+
+        assertEq(curve.currentSnipeTaxBps(), 9_900);
+
+        vm.warp(block.timestamp + 1);
+        assertEq(curve.currentSnipeTaxBps(), 2_475);
+
+        vm.warp(block.timestamp + 1);
+        assertEq(curve.currentSnipeTaxBps(), 309);
+
+        vm.warp(block.timestamp + 3);
+        assertEq(curve.currentSnipeTaxBps(), 0);
+    }
+
+    function testLaunchShieldTaxGoesToLiquidityVaultNotCreator() public {
+        FortuneFactory.LaunchInfo memory info =
+            factory.createLaunch(_params(1_000_000e18));
+        FortuneCurve curve = FortuneCurve(info.curve);
+
+        uint256 shieldBefore = usdt.balanceOf(info.liquidityVault);
+
+        vm.startPrank(user);
+        usdt.approve(address(curve), type(uint256).max);
+        curve.buy(address(usdt), 100e18, 1);
+        vm.stopPrank();
+
+        // 99% launch tax alone contributes 99 USDT; the regular LP fee route
+        // may add a small amount on top.
+        assertGe(
+            usdt.balanceOf(info.liquidityVault) - shieldBefore,
+            99e18
+        );
+        assertGt(FortuneToken(info.token).balanceOf(user), 0);
+    }
+
+    function testLaunchShieldCapsCumulativeEarlyWalletBuy() public {
+        FortuneFactory.LaunchInfo memory info =
+            factory.createLaunch(_params(1_000_000e18));
+        FortuneCurve curve = FortuneCurve(info.curve);
+
+        vm.warp(block.timestamp + 6);
+
+        vm.startPrank(user);
+        usdt.approve(address(curve), type(uint256).max);
+
+        vm.expectRevert("LAUNCH_SHIELD_WALLET_CAP");
+        curve.buy(address(usdt), 300e18, 1);
+
+        vm.stopPrank();
+
+        vm.warp(block.timestamp + 10);
+
+        vm.startPrank(user);
+        uint256 out = curve.buy(address(usdt), 300e18, 1);
+        vm.stopPrank();
+
+        assertGt(out, 0);
+    }
+
     function testTwoQuoteAssetsMoveOneCurve() public {
         FortuneFactory.LaunchInfo memory info = factory.createLaunch(_params(1_000e18));
         FortuneCurve curve = FortuneCurve(info.curve);

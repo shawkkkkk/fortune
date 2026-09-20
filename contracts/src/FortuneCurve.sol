@@ -28,11 +28,9 @@ contract FortuneCurve is ReentrancyGuard {
 
     address[] public quoteAssets;
     mapping(address => bool) public acceptedQuote;
-    mapping(address => uint256) public reserve;
     mapping(address => uint16) public fixedWeightBps;
 
     uint256 public tokensSold;
-    uint256 public netReserveUsd1e18;
     bool public graduationReady;
     bool public graduated;
 
@@ -131,8 +129,6 @@ contract FortuneCurve is ReentrancyGuard {
         require(tokensOut >= minTokensOut && tokensOut > 0, "SLIPPAGE");
         require(launchToken.balanceOf(address(this)) >= tokensOut, "INSUFFICIENT_CURVE_TOKENS");
 
-        reserve[quoteAsset] += netAmount;
-        netReserveUsd1e18 += usdIn;
         tokensSold += tokensOut;
 
         launchToken.safeTransfer(msg.sender, tokensOut);
@@ -155,7 +151,7 @@ contract FortuneCurve is ReentrancyGuard {
         uint256 usdGross = tokenAmount * sellPrice / 1e18;
         uint256 grossQuote = registry.tokenAmountForUsd(quoteAsset, usdGross);
 
-        require(reserve[quoteAsset] >= grossQuote, "INSUFFICIENT_QUOTE_RESERVE");
+        require(reserve(quoteAsset) >= grossQuote, "INSUFFICIENT_QUOTE_RESERVE");
 
         uint256 fee = grossQuote * feeRouter.totalFeeBps() / BPS;
         quoteOut = grossQuote - fee;
@@ -163,8 +159,6 @@ contract FortuneCurve is ReentrancyGuard {
 
         launchToken.safeTransferFrom(msg.sender, address(this), tokenAmount);
         tokensSold = nextSold;
-        reserve[quoteAsset] -= grossQuote;
-        netReserveUsd1e18 = netReserveUsd1e18 > usdGross ? netReserveUsd1e18 - usdGross : 0;
 
         IERC20 quote = IERC20(quoteAsset);
         if (fee > 0) {
@@ -180,6 +174,27 @@ contract FortuneCurve is ReentrancyGuard {
         return quoteAssets.length;
     }
 
+    /// @notice Live reserve balance. Using balanceOf makes the curve resilient to
+    ///         rebasing-style quote assets and direct balance changes.
+    function reserve(address asset) public view returns (uint256) {
+        require(acceptedQuote[asset], "QUOTE_NOT_ACCEPTED");
+        return IERC20(asset).balanceOf(address(this));
+    }
+
+    function netReserveUsd1e18() public view returns (uint256 totalUsd) {
+        for (uint256 i; i < quoteAssets.length; ++i) {
+            address asset = quoteAssets[i];
+            uint256 amount = IERC20(asset).balanceOf(address(this));
+            if (amount > 0) totalUsd += registry.usdValue(asset, amount);
+        }
+    }
+
+    /// @notice Allows a keeper to recognize a threshold crossed by rebasing
+    ///         or direct reserve changes even when no trade just executed.
+    function checkGraduation() external {
+        _checkGraduation();
+    }
+
     function graduationWeights() public view returns (uint16[] memory weights) {
         weights = new uint16[](quoteAssets.length);
 
@@ -193,7 +208,7 @@ contract FortuneCurve is ReentrancyGuard {
         uint256 totalUsd;
         uint256[] memory values = new uint256[](quoteAssets.length);
         for (uint256 i; i < quoteAssets.length; ++i) {
-            values[i] = registry.usdValue(quoteAssets[i], reserve[quoteAssets[i]]);
+            values[i] = registry.usdValue(quoteAssets[i], reserve(quoteAssets[i]));
             totalUsd += values[i];
         }
 
@@ -229,8 +244,7 @@ contract FortuneCurve is ReentrancyGuard {
 
         for (uint256 i; i < quoteAssets.length; ++i) {
             address asset = quoteAssets[i];
-            uint256 amount = reserve[asset];
-            reserve[asset] = 0;
+            uint256 amount = reserve(asset);
             IERC20(asset).safeTransfer(adapter, amount);
             reserves[i] = IGraduationAdapter.AssetReserve({
                 asset: asset,
@@ -253,9 +267,10 @@ contract FortuneCurve is ReentrancyGuard {
     }
 
     function _checkGraduation() internal {
-        if (netReserveUsd1e18 >= graduationUsd1e18) {
+        uint256 totalUsd = netReserveUsd1e18();
+        if (totalUsd >= graduationUsd1e18) {
             graduationReady = true;
-            emit GraduationReady(netReserveUsd1e18);
+            emit GraduationReady(totalUsd);
         }
     }
 }

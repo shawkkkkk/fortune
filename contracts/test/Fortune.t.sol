@@ -370,7 +370,12 @@ contract FortuneTest is Test {
             curve.rescueRedeem(redeemAmount, minimums);
         vm.stopPrank();
 
-        assertEq(received[0], reserveBefore);
+        uint256 usdtIndex =
+            curve.quoteAssets(0) == address(usdt)
+                ? 0
+                : 1;
+
+        assertEq(received[usdtIndex], reserveBefore);
         assertEq(usdt.balanceOf(user), userBefore + reserveBefore);
         assertEq(usdt.balanceOf(address(curve)), 0);
         assertEq(curve.rescueRedeemed(), redeemAmount);

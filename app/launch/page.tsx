@@ -668,6 +668,8 @@ function ManifestRows({
     ["Token", name + " ($" + symbol + ")"],
     ["Fortune vanity address", "Every launch token ends in 0xfe"],
     ["Launch Shield", "99% → 0% over 5 sec · buy-only"],
+    ["Final curve buy", "Partial fill · excess quote refunded atomically"],
+    ["Market phases", "Curve → ready → pools · rescue after 7d if stuck"],
     ["Early wallet cap", "2% cumulative buys for first 15 sec"],
     ["Shield proceeds", "Liquidity reinforcement vault · no exemptions"],
     ["Accepted quote assets", assets.join(" · ")],

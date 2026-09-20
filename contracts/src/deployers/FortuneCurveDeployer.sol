@@ -21,7 +21,10 @@ contract FortuneCurveDeployer is IFortuneCurveDeployer {
                 p.basePriceUsd1e18,
                 p.slopeUsd1e18,
                 p.graduationUsd1e18,
-                p.adaptiveGraduation
+                p.adaptiveGraduation,
+                p.taxProcessor,
+                p.curveBuyTaxBps,
+                p.curveSellTaxBps
             )
         );
     }

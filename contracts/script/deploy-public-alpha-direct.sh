@@ -36,7 +36,7 @@ deploy() {
         --broadcast \
         --legacy \
         --gas-price "$GAS_PRICE" \
-        --gas-limit 20000000 \
+        --gas-limit 16000000 \
         --constructor-args "$@" 2>&1
     )"
   else
@@ -47,7 +47,7 @@ deploy() {
         --broadcast \
         --legacy \
         --gas-price "$GAS_PRICE" \
-        --gas-limit 20000000 2>&1
+        --gas-limit 16000000 2>&1
     )"
   fi
 

@@ -13,6 +13,8 @@ import {FortuneAutomationVault} from "./FortuneAutomationVault.sol";
 import {FortuneMetadataRegistry} from "./FortuneMetadataRegistry.sol";
 
 contract FortuneFactory is Ownable2Step {
+    uint8 public constant FORTUNE_ADDRESS_SUFFIX = 0xfe;
+    uint256 public constant VANITY_SEARCH_LIMIT = 4096;
     struct LaunchParams {
         string name;
         string symbol;
@@ -44,6 +46,7 @@ contract FortuneFactory is Ownable2Step {
         address buybackVault;
         address liquidityVault;
         bytes32 manifestHash;
+        bytes32 vanitySalt;
         uint64 createdAt;
     }
 
@@ -58,6 +61,7 @@ contract FortuneFactory is Ownable2Step {
 
     LaunchInfo[] public launches;
     mapping(address => uint256) public curveIndexPlusOne;
+    mapping(address => uint256) public creatorLaunchNonce;
 
     struct GraduationStatus {
         uint64 attempts;
@@ -75,6 +79,11 @@ contract FortuneFactory is Ownable2Step {
         address indexed token,
         address curve,
         bytes32 manifestHash
+    );
+    event FortuneVanityAddress(
+        uint256 indexed launchId,
+        address indexed token,
+        bytes32 vanitySalt
     );
     event LaunchAutomationVaults(
         uint256 indexed launchId,
@@ -161,6 +170,7 @@ contract FortuneFactory is Ownable2Step {
         require(primaryFound, "PRIMARY_NOT_IN_BASKET");
         require(weightSum == 10_000, "BAD_WEIGHTS");
 
+        uint256 launchNonce = creatorLaunchNonce[msg.sender]++;
         bytes32 manifestHash = keccak256(
             abi.encode(
                 block.chainid,
@@ -169,6 +179,7 @@ contract FortuneFactory is Ownable2Step {
                 address(automationRegistry),
                 automationExecutor,
                 msg.sender,
+                launchNonce,
                 p.name,
                 p.symbol,
                 p.totalSupply,
@@ -190,11 +201,32 @@ contract FortuneFactory is Ownable2Step {
             )
         );
 
-        FortuneToken token = new FortuneToken(
+        bytes32 initCodeHash = keccak256(
+            abi.encodePacked(
+                type(FortuneToken).creationCode,
+                abi.encode(
+                    p.name,
+                    p.symbol,
+                    p.totalSupply,
+                    manifestHash
+                )
+            )
+        );
+
+        (bytes32 vanitySalt, address predictedToken) =
+            _findFortuneSalt(initCodeHash, manifestHash);
+
+        FortuneToken token = new FortuneToken{salt: vanitySalt}(
             p.name,
             p.symbol,
             p.totalSupply,
             manifestHash
+        );
+
+        require(
+            address(token) == predictedToken &&
+                hasFortuneSuffix(address(token)),
+            "FORTUNE_VANITY_MISMATCH"
         );
 
         metadataRegistry.registerToken(
@@ -267,6 +299,7 @@ contract FortuneFactory is Ownable2Step {
             buybackVault: buybackVault,
             liquidityVault: liquidityVault,
             manifestHash: manifestHash,
+            vanitySalt: vanitySalt,
             createdAt: uint64(block.timestamp)
         });
 
@@ -281,12 +314,75 @@ contract FortuneFactory is Ownable2Step {
             address(curve),
             manifestHash
         );
+        emit FortuneVanityAddress(
+            launchId,
+            address(token),
+            vanitySalt
+        );
         emit LaunchAutomationVaults(
             launchId,
             holderVault,
             buybackVault,
             liquidityVault
         );
+    }
+
+    /// @notice Every Fortune-created launch token is deployed with CREATE2
+    ///         so the final byte of its address is 0xfe.
+    /// @dev A one-byte suffix takes ~256 trials on average. The bounded search
+    ///      keeps launch gas predictable while making failure vanishingly rare.
+    function _findFortuneSalt(
+        bytes32 initCodeHash,
+        bytes32 entropy
+    ) internal view returns (bytes32 salt, address predicted) {
+        for (uint256 nonce; nonce < VANITY_SEARCH_LIMIT; ++nonce) {
+            salt = keccak256(
+                abi.encodePacked(
+                    msg.sender,
+                    entropy,
+                    nonce
+                )
+            );
+
+            predicted = _computeCreate2Address(
+                salt,
+                initCodeHash
+            );
+
+            if (hasFortuneSuffix(predicted)) {
+                return (salt, predicted);
+            }
+        }
+
+        revert("FORTUNE_SUFFIX_NOT_FOUND");
+    }
+
+    function _computeCreate2Address(
+        bytes32 salt,
+        bytes32 initCodeHash
+    ) internal view returns (address predicted) {
+        predicted = address(
+            uint160(
+                uint256(
+                    keccak256(
+                        abi.encodePacked(
+                            bytes1(0xff),
+                            address(this),
+                            salt,
+                            initCodeHash
+                        )
+                    )
+                )
+            )
+        );
+    }
+
+    function hasFortuneSuffix(address account)
+        public
+        pure
+        returns (bool)
+    {
+        return uint8(uint160(account)) == FORTUNE_ADDRESS_SUFFIX;
     }
 
     function _automationVault(

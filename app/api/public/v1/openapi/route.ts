@@ -62,6 +62,31 @@ export async function GET(request: Request) {
           responses: { "200": { description: "Asset catalog" } },
         },
       },
+      "/assets/check": {
+        post: {
+          tags: ["Assets"],
+          summary: "Inspect a custom BSC token before Fortune registry approval",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["address"],
+                  properties: {
+                    address: { type: "string" },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": { description: "Static compatibility and Fortune approval state" },
+            "400": { description: "Invalid address or JSON" },
+            "503": { description: "BSC RPC unavailable or not configured" },
+          },
+        },
+      },
       "/pairs": {
         get: {
           tags: ["Assets"],

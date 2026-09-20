@@ -15,13 +15,18 @@ contract FortuneToken is ERC20, ERC20Burnable {
     bytes32 public immutable launchManifest;
 
     constructor(
+        address fortuneFactory_,
         string memory name_,
         string memory symbol_,
         uint256 supply_,
         bytes32 manifest_
     ) ERC20(name_, symbol_) {
+        require(
+            fortuneFactory_ != address(0),
+            "ZERO_FACTORY"
+        );
         require(supply_ > 0, "ZERO_SUPPLY");
-        fortuneFactory = msg.sender;
+        fortuneFactory = fortuneFactory_;
         initialSupply = supply_;
         launchManifest = manifest_;
         _mint(msg.sender, supply_);

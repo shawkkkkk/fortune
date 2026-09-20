@@ -10,8 +10,11 @@ import {FortuneCurve} from "./FortuneCurve.sol";
 import {FortuneFeeRouter} from "./FortuneFeeRouter.sol";
 import {FortuneAssetRegistry} from "./FortuneAssetRegistry.sol";
 import {FortuneAutomationRegistry} from "./FortuneAutomationRegistry.sol";
-import {FortuneAutomationVault} from "./FortuneAutomationVault.sol";
 import {FortuneMetadataRegistry} from "./FortuneMetadataRegistry.sol";
+import {IFortuneTokenDeployer} from "./interfaces/IFortuneTokenDeployer.sol";
+import {IFortuneVaultDeployer} from "./interfaces/IFortuneVaultDeployer.sol";
+import {IFortuneFeeRouterDeployer} from "./interfaces/IFortuneFeeRouterDeployer.sol";
+import {IFortuneCurveDeployer} from "./interfaces/IFortuneCurveDeployer.sol";
 import {FortunePermanentLiquidityLocker} from "./FortunePermanentLiquidityLocker.sol";
 
 contract FortuneFactory is Ownable2Step {
@@ -58,6 +61,10 @@ contract FortuneFactory is Ownable2Step {
     FortuneAssetRegistry public immutable registry;
     FortuneAutomationRegistry public immutable automationRegistry;
     FortuneMetadataRegistry public immutable metadataRegistry;
+    IFortuneTokenDeployer public immutable tokenDeployer;
+    IFortuneVaultDeployer public immutable vaultDeployer;
+    IFortuneFeeRouterDeployer public immutable feeRouterDeployer;
+    IFortuneCurveDeployer public immutable curveDeployer;
     address public immutable automationExecutor;
     address public immutable protocolTreasury;
 
@@ -122,20 +129,45 @@ contract FortuneFactory is Ownable2Step {
         address initialOwner,
         address registry_,
         address automationRegistry_,
+        address metadataRegistry_,
+        address tokenDeployer_,
+        address vaultDeployer_,
+        address feeRouterDeployer_,
+        address curveDeployer_,
         address automationExecutor_,
         address protocolTreasury_
     ) Ownable(initialOwner) {
         require(
             registry_ != address(0) &&
                 automationRegistry_ != address(0) &&
+                metadataRegistry_ != address(0) &&
+                tokenDeployer_ != address(0) &&
+                vaultDeployer_ != address(0) &&
+                feeRouterDeployer_ != address(0) &&
+                curveDeployer_ != address(0) &&
                 automationExecutor_ != address(0) &&
                 protocolTreasury_ != address(0),
             "ZERO_ADDRESS"
         );
 
+        require(
+            registry_.code.length > 0 &&
+                automationRegistry_.code.length > 0 &&
+                metadataRegistry_.code.length > 0 &&
+                tokenDeployer_.code.length > 0 &&
+                vaultDeployer_.code.length > 0 &&
+                feeRouterDeployer_.code.length > 0 &&
+                curveDeployer_.code.length > 0,
+            "MISSING_DEPLOYER_CODE"
+        );
+
         registry = FortuneAssetRegistry(registry_);
         automationRegistry = FortuneAutomationRegistry(automationRegistry_);
-        metadataRegistry = new FortuneMetadataRegistry(address(this));
+        metadataRegistry = FortuneMetadataRegistry(metadataRegistry_);
+        tokenDeployer = IFortuneTokenDeployer(tokenDeployer_);
+        vaultDeployer = IFortuneVaultDeployer(vaultDeployer_);
+        feeRouterDeployer = IFortuneFeeRouterDeployer(feeRouterDeployer_);
+        curveDeployer = IFortuneCurveDeployer(curveDeployer_);
         automationExecutor = automationExecutor_;
         protocolTreasury = protocolTreasury_;
     }

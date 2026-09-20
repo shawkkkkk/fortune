@@ -42,8 +42,13 @@ export default function ExplorePage() {
           "Permanent LP locker",
           PUBLIC_TESTNET.contracts.liquidityLocker,
         ],
+        ["Tax FortuneFactory", PUBLIC_TESTNET.contracts.taxFactory],
+        ["Pool Registry", PUBLIC_TESTNET.contracts.poolRegistry],
+        ["Tax V2 adapter", PUBLIC_TESTNET.contracts.taxGraduationAdapter],
+        ["Tax V2 LP locker", PUBLIC_TESTNET.contracts.taxLiquidityLocker],
         ["Mock fUSD", PUBLIC_TESTNET.contracts.mockQuote],
-        ["Reference Pancake pool", PUBLIC_TESTNET.contracts.referencePool],
+        ["Reference V3 pool", PUBLIC_TESTNET.contracts.referencePool],
+        ["Reference tax V2 pair", PUBLIC_TESTNET.contracts.referenceTaxPool],
       ];
 
   return (
@@ -69,7 +74,7 @@ export default function ExplorePage() {
           <p>
             {mainnet
               ? "Fortune is a non-custodial BNB Chain launch framework with deterministic fixed-supply tokens, onchain curve trading, transparent fee routing, Launch Shield protection, and atomic Pancake V3 graduation."
-              : "Fortune is running an onchain public alpha on BNB Smart Chain Testnet. Create a real Fortune test token, trade its curve with valueless mock fUSD, and graduate it into a real Pancake V3 testnet pool."}
+              : "Fortune is running an onchain public alpha on BNB Smart Chain Testnet. Launch a standard or tax-token test market, trade its curve with valueless mock fUSD, then graduate standard launches into Pancake V3 or tax launches into Pancake V2 with permanently locked liquidity."}
           </p>
 
           <div className="heroActions">
@@ -114,7 +119,7 @@ export default function ExplorePage() {
                 <span>39/39 tests</span>
                 <span>1,000 fuzz runs</span>
                 <span>7,500/7,500 requests</span>
-                <span>3 real graduations</span>
+                <span>Standard + tax verified</span>
               </>
             )}
           </div>
@@ -191,7 +196,7 @@ export default function ExplorePage() {
             <p>
               {mainnet
                 ? "Create a fixed-supply Fortune token through the production factory after an onchain launch preflight."
-                : "Create an actual Fortune token through the deployed BSC Testnet factory. Every Fortune token is CREATE2-deployed with the required 0xfe suffix."}
+                : "Create an actual standard or tax-token Fortune launch through the deployed BSC Testnet factories. Every Fortune token is CREATE2-deployed with the required 0xfe suffix."}
             </p>
             <strong>Wallet-signed</strong>
           </article>
@@ -205,7 +210,7 @@ export default function ExplorePage() {
             <p>
               {mainnet
                 ? "Buy and sell through the canonical Fortune curve using registry-approved quote assets and live oracle checks."
-                : "Mint valueless mock fUSD, approve the new curve, and make an onchain test purchase against Fortune's canonical curve."}
+                : "Mint valueless mock fUSD and trade the canonical curve. Tax-token launches also exercise configured curve tax accounting before their post-graduation DEX tax path."}
             </p>
             <strong>{mainnet ? "Real BNB Chain txs" : "Real testnet txs"}</strong>
           </article>
@@ -219,9 +224,9 @@ export default function ExplorePage() {
             <p>
               {mainnet
                 ? "Permissionlessly finalize eligible launches into Pancake V3 and permanently lock the resulting LP-position NFT."
-                : "Permissionlessly finalize the launch into Pancake V3 testnet and permanently custody the resulting LP-position NFT in the Fortune locker."}
+                : "Permissionlessly finalize standard launches into Pancake V3 or tax-token launches into Pancake V2. Fortune permanently locks the resulting V3 position NFT or V2 LP tokens."}
             </p>
-            <strong>Pancake V3</strong>
+            <strong>{mainnet ? "Pancake V3" : "Pancake V3 + V2"}</strong>
           </article>
         </div>
       </section>

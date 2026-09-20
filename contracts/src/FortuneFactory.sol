@@ -244,8 +244,13 @@ contract FortuneFactory is Ownable2Step {
             })
         );
 
+        // Create a holder vault whenever holder rewards are configured OR the
+        // creator has a fee share, so creators can later surrender their own
+        // share to holders without deploying a new mutable destination.
         address holderVault = _automationVault(
-            p.feeBps[1],
+            p.feeBps[1] > 0 || p.feeBps[0] > 0
+                ? uint16(1)
+                : uint16(0),
             FortuneAutomationRegistry.Purpose.HolderRewards,
             address(token)
         );

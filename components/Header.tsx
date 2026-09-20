@@ -26,6 +26,7 @@ declare global {
 const links = [
   ["/", "Overview"],
   ["/markets", "Markets"],
+  ["/assets", "Assets"],
   [
     FORTUNE_NETWORK.isMainnet ? "/launch" : "/testnet",
     FORTUNE_NETWORK.isMainnet ? "Launch" : "Public Alpha",

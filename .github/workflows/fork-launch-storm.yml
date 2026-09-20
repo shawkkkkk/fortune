@@ -133,7 +133,7 @@ jobs:
             --slow \
             --with-gas-price 1000000000 \
             --priority-gas-price 1000000000 \
-            -vvv | tee /tmp/seed-graduation.log
+            -vvv 2>&1 | tee /tmp/seed-graduation.log
 
           FACTORY=$(awk '/^  FortuneFactory 0x/{v=$2} END{print v}' /tmp/seed-graduation.log)
           REGISTRY=$(awk '/^  FortuneAssetRegistry 0x/{v=$2} END{print v}' /tmp/seed-graduation.log)
@@ -170,17 +170,17 @@ jobs:
           } >> "$GITHUB_ENV"
 
       - name: Verify fresh fork graduation state
-        env:
-          RPC_URL: ${{ env.LOCAL_RPC_URL }}
-          CURVE_ADDRESS: ${{ env.SEED_CURVE }}
-          TOKEN_ADDRESS: ${{ env.SEED_TOKEN }}
-          QUOTE_ADDRESS: ${{ env.SEED_QUOTE }}
-          POOL_ADDRESS: ${{ env.SEED_POOL }}
-          LOCKER_ADDRESS: ${{ env.NEXT_PUBLIC_FORTUNE_LIQUIDITY_LOCKER_ADDRESS }}
-          POSITION_MANAGER_ADDRESS: ${{ env.PANCAKE_V3_POSITION_MANAGER }}
-          LP_TOKEN_ID: ${{ env.SEED_LP_TOKEN_ID }}
-          MAX_PRICE_DEVIATION_BPS: "100"
-        run: node scripts/verify-graduation-state.mjs
+        run: |
+          RPC_URL="$LOCAL_RPC_URL" \
+          CURVE_ADDRESS="$SEED_CURVE" \
+          TOKEN_ADDRESS="$SEED_TOKEN" \
+          QUOTE_ADDRESS="$SEED_QUOTE" \
+          POOL_ADDRESS="$SEED_POOL" \
+          LOCKER_ADDRESS="$NEXT_PUBLIC_FORTUNE_LIQUIDITY_LOCKER_ADDRESS" \
+          POSITION_MANAGER_ADDRESS="$PANCAKE_V3_POSITION_MANAGER" \
+          LP_TOKEN_ID="$SEED_LP_TOKEN_ID" \
+          MAX_PRICE_DEVIATION_BPS="100" \
+          node scripts/verify-graduation-state.mjs
 
 
       - name: Install and build Fortune web against fork
@@ -250,17 +250,17 @@ jobs:
             (echo "Expected ${{ inputs.graduation_repeats }} successful fork graduations, found $COUNT" && cat /tmp/fork-graduations.log && exit 1)
 
       - name: Re-verify seed graduation invariants after storm
-        env:
-          RPC_URL: ${{ env.LOCAL_RPC_URL }}
-          CURVE_ADDRESS: ${{ env.SEED_CURVE }}
-          TOKEN_ADDRESS: ${{ env.SEED_TOKEN }}
-          QUOTE_ADDRESS: ${{ env.SEED_QUOTE }}
-          POOL_ADDRESS: ${{ env.SEED_POOL }}
-          LOCKER_ADDRESS: ${{ env.NEXT_PUBLIC_FORTUNE_LIQUIDITY_LOCKER_ADDRESS }}
-          POSITION_MANAGER_ADDRESS: ${{ env.PANCAKE_V3_POSITION_MANAGER }}
-          LP_TOKEN_ID: ${{ env.SEED_LP_TOKEN_ID }}
-          MAX_PRICE_DEVIATION_BPS: "100"
-        run: node scripts/verify-graduation-state.mjs
+        run: |
+          RPC_URL="$LOCAL_RPC_URL" \
+          CURVE_ADDRESS="$SEED_CURVE" \
+          TOKEN_ADDRESS="$SEED_TOKEN" \
+          QUOTE_ADDRESS="$SEED_QUOTE" \
+          POOL_ADDRESS="$SEED_POOL" \
+          LOCKER_ADDRESS="$NEXT_PUBLIC_FORTUNE_LIQUIDITY_LOCKER_ADDRESS" \
+          POSITION_MANAGER_ADDRESS="$PANCAKE_V3_POSITION_MANAGER" \
+          LP_TOKEN_ID="$SEED_LP_TOKEN_ID" \
+          MAX_PRICE_DEVIATION_BPS="100" \
+          node scripts/verify-graduation-state.mjs
 
       - name: Show storm summary
         if: always()

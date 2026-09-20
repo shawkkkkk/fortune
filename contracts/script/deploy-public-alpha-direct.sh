@@ -17,7 +17,7 @@ pending_nonce() {
 }
 
 log() {
-  printf '\n==> %s\n' "$*"
+  printf '\n==> %s\n' "$*" >&2
 }
 
 extract_deployed() {

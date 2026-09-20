@@ -23,11 +23,31 @@ type XStockCandidate = {
   deployments: Array<{ resolvedAddress?: string | null; [key: string]: unknown }>;
 };
 
+type NasdaqTokenizedResult = {
+  provider: string;
+  tokenSymbol?: string | null;
+  pairingAddress?: string | null;
+  pairable: boolean;
+  underlyingTicker: string;
+  underlyingCompany?: string | null;
+  pennyStock?: boolean | null;
+  note?: string;
+};
+
 export default function RegistryPage() {
   const [active, setActive] = useState<AssetCategory | "Approved">("Approved");
   const [query, setQuery] = useState("");
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [xstocks, setXstocks] = useState<XStockCandidate[]>([]);
+  const [nasdaqResults, setNasdaqResults] = useState<NasdaqTokenizedResult[]>([]);
+  const [nasdaqUnderlying, setNasdaqUnderlying] = useState<{
+    verified: boolean;
+    symbol: string;
+    companyName?: string | null;
+    lastPrice?: number | null;
+    isPenny?: boolean | null;
+  } | null>(null);
+  const [nasdaqLoading, setNasdaqLoading] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -66,8 +86,33 @@ export default function RegistryPage() {
     );
   }, [candidates, query]);
 
+  useEffect(() => {
+    if (active !== "NASDAQ Microcaps") return;
+    const ticker = query.trim().toUpperCase();
+
+    if (!ticker) {
+      setNasdaqResults([]);
+      setNasdaqUnderlying(null);
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setNasdaqLoading(true);
+      void fetch("/api/registry/nasdaq-stocks?q=" + encodeURIComponent(ticker))
+        .then((response) => response.json())
+        .then((data) => {
+          setNasdaqResults(Array.isArray(data.results) ? data.results : []);
+          setNasdaqUnderlying(data.underlying || null);
+        })
+        .finally(() => setNasdaqLoading(false));
+    }, 350);
+
+    return () => window.clearTimeout(timer);
+  }, [active, query]);
+
   const showingCandidates = active === "BSC 400";
   const showingXstocks = active === "xStocks" && xstocks.length > 0;
+  const showingNasdaq = active === "NASDAQ Microcaps";
 
   return (
     <main className="page">
@@ -108,6 +153,15 @@ export default function RegistryPage() {
           placeholder="Search symbol, name or BSC contract"
         />
 
+        {showingNasdaq && (
+          <div className="registryNotice">
+            <strong>Any NASDAQ ticker → BNB token lookup</strong>
+            <span>
+              Search a ticker such as FAMI. Fortune verifies the NASDAQ listing and then looks for a real BSC representation from recognized tokenized-stock providers. No synthetic ticker copies are treated as stock.
+            </span>
+          </div>
+        )}
+
         {showingXstocks && (
           <div className="registryNotice">
             <strong>Official xStocks metadata</strong>
@@ -135,7 +189,62 @@ export default function RegistryPage() {
             <span>Asset</span><span>Category / source</span><span>Capabilities</span><span>Status</span>
           </div>
 
-          {showingXstocks
+          {showingNasdaq
+            ? nasdaqLoading
+              ? <div className="registryEmpty">Checking NASDAQ + BNB tokenization…</div>
+              : !query.trim()
+                ? <div className="registryEmpty">Enter a NASDAQ ticker above.</div>
+                : (
+                  <>
+                    {nasdaqUnderlying && (
+                      <div className="registryRow">
+                        <div className="registryAsset">
+                          <span className="assetIconLarge">NQ</span>
+                          <span>
+                            <strong>{nasdaqUnderlying.symbol}</strong>
+                            <small>{nasdaqUnderlying.companyName || "NASDAQ underlying"}</small>
+                          </span>
+                        </div>
+                        <span>
+                          {nasdaqUnderlying.verified ? "NASDAQ verified" : "Listing not verified"}
+                          {nasdaqUnderlying.lastPrice != null ? " · $" + nasdaqUnderlying.lastPrice.toFixed(4) : ""}
+                        </span>
+                        <div className="capabilityList">
+                          <em>
+                            {nasdaqUnderlying.isPenny === true
+                              ? "Below $5"
+                              : nasdaqUnderlying.isPenny === false
+                                ? "Above $5"
+                                : "Price pending"}
+                          </em>
+                        </div>
+                        <span className="candidateBadge">Underlying</span>
+                      </div>
+                    )}
+                    {nasdaqResults.map((asset, index) => (
+                      <div className="registryRow" key={(asset.pairingAddress || asset.tokenSymbol || "asset") + index}>
+                        <div className="registryAsset">
+                          <span className="assetIconLarge">ST</span>
+                          <span>
+                            <strong>{asset.tokenSymbol || asset.underlyingTicker}</strong>
+                            <small>{asset.underlyingCompany || asset.underlyingTicker}</small>
+                          </span>
+                        </div>
+                        <span>{asset.provider} · BNB Chain</span>
+                        <div className="capabilityList">
+                          {asset.pairable ? <><em>quote</em><em>graduation</em></> : <em>Not pairable</em>}
+                        </div>
+                        <span className={"verificationBadge " + (asset.pairable ? "verificationVerified" : "verificationUnavailable")}>
+                          {asset.pairable ? "Provider verified" : "Unavailable"}
+                        </span>
+                      </div>
+                    ))}
+                    {nasdaqResults.length === 0 && (
+                      <div className="registryEmpty">No recognized BNB stock token found for this ticker yet.</div>
+                    )}
+                  </>
+                )
+            : showingXstocks
             ? xstocks.map((asset) => {
                 const address = asset.deployments[0]?.resolvedAddress || "Deployment found";
                 return (

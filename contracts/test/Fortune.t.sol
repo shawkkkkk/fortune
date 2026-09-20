@@ -184,15 +184,16 @@ contract FortuneTest is Test {
             factory.createLaunch(_params(1_000_000e18));
         FortuneCurve curve = FortuneCurve(info.curve);
 
+        uint256 launchedAt = block.timestamp;
         assertEq(curve.currentSnipeTaxBps(), 9_900);
 
-        vm.warp(block.timestamp + 1);
+        vm.warp(launchedAt + 1);
         assertEq(curve.currentSnipeTaxBps(), 2_475);
 
-        vm.warp(block.timestamp + 1);
+        vm.warp(launchedAt + 2);
         assertEq(curve.currentSnipeTaxBps(), 309);
 
-        vm.warp(block.timestamp + 3);
+        vm.warp(launchedAt + 5);
         assertEq(curve.currentSnipeTaxBps(), 0);
     }
 

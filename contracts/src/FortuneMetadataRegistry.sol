@@ -13,6 +13,9 @@ contract FortuneMetadataRegistry {
         string website;
         string xProfile;
         string telegram;
+        string github;
+        string youtube;
+        string debox;
     }
 
     struct Record {

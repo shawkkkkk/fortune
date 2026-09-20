@@ -42,9 +42,22 @@ type NasdaqUnderlying = {
   isPenny?: boolean | null;
 };
 
+type LighterMarket = {
+  marketId: number;
+  symbol: string;
+  active: boolean;
+  markPrice?: number | null;
+  indexPrice?: number | null;
+  openInterest?: number | null;
+  volume24h?: number | null;
+};
+
+type LaunchMode = "basket" | "stock-floor" | "preipo-perp";
+
 const FACTORY_ADDRESS = process.env.NEXT_PUBLIC_FORTUNE_FACTORY_ADDRESS || "";
 
 export default function LaunchPage() {
+  const [launchMode, setLaunchMode] = useState<LaunchMode>("basket");
   const [name, setName] = useState("");
   const [symbol, setSymbol] = useState("");
   const [description, setDescription] = useState("");
@@ -67,7 +80,56 @@ export default function LaunchPage() {
   const [catalogLoading, setCatalogLoading] = useState(false);
   const [chinaLoading, setChinaLoading] = useState(false);
   const [nasdaqLoading, setNasdaqLoading] = useState(false);
+  const [floorReservePct, setFloorReservePct] = useState(35);
+  const [lighterMarkets, setLighterMarkets] = useState<LighterMarket[]>([]);
+  const [lighterLoading, setLighterLoading] = useState(false);
+  const [perpMarketId, setPerpMarketId] = useState<number | null>(null);
+  const [referenceMultiplier, setReferenceMultiplier] = useState(1);
+  const [depthTier, setDepthTier] = useState<"low" | "standard">("low");
   const protocolBps = 10;
+
+  useEffect(() => {
+    if (launchMode === "stock-floor") {
+      const selectedStock = selected
+        .map((id) => selectableAssets.find((asset) => asset.id === id))
+        .find((asset) =>
+          asset && ["xStocks", "China Stocks", "NASDAQ Penny Stocks"].includes(asset.category)
+        );
+
+      if (!selectedStock) {
+        setSelected([]);
+        setPrimary("");
+      } else {
+        setSelected([selectedStock.id]);
+        setPrimary(selectedStock.id);
+      }
+    }
+
+    if (launchMode === "preipo-perp") {
+      setSelected(["usdt"]);
+      setPrimary("usdt");
+    }
+
+    if (launchMode === "basket" && selected.length === 0) {
+      setSelected(["bnb"]);
+      setPrimary("bnb");
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [launchMode]);
+
+  useEffect(() => {
+    if (launchMode !== "preipo-perp" || lighterMarkets.length > 0) return;
+    setLighterLoading(true);
+    void fetch("/api/registry/lighter-perps?preipo=true")
+      .then((response) => response.json())
+      .then((data) => {
+        const markets = Array.isArray(data.markets) ? data.markets : [];
+        setLighterMarkets(markets);
+        const firstActive = markets.find((market: LighterMarket) => market.active);
+        if (firstActive) setPerpMarketId(firstActive.marketId);
+      })
+      .finally(() => setLighterLoading(false));
+  }, [launchMode, lighterMarkets.length]);
 
   useEffect(() => {
     if (activeCategory !== "BSC 400" || bscCandidates.length > 0) return;
@@ -189,6 +251,15 @@ export default function LaunchPage() {
     const asset = selectableAssets.find((item) => item.id === id);
     if (!asset || !asset.capabilities.includes("quote")) return;
 
+    if (launchMode === "stock-floor") {
+      if (!["xStocks", "China Stocks", "NASDAQ Penny Stocks"].includes(asset.category)) return;
+      setSelected([id]);
+      setPrimary(id);
+      return;
+    }
+
+    if (launchMode === "preipo-perp") return;
+
     setSelected((current) => {
       if (current.includes(id)) {
         if (current.length === 1) return current;
@@ -212,6 +283,79 @@ export default function LaunchPage() {
         <div className="stepRail"><span className="active">01 Token</span><span>02 Market</span><span>03 Economics</span><span>04 Manifest</span></div>
       </section>
 
+      <section className="formCard launchEngineCard">
+        <div className="formSectionTitle">
+          <span>00</span>
+          <div>
+            <h2>Choose the launch engine</h2>
+            <p>Fortune supports normal Basket Curves, reserve-backed stock floors, and experimental perp-referenced pre-IPO markets.</p>
+          </div>
+        </div>
+        <div className="launchEngineGrid">
+          <button className={launchMode==="basket" ? "launchEngine selectedEngine" : "launchEngine"} onClick={()=>setLaunchMode("basket")}>
+            <strong>Basket Curve</strong>
+            <span>1–5 BSC quote assets · one canonical curve</span>
+          </button>
+          <button className={launchMode==="stock-floor" ? "launchEngine selectedEngine" : "launchEngine"} onClick={()=>setLaunchMode("stock-floor")}>
+            <strong>Stock Floor</strong>
+            <span>Launch on top of a real BSC stock token with a reserve-backed redemption floor</span>
+          </button>
+          <button className={launchMode==="preipo-perp" ? "launchEngine selectedEngine" : "launchEngine"} onClick={()=>setLaunchMode("preipo-perp")}>
+            <strong>Pre-IPO Perp</strong>
+            <span>Experimental Lighter-referenced market settled in a BSC stablecoin</span>
+          </button>
+        </div>
+
+        {launchMode==="stock-floor" && (
+          <div className="engineSettings">
+            <div>
+              <span className="eyebrow">STOCK FLOOR</span>
+              <strong>{selectedAssets[0]?.name || "Choose one verified stock token below"}</strong>
+              <small>The floor vault holds a protected share of stock-token reserves and is designed to support pro-rata redemption after activation.</small>
+            </div>
+            <label>
+              Protected floor reserve
+              <span className="fieldValue">{floorReservePct}%</span>
+              <input type="range" min="15" max="70" value={floorReservePct} onChange={(e)=>setFloorReservePct(Number(e.target.value))} />
+            </label>
+          </div>
+        )}
+
+        {launchMode==="preipo-perp" && (
+          <div className="engineSettings">
+            <div>
+              <span className="eyebrow">EXPERIMENTAL PRE-IPO REFERENCE</span>
+              <strong>Lighter perpetual reference</strong>
+              <small>The perp is not a BEP-20 reserve asset. Fortune uses an approved settlement token plus a bridged mark/index reference and separate hedging design.</small>
+            </div>
+            {lighterLoading ? (
+              <div className="registryEmpty">Loading Lighter pre-IPO markets…</div>
+            ) : lighterMarkets.length ? (
+              <div className="fieldGrid">
+                <label>Reference market
+                  <select value={perpMarketId ?? ""} onChange={(e)=>setPerpMarketId(Number(e.target.value))}>
+                    {lighterMarkets.map((market)=><option key={market.marketId} value={market.marketId} disabled={!market.active}>{market.symbol}{market.active ? "" : " · inactive"}</option>)}
+                  </select>
+                </label>
+                <label>Reference multiplier
+                  <select value={referenceMultiplier} onChange={(e)=>setReferenceMultiplier(Number(e.target.value))}>
+                    <option value={1}>1x</option>
+                    <option value={2}>2x experimental</option>
+                    <option value={3}>3x experimental</option>
+                  </select>
+                </label>
+              </div>
+            ) : (
+              <div className="registryNotice"><strong>No live pre-IPO market resolved</strong><span>Fortune will not invent an OpenAI/Anthropic market when Lighter's public API does not return one.</span></div>
+            )}
+            <div className="graduationToggle">
+              <button className={depthTier==="low" ? "tabActive" : ""} onClick={()=>setDepthTier("low")}>Experimental low depth</button>
+              <button className={depthTier==="standard" ? "tabActive" : ""} onClick={()=>setDepthTier("standard")}>Standard depth</button>
+            </div>
+          </div>
+        )}
+      </section>
+
       <div className="launchLayout">
         <div className="launchForm">
           <section className="formCard">
@@ -226,11 +370,22 @@ export default function LaunchPage() {
           </section>
 
           <section className="formCard">
-            <div className="formSectionTitle"><span>02</span><div><h2>Build your Fortune Basket</h2><p>Choose 1–5 assets. Every purchase moves one shared curve.</p></div></div>
-            <div className="modeRow"><button className={selected.length===1?"selectedMode":""}>Single</button><button className={selected.length===2?"selectedMode":""}>Dual</button><button className={selected.length>=3?"selectedMode":""}>Multi 3–5</button><span>{selected.length}/5 selected</span></div>
+            <div className="formSectionTitle"><span>02</span><div>
+              <h2>{launchMode==="basket" ? "Build your Fortune Basket" : launchMode==="stock-floor" ? "Choose the stock floor asset" : "Choose the BSC settlement asset"}</h2>
+              <p>{launchMode==="basket" ? "Choose 1–5 assets. Every purchase moves one shared curve." : launchMode==="stock-floor" ? "Use one real, pairable BSC stock-token representation." : "Perp-referenced pools settle on BSC; the external perp is a price reference, not the reserve token."}</p>
+            </div></div>
+            {launchMode==="basket" && <div className="modeRow"><button className={selected.length===1?"selectedMode":""}>Single</button><button className={selected.length===2?"selectedMode":""}>Dual</button><button className={selected.length>=3?"selectedMode":""}>Multi 3–5</button><span>{selected.length}/5 selected</span></div>}
 
             <div className="categoryTabs">
-              {assetCategories.map((category) => (
+              {assetCategories
+                .filter((category) =>
+                  launchMode === "stock-floor"
+                    ? ["xStocks", "China Stocks", "NASDAQ Penny Stocks"].includes(category)
+                    : launchMode === "preipo-perp"
+                      ? ["Stablecoins"].includes(category)
+                      : true
+                )
+                .map((category) => (
                 <button key={category} onClick={()=>setActiveCategory(category)} className={activeCategory===category?"tabActive":""}>{category}</button>
               ))}
             </div>
@@ -414,6 +569,12 @@ export default function LaunchPage() {
               devBuy={devBuy}
               fee={(feeTotal/100).toFixed(2)}
               graduation={graduation}
+              launchMode={launchMode}
+              stockFloorAsset={launchMode==="stock-floor" ? selectedAssets[0]?.symbol || "None" : undefined}
+              floorReservePct={floorReservePct}
+              perpReference={launchMode==="preipo-perp" ? lighterMarkets.find((market)=>market.marketId===perpMarketId)?.symbol || "Unresolved" : undefined}
+              referenceMultiplier={referenceMultiplier}
+              depthTier={depthTier}
             />
             <button className="launchButton" disabled={!FACTORY_ADDRESS}>
               {FACTORY_ADDRESS ? "Review & deploy to configured BSC testnet →" : "BSC testnet factory not configured"}
@@ -448,8 +609,15 @@ function FeeInput({ label, value, setValue }: { label:string; value:number; setV
   return <div className="feeRow"><span>{label}</span><label><input type="number" min="0" max="500" value={value} onChange={(e)=>setValue(Number(e.target.value))} /><em>bps</em></label></div>;
 }
 
-function ManifestRows({ name, symbol, assets, primary, reward, devBuy, fee, graduation }: { name:string; symbol:string; assets:string[]; primary:string; reward:string; devBuy:number; fee:string; graduation:string }) {
+function ManifestRows({
+  name, symbol, assets, primary, reward, devBuy, fee, graduation, launchMode,
+  stockFloorAsset, floorReservePct, perpReference, referenceMultiplier, depthTier
+}: {
+  name:string; symbol:string; assets:string[]; primary:string; reward:string; devBuy:number; fee:string; graduation:string;
+  launchMode: LaunchMode; stockFloorAsset?: string; floorReservePct: number; perpReference?: string; referenceMultiplier: number; depthTier: "low" | "standard";
+}) {
   const rows = [
+    ["Launch engine", launchMode==="basket" ? "Basket Curve" : launchMode==="stock-floor" ? "Stock Floor" : "Pre-IPO Perp"],
     ["Token", name + " ($" + symbol + ")"],
     ["Accepted quote assets", assets.join(" · ")],
     ["Primary market", primary],
@@ -460,6 +628,12 @@ function ManifestRows({ name, symbol, assets, primary, reward, devBuy, fee, grad
     ["Post-launch mint", "Disabled"],
     ["Arbitrary blacklist", "Disabled"],
     ["Silent fee changes", "Disabled"],
+    ...(launchMode==="stock-floor"
+      ? [["Stock floor asset", stockFloorAsset || "None"], ["Protected reserve", floorReservePct + "%"], ["Floor redemption", "Purpose-built vault"]]
+      : []),
+    ...(launchMode==="preipo-perp"
+      ? [["Perp reference", perpReference || "Unresolved"], ["Reference multiplier", referenceMultiplier + "x"], ["Liquidity depth", depthTier==="low" ? "Experimental low" : "Standard"], ["Settlement", primary]]
+      : []),
   ];
   return <div className="manifestTable">{rows.map(([a,b])=><div key={a}><span>{a}</span><strong>{b}</strong></div>)}</div>;
 }

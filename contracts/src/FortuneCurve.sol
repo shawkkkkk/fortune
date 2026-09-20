@@ -23,6 +23,7 @@ contract FortuneCurve is ReentrancyGuard {
     uint32 public constant SNIPE_TAX_SECONDS = 5;
     uint16 public constant EARLY_WALLET_CAP_BPS = 200; // 2% of supply
     uint32 public constant EARLY_WALLET_CAP_SECONDS = 15;
+    uint32 public constant GRADUATION_RESCUE_DELAY = 7 days;
 
     address public immutable factory;
     IERC20 public immutable launchToken;
@@ -44,7 +45,18 @@ contract FortuneCurve is ReentrancyGuard {
     uint256 public tokensSold;
     bool public graduationReady;
     bool public graduated;
+    bool public rescueActive;
+    uint64 public graduationReadyAt;
     uint256 public graduationAnchorPriceUsd1e18;
+    uint256 public rescueSupply;
+    uint256 public rescueRedeemed;
+
+    enum Phase {
+        CurveActive,
+        GraduationReady,
+        PoolCreated,
+        Rescued
+    }
 
     event LaunchShieldConfigured(
         uint16 startTaxBps,
@@ -59,6 +71,13 @@ contract FortuneCurve is ReentrancyGuard {
         uint256 grossQuoteIn,
         uint256 taxAmount,
         uint16 taxBps
+    );
+    event BuyPartialFill(
+        address indexed buyer,
+        address indexed quoteAsset,
+        uint256 requestedQuoteIn,
+        uint256 spentQuoteIn,
+        uint256 refundedQuoteIn
     );
     event Bought(
         address indexed buyer,
@@ -81,9 +100,22 @@ contract FortuneCurve is ReentrancyGuard {
         uint256 tokensSold
     );
     event Graduated(address indexed adapter);
+    event RescueActivated(
+        uint256 circulatingRescueSupply,
+        uint256 activatedAt
+    );
+    event RescueRedeemed(
+        address indexed holder,
+        uint256 tokenAmount
+    );
 
     modifier tradingOpen() {
-        require(!graduationReady && !graduated, "TRADING_CLOSED");
+        require(
+            !graduationReady &&
+                !graduated &&
+                !rescueActive,
+            "TRADING_CLOSED"
+        );
         _;
     }
 
@@ -166,8 +198,98 @@ contract FortuneCurve is ReentrancyGuard {
         return launchElapsedSeconds() < EARLY_WALLET_CAP_SECONDS;
     }
 
+    function phase() public view returns (Phase) {
+        if (rescueActive) return Phase.Rescued;
+        if (graduated) return Phase.PoolCreated;
+        if (graduationReady) return Phase.GraduationReady;
+        return Phase.CurveActive;
+    }
+
     function currentPriceUsd1e18() public view returns (uint256) {
         return basePriceUsd1e18 + (slopeUsd1e18 * tokensSold / 1e18);
+    }
+
+    /// @notice Preview the exact onchain opening-tax, fee, partial-fill and refund behavior.
+    /// @dev The preview clamps quote input to the remaining graduation target so the
+    ///      final buyer cannot overfund the curve or be reverted by a tiny preceding buy.
+    function previewBuy(address quoteAsset, uint256 amountIn)
+        public
+        view
+        returns (
+            uint256 quoteSpent,
+            uint256 quoteRefund,
+            uint256 snipeTax,
+            uint256 normalFee,
+            uint256 netQuote,
+            uint256 usdIn,
+            uint256 tokensOut
+        )
+    {
+        require(acceptedQuote[quoteAsset], "QUOTE_NOT_ACCEPTED");
+        require(amountIn > 0, "ZERO_AMOUNT");
+        require(!graduationReady && !graduated && !rescueActive, "TRADING_CLOSED");
+
+        uint256 reserveUsdBefore = netReserveUsd1e18();
+        require(
+            reserveUsdBefore < graduationUsd1e18,
+            "GRADUATION_THRESHOLD_REACHED"
+        );
+
+        uint16 shieldBps = currentSnipeTaxBps();
+        uint16 feeBps = feeRouter.totalFeeBps();
+
+        quoteSpent = amountIn;
+        (
+            snipeTax,
+            normalFee,
+            netQuote
+        ) = _feesForGross(quoteSpent, shieldBps, feeBps);
+        usdIn = registry.usdValue(quoteAsset, netQuote);
+
+        uint256 remainingUsd = graduationUsd1e18 - reserveUsdBefore;
+        if (usdIn > remainingUsd) {
+            uint256 targetNetQuote =
+                registry.tokenAmountForUsd(quoteAsset, remainingUsd);
+
+            quoteSpent = _grossForNet(
+                targetNetQuote,
+                shieldBps,
+                feeBps
+            );
+            if (quoteSpent > amountIn) quoteSpent = amountIn;
+
+            (
+                snipeTax,
+                normalFee,
+                netQuote
+            ) = _feesForGross(quoteSpent, shieldBps, feeBps);
+
+            // Rounding can leave one or two base units below the target.
+            while (
+                quoteSpent < amountIn &&
+                netQuote < targetNetQuote
+            ) {
+                quoteSpent += 1;
+                (
+                    snipeTax,
+                    normalFee,
+                    netQuote
+                ) = _feesForGross(
+                    quoteSpent,
+                    shieldBps,
+                    feeBps
+                );
+            }
+
+            usdIn = registry.usdValue(quoteAsset, netQuote);
+        }
+
+        quoteRefund = amountIn - quoteSpent;
+        uint256 price = currentPriceUsd1e18();
+        tokensOut = usdIn * 1e18 / price;
+
+        uint256 inventory = launchToken.balanceOf(address(this));
+        require(tokensOut <= inventory, "INSUFFICIENT_CURVE_TOKENS");
     }
 
     /// @notice Buy launch tokens with any accepted quote asset.
@@ -177,33 +299,33 @@ contract FortuneCurve is ReentrancyGuard {
         uint256 amountIn,
         uint256 minTokensOut
     ) external nonReentrant tradingOpen returns (uint256 tokensOut) {
-        require(acceptedQuote[quoteAsset], "QUOTE_NOT_ACCEPTED");
-        require(amountIn > 0, "ZERO_AMOUNT");
+        (
+            uint256 quoteSpent,
+            uint256 quoteRefund,
+            uint256 snipeTax,
+            uint256 fee,
+            uint256 netAmount,
+            uint256 usdIn,
+            uint256 previewTokensOut
+        ) = previewBuy(quoteAsset, amountIn);
+
+        tokensOut = previewTokensOut;
+        require(tokensOut >= minTokensOut && tokensOut > 0, "SLIPPAGE");
 
         IERC20 quote = IERC20(quoteAsset);
         uint256 balanceBefore = quote.balanceOf(address(this));
         quote.safeTransferFrom(msg.sender, address(this), amountIn);
         uint256 received = quote.balanceOf(address(this)) - balanceBefore;
-        // Fortune v1 deliberately rejects fee-on-transfer / non-standard
-        // accounting rather than silently giving the buyer a bad quote.
         require(received == amountIn, "NON_STANDARD_QUOTE_TOKEN");
-
-        uint16 snipeTaxBps = currentSnipeTaxBps();
-        uint256 snipeTax = received * snipeTaxBps / BPS;
-        uint256 afterShield = received - snipeTax;
-
-        // Normal Fortune fees are charged only after the temporary launch tax.
-        uint256 fee = afterShield * feeRouter.totalFeeBps() / BPS;
-        uint256 netAmount = afterShield - fee;
 
         if (snipeTax > 0) {
             quote.safeTransfer(shieldVault, snipeTax);
             emit SnipeTaxCharged(
                 msg.sender,
                 quoteAsset,
-                received,
+                quoteSpent,
                 snipeTax,
-                snipeTaxBps
+                currentSnipeTaxBps()
             );
         }
 
@@ -212,15 +334,16 @@ contract FortuneCurve is ReentrancyGuard {
             feeRouter.route(quoteAsset, fee);
         }
 
-        uint256 usdIn = registry.usdValue(quoteAsset, netAmount);
-        uint256 price = currentPriceUsd1e18();
-        tokensOut = usdIn * 1e18 / price;
-
-        require(tokensOut >= minTokensOut && tokensOut > 0, "SLIPPAGE");
-        require(
-            launchToken.balanceOf(address(this)) >= tokensOut,
-            "INSUFFICIENT_CURVE_TOKENS"
-        );
+        if (quoteRefund > 0) {
+            quote.safeTransfer(msg.sender, quoteRefund);
+            emit BuyPartialFill(
+                msg.sender,
+                quoteAsset,
+                amountIn,
+                quoteSpent,
+                quoteRefund
+            );
+        }
 
         if (launchElapsedSeconds() < EARLY_WALLET_CAP_SECONDS) {
             uint256 walletCap =
@@ -239,9 +362,59 @@ contract FortuneCurve is ReentrancyGuard {
         tokensSold += tokensOut;
 
         launchToken.safeTransfer(msg.sender, tokensOut);
-        emit Bought(msg.sender, quoteAsset, amountIn, tokensOut, usdIn);
+        emit Bought(
+            msg.sender,
+            quoteAsset,
+            quoteSpent,
+            tokensOut,
+            usdIn
+        );
+
+        // netAmount remains in the curve. This assertion makes the accounting
+        // relationship explicit for audits without trusting nominal transfer input.
+        require(
+            quote.balanceOf(address(this)) >= balanceBefore + netAmount,
+            "CURVE_ACCOUNTING"
+        );
 
         _checkGraduation();
+    }
+
+    function _feesForGross(
+        uint256 gross,
+        uint16 shieldBps,
+        uint16 feeBps
+    )
+        internal
+        pure
+        returns (
+            uint256 shieldTax,
+            uint256 normalFee,
+            uint256 net
+        )
+    {
+        shieldTax = gross * shieldBps / BPS;
+        uint256 afterShield = gross - shieldTax;
+        normalFee = afterShield * feeBps / BPS;
+        net = afterShield - normalFee;
+    }
+
+    function _grossForNet(
+        uint256 targetNet,
+        uint16 shieldBps,
+        uint16 feeBps
+    ) internal pure returns (uint256) {
+        uint256 denominator =
+            uint256(BPS - shieldBps) *
+            uint256(BPS - feeBps);
+        require(denominator > 0, "BAD_FEE_DENOMINATOR");
+
+        uint256 numerator =
+            targetNet * uint256(BPS) * uint256(BPS);
+
+        return numerator == 0
+            ? 0
+            : (numerator - 1) / denominator + 1;
     }
 
     /// @notice Sell launch tokens into any accepted quote reserve with enough depth.
@@ -367,7 +540,12 @@ contract FortuneCurve is ReentrancyGuard {
         view
         returns (bool ready, bytes32 reasonCode)
     {
-        require(graduationReady && !graduated, "NOT_READY");
+        require(
+            graduationReady &&
+                !graduated &&
+                !rescueActive,
+            "NOT_READY"
+        );
         require(adapter != address(0), "ZERO_ADAPTER");
 
         (
@@ -388,7 +566,12 @@ contract FortuneCurve is ReentrancyGuard {
     ///      the entire transaction rolls back and the launch remains retryable.
     function graduate(address adapter, bytes calldata data) external nonReentrant {
         require(msg.sender == factory, "ONLY_FACTORY");
-        require(graduationReady && !graduated, "NOT_READY");
+        require(
+            graduationReady &&
+                !graduated &&
+                !rescueActive,
+            "NOT_READY"
+        );
         require(adapter != address(0), "ZERO_ADAPTER");
 
         (
@@ -433,6 +616,7 @@ contract FortuneCurve is ReentrancyGuard {
         if (totalUsd >= graduationUsd1e18) {
             uint256 anchorPrice = currentPriceUsd1e18();
             graduationReady = true;
+            graduationReadyAt = uint64(block.timestamp);
             graduationAnchorPriceUsd1e18 = anchorPrice;
 
             emit GraduationReady(totalUsd);

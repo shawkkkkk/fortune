@@ -9,3 +9,5 @@ Workflow safety: chain-id, bytecode, balance, full contract suite, simulation, a
 Retry 1: push-trigger defaults fixed for Pancake addresses.
 
 Retry 2: direct broadcast with skip-simulation and live invariant verification.
+
+Retry 3: trace-free direct deployment + live lifecycle harnesses.

@@ -204,6 +204,7 @@ jobs:
             echo "Website config already points at the verified stack."
           else
             git -C .. commit -m "Publish verified Fortune public alpha stack"
+            git -C .. pull --rebase origin main
             git -C .. push origin HEAD:main
           fi
 

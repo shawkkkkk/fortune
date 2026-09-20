@@ -212,7 +212,6 @@ const ZH: Record<string, string> = {
   "FORTUNE PUBLIC API · BETA": "FORTUNE 公共 API · 测试版",
   "Real data or no data.": "只展示真实数据，否则不展示。",
   "Readiness and protocol configuration come from the deployed BSC Testnet stack. Indexed market endpoints deliberately return no synthetic activity until the event indexer is live.": "就绪状态和协议配置来自已部署的 BSC 测试网。市场索引接口在事件索引器上线前不会返回任何模拟活动数据。",
-  "Open public testnet →": "进入公开测试网 →",
   "NON-CUSTODIAL": "非托管",
   "Wallets authorize writes.": "写入操作由钱包授权。",
   "The dedicated testnet UI signs transactions in the user's wallet. Private keys never touch Fortune servers.": "专用测试网界面会在用户钱包中签署交易。私钥绝不会进入 Fortune 服务器。",

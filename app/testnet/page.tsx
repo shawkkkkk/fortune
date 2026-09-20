@@ -317,7 +317,7 @@ type ServiceHealthState =
 type TrackedTransaction = {
   hash: Hex;
   label: string;
-  state: "pending" | "confirmed" | "unknown";
+  state: "pending" | "confirmed" | "reverted" | "unknown";
   updatedAt: string;
 };
 
@@ -709,6 +709,19 @@ export default function PublicTestnetPage() {
       const receipt = await publicClient.waitForTransactionReceipt({
         hash,
       });
+      if (receipt.status !== "success") {
+        setLastTransaction({
+          hash,
+          label,
+          state: "reverted",
+          updatedAt: new Date().toISOString(),
+        });
+        throw new Error(
+          label +
+            " reverted onchain. Review the transaction on BscScan before retrying."
+        );
+      }
+
       setLastTransaction({
         hash,
         label,
@@ -717,13 +730,26 @@ export default function PublicTestnetPage() {
       });
       return receipt;
     } catch (error) {
+      if (
+        error instanceof Error &&
+        error.message.includes("reverted onchain")
+      ) {
+        throw error;
+      }
+
       setLastTransaction({
         hash,
         label,
         state: "unknown",
         updatedAt: new Date().toISOString(),
       });
-      throw error;
+      throw new Error(
+        label +
+          " was submitted, but Fortune could not verify its final receipt. Check BscScan for " +
+          hash +
+          " before retrying. " +
+          (error instanceof Error ? error.message : "")
+      );
     }
   }
 
@@ -1835,9 +1861,11 @@ export default function PublicTestnetPage() {
             >
               {lastTransaction.state === "confirmed"
                 ? "Confirmed"
-                : lastTransaction.state === "pending"
-                  ? "Pending"
-                  : "Check status"}{" "}
+                : lastTransaction.state === "reverted"
+                  ? "Reverted"
+                  : lastTransaction.state === "pending"
+                    ? "Pending"
+                    : "Check status"}{" "}
               on BscScan ↗
             </a>
           ) : null}

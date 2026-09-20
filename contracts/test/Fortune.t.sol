@@ -16,7 +16,13 @@ import {FortuneAutomationVault} from "../src/FortuneAutomationVault.sol";
 import {MockAutomationAdapter} from "../src/test/MockAutomationAdapter.sol";
 import {FortuneStockFloorVault} from "../src/FortuneStockFloorVault.sol";
 import {FortunePermanentLiquidityLocker} from "../src/FortunePermanentLiquidityLocker.sol";
+import {FortunePancakeV3GraduationAdapter} from "../src/FortunePancakeV3GraduationAdapter.sol";
 import {MockPositionManager} from "../src/test/MockPositionManager.sol";
+import {
+    MockPancakeV3Factory,
+    MockPancakeV3Pool,
+    MockPancakeV3PositionManager
+} from "../src/test/MockPancakeV3.sol";
 import {FortunePerpReferenceRegistry} from "../src/FortunePerpReferenceRegistry.sol";
 import {FortuneMetadataRegistry} from "../src/FortuneMetadataRegistry.sol";
 import {MockReferenceOracle} from "../src/test/MockReferenceOracle.sol";
@@ -516,6 +522,196 @@ contract FortuneTest is Test {
         // Subsequent keeper checks cannot move the chart anchor.
         curve.checkGraduation();
         assertEq(curve.graduationAnchorPriceUsd1e18(), anchor);
+    }
+
+    function _installPancakeGraduation()
+        internal
+        returns (
+            MockPancakeV3Factory pancake,
+            MockPancakeV3PositionManager manager,
+            FortunePermanentLiquidityLocker locker,
+            FortunePancakeV3GraduationAdapter adapter
+        )
+    {
+        pancake = new MockPancakeV3Factory();
+        manager =
+            new MockPancakeV3PositionManager(
+                address(pancake)
+            );
+        locker =
+            new FortunePermanentLiquidityLocker(
+                address(factory),
+                address(manager)
+            );
+        adapter =
+            new FortunePancakeV3GraduationAdapter(
+                address(factory),
+                address(registry),
+                address(pancake),
+                address(manager),
+                address(locker)
+            );
+
+        factory.setLiquidityLockerDepositor(
+            address(locker),
+            address(adapter),
+            true
+        );
+        factory.setGraduationAdapter(
+            address(adapter)
+        );
+    }
+
+    function _pancakePlan()
+        internal
+        view
+        returns (bytes memory)
+    {
+        uint24[] memory fees =
+            new uint24[](2);
+        fees[0] = 500;
+        fees[1] = 500;
+
+        FortunePancakeV3GraduationAdapter.GraduationPlan
+            memory plan =
+                FortunePancakeV3GraduationAdapter
+                    .GraduationPlan({
+                        fees: fees,
+                        maxSqrtPriceDeviationBps: 100,
+                        maxDustBps: 100,
+                        deadline: uint64(
+                            block.timestamp + 5 minutes
+                        )
+                    });
+
+        return abi.encode(plan);
+    }
+
+    function testPancakeGraduationLocksLpAndBurnsExcessInventory() public {
+        (
+            MockPancakeV3Factory pancake,
+            MockPancakeV3PositionManager manager,
+            FortunePermanentLiquidityLocker locker,
+            
+        ) = _installPancakeGraduation();
+
+        FortuneFactory.LaunchInfo memory info =
+            factory.createLaunch(_params(50e18));
+        FortuneCurve curve =
+            FortuneCurve(info.curve);
+        FortuneToken token =
+            FortuneToken(info.token);
+
+        vm.warp(block.timestamp + 16);
+
+        vm.startPrank(user);
+        usdt.approve(
+            address(curve),
+            type(uint256).max
+        );
+        curve.buy(address(usdt), 100e18, 1);
+        vm.stopPrank();
+
+        uint256 lpTokens =
+            curve.requiredLaunchTokensForGraduation();
+        uint256 supplyBefore = token.totalSupply();
+
+        bool success =
+            factory.finalizeGraduation(
+                address(curve),
+                _pancakePlan()
+            );
+
+        assertTrue(success);
+        assertTrue(curve.graduated());
+        assertEq(
+            token.balanceOf(address(curve)),
+            0
+        );
+        assertLt(
+            token.totalSupply(),
+            supplyBefore
+        );
+        assertEq(
+            token.totalSupply(),
+            curve.tokensSold() + lpTokens
+        );
+
+        address pool =
+            pancake.getPool(
+                info.token,
+                address(usdt),
+                500
+            );
+        assertTrue(pool != address(0));
+        assertEq(
+            locker.lockedPositionCount(),
+            1
+        );
+        assertEq(
+            manager.ownerOf(1),
+            address(locker)
+        );
+    }
+
+    function testPancakeGraduationRefusesBadExistingPoolPrice() public {
+        (
+            MockPancakeV3Factory pancake,
+            MockPancakeV3PositionManager manager,
+            FortunePermanentLiquidityLocker locker,
+            
+        ) = _installPancakeGraduation();
+
+        // Silence unused-local warnings while retaining typed setup.
+        assertTrue(address(locker) != address(0));
+
+        FortuneFactory.LaunchInfo memory info =
+            factory.createLaunch(_params(50e18));
+        FortuneCurve curve =
+            FortuneCurve(info.curve);
+
+        vm.warp(block.timestamp + 16);
+
+        vm.startPrank(user);
+        usdt.approve(
+            address(curve),
+            type(uint256).max
+        );
+        curve.buy(address(usdt), 100e18, 1);
+        vm.stopPrank();
+
+        manager
+            .createAndInitializePoolIfNecessary(
+                info.token,
+                address(usdt),
+                500,
+                1
+            );
+
+        bool success =
+            factory.finalizeGraduation(
+                address(curve),
+                _pancakePlan()
+            );
+
+        assertFalse(success);
+        assertFalse(curve.graduated());
+        assertGt(
+            usdt.balanceOf(address(curve)),
+            0
+        );
+
+        address pool =
+            pancake.getPool(
+                info.token,
+                address(usdt),
+                500
+            );
+        assertEq(
+            MockPancakeV3Pool(pool)
+                .sqrtPriceX96(),
+            1
+        );
     }
 
     function testGraduationLiquidityMatchesStoredCurveAnchor() public {

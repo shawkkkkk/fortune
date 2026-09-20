@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 import { assetCategories, assets } from "@/data/assets";
 import type { AssetCategory } from "@/lib/types";
 
+const FACTORY_ADDRESS = process.env.NEXT_PUBLIC_FORTUNE_FACTORY_ADDRESS || "";
+
 export default function LaunchPage() {
   const [name, setName] = useState("");
   const [symbol, setSymbol] = useState("");
@@ -166,8 +168,14 @@ export default function LaunchPage() {
               fee={(feeTotal/100).toFixed(2)}
               graduation={graduation}
             />
-            <button className="launchButton">Review & deploy to BSC testnet →</button>
-            <small className="launchWarning">Prototype only. Production launch remains disabled until contract audits, oracle review and graduation-adapter review are complete.</small>
+            <button className="launchButton" disabled={!FACTORY_ADDRESS}>
+              {FACTORY_ADDRESS ? "Review & deploy to configured BSC testnet →" : "BSC testnet factory not configured"}
+            </button>
+            <small className="launchWarning">
+              {FACTORY_ADDRESS
+                ? "A testnet factory is configured. This UI still requires transaction encoding before deployments are submitted."
+                : "Deploy the isolated testnet stack first and set NEXT_PUBLIC_FORTUNE_FACTORY_ADDRESS. Production remains disabled until audits and adapter review are complete."}
+            </small>
           </section>
         </div>
 

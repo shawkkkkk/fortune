@@ -785,6 +785,8 @@ function ManifestRows({
     ["Holder reward asset", reward],
     ["Developer buy", devBuy + "%"],
     ["Total configured fee", fee + "%"],
+    ["Creator fee surrender", "Optional · one-way to holder rewards"],
+    ["Graduation LP", "Permanent locker · no creator withdrawal"],
     ["Post-launch mint", "Disabled"],
     ["Arbitrary blacklist", "Disabled"],
     ["Silent fee changes", "Disabled"],

@@ -211,3 +211,329 @@ input,textarea,select{width:100%;border:1px solid #323832;background:#0e1110;col
 .readiness-pass>b{color:var(--lime);border-color:#58713b;background:#172010}.readiness-warn>b{color:var(--gold);border-color:#695d37;background:#1e1a0f}.readiness-fail>b{color:#f08f8f;border-color:#704040;background:#211111}
 .readinessErrors{display:flex;flex-direction:column;gap:5px;margin-top:10px;border-top:1px solid #2a3028;padding-top:10px}.readinessErrors span{font-size:8px;color:#c98787}
 @media(max-width:760px){.readinessGrid{grid-template-columns:1fr}.readinessSummary{align-items:flex-start;flex-direction:column}}
+
+
+/* Fortune public beta visual system: white canvas with red accents. */
+:root{
+  --bg:#ffffff;
+  --panel:#ffffff;
+  --panel2:#fff8f8;
+  --line:#ece5e5;
+  --line2:#dfd3d3;
+  --text:#171313;
+  --muted:#756d6d;
+  --soft:#4f4747;
+  --lime:#e1262f;
+  --lime2:#b71922;
+  --gold:#b56a21;
+  --danger:#c81e2a;
+  --blue:#2563eb;
+  --red-soft:#fff1f1;
+  --red-soft-2:#ffe5e6;
+  --red-line:#f2c7ca;
+}
+
+html{
+  background:#fff;
+  color-scheme:light;
+}
+
+body{
+  background:
+    radial-gradient(circle at 12% -10%,rgba(225,38,47,.08),transparent 28rem),
+    radial-gradient(circle at 90% 24%,rgba(225,38,47,.045),transparent 24rem),
+    #fff;
+  color:var(--text);
+}
+
+h1,h2,h3,h4,h5,h6,strong,b{color:var(--text)}
+
+.networkBar{
+  background:#fff6f6;
+  border-bottom-color:var(--red-line);
+  color:#6f5557;
+}
+.networkDot{background:var(--lime)}
+.networkNote{color:#9a7779}
+.networkWarn{background:#d98d2b!important}
+
+.siteHeader{
+  background:rgba(255,255,255,.92);
+  border-bottom-color:rgba(226,212,212,.92);
+  box-shadow:0 8px 28px rgba(83,26,29,.04);
+}
+
+.logoMark{
+  background:linear-gradient(145deg,#f0444d,#c91520);
+  color:#fff;
+  box-shadow:0 10px 28px rgba(225,38,47,.18);
+}
+
+.navLinks a{color:#796e6e}
+.navLinks a:hover,.navLinks .navActive{
+  color:#b71922;
+  background:#fff0f1;
+}
+
+.iconButton,.secondaryCta{
+  border-color:#e3d4d4;
+  background:#fff;
+  color:#4d4141;
+}
+.iconButton:hover,.secondaryCta:hover{
+  border-color:#e1262f;
+  background:#fff5f5;
+  color:#bd1721;
+}
+
+.walletButton,.primaryCta,.launchButton{
+  background:#e1262f;
+  color:#fff;
+  border-color:#e1262f;
+  box-shadow:0 8px 20px rgba(225,38,47,.12);
+}
+.walletButton:hover,.primaryCta:hover,.launchButton:hover{
+  background:#bd1721;
+  border-color:#bd1721;
+  color:#fff;
+}
+button:disabled{
+  opacity:.48;
+  cursor:not-allowed;
+}
+
+.languageSwitch{
+  display:flex;
+  align-items:center;
+  border:1px solid #e3d4d4;
+  border-radius:11px;
+  padding:3px;
+  background:#fff;
+}
+.languageSwitch button{
+  border:0;
+  background:transparent;
+  color:#8a7375;
+  padding:7px 9px;
+  border-radius:8px;
+  font-size:10px;
+  font-weight:850;
+  cursor:pointer;
+}
+.languageSwitch button:hover{color:#b71922}
+.languageSwitch .languageActive{
+  background:#fff0f1;
+  color:#c01822;
+}
+
+.eyebrow{color:#aa444a}
+
+.heroManifest{
+  border-color:#edd8d9;
+  background:linear-gradient(145deg,#fff,#fff6f6);
+  box-shadow:0 25px 70px rgba(91,24,28,.08);
+}
+.manifestLabel{color:#be1e28}
+.bigBasket span{
+  border-color:#f0d4d5;
+  background:#fff3f3;
+  color:#9f1c24;
+}
+.manifestRule{background:#eedede}
+.manifestRows span,.statRows span,.previewFacts span,.manifestTable span{color:#7f7272}
+
+.panel,.formCard,.launchPreview,.sidebarCard,.automationCard,.automationHero,
+.metricsGrid,.registryStrip,.registryPanel,.launchCard,.categoryTabs,
+.selectedBasket,.feeMatrix,.apiEndpointTable,.registryTable,.metadataPolicy,
+.launchEngine,.engineSettings,.launchShieldCard,.customAssetBox{
+  background:#fff;
+  border-color:var(--line);
+  color:var(--text);
+}
+
+.panel,.formCard,.automationCard,.heroManifest,.registryStrip,.registryPanel{
+  box-shadow:0 12px 34px rgba(72,28,30,.045);
+}
+
+.registryStrip{
+  background:linear-gradient(145deg,#fff,#fff8f8);
+}
+.registryCategories span{
+  border-color:#ebdada;
+  background:#fff;
+  color:#755f60;
+}
+
+.metric{border-color:var(--line)}
+.metric span{color:#7e7171}
+.metric small{color:#9b8f8f}
+
+.filterTabs button,.forumTabs button,.chartTabs button,.graduationToggle button,
+.categoryTabs button,.rewardModes button,.modeRow button{
+  color:#786b6b;
+}
+.filterTabs .tabActive,.forumTabs .tabActive,.chartTabs .tabActive,
+.graduationToggle .tabActive,.categoryTabs .tabActive,.selectedMode{
+  background:#fff0f1!important;
+  color:#b71922!important;
+  border-color:#efc4c7!important;
+}
+
+input,textarea,select{
+  border-color:#ded2d2;
+  background:#fff;
+  color:#211b1b;
+}
+input::placeholder,textarea::placeholder{color:#a89c9c}
+input:focus,textarea:focus,select:focus{
+  border-color:#e1262f;
+  box-shadow:0 0 0 3px rgba(225,38,47,.08);
+}
+
+.formCard>label,.tradePanel label{color:#665b5b}
+.formSectionTitle>span{
+  background:#fff0f1;
+  color:#c01822;
+}
+.formSectionTitle p,.fieldHint,.launchWarning,.dataDisclaimer{color:#8b7f7f!important}
+
+.registryNotice{
+  border-color:#f0c8ca;
+  background:#fff5f5;
+}
+.registryNotice strong{color:#bb1721}
+.registryNotice span{color:#7c696a}
+
+.registryTableHead{
+  background:#fff5f5;
+  color:#8a6f71;
+}
+.registryRow{
+  border-color:#f0e5e5;
+  color:#6d6161;
+}
+.registryAsset strong{color:#231d1d}
+.registryAsset small{color:#8c8080}
+.capabilityList em{
+  border-color:#efc6c8;
+  background:#fff6f6;
+  color:#b51a23;
+}
+.candidateBadge,.verificationBadge{
+  border-color:#e6d6d6;
+  color:#665a5a;
+}
+.verificationCanonical,.verificationVerified{
+  color:#b71922;
+  border-color:#e9b9bc;
+}
+
+.automationFlow span{
+  border-color:#efc5c8;
+  background:#fff4f4;
+  color:#a81821;
+}
+.automationFlow b{color:#c99ca0}
+.automationIcon{color:#d31f29}
+.automationCard>p,.automationHero p{color:#796d6d}
+.statusHealthy,.statusClear{color:#c31923}
+.statusRunning{color:#a45a19}
+
+.emptyPanel{color:#807474}
+.emptyPanel strong{color:#2d2525}
+
+.apiCode{
+  background:#fff8f8;
+  border-color:#ecdada;
+  color:#4c3738;
+}
+.apiPrinciples>div{
+  background:#fffafa;
+  border-color:#eee1e1;
+}
+.apiPrinciples strong{color:#312727}
+.apiPrinciples span{color:#7d7171}
+.apiEndpointRow{border-color:#f0e5e5}
+.apiEndpointRow code{color:#493a3b}
+.apiEndpointRow>span{color:#786b6b}
+.apiGET{color:#b71922;border-color:#e7b6b9}
+.apiPOST{color:#9b561b;border-color:#e7cfb7}
+
+.launchEngine{
+  background:#fff;
+}
+.launchEngine:hover{border-color:#e3a9ad}
+.launchEngine strong{color:#2c2424}
+.launchEngine span{color:#7e7171}
+.launchEngine.selectedEngine{
+  border-color:#e1262f;
+  background:#fff4f4;
+  box-shadow:inset 0 0 0 1px rgba(225,38,47,.06);
+}
+.launchEngine.selectedEngine strong{color:#bd1721}
+.engineSettings{background:#fffafa;border-color:#eadada}
+
+.metadataPolicy{background:#fffafa;border-color:#eadada}
+.metadataPolicy>div:first-child>strong{color:#2f2727}
+.metadataPolicy>div:first-child>small{color:#807373}
+
+.launchShieldCard{
+  border-color:#efc7c9;
+  background:linear-gradient(145deg,#fff,#fff5f5);
+}
+.shieldGrid>div{
+  border-color:#eed8d9;
+  background:#fff;
+}
+.shieldGrid span,.shieldGrid small{color:#826f70}
+.shieldGrid strong{color:#c51c26}
+.shieldDecay{border-color:#eee0e0}
+.shieldDecay span{
+  border-color:#efd0d2;
+  background:#fff;
+  color:#a53b41;
+}
+.shieldTradeNotice{
+  border-color:#efc8ca;
+  background:#fff5f5;
+}
+.shieldTradeNotice strong{color:#bd1721}
+.shieldTradeNotice span{color:#746667}
+
+.previewArt{
+  border-color:#ead6d7;
+  background:radial-gradient(circle at center,rgba(225,38,47,.10),transparent 42%),#fffafa;
+}
+.previewArt span{color:#d21e28}
+.previewArt small{color:#a55a5f}
+.launchPreview>strong{color:#c01923}
+.launchPreview>p{color:#796c6c}
+
+.progressTrack{background:#f1e4e4}
+.progressTrack span{background:#e1262f}
+.barChart span{background:linear-gradient(#f26067,#bd1721)}
+.mixList>div>div{background:#f0e3e3}
+.mixList i{background:#e1262f}
+
+.healthBadge{color:#bd1721;border-color:#e7b9bb}
+.statusGraduated{color:#bd1721;border-color:#e7b9bb}
+.statusGraduating{color:#9a5b1f;border-color:#e1c8ae}
+.tokenAvatar{
+  background:linear-gradient(145deg,#fff1f1,#fff);
+  border-color:#efd4d5;
+  color:#c71c26;
+}
+.assetOption{
+  background:#fff;
+  border-color:#eadede;
+}
+.assetOption:hover{border-color:#e5aeb1}
+.assetSelected{border-color:#e1262f;background:#fff3f3}
+.assetIconLarge{background:#fff0f1;color:#b71922}
+.selectedBasketHeader,.feeMatrixHeader{background:#fff7f7}
+.feeMatrixHeader span,.fieldValue{color:#c51c26}
+
+@media(max-width:760px){
+  .headerActions{gap:5px}
+  .languageSwitch button{padding:7px 8px}
+}

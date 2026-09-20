@@ -25,17 +25,6 @@ jobs:
       PRIVATE_KEY: ${{ secrets.FORTUNE_TESTNET_PRIVATE_KEY }}
       BSC_TESTNET_RPC_URL: ${{ secrets.BSC_TESTNET_RPC_URL }}
 
-      FORTUNE_FACTORY: "0x744782be89EBeB68dF4c3729b980B9e064a57a24"
-      FORTUNE_TAX_FACTORY: "0x2de91c238c9673Cc1D2BD594eb7d7470513d603E"
-      FORTUNE_REGISTRY: "0x9b379DbF1e5Bcfc68Ec54637Dc03CFC0B03fa284"
-      FORTUNE_POOL_REGISTRY: "0xd4F53A3be71c0EC859dBFf59e5Ec6D56430fE73B"
-      FORTUNE_V3_ADAPTER: "0xbE4C6398fEA94a5a5498586D5575F114C9EBFF26"
-      FORTUNE_V3_LOCKER: "0x9c0782999ED4Bca8A872feFaF6817726d2D25166"
-      FORTUNE_V2_TAX_ADAPTER: "0x819E69ef8A5585dC1919689e980ACFEC8600c066"
-      FORTUNE_V2_LOCKER: "0x21FFC86795881934CAe206d9c06FF6e10fbd0135"
-      FORTUNE_MOCK_QUOTE: "0x37FbCEFB35181022090847D38E7a848265E1e4B2"
-      FORTUNE_MOCK_ORACLE: "0x2057E7AcF631591c320569AeCB1181F0E6636446"
-
       PANCAKE_V2_FACTORY: "0xB7926C0430Afb07AA7DEfDE6DA862aE0Bde767bc"
       PANCAKE_V2_ROUTER: "0x9ac64cc6e4415144c455bd8e4837fea55603e5c3"
       PANCAKE_V3_FACTORY: "0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865"
@@ -43,6 +32,45 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Load currently published Fortune stack
+        run: |
+          python3 - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          text = Path("../lib/public-testnet.ts").read_text()
+          mapping = {
+              "FORTUNE_FACTORY": "factory",
+              "FORTUNE_TAX_FACTORY": "taxFactory",
+              "FORTUNE_REGISTRY": "registry",
+              "FORTUNE_POOL_REGISTRY": "poolRegistry",
+              "FORTUNE_V3_ADAPTER": "graduationAdapter",
+              "FORTUNE_V3_LOCKER": "liquidityLocker",
+              "FORTUNE_V2_TAX_ADAPTER": "taxGraduationAdapter",
+              "FORTUNE_V2_LOCKER": "taxLiquidityLocker",
+              "FORTUNE_MOCK_QUOTE": "mockQuote",
+          }
+
+          values = {}
+          for env_name, key in mapping.items():
+              match = re.search(
+                  rf'\b{re.escape(key)}:\s*"(?P<address>0x[a-fA-F0-9]{{40}})"',
+                  text,
+              )
+              if not match:
+                  raise SystemExit(
+                      f"Missing published address for {key} in lib/public-testnet.ts"
+                  )
+              values[env_name] = match.group("address")
+
+          with open(os.environ["GITHUB_ENV"], "a") as env:
+              for env_name, address in values.items():
+                  env.write(f"{env_name}={address}\n")
+
+          print("Loaded published Fortune public-alpha core stack from lib/public-testnet.ts")
+          PY
 
       - uses: foundry-rs/foundry-toolchain@v1
 
@@ -76,7 +104,6 @@ jobs:
             "$FORTUNE_V2_TAX_ADAPTER" \
             "$FORTUNE_V2_LOCKER" \
             "$FORTUNE_MOCK_QUOTE" \
-            "$FORTUNE_MOCK_ORACLE" \
             "$PANCAKE_V2_FACTORY" \
             "$PANCAKE_V2_ROUTER" \
             "$PANCAKE_V3_FACTORY" \

@@ -56,6 +56,18 @@ The factory searches deterministic CREATE2 salts during launch and rejects any d
 
 Address letter casing is only a display/checksum convention; Fortune renders the suffix as lowercase `fe`.
 
+## Fortune Launch Shield
+
+Every Fortune curve starts with protocol-level anti-sniper protection:
+
+- 99% buy tax at launch, rapidly decaying to 0 after 5 seconds;
+- 2% cumulative per-wallet buy cap during the first 15 seconds;
+- no creator/private-wallet exemptions;
+- temporary shield-tax proceeds route to liquidity reinforcement, not the creator;
+- shield fees do not count as curve buy pressure.
+
+See `docs/LAUNCH_SHIELD.md`.
+
 ## Core idea
 
 Traditional launchpads usually bind a launch to one quote token. Fortune introduces a **Basket Curve**:

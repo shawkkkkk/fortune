@@ -23,6 +23,8 @@ export async function GET(request: Request) {
       {
         items: result.launches.map((launch) => ({
           id: launch.id,
+          mode: launch.mode,
+          factory: launch.factory,
           token: launch.token,
           curve: launch.curve,
           creator: launch.creator,
@@ -46,7 +48,7 @@ export async function GET(request: Request) {
         meta: {
           dataMode: "onchain",
           source:
-            "FortuneFactory + FortuneToken + FortuneCurve reads",
+            "FortuneFactory + FortuneTaxFactory + FortuneToken + FortuneCurve reads",
         },
       }
     );

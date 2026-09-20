@@ -19,3 +19,5 @@ Retry 5: pending-nonce pinning and retry logic for BSC RPC consistency.
 Retry 6: keep deploy logs off stdout so captured addresses remain clean.
 
 Retry 7: fee-rounding regression fixed; bounded lifecycle verifier wired into fresh deployment.
+
+Retry 8: deployer re-funded above 0.12 tBNB by project owner; rerun corrected public alpha stack.

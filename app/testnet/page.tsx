@@ -287,6 +287,41 @@ type TestLaunch = {
   dividendVault?: Address;
 };
 
+const LAST_LAUNCH_KEY = "fortune:bsc-testnet:last-launch:v1";
+
+function isSavedLaunch(value: unknown): value is TestLaunch {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Partial<TestLaunch>;
+  if (candidate.mode !== "standard" && candidate.mode !== "tax") return false;
+  if (
+    typeof candidate.token !== "string" ||
+    typeof candidate.curve !== "string" ||
+    !isAddress(candidate.token) ||
+    !isAddress(candidate.curve)
+  ) {
+    return false;
+  }
+  if (
+    typeof candidate.transactionHash !== "string" ||
+    !/^0x[0-9a-fA-F]{64}$/.test(candidate.transactionHash)
+  ) {
+    return false;
+  }
+  if (
+    candidate.taxProcessor !== undefined &&
+    !isAddress(candidate.taxProcessor)
+  ) {
+    return false;
+  }
+  if (
+    candidate.dividendVault !== undefined &&
+    !isAddress(candidate.dividendVault)
+  ) {
+    return false;
+  }
+  return true;
+}
+
 const allocationLabels = [
   "Creator",
   "Direct burn",
@@ -461,6 +496,22 @@ export default function PublicTestnetPage() {
   );
 
   useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(LAST_LAUNCH_KEY);
+      if (!raw) return;
+      const saved = JSON.parse(raw) as unknown;
+      if (isSavedLaunch(saved)) {
+        setLaunch(saved);
+        setMessage(
+          "Recovered your last Fortune testnet launch from this browser. You can continue its lifecycle below."
+        );
+      }
+    } catch {
+      // A stale or blocked browser storage entry should never block the launch page.
+    }
+  }, []);
+
+  useEffect(() => {
     const injected = (
       window as Window & {
         ethereum?: EIP1193Provider & {
@@ -593,9 +644,17 @@ export default function PublicTestnetPage() {
     };
   }
 
+  function rememberLaunch(next: TestLaunch) {
+    setLaunch(next);
+    try {
+      window.localStorage.setItem(LAST_LAUNCH_KEY, JSON.stringify(next));
+    } catch {
+      // Browser storage is a convenience only; chain state remains authoritative.
+    }
+  }
+
   async function createLaunch() {
     setBusy("launch");
-    setLaunch(null);
 
     try {
       const active = await withAccount();
@@ -818,33 +877,47 @@ export default function PublicTestnetPage() {
         );
       }
 
+      // The launch transaction is already final at this point. Persist it before
+      // any optional follow-up transaction so a rejected/failed creator buy
+      // cannot make a successfully created tax token look lost.
+      rememberLaunch(created);
+
       if (mode === "tax" && initial > 0n) {
-        setMessage(
-          "Tax launch confirmed. Approve fUSD for the curve, then confirm your creator first purchase."
-        );
+        try {
+          setMessage(
+            "Tax launch confirmed. Approve fUSD for the curve, then confirm your creator first purchase."
+          );
 
-        const approval = await walletClient.writeContract({
-          address: PUBLIC_TESTNET.contracts.mockQuote as Address,
-          abi: quoteAbi,
-          functionName: "approve",
-          args: [created.curve, initial],
-        });
-        await publicClient.waitForTransactionReceipt({ hash: approval });
+          const approval = await walletClient.writeContract({
+            address: PUBLIC_TESTNET.contracts.mockQuote as Address,
+            abi: quoteAbi,
+            functionName: "approve",
+            args: [created.curve, initial],
+          });
+          await publicClient.waitForTransactionReceipt({ hash: approval });
 
-        const buyHash = await walletClient.writeContract({
-          address: created.curve,
-          abi: curveAbi,
-          functionName: "buy",
-          args: [
-            PUBLIC_TESTNET.contracts.mockQuote as Address,
-            initial,
-            1n,
-          ],
-        });
-        await publicClient.waitForTransactionReceipt({ hash: buyHash });
+          const buyHash = await walletClient.writeContract({
+            address: created.curve,
+            abi: curveAbi,
+            functionName: "buy",
+            args: [
+              PUBLIC_TESTNET.contracts.mockQuote as Address,
+              initial,
+              1n,
+            ],
+          });
+          await publicClient.waitForTransactionReceipt({ hash: buyHash });
+        } catch (error) {
+          await refreshQuoteBalance(active);
+          setMessage(
+            "Tax token launch succeeded, but the optional creator first-buy did not complete. " +
+              (error instanceof Error ? error.message : "The follow-up transaction failed.") +
+              " Your launch is preserved below and can continue normally."
+          );
+          return;
+        }
       }
 
-      setLaunch(created);
       await refreshQuoteBalance(active);
       setMessage(
         initial > 0n
@@ -1081,7 +1154,6 @@ export default function PublicTestnetPage() {
             className={mode === "standard" ? "selectedMode" : ""}
             onClick={() => {
               setMode("standard");
-              setLaunch(null);
             }}
           >
             <strong>Standard</strong>
@@ -1092,7 +1164,6 @@ export default function PublicTestnetPage() {
             disabled={!taxReady}
             onClick={() => {
               setMode("tax");
-              setLaunch(null);
             }}
           >
             <strong>Tax Token</strong>

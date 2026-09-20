@@ -143,6 +143,36 @@ The prototype caps the total configured trade fee at 5%. The route is immutable 
 
 If holders are meant to receive a different asset from the quote asset, conversion belongs in an approved automation adapter/vault rather than inside the core curve.
 
+## Public API
+
+Fortune now exposes a versioned developer surface at:
+
+```
+/api/public/v1
+```
+
+Public reads require no API key. The API separates discovery from launchability and launchability from runtime preflight.
+
+Current endpoints include:
+- `GET /meta`
+- `GET /protocol`
+- `GET /assets`
+- `GET /pairs`
+- `POST /launches/preview`
+- `GET /tokens`
+- `GET /tokens/{id}`
+- `GET /launches`
+- `GET /stats`
+- `GET /automations`
+- `GET /revenue`
+- `GET /openapi`
+
+A lightweight identity-only asset index is also available at `/api/public/total-assets`.
+
+The launch preview API validates basket weights, quote capabilities, reward assets, fees and launch-engine constraints before any transaction is built. Production transaction preparation remains intentionally disabled until the audited testnet factory/indexer stack is deployed.
+
+See `docs/API.md` and the in-app `/developers` page.
+
 ## Repository layout
 
 ```

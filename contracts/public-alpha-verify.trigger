@@ -13,3 +13,5 @@ Retry 3: precompute vanity salts via eth_call so launch transactions stay below 
 Release verification rerun: launch-hardening + recovery + full-stack readiness gate.
 
 Final launch gate rerun after race-safe publish fix.
+
+Final verifier rerun at current BSC Testnet standard gas price.

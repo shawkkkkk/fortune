@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   createPublicClient,
   createWalletClient,
@@ -263,12 +263,22 @@ function clients(account: Address) {
   };
 }
 
+async function readQuoteBalance(account: Address) {
+  const { publicClient } = clients(account);
+  return publicClient.readContract({
+    address: PUBLIC_TESTNET.contracts.mockQuote,
+    abi: quoteAbi,
+    functionName: "balanceOf",
+    args: [account],
+  });
+}
+
 export default function PublicTestnetPage() {
   const [account, setAccount] = useState<Address | null>(null);
-  const [name, setName] = useState("Fortune Beta Token");
-  const [symbol, setSymbol] = useState("FBETA");
+  const [name, setName] = useState("Fortune Alpha Token");
+  const [symbol, setSymbol] = useState("FALPHA");
   const [description, setDescription] = useState(
-    "Created on the Fortune BSC public testnet beta."
+    "Created on the Fortune BSC public testnet alpha."
   );
   const [launch, setLaunch] = useState<TestLaunch | null>(null);
   const [quoteBalance, setQuoteBalance] = useState("0");
@@ -276,6 +286,66 @@ export default function PublicTestnetPage() {
   const [message, setMessage] = useState(
     "Connect a testnet wallet to begin."
   );
+
+  useEffect(() => {
+    const injected = (
+      window as Window & {
+        ethereum?: EIP1193Provider & {
+          on?: (
+            event: string,
+            listener: (...args: unknown[]) => void
+          ) => void;
+          removeListener?: (
+            event: string,
+            listener: (...args: unknown[]) => void
+          ) => void;
+        };
+      }
+    ).ethereum;
+
+    if (!injected) return;
+
+    const sync = async () => {
+      const accounts = (await injected.request({
+        method: "eth_accounts",
+      })) as Address[];
+
+      const chain = (await injected.request({
+        method: "eth_chainId",
+      })) as string;
+
+      const next = accounts?.[0] || null;
+      setAccount(next);
+
+      if (!next || chain !== PUBLIC_TESTNET.chainHex) {
+        setQuoteBalance("0");
+        return;
+      }
+
+      try {
+        const balance = await readQuoteBalance(next);
+        setQuoteBalance(
+          Number(formatUnits(balance, 18)).toLocaleString(
+            undefined,
+            { maximumFractionDigits: 2 }
+          )
+        );
+      } catch {
+        setQuoteBalance("0");
+      }
+    };
+
+    const changed = () => void sync();
+
+    void sync();
+    injected.on?.("accountsChanged", changed);
+    injected.on?.("chainChanged", changed);
+
+    return () => {
+      injected.removeListener?.("accountsChanged", changed);
+      injected.removeListener?.("chainChanged", changed);
+    };
+  }, []);
 
   async function withAccount() {
     const next = account || (await connectTestnet());
@@ -287,13 +357,7 @@ export default function PublicTestnetPage() {
     const active = nextAccount || account;
     if (!active) return;
 
-    const { publicClient } = clients(active);
-    const balance = await publicClient.readContract({
-      address: PUBLIC_TESTNET.contracts.mockQuote,
-      abi: quoteAbi,
-      functionName: "balanceOf",
-      args: [active],
-    });
+    const balance = await readQuoteBalance(active);
 
     setQuoteBalance(
       Number(formatUnits(balance, 18)).toLocaleString(
@@ -673,7 +737,7 @@ export default function PublicTestnetPage() {
             <FortuneLogo size="md" />
           </div>
           <span className="eyebrow">
-            PUBLIC BSC TESTNET BETA
+            PUBLIC BSC TESTNET ALPHA
           </span>
           <h1>Try Fortune onchain.</h1>
           <p>
@@ -683,14 +747,24 @@ export default function PublicTestnetPage() {
             have no financial value.
           </p>
         </div>
-        <a
-          className="secondaryCta"
-          href={PUBLIC_TESTNET.faucetUrl}
-          target="_blank"
-          rel="noreferrer"
-        >
-          Get tBNB gas ↗
-        </a>
+        <div className="pageHeadingActions">
+          <a
+            className="secondaryCta"
+            href="https://github.com/shawkkkkk/fortune/issues/new?template=testnet-bug.yml"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Report a bug ↗
+          </a>
+          <a
+            className="secondaryCta"
+            href={PUBLIC_TESTNET.faucetUrl}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Get tBNB gas ↗
+          </a>
+        </div>
       </section>
 
       <section className="registryNotice">
@@ -710,7 +784,7 @@ export default function PublicTestnetPage() {
               <h2>Wallet + test funds</h2>
               <p>
                 tBNB pays gas. fUSD is the free quote asset
-                used by this beta deployment.
+                used by this alpha deployment.
               </p>
             </div>
           </div>
@@ -760,7 +834,7 @@ export default function PublicTestnetPage() {
             <div>
               <h2>Create a launch</h2>
               <p>
-                The public beta uses the proven single-asset
+                The public alpha uses the proven single-asset
                 fUSD path and the live Fortune factory.
               </p>
             </div>
@@ -913,7 +987,7 @@ export default function PublicTestnetPage() {
         <div className="panelTitle">
           <div>
             <span className="eyebrow">
-              PUBLIC BETA CONTRACTS
+              PUBLIC ALPHA CONTRACTS
             </span>
             <h2>Verify everything yourself</h2>
           </div>

@@ -143,11 +143,21 @@ test "$CODE" != "0x" || {
   exit 1
 }
 
+mapfile -t STANDARD_PREVIEW < <(
+  cast call "$OPERATOR" \
+    "previewStandardLaunch()(bytes32,address)" \
+    --rpc-url "$RPC"
+)
+STANDARD_SALT="${STANDARD_PREVIEW[0]}"
+STANDARD_PREDICTED="${STANDARD_PREVIEW[1]}"
+
 send_tx \
   "Standard launch + atomic creator first buy" \
   "$OPERATOR" \
-  "runStandardLaunch()(address,address)" \
-  "$MAX_GAS"
+  "runStandardLaunch(bytes32,address)(address,address)" \
+  "$MAX_GAS" \
+  "$STANDARD_SALT" \
+  "$STANDARD_PREDICTED"
 
 STANDARD_TOKEN="$(cast call "$OPERATOR" "standardToken()(address)" --rpc-url "$RPC")"
 STANDARD_CURVE="$(cast call "$OPERATOR" "standardCurve()(address)" --rpc-url "$RPC")"
@@ -188,11 +198,21 @@ echo "OfficialPancakeV3Pool=$STANDARD_POOL"
 echo "LPPositionTokenId=$STANDARD_LP_TOKEN_ID"
 echo "GraduationAnchorUsd1e18=$STANDARD_ANCHOR"
 
+mapfile -t TAX_PREVIEW < <(
+  cast call "$OPERATOR" \
+    "previewTaxLaunch()(bytes32,address)" \
+    --rpc-url "$RPC"
+)
+TAX_SALT="${TAX_PREVIEW[0]}"
+TAX_PREDICTED="${TAX_PREVIEW[1]}"
+
 send_tx \
   "Tax-token launch" \
   "$OPERATOR" \
-  "runTaxLaunch()(address,address)" \
-  "$MAX_GAS"
+  "runTaxLaunch(bytes32,address)(address,address)" \
+  "$MAX_GAS" \
+  "$TAX_SALT" \
+  "$TAX_PREDICTED"
 
 TAX_TOKEN="$(cast call "$OPERATOR" "taxToken()(address)" --rpc-url "$RPC")"
 TAX_CURVE="$(cast call "$OPERATOR" "taxCurve()(address)" --rpc-url "$RPC")"

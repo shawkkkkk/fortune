@@ -61,6 +61,10 @@ export default function LaunchPage() {
   const [name, setName] = useState("");
   const [symbol, setSymbol] = useState("");
   const [description, setDescription] = useState("");
+  const [website, setWebsite] = useState("");
+  const [xProfile, setXProfile] = useState("");
+  const [telegram, setTelegram] = useState("");
+  const [metadataEditable, setMetadataEditable] = useState(true);
   const [activeCategory, setActiveCategory] = useState<AssetCategory>("Majors");
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<string[]>(["bnb"]);
@@ -366,7 +370,27 @@ export default function LaunchPage() {
             </div>
             <label>Description<textarea value={description} onChange={(e)=>setDescription(e.target.value)} maxLength={1000} placeholder="What is the idea? Tell your future community." /></label>
             <div className="uploadBox"><span>＋</span><div><strong>Choose token image</strong><small>PNG, JPEG or WebP · square · up to 2 MB</small></div></div>
-            <div className="fieldGrid"><label>X profile<input placeholder="x.com/handle" /></label><label>Telegram<input placeholder="t.me/community" /></label></div>
+            <div className="fieldGrid">
+              <label>Website<input value={website} onChange={(e)=>setWebsite(e.target.value)} placeholder="https://project.xyz" /></label>
+              <label>X profile<input value={xProfile} onChange={(e)=>setXProfile(e.target.value)} placeholder="x.com/handle" /></label>
+            </div>
+            <label>Telegram<input value={telegram} onChange={(e)=>setTelegram(e.target.value)} placeholder="t.me/community" /></label>
+
+            <div className="metadataPolicy">
+              <div>
+                <span className="eyebrow">TOKEN METADATA</span>
+                <strong>{metadataEditable ? "Editable after launch" : "Immutable from launch"}</strong>
+                <small>
+                  {metadataEditable
+                    ? "Creator can update Fortune display name, ticker, description, image and socials. Every edit is versioned onchain and can later be permanently frozen."
+                    : "Fortune display metadata is frozen at launch. The ERC-20 contract name and symbol are always immutable either way."}
+                </small>
+              </div>
+              <div className="graduationToggle">
+                <button className={metadataEditable ? "tabActive" : ""} onClick={()=>setMetadataEditable(true)}>Editable</button>
+                <button className={!metadataEditable ? "tabActive" : ""} onClick={()=>setMetadataEditable(false)}>Immutable</button>
+              </div>
+            </div>
           </section>
 
           <section className="formCard">
@@ -575,6 +599,7 @@ export default function LaunchPage() {
               perpReference={launchMode==="preipo-perp" ? lighterMarkets.find((market)=>market.marketId===perpMarketId)?.symbol || "Unresolved" : undefined}
               referenceMultiplier={referenceMultiplier}
               depthTier={depthTier}
+              metadataEditable={metadataEditable}
             />
             <button className="launchButton" disabled={!FACTORY_ADDRESS}>
               {FACTORY_ADDRESS ? "Review & deploy to configured BSC testnet →" : "BSC testnet factory not configured"}
@@ -611,10 +636,10 @@ function FeeInput({ label, value, setValue }: { label:string; value:number; setV
 
 function ManifestRows({
   name, symbol, assets, primary, reward, devBuy, fee, graduation, launchMode,
-  stockFloorAsset, floorReservePct, perpReference, referenceMultiplier, depthTier
+  stockFloorAsset, floorReservePct, perpReference, referenceMultiplier, depthTier, metadataEditable
 }: {
   name:string; symbol:string; assets:string[]; primary:string; reward:string; devBuy:number; fee:string; graduation:string;
-  launchMode: LaunchMode; stockFloorAsset?: string; floorReservePct: number; perpReference?: string; referenceMultiplier: number; depthTier: "low" | "standard";
+  launchMode: LaunchMode; stockFloorAsset?: string; floorReservePct: number; perpReference?: string; referenceMultiplier: number; depthTier: "low" | "standard"; metadataEditable: boolean;
 }) {
   const rows = [
     ["Launch engine", launchMode==="basket" ? "Basket Curve" : launchMode==="stock-floor" ? "Stock Floor" : "Pre-IPO Perp"],
@@ -628,6 +653,7 @@ function ManifestRows({
     ["Post-launch mint", "Disabled"],
     ["Arbitrary blacklist", "Disabled"],
     ["Silent fee changes", "Disabled"],
+    ["Fortune display metadata", metadataEditable ? "Editable · revision history · freezable" : "Immutable"],
     ...(launchMode==="stock-floor"
       ? [["Stock floor asset", stockFloorAsset || "None"], ["Protected reserve", floorReservePct + "%"], ["Floor redemption", "Purpose-built vault"]]
       : []),

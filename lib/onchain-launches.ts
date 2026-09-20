@@ -29,9 +29,9 @@ const factoryAbi = [
       { name: "creator", type: "address" },
       { name: "token", type: "address" },
       { name: "curve", type: "address" },
-      { name: "feeRouter", type: "address" },
-      { name: "holderVault", type: "address" },
-      { name: "buybackVault", type: "address" },
+      { name: "componentA", type: "address" },
+      { name: "componentB", type: "address" },
+      { name: "componentC", type: "address" },
       { name: "liquidityVault", type: "address" },
       { name: "manifestHash", type: "bytes32" },
       { name: "vanitySalt", type: "bytes32" },
@@ -111,6 +111,8 @@ const curveAbi = [
 
 export type OnchainFortuneLaunch = {
   id: string;
+  mode: "standard" | "tax";
+  factory: Address;
   creator: Address;
   token: Address;
   curve: Address;
@@ -140,30 +142,21 @@ function client() {
   });
 }
 
-function statusForPhase(phase: number): OnchainFortuneLaunch["status"] {
+function statusForPhase(
+  phase: number
+): OnchainFortuneLaunch["status"] {
   if (phase === 1) return "GraduationReady";
   if (phase === 2) return "Pancake";
   if (phase === 3) return "Rescued";
   return "Curve";
 }
 
-export async function readRecentFortuneLaunches(limit = 12) {
-  if (
-    !FORTUNE_NETWORK_CONFIGURED ||
-    !FORTUNE_NETWORK.contracts.factory
-  ) {
-    return {
-      configured: false,
-      chainId: FORTUNE_NETWORK.chainId,
-      total: 0,
-      launches: [] as OnchainFortuneLaunch[],
-    };
-  }
-
-  const rpc = client();
-  const factory =
-    FORTUNE_NETWORK.contracts.factory as Address;
-
+async function readOneFactory(
+  rpc: ReturnType<typeof client>,
+  factory: Address,
+  mode: OnchainFortuneLaunch["mode"],
+  limit: number
+) {
   const count = await rpc.readContract({
     address: factory,
     abi: factoryAbi,
@@ -263,12 +256,16 @@ export async function readRecentFortuneLaunches(limit = 12) {
             ? 0
             : Math.min(
                 100,
-                Number((reserveUsd * 10_000n) / graduationUsd) /
-                  100
+                Number(
+                  (reserveUsd * 10_000n) /
+                    graduationUsd
+                ) / 100
               );
 
         return {
-          id: String(index),
+          id: mode + ":" + String(index),
+          mode,
+          factory,
           creator,
           token,
           curve,
@@ -291,12 +288,76 @@ export async function readRecentFortuneLaunches(limit = 12) {
   );
 
   return {
-    configured: true,
-    chainId: FORTUNE_NETWORK.chainId,
     total,
     launches: launches.filter(
       (launch): launch is OnchainFortuneLaunch =>
         launch !== null
     ),
+  };
+}
+
+export async function readRecentFortuneLaunches(limit = 12) {
+  if (
+    !FORTUNE_NETWORK_CONFIGURED ||
+    !FORTUNE_NETWORK.contracts.factory
+  ) {
+    return {
+      configured: false,
+      chainId: FORTUNE_NETWORK.chainId,
+      total: 0,
+      launches: [] as OnchainFortuneLaunch[],
+    };
+  }
+
+  const rpc = client();
+  const safeLimit = Math.max(1, Math.min(limit, 25));
+
+  const sources: Array<{
+    factory: Address;
+    mode: OnchainFortuneLaunch["mode"];
+  }> = [
+    {
+      factory:
+        FORTUNE_NETWORK.contracts.factory as Address,
+      mode: "standard",
+    },
+  ];
+
+  if (
+    FORTUNE_NETWORK.contracts.taxFactory
+  ) {
+    sources.push({
+      factory:
+        FORTUNE_NETWORK.contracts.taxFactory as Address,
+      mode: "tax",
+    });
+  }
+
+  const results = await Promise.all(
+    sources.map((source) =>
+      readOneFactory(
+        rpc,
+        source.factory,
+        source.mode,
+        safeLimit
+      )
+    )
+  );
+
+  const total = results.reduce(
+    (sum, result) => sum + result.total,
+    0
+  );
+
+  const launches = results
+    .flatMap((result) => result.launches)
+    .sort((a, b) => b.createdAt - a.createdAt)
+    .slice(0, safeLimit);
+
+  return {
+    configured: true,
+    chainId: FORTUNE_NETWORK.chainId,
+    total,
+    launches,
   };
 }

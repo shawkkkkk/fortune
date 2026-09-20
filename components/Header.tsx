@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { useLanguage } from "@/components/LanguageProvider";
 
 type InjectedEthereum = {
   request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
@@ -29,6 +30,7 @@ export default function Header() {
   const [account, setAccount] = useState("");
   const [chainId, setChainId] = useState("");
   const [connecting, setConnecting] = useState(false);
+  const { language, setLanguage } = useLanguage();
 
   useEffect(() => {
     if (!window.ethereum) return;
@@ -100,6 +102,22 @@ export default function Header() {
         </nav>
 
         <div className="headerActions">
+          <div className="languageSwitch" role="group" aria-label="Language">
+            <button
+              className={language === "en" ? "languageActive" : ""}
+              onClick={() => setLanguage("en")}
+              aria-pressed={language === "en"}
+            >
+              EN
+            </button>
+            <button
+              className={language === "zh" ? "languageActive" : ""}
+              onClick={() => setLanguage("zh")}
+              aria-pressed={language === "zh"}
+            >
+              中文
+            </button>
+          </div>
           <button
             className="walletButton"
             onClick={() => void connect()}

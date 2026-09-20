@@ -46,6 +46,14 @@ export async function GET() {
         preflightRequired: true,
         atomic: true,
         retryableOnFailure: true,
+        finalBuyPartialFillRefund: true,
+        rescueDelaySeconds: 604800,
+        explicitPhases: [
+          "CurveActive",
+          "GraduationReady",
+          "PoolCreated",
+          "Rescued",
+        ],
         priceAnchor: true,
         destination:
           "approved IGraduationAdapter; PancakeSwap production adapter pending audit",

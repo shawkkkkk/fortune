@@ -1,5 +1,5 @@
 name: Public testnet bug
-description: Report a reproducible Fortune BSC Testnet beta problem
+description: Report a reproducible Fortune BSC Testnet alpha problem
 title: "[testnet] "
 labels:
   - bug
@@ -8,18 +8,25 @@ body:
     attributes:
       value: |
         Thanks for testing Fortune. Public testnet uses valueless test assets only.
-        **Never paste a seed phrase, private key, or wallet backup into an issue.**
+        Use the **Copy diagnostics** button on the Fortune testnet page when possible.
+        **Never paste a seed phrase, private key, wallet backup, API secret, or recovery phrase into an issue.**
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Fortune diagnostics
+      description: Paste the JSON produced by the Copy diagnostics button. It contains public addresses/transaction state only.
+      render: json
   - type: input
     id: tx
     attributes:
       label: Transaction hash
-      description: If an onchain action failed, paste the BSC Testnet transaction hash.
+      description: If an onchain action was submitted, paste the BSC Testnet transaction hash.
       placeholder: "0x..."
   - type: input
-    id: wallet
+    id: token
     attributes:
-      label: Public wallet address
-      description: Optional. Only share the public 0x address involved.
+      label: Token or curve address
+      description: Optional. Paste the public testnet token or curve address involved.
       placeholder: "0x..."
   - type: dropdown
     id: area
@@ -29,18 +36,21 @@ body:
         - Wallet / network
         - Testnet faucet
         - Create launch
+        - Creator first buy
         - Curve buy
         - Graduation / Pancake
         - LP lock
+        - Tax processing / dividends
         - API / readiness
-        - UI / other
+        - UI / recovery
+        - Other
     validations:
       required: true
   - type: textarea
     id: steps
     attributes:
       label: Steps to reproduce
-      description: What did you do, and what happened?
+      description: What did you do, and what happened? Note whether BscScan shows the transaction as confirmed, failed, or missing.
     validations:
       required: true
   - type: textarea
@@ -53,4 +63,4 @@ body:
     id: environment
     attributes:
       label: Browser / wallet
-      description: Browser, wallet extension, and anything else that may help reproduce the issue.
+      description: Browser and wallet extension/app. Never include credentials or recovery material.

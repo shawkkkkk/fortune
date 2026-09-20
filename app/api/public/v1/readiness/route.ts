@@ -1,4 +1,5 @@
 import { apiOk } from "@/lib/public-api";
+import { PUBLIC_TESTNET } from "@/lib/public-testnet";
 import {
   configuredRpcUrls,
   probeRpcEndpoints,
@@ -46,23 +47,38 @@ export async function GET() {
     chainId === 56 || chainId === 97;
 
   const factory =
-    process.env.NEXT_PUBLIC_FORTUNE_FACTORY_ADDRESS || "";
+    process.env.NEXT_PUBLIC_FORTUNE_FACTORY_ADDRESS ||
+    (chainId === PUBLIC_TESTNET.chainId
+      ? PUBLIC_TESTNET.contracts.factory
+      : "");
   const registry =
     process.env.FORTUNE_REGISTRY ||
     process.env.NEXT_PUBLIC_FORTUNE_REGISTRY_ADDRESS ||
-    "";
+    (chainId === PUBLIC_TESTNET.chainId
+      ? PUBLIC_TESTNET.contracts.registry
+      : "");
   const graduationAdapter =
     process.env.FORTUNE_GRADUATION_ADAPTER ||
     process.env.NEXT_PUBLIC_FORTUNE_GRADUATION_ADAPTER_ADDRESS ||
-    "";
+    (chainId === PUBLIC_TESTNET.chainId
+      ? PUBLIC_TESTNET.contracts.graduationAdapter
+      : "");
   const liquidityLocker =
     process.env.FORTUNE_LIQUIDITY_LOCKER ||
     process.env.NEXT_PUBLIC_FORTUNE_LIQUIDITY_LOCKER_ADDRESS ||
-    "";
+    (chainId === PUBLIC_TESTNET.chainId
+      ? PUBLIC_TESTNET.contracts.liquidityLocker
+      : "");
   const pancakeFactory =
-    process.env.PANCAKE_V3_FACTORY || "";
+    process.env.PANCAKE_V3_FACTORY ||
+    (chainId === PUBLIC_TESTNET.chainId
+      ? PUBLIC_TESTNET.contracts.pancakeV3Factory
+      : "");
   const positionManager =
-    process.env.PANCAKE_V3_POSITION_MANAGER || "";
+    process.env.PANCAKE_V3_POSITION_MANAGER ||
+    (chainId === PUBLIC_TESTNET.chainId
+      ? PUBLIC_TESTNET.contracts.pancakeV3PositionManager
+      : "");
 
   const urls = configuredRpcUrls(chainId);
   const rpc = await probeRpcEndpoints(chainId);

@@ -22,6 +22,7 @@ const links = [
   ["/analytics", "Analytics"],
   ["/automations", "Automations"],
   ["/portfolio", "Portfolio"],
+  ["/developers", "API"],
 ] as const;
 
 function short(address: string) {

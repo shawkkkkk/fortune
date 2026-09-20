@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { useLanguage } from "@/components/LanguageProvider";
 import FortuneLogo from "@/components/FortuneLogo";
 import { useTheme } from "@/components/ThemeProvider";
-import { PUBLIC_TESTNET } from "@/lib/public-testnet";
+import { FORTUNE_NETWORK } from "@/lib/fortune-network";
 
 type InjectedEthereum = {
   request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
@@ -25,7 +25,11 @@ declare global {
 
 const links = [
   ["/", "Overview"],
-  ["/testnet", "Public Alpha"],
+  ["/markets", "Markets"],
+  [
+    FORTUNE_NETWORK.isMainnet ? "/launch" : "/testnet",
+    FORTUNE_NETWORK.isMainnet ? "Launch" : "Public Alpha",
+  ],
   ["/status", "Status"],
   ["/developers", "API"],
 ] as const;
@@ -34,11 +38,11 @@ function short(address: string) {
   return address.slice(0, 6) + "…" + address.slice(-4);
 }
 
-async function switchToTestnet(ethereum: InjectedEthereum) {
+async function switchToNetwork(ethereum: InjectedEthereum) {
   try {
     await ethereum.request({
       method: "wallet_switchEthereumChain",
-      params: [{ chainId: PUBLIC_TESTNET.chainHex }],
+      params: [{ chainId: FORTUNE_NETWORK.chainHex }],
     });
   } catch (error) {
     const code =
@@ -54,15 +58,15 @@ async function switchToTestnet(ethereum: InjectedEthereum) {
       method: "wallet_addEthereumChain",
       params: [
         {
-          chainId: PUBLIC_TESTNET.chainHex,
-          chainName: PUBLIC_TESTNET.chainName,
+          chainId: FORTUNE_NETWORK.chainHex,
+          chainName: FORTUNE_NETWORK.chainName,
           nativeCurrency: {
             name: "Test BNB",
-            symbol: PUBLIC_TESTNET.nativeSymbol,
+            symbol: FORTUNE_NETWORK.nativeSymbol,
             decimals: 18,
           },
-          rpcUrls: [PUBLIC_TESTNET.rpcUrl],
-          blockExplorerUrls: [PUBLIC_TESTNET.explorerUrl],
+          rpcUrls: [FORTUNE_NETWORK.publicRpcUrl],
+          blockExplorerUrls: [FORTUNE_NETWORK.explorerUrl],
         },
       ],
     });
@@ -131,8 +135,8 @@ export default function Header() {
         method: "eth_chainId",
       })) as string;
 
-      if (chain !== PUBLIC_TESTNET.chainHex) {
-        await switchToTestnet(ethereum);
+      if (chain !== FORTUNE_NETWORK.chainHex) {
+        await switchToNetwork(ethereum);
         chain = (await ethereum.request({
           method: "eth_chainId",
         })) as string;
@@ -145,7 +149,7 @@ export default function Header() {
     }
   }
 
-  const onTestnet = chainId === PUBLIC_TESTNET.chainHex;
+  const onNetwork = chainId === FORTUNE_NETWORK.chainHex;
 
   return (
     <>
@@ -153,16 +157,22 @@ export default function Header() {
         <span
           className={
             "networkDot " +
-            (account && !onTestnet ? "networkWarn" : "")
+            (account && !onNetwork ? "networkWarn" : "")
           }
         />
         {account
-          ? onTestnet
-            ? "BSC Testnet wallet connected"
-            : "Wallet connected · switch to BSC Testnet"
-          : "Fortune · public BSC Testnet alpha"}
+          ? onNetwork
+            ? FORTUNE_NETWORK.isMainnet
+              ? "BNB Smart Chain wallet connected"
+              : "BSC Testnet wallet connected"
+            : "Wallet connected · switch network"
+          : FORTUNE_NETWORK.isMainnet
+            ? "Fortune · BNB Smart Chain"
+            : "Fortune · public BSC Testnet alpha"}
         <span className="networkNote">
-          Test assets only · no real funds
+          {FORTUNE_NETWORK.isMainnet
+            ? "Real-value network · review every transaction"
+            : "Test assets only · no real funds"}
         </span>
       </div>
 
@@ -224,8 +234,8 @@ export default function Header() {
           >
             {connecting
               ? "Connecting…"
-              : account && !onTestnet
-                ? "Switch testnet"
+              : account && !onNetwork
+                ? "Switch network"
                 : account
                   ? short(account)
                   : "Connect wallet"}

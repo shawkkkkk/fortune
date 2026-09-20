@@ -404,6 +404,69 @@ contract FortuneTest is Test {
         );
     }
 
+    function testStandardLaunchAtomicCreatorFirstBuy() public {
+        FortuneFactory.LaunchParams memory p =
+            _params(1_000e18);
+
+        (
+            bytes32 salt,
+            address predicted,
+            ,
+        ) =
+            factory.previewPreparedVanity(
+                user,
+                p
+            );
+
+        uint256 beforeQuote =
+            wbnb.balanceOf(user);
+
+        vm.startPrank(user);
+        wbnb.approve(
+            address(factory),
+            1e18
+        );
+
+        (
+            FortuneFactory.LaunchInfo memory info,
+            uint256 tokensOut
+        ) =
+            factory.createLaunchPreparedAndBuy(
+                p,
+                salt,
+                1e18,
+                1
+            );
+        vm.stopPrank();
+
+        assertEq(
+            info.token,
+            predicted
+        );
+        assertGt(
+            tokensOut,
+            0
+        );
+        assertEq(
+            FortuneToken(info.token)
+                .balanceOf(user),
+            tokensOut
+        );
+        assertLt(
+            wbnb.balanceOf(user),
+            beforeQuote
+        );
+        assertEq(
+            wbnb.balanceOf(address(factory)),
+            0
+        );
+        assertEq(
+            FortuneToken(info.token)
+                .balanceOf(address(factory)),
+            0
+        );
+    }
+
     function testEveryFortuneTokenAddressEndsInFe() public {
         FortuneFactory.LaunchInfo memory first =
             factory.createLaunch(_params(1_000e18));

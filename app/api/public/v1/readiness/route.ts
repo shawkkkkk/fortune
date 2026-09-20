@@ -58,19 +58,11 @@ const registryHealthAbi = [
   },
 ] as const;
 
-async function readContractView<T>(
+async function rawEthCall(
   chainId: number,
   address: string,
-  abi: readonly unknown[],
-  functionName: string,
-  args: readonly unknown[] = []
-): Promise<T> {
-  const data = encodeFunctionData({
-    abi: abi as never,
-    functionName: functionName as never,
-    args: args as never,
-  });
-
+  data: `0x${string}`
+) {
   const response = await rpcCall(
     chainId,
     "eth_call",
@@ -78,11 +70,7 @@ async function readContractView<T>(
     { timeoutMs: 2500 }
   );
 
-  return decodeFunctionResult({
-    abi: abi as never,
-    functionName: functionName as never,
-    data: String(response.result || "0x") as `0x${string}`,
-  }) as T;
+  return String(response.result || "0x") as `0x${string}`;
 }
 
 async function hasCode(
@@ -180,23 +168,31 @@ export async function GET() {
 
   if (chainId === 56 && factoryCode && factory) {
     try {
-      factoryPaused = await readContractView<boolean>(
-        chainId,
-        factory,
-        factoryStateAbi,
-        "launchesPaused"
-      );
+      const data = encodeFunctionData({
+        abi: factoryStateAbi,
+        functionName: "launchesPaused",
+      });
+      const raw = await rawEthCall(chainId, factory, data);
+      factoryPaused = decodeFunctionResult({
+        abi: factoryStateAbi,
+        functionName: "launchesPaused",
+        data: raw,
+      });
     } catch {
       factoryPaused = null;
     }
 
     try {
-      factoryOwner = await readContractView<Address>(
-        chainId,
-        factory,
-        ownableAbi,
-        "owner"
-      );
+      const data = encodeFunctionData({
+        abi: ownableAbi,
+        functionName: "owner",
+      });
+      const raw = await rawEthCall(chainId, factory, data);
+      factoryOwner = decodeFunctionResult({
+        abi: ownableAbi,
+        functionName: "owner",
+        data: raw,
+      });
     } catch {
       factoryOwner = null;
     }
@@ -209,15 +205,17 @@ export async function GET() {
     /^0x[a-fA-F0-9]{40}$/.test(primaryQuote)
   ) {
     try {
-      const health = await readContractView<
-        readonly [boolean, `0x${string}`, bigint, bigint]
-      >(
-        chainId,
-        registry,
-        registryHealthAbi,
-        "assetHealth",
-        [primaryQuote as Address]
-      );
+      const data = encodeFunctionData({
+        abi: registryHealthAbi,
+        functionName: "assetHealth",
+        args: [primaryQuote as Address],
+      });
+      const raw = await rawEthCall(chainId, registry, data);
+      const health = decodeFunctionResult({
+        abi: registryHealthAbi,
+        functionName: "assetHealth",
+        data: raw,
+      });
       primaryQuoteHealthy = Boolean(health[0]);
     } catch {
       primaryQuoteHealthy = false;

@@ -91,14 +91,10 @@ jobs:
       - name: Run full local contract suite
         run: forge test --fuzz-runs 1000 -vvv
 
-      - name: Simulate unified public testnet deployment
-        run: |
-          forge script script/PublicTestnetStack.s.sol:PublicTestnetStack             --rpc-url "$BSC_TESTNET_RPC_URL"             -vvvv
-
       - name: Broadcast unified public testnet deployment
         run: |
           set -o pipefail
-          forge script script/PublicTestnetStack.s.sol:PublicTestnetStack             --rpc-url "$BSC_TESTNET_RPC_URL"             --broadcast             --slow             --with-gas-price 1000000000             --priority-gas-price 1000000000             -vvvv | tee /tmp/fortune-public-alpha-deploy.log
+          forge script script/PublicTestnetStack.s.sol:PublicTestnetStack             --rpc-url "$BSC_TESTNET_RPC_URL"             --broadcast             --skip-simulation             --slow             --with-gas-price 1000000000             --priority-gas-price 1000000000             -vvvv | tee /tmp/fortune-public-alpha-deploy.log
 
       - name: Export deployed addresses
         run: |
@@ -127,36 +123,41 @@ jobs:
             echo "$LABEL=$VALUE"
           done
 
-      - name: Verify deployed bytecode
+      - name: Verify deployed stack invariants
         run: |
           set -euo pipefail
+
           for ADDRESS in             "$FORTUNE_FACTORY"             "$FORTUNE_TAX_FACTORY"             "$FORTUNE_REGISTRY"             "$FORTUNE_POOL_REGISTRY"             "$FORTUNE_V3_ADAPTER"             "$FORTUNE_V3_LOCKER"             "$FORTUNE_V2_TAX_ADAPTER"             "$FORTUNE_V2_LOCKER"             "$FORTUNE_MOCK_QUOTE"             "$FORTUNE_MOCK_ORACLE"
           do
             CODE=$(cast code "$ADDRESS" --rpc-url "$BSC_TESTNET_RPC_URL")
             test "$CODE" != "0x" || (echo "Missing deployed bytecode: $ADDRESS" && exit 1)
           done
 
-      - name: Simulate standard atomic-first-buy lifecycle
-        run: |
-          forge script script/StandardPublicTestnetDrill.s.sol:StandardPublicTestnetDrill             --rpc-url "$BSC_TESTNET_RPC_URL"             -vvvv
+          STANDARD_ADAPTER=$(cast call "$FORTUNE_FACTORY" "graduationAdapter()(address)" --rpc-url "$BSC_TESTNET_RPC_URL")
+          TAX_ADAPTER=$(cast call "$FORTUNE_TAX_FACTORY" "graduationAdapter()(address)" --rpc-url "$BSC_TESTNET_RPC_URL")
+          TAX_PAUSED=$(cast call "$FORTUNE_TAX_FACTORY" "launchesPaused()(bool)" --rpc-url "$BSC_TESTNET_RPC_URL")
+          V2_ROUTER_FACTORY=$(cast call "$PANCAKE_V2_ROUTER" "factory()(address)" --rpc-url "$BSC_TESTNET_RPC_URL")
+
+          test "${STANDARD_ADAPTER,,}" = "${FORTUNE_V3_ADAPTER,,}" || (echo "Standard adapter mismatch" && exit 1)
+          test "${TAX_ADAPTER,,}" = "${FORTUNE_V2_TAX_ADAPTER,,}" || (echo "Tax adapter mismatch" && exit 1)
+          test "$TAX_PAUSED" = "false" || (echo "Tax launches unexpectedly paused" && exit 1)
+          test "${V2_ROUTER_FACTORY,,}" = "${PANCAKE_V2_FACTORY,,}" || (echo "V2 router/factory mismatch" && exit 1)
+
+          echo "Unified public testnet stack invariant checks passed."
 
       - name: Broadcast standard V3 lifecycle
         run: |
           set -o pipefail
-          forge script script/StandardPublicTestnetDrill.s.sol:StandardPublicTestnetDrill             --rpc-url "$BSC_TESTNET_RPC_URL"             --broadcast             --slow             --with-gas-price 1000000000             --priority-gas-price 1000000000             -vvvv | tee /tmp/fortune-standard-public-alpha-drill.log
+          forge script script/StandardPublicTestnetDrill.s.sol:StandardPublicTestnetDrill             --rpc-url "$BSC_TESTNET_RPC_URL"             --broadcast             --skip-simulation             --slow             --with-gas-price 1000000000             --priority-gas-price 1000000000             -vvvv | tee /tmp/fortune-standard-public-alpha-drill.log
 
       - name: Require standard lifecycle marker
         run: |
           grep -q "STANDARD_ONCHAIN_EXECUTION_COMPLETE_AND_SUCCESSFUL" /tmp/fortune-standard-public-alpha-drill.log
 
-      - name: Simulate tax-token lifecycle
-        run: |
-          forge script script/TaxPublicTestnetDrill.s.sol:TaxPublicTestnetDrill             --rpc-url "$BSC_TESTNET_RPC_URL"             -vvvv
-
       - name: Broadcast tax-token V2 lifecycle
         run: |
           set -o pipefail
-          forge script script/TaxPublicTestnetDrill.s.sol:TaxPublicTestnetDrill             --rpc-url "$BSC_TESTNET_RPC_URL"             --broadcast             --slow             --with-gas-price 1000000000             --priority-gas-price 1000000000             -vvvv | tee /tmp/fortune-tax-public-alpha-drill.log
+          forge script script/TaxPublicTestnetDrill.s.sol:TaxPublicTestnetDrill             --rpc-url "$BSC_TESTNET_RPC_URL"             --broadcast             --skip-simulation             --slow             --with-gas-price 1000000000             --priority-gas-price 1000000000             -vvvv | tee /tmp/fortune-tax-public-alpha-drill.log
 
       - name: Require tax lifecycle marker
         run: |

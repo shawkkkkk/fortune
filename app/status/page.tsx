@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useLanguage } from "@/components/LanguageProvider";
-import { PUBLIC_TESTNET } from "@/lib/public-testnet";
+import { FORTUNE_NETWORK } from "@/lib/fortune-network";
 
 type BasicStatus = {
   ready: boolean;
@@ -103,13 +103,19 @@ export default function StatusPage() {
       <section className="pageHeading">
         <div>
           <span className="eyebrow">
-            {zh ? "FORTUNE 公开 ALPHA" : "FORTUNE PUBLIC ALPHA"}
+            {FORTUNE_NETWORK.isMainnet
+              ? zh ? "FORTUNE 正式网络" : "FORTUNE PRODUCTION"
+              : zh ? "FORTUNE 公开 ALPHA" : "FORTUNE PUBLIC ALPHA"}
           </span>
           <h1>{zh ? "系统状态" : "System status"}</h1>
           <p>
             {zh
-              ? "此页面直接检查 Fortune 的 BSC 测试网 RPC、核心合约和 Pancake V3 依赖。"
-              : "This page directly checks Fortune's BSC Testnet RPC, core contracts, and Pancake V3 dependencies."}
+              ? FORTUNE_NETWORK.isMainnet
+                ? "此页面直接检查 Fortune 的 BNB Smart Chain 主网 RPC、核心合约和 Pancake V3 依赖。"
+                : "此页面直接检查 Fortune 的 BSC 测试网 RPC、核心合约和 Pancake V3 依赖。"
+              : FORTUNE_NETWORK.isMainnet
+                ? "This page directly checks Fortune's BNB Smart Chain mainnet RPC, core contracts, and Pancake V3 dependencies."
+                : "This page directly checks Fortune's BSC Testnet RPC, core contracts, and Pancake V3 dependencies."}
           </p>
         </div>
 
@@ -171,7 +177,7 @@ export default function StatusPage() {
         <div className="statusHeroMeta">
           <span>
             {zh ? "网络" : "Network"}
-            <strong>BSC Testnet · 97</strong>
+            <strong>{FORTUNE_NETWORK.chainName} · {FORTUNE_NETWORK.chainId}</strong>
           </span>
           <span>
             RPC
@@ -273,15 +279,15 @@ export default function StatusPage() {
           </span>
           <div className="statRows">
             {[
-              [zh ? "工厂" : "Factory", PUBLIC_TESTNET.contracts.factory],
-              [zh ? "资产注册表" : "Registry", PUBLIC_TESTNET.contracts.registry],
-              [zh ? "毕业适配器" : "Graduation adapter", PUBLIC_TESTNET.contracts.graduationAdapter],
-              [zh ? "永久 LP 锁仓" : "Permanent LP locker", PUBLIC_TESTNET.contracts.liquidityLocker],
+              [zh ? "工厂" : "Factory", FORTUNE_NETWORK.contracts.factory],
+              [zh ? "资产注册表" : "Registry", FORTUNE_NETWORK.contracts.registry],
+              [zh ? "毕业适配器" : "Graduation adapter", FORTUNE_NETWORK.contracts.graduationAdapter],
+              [zh ? "永久 LP 锁仓" : "Permanent LP locker", FORTUNE_NETWORK.contracts.liquidityLocker],
             ].map(([label, address]) => (
               <div key={label}>
                 <span>{label}</span>
                 <a
-                  href={PUBLIC_TESTNET.explorerUrl + "/address/" + address}
+                  href={FORTUNE_NETWORK.explorerUrl + "/address/" + address}
                   target="_blank"
                   rel="noreferrer"
                 >

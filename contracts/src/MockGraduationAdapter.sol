@@ -44,8 +44,11 @@ contract MockGraduationAdapter is IGraduationAdapter, IGraduationPreflight {
             if (reserves[i].asset == address(0)) {
                 return (false, bytes32("ZERO_ASSET"));
             }
-            if (reserves[i].amount == 0) {
-                return (false, bytes32("EMPTY_RESERVE"));
+            if (
+                reserves[i].amount == 0 &&
+                reserves[i].weightBps > 0
+            ) {
+                return (false, bytes32("EMPTY_WEIGHTED_RESERVE"));
             }
         }
 

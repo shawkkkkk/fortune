@@ -236,6 +236,25 @@ export async function GET(request: Request) {
           },
         },
       },
+      "/transactions/{hash}": {
+        get: {
+          tags: ["Protocol"],
+          summary: "Resolve an uncertain transaction from BSC RPC before retrying",
+          parameters: [
+            {
+              name: "hash",
+              in: "path",
+              required: true,
+              schema: { type: "string" },
+            },
+          ],
+          responses: {
+            "200": { description: "Transaction state" },
+            "400": { description: "Malformed transaction hash" },
+            "503": { description: "RPC unavailable or not configured" },
+          },
+        },
+      },
       "/stats": {
         get: {
           tags: ["Analytics"],

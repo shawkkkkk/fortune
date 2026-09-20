@@ -172,3 +172,12 @@ input,textarea,select{width:100%;border:1px solid #323832;background:#0e1110;col
 .metadataPolicy>div:first-child>strong{font-size:12px;color:#e4e9e0}
 .metadataPolicy>div:first-child>small{font-size:9px;line-height:1.5;color:#747f72;max-width:620px}
 @media(max-width:760px){.metadataPolicy{grid-template-columns:1fr}}
+
+
+.launchShieldCard{border-color:#4d5d38;background:linear-gradient(145deg,rgba(21,27,17,.96),rgba(14,17,14,.96))}
+.shieldGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+.shieldGrid>div{border:1px solid #30392b;border-radius:12px;background:#11150f;padding:12px;display:flex;flex-direction:column;gap:4px}
+.shieldGrid span{font-size:8px;color:#788273}.shieldGrid strong{font-size:16px;color:var(--lime)}.shieldGrid small{font-size:8px;color:#626c60}
+.shieldDecay{display:flex;gap:6px;flex-wrap:wrap;border-top:1px solid #293126;padding-top:12px}.shieldDecay span{border:1px solid #35402f;border-radius:999px;padding:5px 7px;font-size:8px;color:#9daf87}
+.shieldTradeNotice{border:1px solid #465536;border-radius:11px;background:#141a11;padding:10px;margin-bottom:12px;display:flex;flex-direction:column;gap:5px}.shieldTradeNotice strong{font-size:9px;color:var(--lime)}.shieldTradeNotice span{font-size:8px;line-height:1.45;color:#7f897b}
+@media(max-width:760px){.shieldGrid{grid-template-columns:1fr 1fr}}

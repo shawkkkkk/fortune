@@ -6,6 +6,11 @@ import {Script, console2} from "forge-std/Script.sol";
 import {FortuneAssetRegistry} from "../src/FortuneAssetRegistry.sol";
 import {FortuneFactory} from "../src/FortuneFactory.sol";
 import {FortuneAutomationRegistry} from "../src/FortuneAutomationRegistry.sol";
+import {FortuneMetadataRegistry} from "../src/FortuneMetadataRegistry.sol";
+import {FortuneTokenDeployer} from "../src/deployers/FortuneTokenDeployer.sol";
+import {FortuneVaultDeployer} from "../src/deployers/FortuneVaultDeployer.sol";
+import {FortuneFeeRouterDeployer} from "../src/deployers/FortuneFeeRouterDeployer.sol";
+import {FortuneCurveDeployer} from "../src/deployers/FortuneCurveDeployer.sol";
 import {MockGraduationAdapter} from "../src/MockGraduationAdapter.sol";
 import {MockUsdOracle} from "../src/test/MockUsdOracle.sol";
 import {MockQuoteToken} from "../src/test/MockQuoteToken.sol";
@@ -55,24 +60,51 @@ contract DeployTestnet is Script {
 
         FortuneAutomationRegistry automationRegistry =
             new FortuneAutomationRegistry(deployer);
+        FortuneMetadataRegistry metadataRegistry =
+            new FortuneMetadataRegistry(deployer);
+        FortuneTokenDeployer tokenDeployer =
+            new FortuneTokenDeployer();
+        FortuneVaultDeployer vaultDeployer =
+            new FortuneVaultDeployer();
+        FortuneFeeRouterDeployer feeRouterDeployer =
+            new FortuneFeeRouterDeployer();
+        FortuneCurveDeployer curveDeployer =
+            new FortuneCurveDeployer();
 
         FortuneFactory factory =
             new FortuneFactory(
                 deployer,
                 address(registry),
                 address(automationRegistry),
+                address(metadataRegistry),
+                address(tokenDeployer),
+                address(vaultDeployer),
+                address(feeRouterDeployer),
+                address(curveDeployer),
                 deployer,
                 deployer
             );
-        MockGraduationAdapter graduation = new MockGraduationAdapter();
-        factory.setGraduationAdapter(address(graduation));
+
+        metadataRegistry.bindFactory(
+            address(factory)
+        );
+
+        MockGraduationAdapter graduation =
+            new MockGraduationAdapter();
+        factory.setGraduationAdapter(
+            address(graduation)
+        );
 
         vm.stopBroadcast();
 
         console2.log("FortuneFactory", address(factory));
         console2.log("FortuneAssetRegistry", address(registry));
         console2.log("FortuneAutomationRegistry", address(automationRegistry));
-        console2.log("FortuneMetadataRegistry", address(factory.metadataRegistry()));
+        console2.log("FortuneMetadataRegistry", address(metadataRegistry));
+        console2.log("FortuneTokenDeployer", address(tokenDeployer));
+        console2.log("FortuneVaultDeployer", address(vaultDeployer));
+        console2.log("FortuneFeeRouterDeployer", address(feeRouterDeployer));
+        console2.log("FortuneCurveDeployer", address(curveDeployer));
         console2.log("MockGraduationAdapter", address(graduation));
         console2.log("MockUsdOracle", address(oracle));
         console2.log("Mock tUSDT", address(mockUsdt));

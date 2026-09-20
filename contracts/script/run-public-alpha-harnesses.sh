@@ -16,6 +16,11 @@ set -euo pipefail
 
 RPC="$BSC_TESTNET_RPC_URL"
 GAS_PRICE=1000000000
+DEPLOYER="$(cast wallet address --private-key "$PRIVATE_KEY")"
+
+pending_nonce() {
+  cast nonce "$DEPLOYER" --block pending --rpc-url "$RPC"
+}
 
 extract_deployed() {
   sed -nE 's/.*Deployed to:[[:space:]]*(0x[a-fA-F0-9]{40}).*/\1/p' | tail -1
@@ -29,29 +34,62 @@ deploy_harness() {
 
   echo "==> Deploying $label"
 
-  local output
-  output="$(
-    forge create "$contract" \
-      --rpc-url "$RPC" \
-      --private-key "$PRIVATE_KEY" \
-      --broadcast \
-      --legacy \
-      --gas-price "$GAS_PRICE" \
-      --gas-limit "$gas_limit" \
-      --constructor-args "$@" 2>&1
-  )"
+  local output=""
+  local address=""
+  local attempt
+  local nonce
 
-  printf '%s\n' "$output" >&2
+  for attempt in 1 2 3 4 5; do
+    nonce="$(pending_nonce)"
+    echo "Using pending nonce $nonce (attempt $attempt)" >&2
 
-  local address
-  address="$(printf '%s\n' "$output" | extract_deployed)"
+    set +e
+    output="$(
+      forge create "$contract" \
+        --rpc-url "$RPC" \
+        --private-key "$PRIVATE_KEY" \
+        --broadcast \
+        --legacy \
+        --gas-price "$GAS_PRICE" \
+        --gas-limit "$gas_limit" \
+        --nonce "$nonce" \
+        --constructor-args "$@" 2>&1
+    )"
+    local exit_code=$?
+    set -e
+
+    printf '%s\n' "$output" >&2
+
+    if [ "$exit_code" -eq 0 ]; then
+      address="$(printf '%s\n' "$output" | extract_deployed)"
+      if [ -n "$address" ]; then
+        break
+      fi
+    fi
+
+    if printf '%s\n' "$output" | grep -qiE 'nonce too low|already known|replacement transaction underpriced'; then
+      sleep $((attempt * 2))
+      continue
+    fi
+
+    echo "$label deployment failed" >&2
+    exit "$exit_code"
+  done
+
   test -n "$address" || {
-    echo "Could not parse $label deployment address" >&2
+    echo "Could not parse $label deployment address after nonce retries" >&2
     exit 1
   }
 
-  local code
-  code="$(cast code "$address" --rpc-url "$RPC")"
+  local code=""
+  for attempt in 1 2 3 4 5; do
+    code="$(cast code "$address" --rpc-url "$RPC")"
+    if [ "$code" != "0x" ]; then
+      break
+    fi
+    sleep 2
+  done
+
   test "$code" != "0x" || {
     echo "$label has no deployed runtime bytecode" >&2
     exit 1

@@ -84,6 +84,24 @@ export async function GET(request: Request) {
           responses: { "200": { description: "Pair catalog" } },
         },
       },
+      "/stocks": {
+        get: {
+          tags: ["Assets"],
+          summary: "Discovered BSC tokenized-stock representations",
+          parameters: [
+            { name: "q", in: "query", schema: { type: "string" } },
+            { name: "provider", in: "query", schema: { type: "string" } },
+            { name: "pairable", in: "query", schema: { type: "boolean" } },
+            { name: "cursor", in: "query", schema: { type: "string" } },
+            {
+              name: "limit",
+              in: "query",
+              schema: { type: "integer", minimum: 1, maximum: 100 },
+            },
+          ],
+          responses: { "200": { description: "Stock-token catalog" } },
+        },
+      },
       "/tokens": {
         get: {
           tags: ["Markets"],

@@ -23,6 +23,7 @@ const links = [
   ["/automations", "Automations"],
   ["/portfolio", "Portfolio"],
   ["/developers", "API"],
+  ["/testnet", "Testnet"],
 ] as const;
 
 function short(address: string) {
@@ -67,14 +68,24 @@ export default function Header() {
     }
   }
 
-  const onBsc = chainId === "0x38" || chainId === "0x61";
+  const configuredChainId = Number(
+    process.env.NEXT_PUBLIC_CHAIN_ID || 97
+  );
+  const configuredChainHex =
+    "0x" + configuredChainId.toString(16);
+  const onConfiguredChain =
+    chainId === configuredChainHex;
 
   return (
     <>
       <div className="networkBar">
-        <span className={"networkDot " + (account && !onBsc ? "networkWarn" : "")} />
-        {account ? (onBsc ? "BNB Smart Chain wallet connected" : "Wallet connected · switch to BNB Chain") : "BNB Smart Chain · testnet-first"}
-        <span className="networkNote">Pre-audit software — no real funds</span>
+        <span className={"networkDot " + (account && !onConfiguredChain ? "networkWarn" : "")} />
+        {account
+          ? onConfiguredChain
+            ? "Fortune public testnet wallet connected"
+            : "Wallet connected · switch to BSC Testnet"
+          : "Fortune · BSC public testnet beta"}
+        <span className="networkNote">Test assets only · no real funds</span>
       </div>
       <header className="siteHeader">
         <Link href="/" className="logo">

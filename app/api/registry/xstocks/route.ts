@@ -12,6 +12,7 @@ type Deployment = {
   address?: string;
   contractAddress?: string;
   tokenAddress?: string;
+  wrapperAddress?: string;
   wrappedAddress?: string;
   [key: string]: unknown;
 };
@@ -23,8 +24,16 @@ type XAsset = {
   logo?: string;
   isTradingHalted?: boolean;
   deployments?: Deployment[];
+  tokenDeployments?: Deployment[];
   [key: string]: unknown;
 };
+
+function deploymentsFor(asset: XAsset) {
+  return [
+    ...(Array.isArray(asset.tokenDeployments) ? asset.tokenDeployments : []),
+    ...(Array.isArray(asset.deployments) ? asset.deployments : []),
+  ];
+}
 
 function isBnbDeployment(deployment: Deployment) {
   const labels = [
@@ -56,9 +65,12 @@ function deploymentAddress(deployment: Deployment) {
     deployment.address ||
     deployment.contractAddress ||
     deployment.tokenAddress ||
-    deployment.wrappedAddress ||
     null
   );
+}
+
+function wrapperAddress(deployment: Deployment) {
+  return deployment.wrapperAddress || deployment.wrappedAddress || null;
 }
 
 export async function GET() {
@@ -83,7 +95,7 @@ export async function GET() {
 
     const assets = list
       .map((asset) => {
-        const bnbDeployments = (asset.deployments || []).filter(isBnbDeployment);
+        const bnbDeployments = deploymentsFor(asset).filter(isBnbDeployment);
 
         return {
           id: asset.id || null,
@@ -91,10 +103,20 @@ export async function GET() {
           name: asset.name || asset.symbol || "xStock",
           logo: asset.logo || null,
           isTradingHalted: Boolean(asset.isTradingHalted),
-          deployments: bnbDeployments.map((deployment) => ({
-            ...deployment,
-            resolvedAddress: deploymentAddress(deployment),
-          })),
+          deployments: bnbDeployments.map((deployment) => {
+            const resolvedAddress = deploymentAddress(deployment);
+            const resolvedWrapperAddress = wrapperAddress(deployment);
+
+            return {
+              ...deployment,
+              resolvedAddress,
+              resolvedWrapperAddress,
+              pairable:
+                Boolean(resolvedWrapperAddress) &&
+                !Boolean(asset.isTradingHalted),
+              pairingAsset: resolvedWrapperAddress,
+            };
+          }),
         };
       })
       .filter((asset) => asset.deployments.length > 0);
@@ -103,8 +125,10 @@ export async function GET() {
       chainId: 56,
       source: XSTOCKS_ASSETS,
       count: assets.length,
+      pairingPolicy:
+        "Fortune pairs against current wrapped xStocks, not native rebasing xStocks. A BNB deployment without a current wrapper remains discovery-only.",
       note:
-        "Discovery metadata only. Fortune onchain capabilities still require exact address, oracle, transfer-model and eligibility review.",
+        "Discovery metadata only. Production Fortune capabilities still require exact wrapper verification, an independent oracle, liquidity review and user eligibility controls.",
       assets,
     });
   } catch (error) {

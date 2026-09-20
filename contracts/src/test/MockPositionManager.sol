@@ -13,6 +13,15 @@ contract MockPositionManager is ERC721, IFortunePositionManager {
 
     constructor() ERC721("Mock LP Position", "MLP") {}
 
+    function ownerOf(uint256 tokenId)
+        public
+        view
+        override(ERC721, IFortunePositionManager)
+        returns (address)
+    {
+        return super.ownerOf(tokenId);
+    }
+
     function mint(address to, uint256 tokenId) external {
         _mint(to, tokenId);
     }

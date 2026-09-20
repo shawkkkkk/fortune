@@ -109,7 +109,22 @@ jobs:
           cast rpc --rpc-url "$LOCAL_RPC_URL" anvil_setBalance \
             "$LOCAL_SIGNER" \
             0x3635C9ADC5DEA00000 >/dev/null
-          echo "PRIVATE_KEY=$LOCAL_KEY" >> "$GITHUB_ENV"
+
+          # Forge otherwise simulates scripts from its built-in default sender
+          # (0x1804...), which makes Anvil lazily fetch that account from the
+          # upstream testnet node. Some public BSC testnet RPCs cannot serve
+          # the required trie node. Force every script simulation to use the
+          # locally-created funded signer instead.
+          cast rpc --rpc-url "$LOCAL_RPC_URL" anvil_setBalance \
+            0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38 \
+            0x3635C9ADC5DEA00000 >/dev/null
+
+          {
+            echo "PRIVATE_KEY=$LOCAL_KEY"
+            echo "LOCAL_SIGNER=$LOCAL_SIGNER"
+            echo "FOUNDRY_SENDER=$LOCAL_SIGNER"
+            echo "FOUNDRY_TX_ORIGIN=$LOCAL_SIGNER"
+          } >> "$GITHUB_ENV"
 
           test "$(cast code "$PANCAKE_V3_FACTORY" --rpc-url "$LOCAL_RPC_URL")" != "0x"
           test "$(cast code "$PANCAKE_V3_POSITION_MANAGER" --rpc-url "$LOCAL_RPC_URL")" != "0x"
@@ -131,6 +146,7 @@ jobs:
             --rpc-url "$LOCAL_RPC_URL" \
             --broadcast \
             --slow \
+            --sender "$LOCAL_SIGNER" \
             --with-gas-price 1000000000 \
             --priority-gas-price 1000000000 \
             -vvv 2>&1 | tee /tmp/seed-graduation.log

@@ -15,3 +15,5 @@ Retry 3: trace-free direct deployment + live lifecycle harnesses.
 Retry 4: respect BSC testnet 16,777,216 transaction gas cap.
 
 Retry 5: pending-nonce pinning and retry logic for BSC RPC consistency.
+
+Retry 6: keep deploy logs off stdout so captured addresses remain clean.

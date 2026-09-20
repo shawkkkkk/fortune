@@ -4,7 +4,7 @@
 
 Fortune is a BNB Smart Chain launch protocol built around a shared **multi-asset Basket Curve**. A launch can accept **1–5 approved BSC quote assets**, maintain **one canonical launch price**, route trading fees through an immutable **Fee Matrix**, and graduate reserves into multiple destination markets.
 
-> **Status:** public BSC Testnet beta. Test assets only; the contracts remain pre-audit and mainnet is intentionally disabled. Do not use with real funds.
+> **Status:** public BSC Testnet alpha. Test assets only; the contracts remain pre-audit and mainnet is intentionally disabled. Do not use with real funds.
 
 ## What is built
 
@@ -43,9 +43,9 @@ Demo market/analytics values are deliberately marked as placeholders until oncha
 
 CI builds the Next.js application and runs the Foundry test suite.
 
-## Public BSC Testnet beta
+## Public BSC Testnet alpha
 
-The `/testnet` route is the public onchain beta path. It lets a tester:
+The `/testnet` route is the public onchain alpha path. It lets a tester:
 
 1. connect or switch an injected wallet to BSC Testnet (chain 97);
 2. mint Fortune's valueless mock `fUSD` quote token;
@@ -54,9 +54,9 @@ The `/testnet` route is the public onchain beta path. It lets a tester:
 5. permissionlessly finalize graduation into a real Pancake V3 testnet pool;
 6. inspect the resulting token, curve, transactions and protocol contracts on BscScan.
 
-The current public-beta reference deployment is documented in `docs/PUBLIC_TESTNET.md`. The successful release drill ran 7,500 web requests with 100% request success while three additional real BSC Testnet graduation cycles executed, then re-verified the original graduation invariants.
+The current public-alpha reference deployment is documented in `docs/PUBLIC_TESTNET.md`. The successful release drill ran 7,500 web requests with 100% request success while three additional real BSC Testnet graduation cycles executed, then re-verified the original graduation invariants.
 
-The broader 10/25/50/100 concurrent-graduation ladder remains available as a later capacity exercise; it is not a prerequisite for opening the testnet beta.
+The broader 10/25/50/100 concurrent-graduation ladder remains available as a later capacity exercise; it is not a prerequisite for opening the testnet alpha.
 
 ## Fortune vanity addresses
 
@@ -215,7 +215,7 @@ Current endpoints include:
 
 A lightweight identity-only asset index is also available at `/api/public/total-assets`.
 
-The launch preview API validates basket weights, quote capabilities, reward assets, fees and launch-engine constraints before any transaction is built. General-purpose API transaction preparation remains intentionally disabled. The dedicated `/testnet` beta route performs wallet-signed transactions against the published BSC Testnet deployment; production/mainnet transaction preparation remains disabled.
+The launch preview API validates basket weights, quote capabilities, reward assets, fees and launch-engine constraints before any transaction is built. General-purpose API transaction preparation remains intentionally disabled. The dedicated `/testnet` alpha route performs wallet-signed transactions against the published BSC Testnet deployment; production/mainnet transaction preparation remains disabled.
 
 See `docs/API.md` and the in-app `/developers` page.
 

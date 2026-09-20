@@ -299,7 +299,7 @@ contract FortuneTest is Test {
 
     function testLaunchShieldStartsAt99PercentAndDecaysToZero() public {
         FortuneFactory.LaunchInfo memory info =
-            factory.createLaunch(_params(1_000_000e18));
+            factory.createLaunch(_params(1_000e18));
         FortuneCurve curve = FortuneCurve(info.curve);
 
         uint256 launchedAt = curve.launchTimestamp();
@@ -317,7 +317,7 @@ contract FortuneTest is Test {
 
     function testLaunchShieldTaxGoesToLiquidityVaultNotCreator() public {
         FortuneFactory.LaunchInfo memory info =
-            factory.createLaunch(_params(1_000_000e18));
+            factory.createLaunch(_params(1_000e18));
         FortuneCurve curve = FortuneCurve(info.curve);
 
         uint256 shieldBefore = usdt.balanceOf(info.liquidityVault);
@@ -338,7 +338,7 @@ contract FortuneTest is Test {
 
     function testLaunchShieldCapsCumulativeEarlyWalletBuy() public {
         FortuneFactory.LaunchInfo memory info =
-            factory.createLaunch(_params(1_000_000e18));
+            factory.createLaunch(_params(1_000e18));
         FortuneCurve curve = FortuneCurve(info.curve);
 
         vm.warp(block.timestamp + 6);
@@ -429,7 +429,7 @@ contract FortuneTest is Test {
         );
 
         FortuneFactory.LaunchInfo memory info =
-            factory.createLaunch(_params(10_000e18));
+            factory.createLaunch(_params(1_000e18));
         FortuneCurve curve = FortuneCurve(info.curve);
 
         vm.warp(block.timestamp + 16);
@@ -461,7 +461,7 @@ contract FortuneTest is Test {
         );
 
         FortuneFactory.LaunchInfo memory info =
-            factory.createLaunch(_params(100_000e18));
+            factory.createLaunch(_params(1_000e18));
         FortuneCurve curve = FortuneCurve(info.curve);
 
         vm.warp(block.timestamp + 16);
@@ -1585,7 +1585,7 @@ contract FortuneTest is Test {
         perpRegistry.referencePrice(marketKey, 10_000);
     }
 
-    function testPositiveRebaseChangesReserveAndCanTriggerGraduation() public {
+    function testPositiveRebaseCannotManipulateReserveOrTriggerGraduation() public {
         MockRebaseToken rebaseToken = new MockRebaseToken();
         oracle.setPrice(address(rebaseToken), 1e18);
 
@@ -1622,13 +1622,30 @@ contract FortuneTest is Test {
         vm.stopPrank();
 
         assertFalse(curve.graduationReady());
-        uint256 beforeReserve = curve.reserve(address(rebaseToken));
 
-        // Simulate a positive rebase increasing the curve's actual balance.
+        uint256 beforeReserve =
+            curve.reserve(address(rebaseToken));
+        uint256 rawBefore =
+            curve.rawReserveBalance(address(rebaseToken));
+
+        // A positive rebase changes the raw ERC-20 balance, but Fortune's
+        // accounted reserve intentionally ignores it.
         rebaseToken.positiveRebase(address(curve), 60e18);
-        assertEq(curve.reserve(address(rebaseToken)), beforeReserve + 60e18);
+
+        assertEq(
+            curve.reserve(address(rebaseToken)),
+            beforeReserve
+        );
+        assertEq(
+            curve.rawReserveBalance(address(rebaseToken)),
+            rawBefore + 60e18
+        );
+        assertEq(
+            curve.excessQuoteBalance(address(rebaseToken)),
+            60e18
+        );
 
         curve.checkGraduation();
-        assertTrue(curve.graduationReady());
+        assertFalse(curve.graduationReady());
     }
 }

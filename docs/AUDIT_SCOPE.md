@@ -65,7 +65,7 @@ Deployment/governance scripts:
 ### Administration and governance
 
 - Verify production deployment starts paused.
-- Verify Ownable2Step handoff to contract-based governance.
+- Verify Ownable2Step handoff to Safe-compatible governance with threshold >= 2 and owner count >= threshold.
 - Inventory every owner/admin action and its impact.
 - Verify deployer has no continuing protocol ownership after acceptance.
 - Verify automation registry cannot turn a purpose-locked vault into an arbitrary sweep.

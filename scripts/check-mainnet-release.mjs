@@ -29,6 +29,16 @@ const activationGates = [
 const expectedGates = new Set(activationGates);
 const errors = [];
 
+function validEvidenceReference(value) {
+  const evidence = String(value || "").trim();
+  return (
+    /^https:\/\/\S+$/i.test(evidence) ||
+    /^github-actions:\d+$/.test(evidence) ||
+    /^bsc:(?:0x)?[a-fA-F0-9]{40,64}$/.test(evidence) ||
+    /^sha256:[a-fA-F0-9]{64}$/.test(evidence)
+  );
+}
+
 if (manifest.version !== 1) errors.push("version must be 1");
 if (manifest.chainId !== 56) errors.push("chainId must be 56");
 if (manifest.release !== "fortune-bsc-mainnet-v1") {
@@ -57,6 +67,12 @@ for (const id of expectedGates) {
   const gate = manifest.gates?.[id];
   if (!gate || typeof gate.passed !== "boolean" || typeof gate.evidence !== "string") {
     errors.push(`invalid or missing gate: ${id}`);
+    continue;
+  }
+  if (gate.passed && !validEvidenceReference(gate.evidence)) {
+    errors.push(
+      `gate ${id} is marked passed but evidence is not a reproducible reference`
+    );
   }
 }
 
@@ -72,7 +88,7 @@ if (errors.length) {
 
 const complete = (id) =>
   manifest.gates[id].passed === true &&
-  manifest.gates[id].evidence.trim().length > 0;
+  validEvidenceReference(manifest.gates[id].evidence);
 
 const reviewedCommitOk = /^[a-fA-F0-9]{40}$/.test(manifest.reviewedCommit || "");
 const deployMissing = deployGates.filter((id) => !complete(id));

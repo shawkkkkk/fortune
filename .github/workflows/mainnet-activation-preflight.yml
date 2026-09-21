@@ -34,7 +34,7 @@ jobs:
         with:
           node-version: 22
 
-      - run: npm install
+      - run: npm ci
 
       - name: Require activation-ready release evidence
         run: npm run mainnet:require-activate

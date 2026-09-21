@@ -9,7 +9,7 @@ The first real-value release is deliberately smaller than the research/testnet s
 - BNB Smart Chain mainnet only;
 - standard Fortune launches only;
 - tax-token mainnet launches disabled;
-- at most five assets in the initial production registry;
+- exactly one reviewed asset in the initial production registry (WBNB in the current candidate);
 - tokenized securities / restricted RWAs disabled in the initial registry;
 - Pancake V3 graduation only;
 - launch creation stays paused immediately after deployment;
@@ -53,7 +53,7 @@ npm run mainnet:deps:require
 
 The paused deployment workflow exports the reviewed dependency manifest into its runtime environment. Pancake and asset/feed addresses are not accepted from mutable GitHub dashboard variables.
 
-Every initial asset entry must include its token address, oracle feed, maximum oracle age, capabilities, category, and a primary-source reference. Mainnet v1 refuses to deploy with zero pinned assets or more than five.
+Every initial asset entry must include its token address, oracle feed, maximum oracle age, capabilities, category, and a primary-source reference. Mainnet v1 refuses to deploy unless exactly one production asset is pinned.
 
 ## Phase 1 — reviewed source
 
@@ -84,6 +84,7 @@ The workflow:
 - runs under the GitHub `mainnet` environment;
 - requires BSC chain ID 56;
 - requires a contract-based governance address;
+- requires a contract-based automation executor rather than a single-key EOA;
 - validates Pancake dependencies contain bytecode;
 - reruns the Foundry suite with a stronger fuzz count;
 - dry-runs the deployment;

@@ -103,14 +103,21 @@ jobs:
           cp docs/MAINNET_INCIDENT.md "$OUT/"
           cp docs/SECURITY.md "$OUT/"
 
-          if [ -f package-lock.json ]; then cp package-lock.json "$OUT/"; fi
+          cp package-lock.json "$OUT/"
           cp package.json "$OUT/"
+          cp next.config.ts "$OUT/"
+          mkdir -p "$OUT/workflows"
+          cp .github/workflows/mainnet-deploy-paused.yml "$OUT/workflows/"
+          cp .github/workflows/mainnet-activation-preflight.yml "$OUT/workflows/"
+          cp .github/workflows/mainnet-readiness.yml "$OUT/workflows/"
+          cp .github/workflows/mainnet-node-security.yml "$OUT/workflows/"
+          cp .github/workflows/mainnet-audit-bundle.yml "$OUT/workflows/"
 
           find contracts/src contracts/test             contracts/script/DeployProduction.s.sol             contracts/script/ActivateProduction.s.sol             contracts/script/PrepareGovernanceAcceptance.s.sol             -type f -print0 |
             sort -z |
             xargs -0 sha256sum > "$OUT/security-source-sha256.txt"
 
-          git archive --format=tar.gz             --output="$OUT/reviewed-source.tar.gz"             HEAD             contracts/src             contracts/test             contracts/script/DeployProduction.s.sol             contracts/script/ActivateProduction.s.sol             contracts/script/PrepareGovernanceAcceptance.s.sol             mainnet-release.json             mainnet-dependencies.json             docs/AUDIT_SCOPE.md             docs/ECONOMIC_SPEC.md             docs/MAINNET_READINESS.md             docs/MAINNET_ASSET_POLICY.md             docs/MAINNET_INCIDENT.md             docs/SECURITY.md             scripts/mainnet-economic-sim.mjs             scripts/check-mainnet-release.mjs             scripts/check-mainnet-dependencies.mjs
+          git archive --format=tar.gz             --output="$OUT/reviewed-source.tar.gz"             HEAD             contracts/src             contracts/test             contracts/script/DeployProduction.s.sol             contracts/script/ActivateProduction.s.sol             contracts/script/PrepareGovernanceAcceptance.s.sol             mainnet-release.json             mainnet-dependencies.json             docs/AUDIT_SCOPE.md             docs/ECONOMIC_SPEC.md             docs/MAINNET_READINESS.md             docs/MAINNET_ASSET_POLICY.md             docs/MAINNET_INCIDENT.md             docs/SECURITY.md             scripts/mainnet-economic-sim.mjs             scripts/check-mainnet-release.mjs             scripts/check-mainnet-dependencies.mjs             package.json             package-lock.json             next.config.ts             .github/workflows/mainnet-deploy-paused.yml             .github/workflows/mainnet-activation-preflight.yml             .github/workflows/mainnet-readiness.yml             .github/workflows/mainnet-node-security.yml             .github/workflows/mainnet-audit-bundle.yml
 
           (cd "$OUT" && sha256sum * > AUDIT_BUNDLE_SHA256.txt)
 

@@ -226,6 +226,13 @@ contract FortuneMainnetForkTest is Test {
         assertFalse(multiReady);
         assertEq(multiReason, bytes32("MAINNET_SINGLE_QUOTE"));
 
+        // Memory struct assignments above share memory references. Restore the
+        // canonical canary before probing the independent fee ceiling.
+        p.quoteAssets = quotes;
+        p.weightsBps = weights;
+        p.primaryQuote = WBNB;
+        p.graduationUsd1e18 = 50e18;
+
         FortuneFactory.LaunchParams memory highFee = p;
         uint16[6] memory highFees = [
             uint16(50),
@@ -241,12 +248,8 @@ contract FortuneMainnetForkTest is Test {
         assertFalse(highFeeReady);
         assertEq(highFeeReason, bytes32("MAINNET_FEE_CAP"));
 
-        // Memory struct assignments above share dynamic-array references.
-        // Restore the canonical valid canary parameters before execution.
-        p.quoteAssets = quotes;
-        p.weightsBps = weights;
-        p.primaryQuote = WBNB;
-        p.graduationUsd1e18 = 50e18;
+        // Restore the canonical fee schedule before execution.
+        p.feeBps = fees;
 
         FortuneFactory.LaunchInfo memory info =
             factory.createLaunch(p);

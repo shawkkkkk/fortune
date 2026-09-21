@@ -226,6 +226,13 @@ contract FortuneMainnetForkTest is Test {
         assertFalse(multiReady);
         assertEq(multiReason, bytes32("MAINNET_SINGLE_QUOTE"));
 
+        // Memory struct assignments above share dynamic-array references.
+        // Restore the canonical valid canary parameters before execution.
+        p.quoteAssets = quotes;
+        p.weightsBps = weights;
+        p.primaryQuote = WBNB;
+        p.graduationUsd1e18 = 50e18;
+
         FortuneFactory.LaunchInfo memory info =
             factory.createLaunch(p);
         FortuneCurve curve =

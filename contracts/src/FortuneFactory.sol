@@ -481,6 +481,9 @@ contract FortuneFactory is Ownable2Step {
         if (totalFeeBps == 0 || totalFeeBps > 500) {
             return (false, bytes32("BAD_TOTAL_FEE"));
         }
+        if (block.chainid == 56 && totalFeeBps > 100) {
+            return (false, bytes32("MAINNET_FEE_CAP"));
+        }
         if (p.feeBps[4] > 0 && p.treasury == address(0)) {
             return (false, bytes32("TREASURY_REQUIRED"));
         }

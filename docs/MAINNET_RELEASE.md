@@ -12,8 +12,8 @@ not make Fortune production-ready.
 The production deployment script:
 
 - only runs on BNB Smart Chain mainnet (`chainid == 56`);
-- receives every external Pancake, asset, oracle, treasury and governance address
-  from environment configuration;
+- receives governance/operator addresses from protected environment configuration;
+- receives Pancake dependencies plus the initial WBNB/Chainlink asset configuration from the reviewed, version-controlled `mainnet-dependencies.json` manifest;
 - verifies bytecode exists at all configured assets, feeds and Pancake contracts;
 - calls the live Fortune registry health check for every configured asset;
 - requires at least one healthy quote + graduation asset;
@@ -88,13 +88,7 @@ It expects:
 - `FORTUNE_GOVERNANCE`
 - `FORTUNE_AUTOMATION_EXECUTOR`
 - `FORTUNE_PROTOCOL_TREASURY`
-- `PANCAKE_V3_FACTORY`
-- `PANCAKE_V3_POSITION_MANAGER`
-- `PRODUCTION_ASSET_COUNT`
-- numbered `PRODUCTION_ASSET_N`, `PRODUCTION_FEED_N`,
-  `PRODUCTION_MAX_AGE_N`, `PRODUCTION_QUOTE_ENABLED_N`,
-  `PRODUCTION_REWARD_ENABLED_N`, `PRODUCTION_GRADUATION_ENABLED_N`,
-  and `PRODUCTION_CATEGORY_N` variables.
+The deploy workflow exports `PANCAKE_V3_FACTORY`, `PANCAKE_V3_POSITION_MANAGER`, and the numbered `PRODUCTION_ASSET_N` / feed / policy variables from `mainnet-dependencies.json`; they are not free-form operator inputs. Mainnet v1 requires exactly one pinned production asset.
 
 The script intentionally leaves `launchesPaused() == true`.
 
@@ -112,27 +106,24 @@ the wrong address.
 
 ## Activation
 
-The final activation script is:
+The final activation validator is:
 
 `contracts/script/ActivateProduction.s.sol`
 
-It requires:
+It is intentionally **non-broadcasting** and never receives a governance private key. The protected **Fortune Mainnet Activation Preflight** workflow runs it against the deployed, still-paused production stack and emits the exact governance calldata for review.
 
-`CONFIRM_MAINNET_ACTIVATION=ACTIVATE_FORTUNE_MAINNET`
-
-and the private key for the actual FortuneFactory governance owner.
-
-Before unpausing, the script verifies:
+Before any unpause transaction, it verifies:
 
 - chain ID 56;
-- governance owns FortuneFactory and FortuneAssetRegistry;
+- contract-based governance owns FortuneFactory and FortuneAssetRegistry;
 - metadata registry is bound to the exact factory;
 - graduation adapter exists;
 - Pancake factory and position manager contain bytecode;
 - permanent locker exists and approves the graduation adapter;
-- at least one registry asset is both launchable and oracle-healthy.
+- the pinned production quote asset is launchable and oracle-healthy;
+- every machine-enforced activation gate in `mainnet-release.json` is complete.
 
-Only then does it call `setLaunchesPaused(false)`.
+The actual `setLaunchesPaused(false)` transaction must then be submitted separately through the configured governance Safe/multisig. CI does not hold or use a governance signing key.
 
 ## Website behavior
 

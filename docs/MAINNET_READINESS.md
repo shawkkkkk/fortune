@@ -26,9 +26,16 @@ Expanding the registry, adding restricted RWAs, or enabling another launch archi
 Every gate is represented as:
 
 - `passed`: boolean;
-- `evidence`: a public audit report, repository artifact, issue/PR, signed review, runbook, deployment transaction, or other reproducible reference.
+- `evidence`: one reproducible reference.
 
-A gate is incomplete if evidence is empty even when `passed` is true.
+Accepted evidence formats are:
+
+- an `https://` reference;
+- `github-actions:<run-id>`;
+- `bsc:<address-or-transaction-hash>`;
+- `sha256:<64-hex-digest>` for a retained private report.
+
+A gate is incomplete if it is marked passed without one of those evidence references. Plain text such as `done` is rejected.
 
 Run:
 

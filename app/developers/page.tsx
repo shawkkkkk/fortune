@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { FORTUNE_SITE_URL } from "@/lib/site";
 
 const endpoints = [
   ["GET", "/api/ready", "Live BSC Testnet service readiness"],
@@ -12,9 +13,9 @@ const endpoints = [
 ] as const;
 
 const quickstart =
-  "curl https://fortune-rho-snowy.vercel.app/api/ready\n\n" +
-  "curl https://fortune-rho-snowy.vercel.app/api/public/v1/readiness\n\n" +
-  "curl https://fortune-rho-snowy.vercel.app/api/public/v1/protocol";
+  "curl " + FORTUNE_SITE_URL + "/api/ready\n\n" +
+  "curl " + FORTUNE_SITE_URL + "/api/public/v1/readiness\n\n" +
+  "curl " + FORTUNE_SITE_URL + "/api/public/v1/protocol";
 
 export default function DevelopersPage() {
   return (

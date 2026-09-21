@@ -40,4 +40,6 @@ jobs:
             exit 0
           fi
           git commit -m "Lock Node dependencies for reproducible releases"
+          git fetch origin main
+          git rebase origin/main
           git push origin HEAD:main

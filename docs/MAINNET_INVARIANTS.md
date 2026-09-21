@@ -11,6 +11,8 @@ This is the canonical checklist for independent review of Fortune's first BSC ma
 - **I-05 Mainnet quote restriction:** on chain 56, exactly one quote is accepted and both quote and primary quote must be WBNB.
 - **I-06 Mainnet reserve ceiling:** on chain 56, graduation target is at most $10,000 normalized USD.
 - **I-07 Launch pause:** no launch may be created while the factory is paused.
+- **I-07A Mainnet fee ceiling:** chain 56 rejects a total launch trade fee above 100 bps.
+- **I-07B Automation fee routes disabled:** chain 56 rejects holder-reward, buyback, or liquidity-automation trade-fee allocations until a separately reviewed production adapter exists.
 
 ## Curve accounting
 
@@ -27,7 +29,7 @@ This is the canonical checklist for independent review of Fortune's first BSC ma
 - **I-15 Fee ceiling:** immutable configured trade fees cannot exceed the protocol maximum.
 - **I-16 Fee conservation:** routed fee output cannot exceed the fee amount supplied by the curve.
 - **I-17 Immutable destinations:** per-launch fee destinations cannot be arbitrarily rewritten after creation.
-- **I-18 Creator surrender one-way:** creator fee surrender can only redirect the existing creator share toward holder rewards and cannot be reversed.
+- **I-18 Creator surrender one-way:** outside mainnet v1, creator fee surrender can only redirect the existing creator share toward holder rewards and cannot be reversed; chain 56 disables surrender while production automation is unavailable.
 - **I-19 No automation sweep:** automation vaults expose no arbitrary owner/executor withdrawal.
 - **I-20 Purpose allowlist:** vault execution requires an adapter approved for that exact automation purpose.
 
@@ -36,6 +38,7 @@ This is the canonical checklist for independent review of Fortune's first BSC ma
 - **I-21 Known curve only:** graduation adapters only process curves created by the canonical factory.
 - **I-22 Full preflight:** any condition required for execution is either checked in preflight or fails atomically during execution.
 - **I-23 Existing-pool protection:** an existing Pancake pool outside the permitted price-deviation bound cannot be used for graduation.
+- **I-23A Mainnet graduation plan:** chain 56 requires Pancake fee tier 500 and caps caller-selected sqrt-price deviation and dust at 100 bps each.
 - **I-24 Atomic graduation:** reserve transfer, pool creation/mint, dust routing, NFT transfer and locker registration either all succeed or all revert.
 - **I-25 Retry safety:** failed graduation remains retryable without duplicate successful graduation.
 - **I-26 Single completion:** a successfully graduated curve cannot graduate twice.

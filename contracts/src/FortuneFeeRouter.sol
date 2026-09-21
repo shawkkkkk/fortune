@@ -83,6 +83,10 @@ contract FortuneFeeRouter {
     /// @dev This is deliberately one-way: it can reduce creator extraction but can
     ///      never increase the fee, restore creator routing or change other routes.
     function surrenderCreatorFeesToHolders() external {
+        require(
+            block.chainid != 56,
+            "MAINNET_AUTOMATION_DISABLED"
+        );
         require(msg.sender == creator, "ONLY_CREATOR");
         require(!creatorFeesSurrenderedToHolders, "ALREADY_SURRENDERED");
         require(creatorBps > 0, "NO_CREATOR_FEE");

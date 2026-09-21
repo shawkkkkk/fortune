@@ -377,12 +377,14 @@ contract FortuneTest is Test {
         FortuneFactory.LaunchParams memory p = _params(10_001e18);
 
         address[] memory quotes = new address[](1);
-        quotes[0] = address(wbnb);
+        quotes[0] =
+            0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c;
         uint16[] memory weights = new uint16[](1);
         weights[0] = 10_000;
         p.quoteAssets = quotes;
         p.weightsBps = weights;
-        p.primaryQuote = address(wbnb);
+        p.primaryQuote =
+            0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c;
 
         vm.chainId(56);
         (bool ready, bytes32 reason) = factory.preflightLaunch(p);

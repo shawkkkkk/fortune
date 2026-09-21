@@ -28,6 +28,14 @@ contract ActivateProduction is Script {
 
         require(address(factory).code.length > 0, "FACTORY_NO_CODE");
         require(factory.owner() == governance, "GOVERNANCE_NOT_FACTORY_OWNER");
+        require(
+            factory.automationExecutor() == governance,
+            "AUTOMATION_EXECUTOR_NOT_GOVERNANCE"
+        );
+        require(
+            factory.protocolTreasury() == governance,
+            "PROTOCOL_TREASURY_NOT_GOVERNANCE"
+        );
         require(factory.launchesPaused(), "FACTORY_ALREADY_ACTIVE");
 
         FortuneAssetRegistry registry = factory.registry();

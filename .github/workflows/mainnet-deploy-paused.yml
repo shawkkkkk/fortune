@@ -52,7 +52,7 @@ jobs:
         run: |
           REVIEWED="$(node -p "require('./mainnet-release.json').reviewedCommit")"
           git cat-file -e "$REVIEWED^{commit}"
-          git diff --exit-code "$REVIEWED"..HEAD --             contracts/src             contracts/script/DeployProduction.s.sol             contracts/script/ActivateProduction.s.sol             contracts/script/PrepareGovernanceAcceptance.s.sol             app/launch             lib/fortune-network.ts             app/api/public/v1/readiness/route.ts             mainnet-dependencies.json             scripts/check-mainnet-dependencies.mjs             scripts/export-mainnet-dependencies.mjs
+          git diff --exit-code "$REVIEWED"..HEAD --             contracts/src             contracts/script/DeployProduction.s.sol             contracts/script/ActivateProduction.s.sol             contracts/script/PrepareGovernanceAcceptance.s.sol             app/launch             lib/fortune-network.ts             app/api/public/v1/readiness/route.ts             mainnet-dependencies.json             scripts/check-mainnet-dependencies.mjs             scripts/export-mainnet-dependencies.mjs             package.json             package-lock.json             next.config.ts             .github/workflows/mainnet-deploy-paused.yml             .github/workflows/mainnet-activation-preflight.yml             .github/workflows/mainnet-readiness.yml             .github/workflows/mainnet-node-security.yml             .github/workflows/mainnet-audit-bundle.yml
 
       - uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09
 

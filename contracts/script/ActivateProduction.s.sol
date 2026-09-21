@@ -16,7 +16,7 @@ import {FortunePermanentLiquidityLocker} from "../src/FortunePermanentLiquidityL
 ///      Mainnet activation must be executed by the configured contract-based
 ///      governance wallet after all offchain release gates pass.
 contract ActivateProduction is Script {
-    function run() external view {
+    function run() external {
         require(block.chainid == 56, "BSC_MAINNET_ONLY");
 
         address governance = vm.envAddress("FORTUNE_GOVERNANCE");

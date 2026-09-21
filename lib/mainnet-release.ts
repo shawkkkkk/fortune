@@ -24,9 +24,19 @@ export const MAINNET_ACTIVATION_GATE_IDS = [
 
 type GateId = keyof typeof releaseManifest.gates;
 
+function validEvidenceReference(value: string) {
+  const evidence = value.trim();
+  return (
+    /^https:\/\/\S+$/i.test(evidence) ||
+    /^github-actions:\d+$/.test(evidence) ||
+    /^bsc:(?:0x)?[a-fA-F0-9]{40,64}$/.test(evidence) ||
+    /^sha256:[a-fA-F0-9]{64}$/.test(evidence)
+  );
+}
+
 function gateComplete(id: GateId) {
   const gate = releaseManifest.gates[id];
-  return gate.passed === true && gate.evidence.trim().length > 0;
+  return gate.passed === true && validEvidenceReference(gate.evidence);
 }
 
 export const MAINNET_RELEASE = releaseManifest;

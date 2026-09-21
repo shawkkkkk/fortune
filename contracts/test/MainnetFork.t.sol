@@ -216,10 +216,13 @@ contract FortuneMainnetForkTest is Test {
         vm.stopPrank();
 
         assertTrue(curve.graduationReady());
-        assertLe(
-            curve.netReserveUsd1e18(),
-            50e18 + 1
-        );
+        uint256 reserveUsd = curve.netReserveUsd1e18();
+        assertGe(reserveUsd, 50e18);
+        // Live Chainlink normalization and ERC-20 integer conversion can leave
+        // a sub-pico-dollar rounding remainder on the partial-fill boundary.
+        // Keep the bound explicit and tiny rather than requiring exact 1-wei
+        // equality across oracle prices and token decimals.
+        assertLe(reserveUsd, 50e18 + 1e6);
 
         uint24[] memory poolFees =
             new uint24[](1);

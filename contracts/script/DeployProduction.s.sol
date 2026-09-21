@@ -46,6 +46,12 @@ contract DeployProduction is Script {
             governance.code.length > 0,
             "GOVERNANCE_MUST_BE_CONTRACT"
         );
+        // Mainnet v1 does not permit a single hot-key EOA to command launch
+        // automation vaults. The executor must itself be contract-controlled.
+        require(
+            automationExecutor.code.length > 0,
+            "AUTOMATION_EXECUTOR_MUST_BE_CONTRACT"
+        );
         require(
             pancakeV3Factory.code.length > 0 &&
                 positionManager.code.length > 0,
@@ -53,10 +59,10 @@ contract DeployProduction is Script {
         );
 
         uint256 assetCount = vm.envUint("PRODUCTION_ASSET_COUNT");
-        // Mainnet v1 intentionally starts with a narrow registry. Additional
-        // assets can be added later through governance after production data
-        // and asset-specific review.
-        require(assetCount >= 1 && assetCount <= 5, "BAD_ASSET_COUNT");
+        // Mainnet v1 is deliberately single-reserve. This removes
+        // cross-reserve execution/arbitrage from the first real-funds canary.
+        // Additional assets require a later reviewed release.
+        require(assetCount == 1, "MAINNET_V1_SINGLE_ASSET");
 
         vm.startBroadcast(deployerKey);
 

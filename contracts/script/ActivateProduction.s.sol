@@ -87,44 +87,50 @@ contract ActivateProduction is Script {
             "LOCKER_ADAPTER_NOT_APPROVED"
         );
 
+        address expectedPancakeFactory =
+            vm.envAddress("PANCAKE_V3_FACTORY");
+        address expectedPositionManager =
+            vm.envAddress("PANCAKE_V3_POSITION_MANAGER");
+        require(
+            address(adapter.pancakeFactory()) == expectedPancakeFactory,
+            "PANCAKE_FACTORY_MISMATCH"
+        );
+        require(
+            address(adapter.positionManager()) == expectedPositionManager,
+            "POSITION_MANAGER_MISMATCH"
+        );
+
         uint256 assetCount = registry.assetCount();
-        require(assetCount > 0 && assetCount <= 5, "BAD_REGISTERED_ASSET_COUNT");
+        require(assetCount == 1, "MAINNET_V1_SINGLE_ASSET");
 
-        bool hasHealthyLaunchableQuote;
+        address asset = registry.allAssets(0);
+        require(
+            asset == factory.BSC_MAINNET_V1_QUOTE(),
+            "MAINNET_V1_ASSET_NOT_WBNB"
+        );
 
-        for (uint256 i; i < assetCount; ++i) {
-            address asset = registry.allAssets(i);
-
-            FortuneAssetRegistry.AssetConfig memory config =
-                registry.assetConfig(asset);
-
-            if (
-                config.active &&
+        FortuneAssetRegistry.AssetConfig memory config =
+            registry.assetConfig(asset);
+        require(
+            config.active &&
                 config.quoteEnabled &&
-                config.graduationEnabled
-            ) {
-                (
-                    bool healthy,
-                    bytes32 reasonCode,
-                    uint256 price,
-                    uint256 updatedAt
-                ) = registry.assetHealth(asset);
+                config.graduationEnabled,
+            "WBNB_CAPABILITIES_INVALID"
+        );
 
-                if (
-                    healthy &&
-                    reasonCode == bytes32("OK") &&
-                    price > 0 &&
-                    updatedAt > 0
-                ) {
-                    hasHealthyLaunchableQuote = true;
-                    break;
-                }
-            }
-        }
+        (
+            bool healthy,
+            bytes32 reasonCode,
+            uint256 price,
+            uint256 updatedAt
+        ) = registry.assetHealth(asset);
 
         require(
-            hasHealthyLaunchableQuote,
-            "NO_HEALTHY_LAUNCHABLE_QUOTE"
+            healthy &&
+                reasonCode == bytes32("OK") &&
+                price > 0 &&
+                updatedAt > 0,
+            "WBNB_HEALTH_FAILED"
         );
 
         bytes memory activationCalldata =

@@ -280,6 +280,34 @@ contract FortuneMainnetForkTest is Test {
                         )
                     });
 
+        // Permissionless finalizers cannot choose a different market shape on
+        // mainnet v1. The adapter itself enforces the reviewed plan.
+        poolFees[0] = 2500;
+        (bool badFeeReady, bytes32 badFeeReason) =
+            curve.preflightGraduation(address(adapter), abi.encode(plan));
+        assertFalse(badFeeReady);
+        assertEq(badFeeReason, bytes32("MAINNET_FEE_TIER"));
+
+        poolFees[0] = 500;
+        plan.maxSqrtPriceDeviationBps = 101;
+        (bool badDeviationReady, bytes32 badDeviationReason) =
+            curve.preflightGraduation(address(adapter), abi.encode(plan));
+        assertFalse(badDeviationReady);
+        assertEq(badDeviationReason, bytes32("MAINNET_DEVIATION"));
+
+        plan.maxSqrtPriceDeviationBps = 100;
+        plan.maxDustBps = 101;
+        (bool badDustReady, bytes32 badDustReason) =
+            curve.preflightGraduation(address(adapter), abi.encode(plan));
+        assertFalse(badDustReady);
+        assertEq(badDustReason, bytes32("MAINNET_DUST"));
+
+        plan.maxDustBps = 100;
+        (bool finalReady, bytes32 finalReason) =
+            curve.preflightGraduation(address(adapter), abi.encode(plan));
+        assertTrue(finalReady);
+        assertEq(finalReason, bytes32("OK"));
+
         bool graduated =
             factory.finalizeGraduation(
                 address(curve),

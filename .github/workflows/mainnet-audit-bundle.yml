@@ -13,6 +13,7 @@ on:
       - "mainnet-dependencies.json"
       - "scripts/check-mainnet-*.mjs"
       - "scripts/export-mainnet-dependencies.mjs"
+      - "scripts/export-mainnet-deployment.mjs"
       - "scripts/mainnet-economic-sim.mjs"
       - "scripts/mainnet-candidate-fingerprint.mjs"
       - "scripts/check-mainnet-contract-sizes.mjs"
@@ -135,7 +136,7 @@ jobs:
             sort -z |
             xargs -0 sha256sum > "$OUT/security-source-sha256.txt"
 
-          git archive --format=tar.gz             --output="$OUT/reviewed-source.tar.gz"             HEAD             contracts/src             contracts/test             contracts/script/DeployProduction.s.sol             contracts/script/ActivateProduction.s.sol             contracts/script/PrepareGovernanceAcceptance.s.sol             mainnet-release.json             mainnet-dependencies.json             docs/AUDIT_SCOPE.md             docs/ECONOMIC_SPEC.md             docs/MAINNET_READINESS.md             docs/MAINNET_ASSET_POLICY.md             docs/MAINNET_INCIDENT.md             docs/MAINNET_GOVERNANCE.md             docs/MAINNET_THREAT_MODEL.md             docs/MAINNET_INVARIANTS.md             docs/SECURITY.md             scripts/mainnet-economic-sim.mjs             scripts/mainnet-candidate-fingerprint.mjs             scripts/check-mainnet-contract-sizes.mjs             scripts/check-mainnet-release.mjs             scripts/check-mainnet-dependencies.mjs             package.json             package-lock.json             next.config.ts             .github/workflows/mainnet-deploy-paused.yml             .github/workflows/mainnet-activation-preflight.yml             .github/workflows/mainnet-readiness.yml             .github/workflows/mainnet-node-security.yml             .github/workflows/mainnet-audit-bundle.yml
+          git archive --format=tar.gz             --output="$OUT/reviewed-source.tar.gz"             HEAD             contracts/src             contracts/test             contracts/script/DeployProduction.s.sol             contracts/script/ActivateProduction.s.sol             contracts/script/PrepareGovernanceAcceptance.s.sol             mainnet-release.json             mainnet-dependencies.json             docs/AUDIT_SCOPE.md             docs/ECONOMIC_SPEC.md             docs/MAINNET_READINESS.md             docs/MAINNET_ASSET_POLICY.md             docs/MAINNET_INCIDENT.md             docs/MAINNET_GOVERNANCE.md             docs/MAINNET_THREAT_MODEL.md             docs/MAINNET_INVARIANTS.md             docs/SECURITY.md             scripts/mainnet-economic-sim.mjs             scripts/mainnet-candidate-fingerprint.mjs             scripts/check-mainnet-contract-sizes.mjs             scripts/export-mainnet-deployment.mjs             scripts/check-mainnet-release.mjs             scripts/check-mainnet-dependencies.mjs             package.json             package-lock.json             next.config.ts             .github/workflows/mainnet-deploy-paused.yml             .github/workflows/mainnet-activation-preflight.yml             .github/workflows/mainnet-readiness.yml             .github/workflows/mainnet-node-security.yml             .github/workflows/mainnet-audit-bundle.yml
 
           (
             cd "$OUT"

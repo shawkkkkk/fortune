@@ -1,0 +1,75 @@
+{
+  "version": 1,
+  "chainId": 56,
+  "release": "fortune-bsc-mainnet-v1",
+  "status": "blocked",
+  "scope": {
+    "standardLaunches": true,
+    "taxTokenLaunches": false,
+    "maximumInitialRegistryAssets": 5,
+    "restrictedRwaAssetsEnabled": false
+  },
+  "reviewedCommit": "",
+  "gates": {
+    "independentSmartContractAudit": {
+      "passed": false,
+      "evidence": ""
+    },
+    "economicCurveSimulation": {
+      "passed": false,
+      "evidence": ""
+    },
+    "mevCrossReserveReview": {
+      "passed": false,
+      "evidence": ""
+    },
+    "oracleAssetPolicyReview": {
+      "passed": false,
+      "evidence": ""
+    },
+    "graduationAdapterAudit": {
+      "passed": false,
+      "evidence": ""
+    },
+    "automationVaultAudit": {
+      "passed": false,
+      "evidence": ""
+    },
+    "governanceMultisig": {
+      "passed": false,
+      "evidence": ""
+    },
+    "deploymentKeyControls": {
+      "passed": false,
+      "evidence": ""
+    },
+    "legalComplianceReview": {
+      "passed": false,
+      "evidence": ""
+    },
+    "productionRpcRedundancy": {
+      "passed": false,
+      "evidence": ""
+    },
+    "monitoringAlerts": {
+      "passed": false,
+      "evidence": ""
+    },
+    "incidentRunbook": {
+      "passed": false,
+      "evidence": ""
+    },
+    "reproduciblePausedDeployment": {
+      "passed": false,
+      "evidence": ""
+    },
+    "reproducibleIndexerAnalytics": {
+      "passed": false,
+      "evidence": ""
+    },
+    "productionCanaryDrill": {
+      "passed": false,
+      "evidence": ""
+    }
+  }
+}

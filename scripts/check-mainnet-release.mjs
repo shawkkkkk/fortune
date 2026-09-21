@@ -45,10 +45,9 @@ if (manifest.scope?.taxTokenLaunches !== false) {
 }
 if (
   !Number.isInteger(manifest.scope?.maximumInitialRegistryAssets) ||
-  manifest.scope.maximumInitialRegistryAssets < 1 ||
-  manifest.scope.maximumInitialRegistryAssets > 5
+  manifest.scope.maximumInitialRegistryAssets !== 1
 ) {
-  errors.push("maximumInitialRegistryAssets must be 1-5");
+  errors.push("mainnet v1 maximumInitialRegistryAssets must be exactly 1");
 }
 if (manifest.scope?.restrictedRwaAssetsEnabled !== false) {
   errors.push("restricted RWA assets must remain disabled for mainnet v1");

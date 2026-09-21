@@ -481,8 +481,20 @@ contract FortuneFactory is Ownable2Step {
         if (totalFeeBps == 0 || totalFeeBps > 500) {
             return (false, bytes32("BAD_TOTAL_FEE"));
         }
-        if (block.chainid == 56 && totalFeeBps > 100) {
-            return (false, bytes32("MAINNET_FEE_CAP"));
+        if (block.chainid == 56) {
+            if (totalFeeBps > 100) {
+                return (false, bytes32("MAINNET_FEE_CAP"));
+            }
+            // Mainnet v1 ships without production automation adapters.
+            // Do not route user trade fees into purpose vaults that cannot yet
+            // execute their advertised reward/buyback/liquidity behavior.
+            if (
+                p.feeBps[1] != 0 ||
+                p.feeBps[2] != 0 ||
+                p.feeBps[3] != 0
+            ) {
+                return (false, bytes32("MAINNET_AUTOMATION_DISABLED"));
+            }
         }
         if (p.feeBps[4] > 0 && p.treasury == address(0)) {
             return (false, bytes32("TREASURY_REQUIRED"));

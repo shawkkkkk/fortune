@@ -77,13 +77,17 @@ Deployment/governance scripts:
 
 ## Evidence supplied to auditors
 
+- `docs/MAINNET_THREAT_MODEL.md`
+- `docs/MAINNET_INVARIANTS.md`
 - `docs/ECONOMIC_SPEC.md`
 - `docs/RELIABILITY.md`
 - `docs/SECURITY.md`
 - `docs/MAINNET_READINESS.md`
 - `mainnet-dependencies.json`
 - Foundry test suite
+- live BSC mainnet-fork assertions for WBNB-only, single-quote, and $10k graduation-cap policy
 - 5,000-run mainnet-readiness fuzz workflow
+- 10,000-run audit-bundle fuzz workflow
 - public BSC Testnet lifecycle verification artifacts
 
 Audit findings and remediations should be linked from the `independentSmartContractAudit`, `graduationAdapterAudit`, and `automationVaultAudit` gates as applicable.

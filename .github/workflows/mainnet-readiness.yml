@@ -1,0 +1,48 @@
+name: Fortune Mainnet Readiness
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "mainnet-release.json"
+      - "scripts/check-mainnet-release.mjs"
+      - "lib/mainnet-release.ts"
+      - "contracts/src/**"
+      - "contracts/script/DeployProduction.s.sol"
+      - "contracts/script/ActivateProduction.s.sol"
+      - "contracts/script/PrepareGovernanceAcceptance.s.sol"
+      - "docs/MAINNET_READINESS.md"
+      - ".github/workflows/mainnet-*.yml"
+  workflow_dispatch:
+
+jobs:
+  readiness:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - run: npm install
+
+      - name: Validate release manifest
+        run: npm run mainnet:check
+
+      - uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Install Solidity libraries
+        working-directory: contracts
+        run: |
+          forge install OpenZeppelin/openzeppelin-contracts@v5.1.0 --no-commit
+          forge install foundry-rs/forge-std --no-commit
+
+      - name: Mainnet-candidate contract suite
+        working-directory: contracts
+        run: forge test --fuzz-runs 5000 -vvv

@@ -1,0 +1,71 @@
+name: Fortune Mainnet Activation Preflight
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type PREPARE_FORTUNE_MAINNET_ACTIVATION"
+        required: true
+        type: string
+
+concurrency:
+  group: fortune-mainnet-activation
+  cancel-in-progress: false
+
+jobs:
+  prepare-activation:
+    if: ${{ inputs.confirm == 'PREPARE_FORTUNE_MAINNET_ACTIVATION' }}
+    runs-on: ubuntu-latest
+    environment: mainnet
+    permissions:
+      contents: read
+
+    env:
+      BSC_RPC_URL: ${{ secrets.BSC_MAINNET_RPC_URL }}
+      FORTUNE_GOVERNANCE: ${{ vars.FORTUNE_GOVERNANCE }}
+      FORTUNE_FACTORY: ${{ vars.FORTUNE_FACTORY }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - run: npm install
+
+      - name: Require activation-ready release evidence
+        run: npm run mainnet:require-activate
+
+      - uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Require BSC mainnet and contract governance
+        run: |
+          test -n "$BSC_RPC_URL"
+          test "$(cast chain-id --rpc-url "$BSC_RPC_URL")" = "56"
+          test "$(cast code "$FORTUNE_GOVERNANCE" --rpc-url "$BSC_RPC_URL")" != "0x"
+          test "$(cast code "$FORTUNE_FACTORY" --rpc-url "$BSC_RPC_URL")" != "0x"
+
+      - name: Install Solidity libraries
+        working-directory: contracts
+        run: |
+          forge install OpenZeppelin/openzeppelin-contracts@v5.1.0 --no-commit
+          forge install foundry-rs/forge-std --no-commit
+
+      - name: Validate live production stack and generate governance calldata
+        working-directory: contracts
+        run: |
+          set -o pipefail
+          forge script script/ActivateProduction.s.sol:ActivateProduction             --rpc-url "$BSC_RPC_URL"             -vvv 2>&1 | tee /tmp/fortune-mainnet-activation-preflight.log
+
+          grep -q "FORTUNE MAINNET ACTIVATION PREFLIGHT PASSED"             /tmp/fortune-mainnet-activation-preflight.log
+          grep -q "No activation transaction was broadcast"             /tmp/fortune-mainnet-activation-preflight.log
+
+      - name: Upload activation package
+        uses: actions/upload-artifact@v4
+        with:
+          name: fortune-mainnet-activation-preflight
+          path: /tmp/fortune-mainnet-activation-preflight.log
+          retention-days: 90

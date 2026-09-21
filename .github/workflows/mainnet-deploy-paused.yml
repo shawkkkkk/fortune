@@ -1,0 +1,144 @@
+name: Fortune Mainnet Deploy Paused
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type DEPLOY_FORTUNE_MAINNET_PAUSED"
+        required: true
+        type: string
+
+concurrency:
+  group: fortune-mainnet-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy-paused:
+    if: ${{ inputs.confirm == 'DEPLOY_FORTUNE_MAINNET_PAUSED' }}
+    runs-on: ubuntu-latest
+    environment: mainnet
+    permissions:
+      contents: read
+
+    env:
+      PRIVATE_KEY: ${{ secrets.FORTUNE_MAINNET_DEPLOYER_PRIVATE_KEY }}
+      BSC_RPC_URL: ${{ secrets.BSC_MAINNET_RPC_URL }}
+
+      FORTUNE_GOVERNANCE: ${{ vars.FORTUNE_GOVERNANCE }}
+      FORTUNE_AUTOMATION_EXECUTOR: ${{ vars.FORTUNE_AUTOMATION_EXECUTOR }}
+      FORTUNE_PROTOCOL_TREASURY: ${{ vars.FORTUNE_PROTOCOL_TREASURY }}
+      PANCAKE_V3_FACTORY: ${{ vars.PANCAKE_V3_FACTORY }}
+      PANCAKE_V3_POSITION_MANAGER: ${{ vars.PANCAKE_V3_POSITION_MANAGER }}
+
+      PRODUCTION_ASSET_COUNT: ${{ vars.PRODUCTION_ASSET_COUNT }}
+      PRODUCTION_ASSET_0: ${{ vars.PRODUCTION_ASSET_0 }}
+      PRODUCTION_FEED_0: ${{ vars.PRODUCTION_FEED_0 }}
+      PRODUCTION_MAX_AGE_0: ${{ vars.PRODUCTION_MAX_AGE_0 }}
+      PRODUCTION_QUOTE_ENABLED_0: ${{ vars.PRODUCTION_QUOTE_ENABLED_0 }}
+      PRODUCTION_REWARD_ENABLED_0: ${{ vars.PRODUCTION_REWARD_ENABLED_0 }}
+      PRODUCTION_GRADUATION_ENABLED_0: ${{ vars.PRODUCTION_GRADUATION_ENABLED_0 }}
+      PRODUCTION_CATEGORY_0: ${{ vars.PRODUCTION_CATEGORY_0 }}
+
+      PRODUCTION_ASSET_1: ${{ vars.PRODUCTION_ASSET_1 }}
+      PRODUCTION_FEED_1: ${{ vars.PRODUCTION_FEED_1 }}
+      PRODUCTION_MAX_AGE_1: ${{ vars.PRODUCTION_MAX_AGE_1 }}
+      PRODUCTION_QUOTE_ENABLED_1: ${{ vars.PRODUCTION_QUOTE_ENABLED_1 }}
+      PRODUCTION_REWARD_ENABLED_1: ${{ vars.PRODUCTION_REWARD_ENABLED_1 }}
+      PRODUCTION_GRADUATION_ENABLED_1: ${{ vars.PRODUCTION_GRADUATION_ENABLED_1 }}
+      PRODUCTION_CATEGORY_1: ${{ vars.PRODUCTION_CATEGORY_1 }}
+
+      PRODUCTION_ASSET_2: ${{ vars.PRODUCTION_ASSET_2 }}
+      PRODUCTION_FEED_2: ${{ vars.PRODUCTION_FEED_2 }}
+      PRODUCTION_MAX_AGE_2: ${{ vars.PRODUCTION_MAX_AGE_2 }}
+      PRODUCTION_QUOTE_ENABLED_2: ${{ vars.PRODUCTION_QUOTE_ENABLED_2 }}
+      PRODUCTION_REWARD_ENABLED_2: ${{ vars.PRODUCTION_REWARD_ENABLED_2 }}
+      PRODUCTION_GRADUATION_ENABLED_2: ${{ vars.PRODUCTION_GRADUATION_ENABLED_2 }}
+      PRODUCTION_CATEGORY_2: ${{ vars.PRODUCTION_CATEGORY_2 }}
+
+      PRODUCTION_ASSET_3: ${{ vars.PRODUCTION_ASSET_3 }}
+      PRODUCTION_FEED_3: ${{ vars.PRODUCTION_FEED_3 }}
+      PRODUCTION_MAX_AGE_3: ${{ vars.PRODUCTION_MAX_AGE_3 }}
+      PRODUCTION_QUOTE_ENABLED_3: ${{ vars.PRODUCTION_QUOTE_ENABLED_3 }}
+      PRODUCTION_REWARD_ENABLED_3: ${{ vars.PRODUCTION_REWARD_ENABLED_3 }}
+      PRODUCTION_GRADUATION_ENABLED_3: ${{ vars.PRODUCTION_GRADUATION_ENABLED_3 }}
+      PRODUCTION_CATEGORY_3: ${{ vars.PRODUCTION_CATEGORY_3 }}
+
+      PRODUCTION_ASSET_4: ${{ vars.PRODUCTION_ASSET_4 }}
+      PRODUCTION_FEED_4: ${{ vars.PRODUCTION_FEED_4 }}
+      PRODUCTION_MAX_AGE_4: ${{ vars.PRODUCTION_MAX_AGE_4 }}
+      PRODUCTION_QUOTE_ENABLED_4: ${{ vars.PRODUCTION_QUOTE_ENABLED_4 }}
+      PRODUCTION_REWARD_ENABLED_4: ${{ vars.PRODUCTION_REWARD_ENABLED_4 }}
+      PRODUCTION_GRADUATION_ENABLED_4: ${{ vars.PRODUCTION_GRADUATION_ENABLED_4 }}
+      PRODUCTION_CATEGORY_4: ${{ vars.PRODUCTION_CATEGORY_4 }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - run: npm install
+
+      - name: Require deploy-ready release evidence
+        run: npm run mainnet:require-deploy
+
+      - name: Require reviewed security-critical source
+        run: |
+          REVIEWED="$(node -p "require('./mainnet-release.json').reviewedCommit")"
+          git cat-file -e "$REVIEWED^{commit}"
+          git diff --exit-code "$REVIEWED"..HEAD --             contracts/src             contracts/script/DeployProduction.s.sol             contracts/script/ActivateProduction.s.sol             contracts/script/PrepareGovernanceAcceptance.s.sol             app/launch             lib/fortune-network.ts             app/api/public/v1/readiness/route.ts
+
+      - uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Require mainnet credentials and dependencies
+        run: |
+          test -n "$PRIVATE_KEY"
+          test -n "$BSC_RPC_URL"
+          test "$(cast chain-id --rpc-url "$BSC_RPC_URL")" = "56"
+          test "$(cast code "$FORTUNE_GOVERNANCE" --rpc-url "$BSC_RPC_URL")" != "0x"
+          test "$(cast code "$PANCAKE_V3_FACTORY" --rpc-url "$BSC_RPC_URL")" != "0x"
+          test "$(cast code "$PANCAKE_V3_POSITION_MANAGER" --rpc-url "$BSC_RPC_URL")" != "0x"
+          test "$PRODUCTION_ASSET_COUNT" -ge 1
+          test "$PRODUCTION_ASSET_COUNT" -le 5
+
+      - name: Install Solidity libraries
+        working-directory: contracts
+        run: |
+          forge install OpenZeppelin/openzeppelin-contracts@v5.1.0 --no-commit
+          forge install foundry-rs/forge-std --no-commit
+
+      - name: Final mainnet-candidate fuzz gate
+        working-directory: contracts
+        run: forge test --fuzz-runs 10000 -vvv
+
+      - name: Dry-run production deployment
+        working-directory: contracts
+        run: |
+          forge script script/DeployProduction.s.sol:DeployProduction             --rpc-url "$BSC_RPC_URL"             -vvv 2>&1 | tee /tmp/fortune-mainnet-dry-run.log
+
+      - name: Broadcast paused production deployment
+        working-directory: contracts
+        run: |
+          set -o pipefail
+          forge script script/DeployProduction.s.sol:DeployProduction             --rpc-url "$BSC_RPC_URL"             --broadcast             -vvv 2>&1 | tee /tmp/fortune-mainnet-deploy.log
+
+          grep -q "LaunchesPaused true" /tmp/fortune-mainnet-deploy.log
+          grep -q "IMPORTANT: production launches remain paused" /tmp/fortune-mainnet-deploy.log
+
+      - name: Record source commit
+        run: git rev-parse HEAD | tee /tmp/fortune-mainnet-source-commit.txt
+
+      - name: Upload paused deployment evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fortune-mainnet-paused-deployment
+          path: |
+            /tmp/fortune-mainnet-dry-run.log
+            /tmp/fortune-mainnet-deploy.log
+            /tmp/fortune-mainnet-source-commit.txt
+            contracts/broadcast/DeployProduction.s.sol/56/
+          retention-days: 90

@@ -4,12 +4,13 @@ This document defines the minimum operational control model for Fortune's first 
 
 ## Governance contract
 
-Fortune mainnet v1 requires contract-based governance. A Safe-style multisig is the reference model, but another contract wallet may be used if it provides equivalent multi-party authorization and auditable execution.
+Fortune mainnet v1 requires a Safe-compatible multisig governance contract. The protected deployment and activation workflows call `getThreshold()` and `getOwners()`; governance must expose those interfaces and require at least two approvals.
 
 Minimum properties before the governanceMultisig gate may be marked complete:
 
 - no single ordinary EOA can execute governance actions alone;
-- transaction threshold is at least 2 independent approvals;
+- `getThreshold()` returns at least 2;
+- `getOwners()` returns at least threshold-many owner addresses;
 - signer/recovery configuration has been tested with a harmless transaction;
 - the governance contract address is recorded as release evidence;
 - the governance contract contains deployed bytecode on BSC mainnet;

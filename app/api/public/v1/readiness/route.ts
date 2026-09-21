@@ -8,6 +8,7 @@ import { PUBLIC_TESTNET } from "@/lib/public-testnet";
 import {
   MAINNET_ACTIVATION_GATE_IDS,
   MAINNET_ACTIVATION_READY,
+  MAINNET_DEPLOY_READY,
   MAINNET_RELEASE,
   mainnetGateComplete,
 } from "@/lib/mainnet-release";
@@ -477,7 +478,7 @@ export async function GET() {
               release: MAINNET_RELEASE.release,
               status: MAINNET_RELEASE.status,
               reviewedCommit: MAINNET_RELEASE.reviewedCommit,
-              deployReady: false,
+              deployReady: MAINNET_DEPLOY_READY,
               activationReady: MAINNET_ACTIVATION_READY,
               operatorApproved: operatorReleaseApproved,
             }

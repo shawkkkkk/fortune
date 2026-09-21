@@ -22,6 +22,20 @@ import {FortunePermanentLiquidityLocker} from "./FortunePermanentLiquidityLocker
 contract FortuneFactory is Ownable2Step {
     using SafeERC20 for IERC20;
     error LaunchPreflightFailed(bytes32 reasonCode);
+    error ZeroAddress();
+    error MissingDeployerCode();
+    error ZeroAdapter();
+    error ZeroCreator();
+    error ZeroInitialPurchase();
+    error NonStandardQuote();
+    error InitialBuyMismatch();
+    error BadPreparedVanity();
+    error FortuneVanityMismatch();
+    error TokenFundFailed();
+    error FortuneSuffixNotFound();
+    error UnknownCurve();
+    error NoAdapter();
+    error AlreadyGraduated();
     uint16 public constant BPS = 10_000;
     uint8 public constant FORTUNE_ADDRESS_SUFFIX = 0xfe;
     uint256 public constant VANITY_SEARCH_LIMIT = 4096;
@@ -147,29 +161,27 @@ contract FortuneFactory is Ownable2Step {
         address automationExecutor_,
         address protocolTreasury_
     ) Ownable(initialOwner) {
-        require(
-            registry_ != address(0) &&
-                automationRegistry_ != address(0) &&
-                metadataRegistry_ != address(0) &&
-                tokenDeployer_ != address(0) &&
-                vaultDeployer_ != address(0) &&
-                feeRouterDeployer_ != address(0) &&
-                curveDeployer_ != address(0) &&
-                automationExecutor_ != address(0) &&
-                protocolTreasury_ != address(0),
-            "ZERO_ADDRESS"
-        );
+        if (
+            registry_ == address(0) ||
+            automationRegistry_ == address(0) ||
+            metadataRegistry_ == address(0) ||
+            tokenDeployer_ == address(0) ||
+            vaultDeployer_ == address(0) ||
+            feeRouterDeployer_ == address(0) ||
+            curveDeployer_ == address(0) ||
+            automationExecutor_ == address(0) ||
+            protocolTreasury_ == address(0)
+        ) revert ZeroAddress();
 
-        require(
-            registry_.code.length > 0 &&
-                automationRegistry_.code.length > 0 &&
-                metadataRegistry_.code.length > 0 &&
-                tokenDeployer_.code.length > 0 &&
-                vaultDeployer_.code.length > 0 &&
-                feeRouterDeployer_.code.length > 0 &&
-                curveDeployer_.code.length > 0,
-            "MISSING_DEPLOYER_CODE"
-        );
+        if (
+            registry_.code.length == 0 ||
+            automationRegistry_.code.length == 0 ||
+            metadataRegistry_.code.length == 0 ||
+            tokenDeployer_.code.length == 0 ||
+            vaultDeployer_.code.length == 0 ||
+            feeRouterDeployer_.code.length == 0 ||
+            curveDeployer_.code.length == 0
+        ) revert MissingDeployerCode();
 
         registry = FortuneAssetRegistry(registry_);
         automationRegistry = FortuneAutomationRegistry(automationRegistry_);
@@ -183,7 +195,7 @@ contract FortuneFactory is Ownable2Step {
     }
 
     function setGraduationAdapter(address adapter) external onlyOwner {
-        require(adapter != address(0), "ZERO_ADAPTER");
+        if (adapter == address(0)) revert ZeroAdapter();
         graduationAdapter = adapter;
         emit GraduationAdapterSet(adapter);
     }
@@ -193,11 +205,9 @@ contract FortuneFactory is Ownable2Step {
         address depositor,
         bool approved
     ) external onlyOwner {
-        require(
-            locker != address(0) &&
-                depositor != address(0),
-            "ZERO_ADDRESS"
-        );
+        if (locker == address(0) || depositor == address(0)) {
+            revert ZeroAddress();
+        }
 
         FortunePermanentLiquidityLocker(locker)
             .setApprovedDepositor(
@@ -494,7 +504,7 @@ contract FortuneFactory is Ownable2Step {
             uint256 launchNonce
         )
     {
-        require(creator != address(0), "ZERO_CREATOR");
+        if (creator == address(0)) revert ZeroCreator();
 
         launchNonce =
             creatorLaunchNonce[creator];
@@ -560,10 +570,7 @@ contract FortuneFactory is Ownable2Step {
             uint256 tokensOut
         )
     {
-        require(
-            amountIn > 0,
-            "ZERO_INITIAL_PURCHASE"
-        );
+        if (amountIn == 0) revert ZeroInitialPurchase();
 
         info =
             _createLaunch(
@@ -588,14 +595,10 @@ contract FortuneFactory is Ownable2Step {
             amountIn
         );
 
-        require(
-            quote.balanceOf(
-                address(this)
-            ) ==
-                quoteBefore +
-                amountIn,
-            "NON_STANDARD_QUOTE"
-        );
+        if (
+            quote.balanceOf(address(this)) !=
+            quoteBefore + amountIn
+        ) revert NonStandardQuote();
 
         quote.forceApprove(
             info.curve,
@@ -627,12 +630,9 @@ contract FortuneFactory is Ownable2Step {
             ) -
             tokenBefore;
 
-        require(
-            received ==
-                tokensOut &&
-                received > 0,
-            "INITIAL_BUY_MISMATCH"
-        );
+        if (received != tokensOut || received == 0) {
+            revert InitialBuyMismatch();
+        }
 
         launchToken.safeTransfer(
             msg.sender,
@@ -698,10 +698,9 @@ contract FortuneFactory is Ownable2Step {
                     vanitySalt
                 );
 
-            require(
-                hasFortuneSuffix(predictedToken),
-                "BAD_PREPARED_VANITY"
-            );
+            if (!hasFortuneSuffix(predictedToken)) {
+                revert BadPreparedVanity();
+            }
         } else {
             (
                 vanitySalt,
@@ -729,14 +728,10 @@ contract FortuneFactory is Ownable2Step {
         FortuneToken token =
             FortuneToken(tokenAddress);
 
-        require(
-            tokenAddress ==
-                predictedToken &&
-                hasFortuneSuffix(
-                    tokenAddress
-                ),
-            "FORTUNE_VANITY_MISMATCH"
-        );
+        if (
+            tokenAddress != predictedToken ||
+            !hasFortuneSuffix(tokenAddress)
+        ) revert FortuneVanityMismatch();
 
         metadataRegistry.registerToken(
             address(token),
@@ -831,13 +826,9 @@ contract FortuneFactory is Ownable2Step {
 
         router.setCurve(curveAddress);
 
-        require(
-            token.transfer(
-                address(curve),
-                p.totalSupply
-            ),
-            "TOKEN_FUND_FAILED"
-        );
+        if (!token.transfer(address(curve), p.totalSupply)) {
+            revert TokenFundFailed();
+        }
 
         info = LaunchInfo({
             creator: msg.sender,
@@ -976,9 +967,7 @@ contract FortuneFactory is Ownable2Step {
             }
         }
 
-        revert(
-            "FORTUNE_SUFFIX_NOT_FOUND"
-        );
+        revert FortuneSuffixNotFound();
     }
 
     function hasFortuneSuffix(address account)
@@ -1015,23 +1004,19 @@ contract FortuneFactory is Ownable2Step {
         external
         returns (bool success)
     {
-        require(
-            curveIndexPlusOne[curve] != 0,
-            "UNKNOWN_CURVE"
-        );
+        if (curveIndexPlusOne[curve] == 0) {
+            revert UnknownCurve();
+        }
 
         address adapter =
             graduationAdapterForCurve[
                 curve
             ];
 
-        require(
-            adapter != address(0),
-            "NO_ADAPTER"
-        );
+        if (adapter == address(0)) revert NoAdapter();
 
         GraduationStatus storage status = graduationStatus[curve];
-        require(!status.completed, "ALREADY_GRADUATED");
+        if (status.completed) revert AlreadyGraduated();
 
         status.attempts += 1;
         status.lastAttemptAt = uint64(block.timestamp);
@@ -1090,7 +1075,7 @@ contract FortuneFactory is Ownable2Step {
     {
         uint256 indexPlusOne =
             curveIndexPlusOne[curve];
-        require(indexPlusOne != 0, "UNKNOWN_CURVE");
+        if (indexPlusOne == 0) revert UnknownCurve();
 
         return
             launches[indexPlusOne - 1]

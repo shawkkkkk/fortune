@@ -59,9 +59,11 @@ The requested quote asset must be an accepted reserve and have enough protocol-a
 
 Protocol fee and any launch tax are deducted from the gross quote output.
 
-## Multi-asset accounting
+## Reserve accounting
 
-Each quote asset is normalized with the oracle configuration snapshotted by the curve at launch.
+The generic Fortune curve supports multiple quote assets on research/testnet deployments. **Mainnet v1 does not:** on BSC chain ID 56 the factory rejects any launch whose quote-asset count is not exactly one. The initial production registry is separately constrained to one WBNB entry.
+
+For generic deployments, each quote asset is normalized with the oracle configuration snapshotted by the curve at launch.
 
 Important properties:
 
@@ -71,7 +73,7 @@ Important properties:
 - sells may select another accepted reserve if it has enough depth;
 - a stale snapshotted oracle causes affected valuation/trading paths to fail closed.
 
-An external review must analyze cross-reserve arbitrage when oracle prices move asynchronously or represent different liquidity conditions.
+Cross-reserve arbitrage is therefore dormant in mainnet v1. Re-enabling multi-reserve mainnet launches requires a separately reviewed factory release and a dedicated asynchronous-oracle/cross-reserve analysis.
 
 ## Fees and Launch Shield
 
@@ -128,9 +130,8 @@ Before `economicCurveSimulation` can be marked complete, an independent review s
 - graduation target;
 - total supply;
 - allowed fee range;
-- reserve count;
-- fixed versus adaptive graduation;
-- minimum reserve depth needed for cross-reserve sells.
+- reserve count (hard-capped to one for mainnet v1);
+- fixed versus adaptive graduation.
 
 Those conclusions should be enforced onchain, not only in the frontend.
 

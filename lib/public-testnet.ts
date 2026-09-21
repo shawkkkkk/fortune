@@ -28,7 +28,7 @@ export const PUBLIC_TESTNET = {
     referenceTaxCurve: "0x16912134E11db9EbEE26E1259F3e67722c4Fbb18",
     referenceTaxPool: "0xd5810cA5042154A756bd08E7702AE9945f977925",
   },
-  referenceLpTokenId: 37523 [3.752e4],
+  referenceLpTokenId: 37523,
 } as const;
 
 export function publicTestnetAddress(

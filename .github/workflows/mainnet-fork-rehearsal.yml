@@ -29,7 +29,7 @@ jobs:
         with:
           node-version: 22
 
-      - run: npm install
+      - run: npm ci
 
       - name: Require pinned production asset
         run: npm run mainnet:deps:require

@@ -28,18 +28,18 @@ The website source of truth for these addresses is `lib/public-testnet.ts`.
 
 ### Verified standard lifecycle reference
 
-- Token: `0xDCb92C2B3062F246D93a0BF1712c17a2Be4d39FE`
-- Curve: `0x48A7353F28e5A237bdA85E73217cc670fCf58e17`
-- Pancake V3 pool: `0xFBDC7FF79687F4F3866Ed586E52F98c7C992608f`
-- Permanently locked V3 LP NFT: `37520`
+- Token: `0xF2A934B924C50566eCAB90ea8D5644378237D9fE`
+- Curve: `0xE768cc50dC03Bf9CF838953a4b76057D63D8995D`
+- Pancake V3 pool: `0xB2B28583bE3A47D1E147d2C5E8624594Edf7FaA1`
+- Permanently locked V3 LP NFT: `37523`
 
 ### Verified tax-token lifecycle reference
 
-- Tax token: `0x99801f077Ecca030898664c7708Ba9857b8E5EFe`
-- Tax curve: `0xb7f86e7E71Fc08E1c3cC4306DC33684D88e4019d`
-- Pancake V2 pair: `0xB13F241D37Ea74854a8D45bF195cFcd6342535d6`
-- Tax processor: `0xf2eB2e59e44bA658C0eD62c04eBEBc60206d8BBc`
-- Holder dividend vault: `0x37B7E38fFE164b6c0775ba212a4ca6F4B57427F3`
+- Tax token: `0x586C005C7D82d2255Ee82Cbf3047743290e67Ffe`
+- Tax curve: `0x16912134E11db9EbEE26E1259F3e67722c4Fbb18`
+- Pancake V2 pair: `0xd5810cA5042154A756bd08E7702AE9945f977925`
+- Tax processor: `0x398254722c7B8dC56F35e73E3F9A987025048E11`
+- Holder dividend vault: `0x334fFbf0EFA8c7C3Bef587CA403E1f620FEDbe61`
 
 ### PancakeSwap BSC Testnet references
 
@@ -50,39 +50,41 @@ The website source of truth for these addresses is `lib/public-testnet.ts`.
 
 ## Final release verification
 
-GitHub Actions run `35541179283` (**Fortune Finalize Verified Public Alpha**) completed successfully on 2026-09-20 and published the verified stack to `lib/public-testnet.ts` in commit `d482b6a3bde3dc858fb01034582900b6644b9ee4`.
+GitHub Actions run `35544366546` (**Fortune Verify Existing Public Alpha**) completed successfully on 2026-09-20 against the currently deployed BSC Testnet stack. It executed fresh standard and tax-token lifecycle proofs, required both completion markers, and published the newest reference addresses.
 
-The final verifier re-read the completed lifecycle state directly from BSC Testnet and required all of the following before publishing the addresses:
+The verifier required all of the following before the release manifest was accepted:
 
-- standard launch completed;
-- standard creator first buy completed;
+- standard launch + creator first buy completed;
 - standard Pancake V3 graduation completed;
 - the V3 LP-position NFT is permanently locked;
-- tax-token launch completed;
-- tax-token creator first buy completed;
-- tax accounting is non-zero;
-- Pancake V2 graduation completed;
-- V2 LP is permanently locked;
-- anti-farmer protection is active;
+- tax-token launch + creator first buy completed;
+- Pancake V2 graduation completed with non-zero locked LP;
 - a real post-graduation taxed sell completed;
-- DEX tax processing produced non-zero tax;
-- direct/token burn produced non-zero burned tokens;
+- curve and DEX tax processing were non-zero;
+- token burn processing was non-zero;
 - at least one holder-dividend epoch was created;
-- both `STANDARD_ONCHAIN_EXECUTION_COMPLETE_AND_SUCCESSFUL` and `TAX_ONCHAIN_EXECUTION_COMPLETE_AND_SUCCESSFUL` lifecycle markers were emitted.
+- both `STANDARD_ONCHAIN_EXECUTION_COMPLETE_AND_SUCCESSFUL` and `TAX_ONCHAIN_EXECUTION_COMPLETE_AND_SUCCESSFUL` were emitted.
 
-The same verifier recorded:
+The latest proof recorded:
 
-- standard token: `0xDCb92C2B3062F246D93a0BF1712c17a2Be4d39FE`;
-- standard pool: `0xFBDC7FF79687F4F3866Ed586E52F98c7C992608f`;
-- standard LP NFT: `37520`;
-- tax token: `0x99801f077Ecca030898664c7708Ba9857b8E5EFe`;
-- tax pair: `0xB13F241D37Ea74854a8D45bF195cFcd6342535d6`;
-- non-zero V2 LP lock amount;
-- non-zero curve tax;
-- non-zero burned token amount;
-- one dividend epoch.
+- standard token: `0xF2A934B924C50566eCAB90ea8D5644378237D9fE`;
+- standard curve: `0xE768cc50dC03Bf9CF838953a4b76057D63D8995D`;
+- standard Pancake V3 pool: `0xB2B28583bE3A47D1E147d2C5E8624594Edf7FaA1`;
+- standard LP NFT: `37523`;
+- tax token: `0x586C005C7D82d2255Ee82Cbf3047743290e67Ffe`;
+- tax curve: `0x16912134E11db9EbEE26E1259F3e67722c4Fbb18`;
+- tax Pancake V2 pair: `0xd5810cA5042154A756bd08E7702AE9945f977925`;
+- tax processor: `0x398254722c7B8dC56F35e73E3F9A987025048E11`;
+- holder dividend vault: `0x334fFbf0EFA8c7C3Bef587CA403E1f620FEDbe61`;
+- locked V2 LP: `31622760790315255754`;
+- curve tax recorded: `20618556701030927`;
+- DEX tax tokens processed: `1499999250000000000`;
+- tokens burned: `6892246585519629987`;
+- dividend epochs: `1`.
 
-The verification artifact was uploaded as `fortune-final-public-alpha-verification` (artifact ID `10615200301`).
+The evidence artifact is `fortune-existing-public-alpha-verification` (artifact ID `10616740471`).
+
+The verifier output is normalized before it reaches TypeScript configuration, and the publishing workflow explicitly refuses to commit generated dependency metadata or any file other than `lib/public-testnet.ts`.
 
 ## Load and reliability evidence
 

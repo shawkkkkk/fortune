@@ -53,6 +53,15 @@ contract DeployProduction is Script {
             "AUTOMATION_EXECUTOR_MUST_BE_CONTRACT"
         );
         require(
+            protocolTreasury.code.length > 0,
+            "PROTOCOL_TREASURY_MUST_BE_CONTRACT"
+        );
+        require(
+            automationExecutor == governance &&
+                protocolTreasury == governance,
+            "MAINNET_V1_USE_GOVERNANCE_SAFE"
+        );
+        require(
             pancakeV3Factory.code.length > 0 &&
                 positionManager.code.length > 0,
             "PANCAKE_DEPENDENCY_NO_CODE"

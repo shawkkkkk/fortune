@@ -39,6 +39,12 @@ jobs:
       - name: Require activation-ready release evidence
         run: npm run mainnet:require-activate
 
+      - name: Require pinned production dependencies
+        run: npm run mainnet:deps:require
+
+      - name: Export reviewed dependency manifest
+        run: node scripts/export-mainnet-dependencies.mjs >> "$GITHUB_ENV"
+
       - uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09
 
         with:
@@ -50,6 +56,9 @@ jobs:
           test "$(cast chain-id --rpc-url "$BSC_RPC_URL")" = "56"
           test "$(cast code "$FORTUNE_GOVERNANCE" --rpc-url "$BSC_RPC_URL")" != "0x"
           test "$(cast code "$FORTUNE_FACTORY" --rpc-url "$BSC_RPC_URL")" != "0x"
+          test "$(cast code "$PANCAKE_V3_FACTORY" --rpc-url "$BSC_RPC_URL")" != "0x"
+          test "$(cast code "$PANCAKE_V3_POSITION_MANAGER" --rpc-url "$BSC_RPC_URL")" != "0x"
+          test "$PRODUCTION_ASSET_COUNT" = "1"
 
       - name: Install Solidity libraries
         working-directory: contracts

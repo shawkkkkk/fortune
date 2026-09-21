@@ -31,7 +31,7 @@ With one quote asset:
 - oracle staleness and quote-accounting protections remain fully exercised;
 - no user can buy through reserve A and immediately sell into reserve B.
 
-Adding a second quote asset changes the mainnet risk model and must not be treated as a routine catalog update.
+Adding a second quote asset changes the mainnet risk model and must not be treated as a routine catalog update. The current chain-56 factory rejects multi-quote launches, so registry governance alone cannot enable that behavior.
 
 ## Requirements for adding another quote asset
 
@@ -44,7 +44,8 @@ Before governance enables a second production quote asset:
 5. rerun cross-reserve simulations under asynchronous oracle movements;
 6. complete the MEV/cross-reserve review;
 7. document legal/issuer/transfer restrictions;
-8. execute the change through contract-based governance.
+8. deploy a separately reviewed factory version that intentionally permits multi-reserve launches on chain 56;
+9. execute registry/factory changes through contract-based governance.
 
 Restricted tokenized securities/RWAs remain out of scope for mainnet v1.
 

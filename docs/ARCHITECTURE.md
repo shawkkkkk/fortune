@@ -22,7 +22,7 @@ FortuneFactory
               ↓ threshold
        GraduationAdapter
               ↓
-       destination pools (production adapter TBD)
+       Pancake V3 destination pools
 ```
 
 ## Fortune Asset Registry
@@ -40,14 +40,15 @@ The web API `/api/registry/bsc` imports up to 400 discovery candidates from Panc
 
 Every accepted quote asset is converted to a common 1e18 USD accounting unit through the configured oracle layer. The curve uses one global `tokensSold` state.
 
-The current Solidity implementation intentionally uses a simple marginal-price approximation for testnet research. Before mainnet, the pricing function needs:
+The current Solidity implementation integrates the linear curve exactly rather than pricing an entire trade at the pre-trade marginal price. Buy execution solves the linear-curve integral for the post-trade price, and sell execution integrates the same curve in reverse using the two endpoint prices.
 
-- formal economic specification;
-- integral buy/sell math;
-- numerical simulations under volatile cross-asset prices;
-- MEV and oracle manipulation analysis;
-- reserve imbalance analysis;
-- stress tests for multi-asset sells.
+Exact arithmetic does not by itself establish safe mainnet economics. Before activation Fortune still requires:
+
+- a formal economic specification and independent review of the parameter bounds;
+- numerical simulations under volatile and divergent cross-asset prices;
+- MEV and oracle-manipulation analysis;
+- reserve-imbalance and cross-reserve-arbitrage analysis;
+- stress tests for large, partial-fill, and multi-asset trades.
 
 ## Graduation
 

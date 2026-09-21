@@ -27,49 +27,6 @@ jobs:
       FORTUNE_GOVERNANCE: ${{ vars.FORTUNE_GOVERNANCE }}
       FORTUNE_AUTOMATION_EXECUTOR: ${{ vars.FORTUNE_AUTOMATION_EXECUTOR }}
       FORTUNE_PROTOCOL_TREASURY: ${{ vars.FORTUNE_PROTOCOL_TREASURY }}
-      PANCAKE_V3_FACTORY: ${{ vars.PANCAKE_V3_FACTORY }}
-      PANCAKE_V3_POSITION_MANAGER: ${{ vars.PANCAKE_V3_POSITION_MANAGER }}
-
-      PRODUCTION_ASSET_COUNT: ${{ vars.PRODUCTION_ASSET_COUNT }}
-      PRODUCTION_ASSET_0: ${{ vars.PRODUCTION_ASSET_0 }}
-      PRODUCTION_FEED_0: ${{ vars.PRODUCTION_FEED_0 }}
-      PRODUCTION_MAX_AGE_0: ${{ vars.PRODUCTION_MAX_AGE_0 }}
-      PRODUCTION_QUOTE_ENABLED_0: ${{ vars.PRODUCTION_QUOTE_ENABLED_0 }}
-      PRODUCTION_REWARD_ENABLED_0: ${{ vars.PRODUCTION_REWARD_ENABLED_0 }}
-      PRODUCTION_GRADUATION_ENABLED_0: ${{ vars.PRODUCTION_GRADUATION_ENABLED_0 }}
-      PRODUCTION_CATEGORY_0: ${{ vars.PRODUCTION_CATEGORY_0 }}
-
-      PRODUCTION_ASSET_1: ${{ vars.PRODUCTION_ASSET_1 }}
-      PRODUCTION_FEED_1: ${{ vars.PRODUCTION_FEED_1 }}
-      PRODUCTION_MAX_AGE_1: ${{ vars.PRODUCTION_MAX_AGE_1 }}
-      PRODUCTION_QUOTE_ENABLED_1: ${{ vars.PRODUCTION_QUOTE_ENABLED_1 }}
-      PRODUCTION_REWARD_ENABLED_1: ${{ vars.PRODUCTION_REWARD_ENABLED_1 }}
-      PRODUCTION_GRADUATION_ENABLED_1: ${{ vars.PRODUCTION_GRADUATION_ENABLED_1 }}
-      PRODUCTION_CATEGORY_1: ${{ vars.PRODUCTION_CATEGORY_1 }}
-
-      PRODUCTION_ASSET_2: ${{ vars.PRODUCTION_ASSET_2 }}
-      PRODUCTION_FEED_2: ${{ vars.PRODUCTION_FEED_2 }}
-      PRODUCTION_MAX_AGE_2: ${{ vars.PRODUCTION_MAX_AGE_2 }}
-      PRODUCTION_QUOTE_ENABLED_2: ${{ vars.PRODUCTION_QUOTE_ENABLED_2 }}
-      PRODUCTION_REWARD_ENABLED_2: ${{ vars.PRODUCTION_REWARD_ENABLED_2 }}
-      PRODUCTION_GRADUATION_ENABLED_2: ${{ vars.PRODUCTION_GRADUATION_ENABLED_2 }}
-      PRODUCTION_CATEGORY_2: ${{ vars.PRODUCTION_CATEGORY_2 }}
-
-      PRODUCTION_ASSET_3: ${{ vars.PRODUCTION_ASSET_3 }}
-      PRODUCTION_FEED_3: ${{ vars.PRODUCTION_FEED_3 }}
-      PRODUCTION_MAX_AGE_3: ${{ vars.PRODUCTION_MAX_AGE_3 }}
-      PRODUCTION_QUOTE_ENABLED_3: ${{ vars.PRODUCTION_QUOTE_ENABLED_3 }}
-      PRODUCTION_REWARD_ENABLED_3: ${{ vars.PRODUCTION_REWARD_ENABLED_3 }}
-      PRODUCTION_GRADUATION_ENABLED_3: ${{ vars.PRODUCTION_GRADUATION_ENABLED_3 }}
-      PRODUCTION_CATEGORY_3: ${{ vars.PRODUCTION_CATEGORY_3 }}
-
-      PRODUCTION_ASSET_4: ${{ vars.PRODUCTION_ASSET_4 }}
-      PRODUCTION_FEED_4: ${{ vars.PRODUCTION_FEED_4 }}
-      PRODUCTION_MAX_AGE_4: ${{ vars.PRODUCTION_MAX_AGE_4 }}
-      PRODUCTION_QUOTE_ENABLED_4: ${{ vars.PRODUCTION_QUOTE_ENABLED_4 }}
-      PRODUCTION_REWARD_ENABLED_4: ${{ vars.PRODUCTION_REWARD_ENABLED_4 }}
-      PRODUCTION_GRADUATION_ENABLED_4: ${{ vars.PRODUCTION_GRADUATION_ENABLED_4 }}
-      PRODUCTION_CATEGORY_4: ${{ vars.PRODUCTION_CATEGORY_4 }}
 
     steps:
       - uses: actions/checkout@v4
@@ -85,11 +42,17 @@ jobs:
       - name: Require deploy-ready release evidence
         run: npm run mainnet:require-deploy
 
+      - name: Require pinned production dependencies and assets
+        run: npm run mainnet:deps:require
+
+      - name: Export reviewed dependency manifest
+        run: node scripts/export-mainnet-dependencies.mjs >> "$GITHUB_ENV"
+
       - name: Require reviewed security-critical source
         run: |
           REVIEWED="$(node -p "require('./mainnet-release.json').reviewedCommit")"
           git cat-file -e "$REVIEWED^{commit}"
-          git diff --exit-code "$REVIEWED"..HEAD --             contracts/src             contracts/script/DeployProduction.s.sol             contracts/script/ActivateProduction.s.sol             contracts/script/PrepareGovernanceAcceptance.s.sol             app/launch             lib/fortune-network.ts             app/api/public/v1/readiness/route.ts
+          git diff --exit-code "$REVIEWED"..HEAD --             contracts/src             contracts/script/DeployProduction.s.sol             contracts/script/ActivateProduction.s.sol             contracts/script/PrepareGovernanceAcceptance.s.sol             app/launch             lib/fortune-network.ts             app/api/public/v1/readiness/route.ts             mainnet-dependencies.json             scripts/check-mainnet-dependencies.mjs             scripts/export-mainnet-dependencies.mjs
 
       - uses: foundry-rs/foundry-toolchain@v1
 
@@ -97,6 +60,7 @@ jobs:
         run: |
           test -n "$PRIVATE_KEY"
           test -n "$BSC_RPC_URL"
+          node scripts/check-mainnet-dependencies.mjs --require-assets --check-env
           test "$(cast chain-id --rpc-url "$BSC_RPC_URL")" = "56"
           test "$(cast code "$FORTUNE_GOVERNANCE" --rpc-url "$BSC_RPC_URL")" != "0x"
           test "$(cast code "$PANCAKE_V3_FACTORY" --rpc-url "$BSC_RPC_URL")" != "0x"

@@ -38,6 +38,23 @@ npm run mainnet:require-activate
 
 The first command validates the manifest schema while allowing a blocked release. The latter two fail closed until their respective phases are complete.
 
+## Version-controlled production dependencies
+
+`mainnet-dependencies.json` is the canonical source for external contracts and initial production assets used by the deploy workflow.
+
+It currently pins the official PancakeSwap V3 BSC mainnet factory and NonfungiblePositionManager. Production asset entries remain empty until each exact token contract and price feed has been independently verified from primary sources.
+
+Run:
+
+```bash
+npm run mainnet:deps
+npm run mainnet:deps:require
+```
+
+The paused deployment workflow exports the reviewed dependency manifest into its runtime environment. Pancake and asset/feed addresses are not accepted from mutable GitHub dashboard variables.
+
+Every initial asset entry must include its token address, oracle feed, maximum oracle age, capabilities, category, and a primary-source reference. Mainnet v1 refuses to deploy with zero pinned assets or more than five.
+
 ## Phase 1 — reviewed source
 
 Before any mainnet deployment:
@@ -154,6 +171,6 @@ Secrets:
 - `FORTUNE_MAINNET_DEPLOYER_PRIVATE_KEY`
 - `BSC_MAINNET_RPC_URL`
 
-Public environment variables should contain governance, treasury, Pancake, and production asset/feed addresses. These values are public blockchain configuration and should be independently verified from primary sources before use.
+Public environment variables should contain only operator-specific public addresses such as governance, automation executor, and protocol treasury. Pancake dependencies and production asset/feed addresses come from the reviewed `mainnet-dependencies.json` manifest and are checked against it during deployment.
 
 Never place a seed phrase, governance key, private RPC credential, or API secret in the repository or release manifest.

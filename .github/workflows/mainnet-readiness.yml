@@ -5,7 +5,10 @@ on:
     branches: [main]
     paths:
       - "mainnet-release.json"
+      - "mainnet-dependencies.json"
       - "scripts/check-mainnet-release.mjs"
+      - "scripts/check-mainnet-dependencies.mjs"
+      - "scripts/export-mainnet-dependencies.mjs"
       - "lib/mainnet-release.ts"
       - "contracts/src/**"
       - "contracts/script/DeployProduction.s.sol"
@@ -34,6 +37,9 @@ jobs:
 
       - name: Validate release manifest
         run: npm run mainnet:check
+
+      - name: Validate pinned mainnet dependencies
+        run: npm run mainnet:deps
 
       - uses: foundry-rs/foundry-toolchain@v1
 

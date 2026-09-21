@@ -16,6 +16,7 @@
     "mainnet:deps": "node scripts/check-mainnet-dependencies.mjs",
     "mainnet:deps:require": "node scripts/check-mainnet-dependencies.mjs --require-assets",
     "mainnet:sizes": "node scripts/check-mainnet-contract-sizes.mjs",
+    "mainnet:deployment:export": "node scripts/export-mainnet-deployment.mjs",
     "mainnet:fingerprint": "node scripts/mainnet-candidate-fingerprint.mjs"
   },
   "dependencies": {

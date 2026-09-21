@@ -26,6 +26,10 @@ contract FortuneFactory is Ownable2Step {
     uint8 public constant FORTUNE_ADDRESS_SUFFIX = 0xfe;
     uint256 public constant VANITY_SEARCH_LIMIT = 4096;
     uint16 public constant MIN_GRADUATION_SUPPLY_BUFFER_BPS = 1_000; // 10%
+    address public constant BSC_MAINNET_V1_QUOTE =
+        0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c; // WBNB
+    uint256 public constant MAINNET_V1_MAX_GRADUATION_USD1E18 =
+        10_000e18;
     struct LaunchParams {
         string name;
         string symbol;
@@ -245,14 +249,33 @@ contract FortuneFactory is Ownable2Step {
         // enforced by the deployed protocol, not only by registry policy or UI.
         // Enabling multi-reserve launches on BSC mainnet requires a separately
         // reviewed factory release.
-        if (
-            block.chainid == 56 &&
-            p.quoteAssets.length != 1
-        ) {
-            return (
-                false,
-                bytes32("MAINNET_SINGLE_QUOTE")
-            );
+        if (block.chainid == 56) {
+            if (p.quoteAssets.length != 1) {
+                return (
+                    false,
+                    bytes32("MAINNET_SINGLE_QUOTE")
+                );
+            }
+            if (
+                p.quoteAssets[0] !=
+                    BSC_MAINNET_V1_QUOTE ||
+                p.primaryQuote !=
+                    BSC_MAINNET_V1_QUOTE
+            ) {
+                return (
+                    false,
+                    bytes32("MAINNET_WBNB_ONLY")
+                );
+            }
+            if (
+                p.graduationUsd1e18 >
+                    MAINNET_V1_MAX_GRADUATION_USD1E18
+            ) {
+                return (
+                    false,
+                    bytes32("MAINNET_GRADUATION_CAP")
+                );
+            }
         }
         if (p.quoteAssets.length != p.weightsBps.length) {
             return (false, bytes32("BAD_WEIGHT_LENGTH"));

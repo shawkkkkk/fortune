@@ -16,6 +16,8 @@ jobs:
       - run: npm install
       - name: Validate mainnet release manifest
         run: npm run mainnet:check
+      - name: Validate pinned mainnet dependencies
+        run: npm run mainnet:deps
       - run: npm run build
 
       - name: Boot production server

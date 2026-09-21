@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "chainId": 56,
+  "verifiedAt": "2026-09-20",
+  "pancakeV3": {
+    "factory": "0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865",
+    "nonfungiblePositionManager": "0x46A15B0b27311cedF172AB29E4f4766fbE7F4364",
+    "source": "https://developer.pancakeswap.finance/contracts/v3/addresses"
+  },
+  "assets": []
+}

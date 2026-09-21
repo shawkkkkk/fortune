@@ -4,7 +4,7 @@ Candidate auditors should review the exact commit recorded in `mainnet-release.j
 
 ## Mainnet v1 in scope
 
-Mainnet v1 deliberately excludes the tax-token launch stack and restricted tokenized-stock/RWA quote assets. On BSC mainnet (chain 56), `FortuneFactory.preflightLaunch` also enforces exactly one quote asset, so multi-reserve launches are unreachable in this release even if governance later adds another registry entry.
+Mainnet v1 deliberately excludes the tax-token launch stack and restricted tokenized-stock/RWA quote assets. On BSC mainnet (chain 56), `FortuneFactory.preflightLaunch` enforces exactly one WBNB quote, a $10,000 graduation ceiling, a 1% total trade-fee ceiling, and disables holder/buyback/liquidity automation fee routes because no production automation adapter ships in v1. Multi-reserve launches are unreachable even if governance later adds another registry entry.
 
 Primary contracts:
 
@@ -57,6 +57,7 @@ Deployment/governance scripts:
 ### Graduation
 
 - Verify preflight covers every assumption required by execution.
+- Verify chain-56 graduation fixes the Pancake V3 fee tier to 500 and caps caller-selected sqrt-price deviation/dust at 100 bps each.
 - Review Pancake V3 price derivation, tick handling, existing-pool price deviation, slippage/dust limits, and deadlines.
 - Verify reserve transfers + pool creation + LP mint + permanent lock are atomic.
 - Verify failed graduation leaves reserves retryable.
@@ -69,6 +70,7 @@ Deployment/governance scripts:
 - Inventory every owner/admin action and its impact.
 - Verify deployer has no continuing protocol ownership after acceptance.
 - Verify automation registry cannot turn a purpose-locked vault into an arbitrary sweep.
+- Verify chain-56 launch creation rejects holder/buyback/liquidity automation fee routes and creator fee surrender remains disabled until a separately reviewed production adapter exists.
 
 ### Web / signing boundary
 

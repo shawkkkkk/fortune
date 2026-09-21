@@ -46,11 +46,15 @@ contract DeployProduction is Script {
             governance.code.length > 0,
             "GOVERNANCE_MUST_BE_CONTRACT"
         );
-        // Mainnet v1 does not permit a single hot-key EOA to command launch
-        // automation vaults. The executor must itself be contract-controlled.
+        // Keep all protocol-controlled value-routing/admin authority under the
+        // same contract governance boundary for the first real-funds canary.
         require(
-            automationExecutor.code.length > 0,
-            "AUTOMATION_EXECUTOR_MUST_BE_CONTRACT"
+            automationExecutor == governance,
+            "AUTOMATION_EXECUTOR_MUST_BE_GOVERNANCE"
+        );
+        require(
+            protocolTreasury == governance,
+            "PROTOCOL_TREASURY_MUST_BE_GOVERNANCE"
         );
         require(
             protocolTreasury.code.length > 0,

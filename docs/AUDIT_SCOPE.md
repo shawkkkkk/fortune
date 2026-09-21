@@ -41,7 +41,8 @@ Deployment/governance scripts:
 ### Oracle and asset behavior
 
 - Validate Chainlink round completeness, timestamp, decimal normalization, and max-age behavior.
-- Verify WBNB is the only pinned mainnet-v1 quote asset and the production deployment contains exactly one initial asset.
+- Verify WBNB is the only pinned mainnet-v1 quote asset, the production deployment contains exactly one initial asset, and the chain-56 factory rejects any non-WBNB quote.
+- Verify the chain-56 $10,000 graduation-target ceiling cannot be bypassed through prepared launches or creator-first-buy paths.
 - Verify registry expansion alone cannot bypass the factory's chain-56 single-quote launch gate.
 - Determine safe production asset criteria and max-age policy.
 - Verify existing curves cannot be silently repriced by later registry edits.

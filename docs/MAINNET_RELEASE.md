@@ -16,10 +16,11 @@ The production deployment script:
 - receives Pancake dependencies plus the initial WBNB/Chainlink asset configuration from the reviewed, version-controlled `mainnet-dependencies.json` manifest;
 - verifies bytecode exists at all configured assets, feeds and Pancake contracts;
 - calls the live Fortune registry health check for every configured asset;
-- requires at least one healthy quote + graduation asset;
+- requires exactly one production asset for mainnet v1 and verifies it is the pinned WBNB quote;
 - deploys the full Fortune factory/deployer/registry/oracle/locker/adapter stack;
 - wires the Pancake V3 adapter and permanent LP locker;
 - **pauses launch creation before handing governance over**;
+- requires the automation executor and protocol treasury to equal the contract governance address for v1;
 - starts two-step ownership transfers to the configured governance address.
 
 The deployment therefore cannot become an open launchpad merely because a
@@ -38,7 +39,8 @@ Before a governance owner activates Fortune mainnet:
    - production deployment and ownership flow
 
 2. **Production governance**
-   - use a multisig/timelock rather than an ordinary hot wallet;
+   - follow `docs/MAINNET_GOVERNANCE.md`;
+   - use multi-party contract governance rather than an ordinary hot wallet;
    - accept all `Ownable2Step` ownership transfers;
    - verify the factory and registry report the expected owner;
    - document emergency pause responsibilities.
@@ -120,7 +122,10 @@ Before any unpause transaction, it verifies:
 - graduation adapter exists;
 - Pancake factory and position manager contain bytecode;
 - permanent locker exists and approves the graduation adapter;
-- the pinned production quote asset is launchable and oracle-healthy;
+- exactly one registry asset exists and it is the factory-pinned WBNB quote;
+- the pinned WBNB quote is launchable and oracle-healthy;
+- the live adapter points to the exact pinned Pancake V3 factory and position manager;
+- automation executor and protocol treasury equal the governance contract;
 - every machine-enforced activation gate in `mainnet-release.json` is complete.
 
 The actual `setLaunchesPaused(false)` transaction must then be submitted separately through the configured governance Safe/multisig. CI does not hold or use a governance signing key.

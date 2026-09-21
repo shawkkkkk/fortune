@@ -14,7 +14,8 @@
     "mainnet:require-deploy": "node scripts/check-mainnet-release.mjs --phase=deploy",
     "mainnet:require-activate": "node scripts/check-mainnet-release.mjs --phase=activate",
     "mainnet:deps": "node scripts/check-mainnet-dependencies.mjs",
-    "mainnet:deps:require": "node scripts/check-mainnet-dependencies.mjs --require-assets"
+    "mainnet:deps:require": "node scripts/check-mainnet-dependencies.mjs --require-assets",
+    "mainnet:fingerprint": "node scripts/mainnet-candidate-fingerprint.mjs"
   },
   "dependencies": {
     "next": "16.3.5",

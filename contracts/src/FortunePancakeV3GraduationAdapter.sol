@@ -31,6 +31,13 @@ contract FortunePancakeV3GraduationAdapter is
     uint16 public constant MAX_SQRT_DEVIATION_BPS = 500;
     uint16 public constant MAX_DUST_BPS = 500;
 
+    // Mainnet v1 removes permissionless graduation-plan discretion. Testnet
+    // remains flexible for research, while chain 56 uses one reviewed market
+    // shape for the first real-funds canary.
+    uint24 public constant MAINNET_V1_POOL_FEE = 500; // Pancake V3 0.05%
+    uint16 public constant MAINNET_V1_MAX_SQRT_DEVIATION_BPS = 100;
+    uint16 public constant MAINNET_V1_MAX_DUST_BPS = 100;
+
     int24 public constant MIN_TICK = -887272;
     int24 public constant MAX_TICK = 887272;
 
@@ -149,6 +156,25 @@ contract FortunePancakeV3GraduationAdapter is
         }
         if (plan.maxDustBps > MAX_DUST_BPS) {
             return (false, bytes32("BAD_DUST"));
+        }
+
+        if (block.chainid == 56) {
+            if (
+                reserves.length != 1 ||
+                plan.fees.length != 1 ||
+                plan.fees[0] != MAINNET_V1_POOL_FEE
+            ) {
+                return (false, bytes32("MAINNET_FEE_TIER"));
+            }
+            if (
+                plan.maxSqrtPriceDeviationBps >
+                    MAINNET_V1_MAX_SQRT_DEVIATION_BPS
+            ) {
+                return (false, bytes32("MAINNET_DEVIATION"));
+            }
+            if (plan.maxDustBps > MAINNET_V1_MAX_DUST_BPS) {
+                return (false, bytes32("MAINNET_DUST"));
+            }
         }
 
         uint256 weightSum;

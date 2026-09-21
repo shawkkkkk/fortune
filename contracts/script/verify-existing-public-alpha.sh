@@ -174,8 +174,8 @@ send_tx \
   "$MAX_GAS"
 
 STANDARD_GRAD="$(cast call "$OPERATOR" "standardGraduationPassed()(bool)" --rpc-url "$RPC")"
-STANDARD_LP_TOKEN_ID="$(cast call "$OPERATOR" "standardLpTokenId()(uint256)" --rpc-url "$RPC")"
-STANDARD_ANCHOR="$(cast call "$OPERATOR" "standardAnchor()(uint256)" --rpc-url "$RPC")"
+STANDARD_LP_TOKEN_ID="$(cast call "$OPERATOR" "standardLpTokenId()(uint256)" --rpc-url "$RPC" | awk '{print $1}')"
+STANDARD_ANCHOR="$(cast call "$OPERATOR" "standardAnchor()(uint256)" --rpc-url "$RPC" | awk '{print $1}')"
 test "$STANDARD_GRAD" = "true" || {
   echo "Standard graduation proof flag is false" >&2
   exit 1
@@ -243,7 +243,7 @@ send_tx \
   "$MAX_GAS"
 
 TAX_POOL="$(cast call "$OPERATOR" "taxPool()(address)" --rpc-url "$RPC")"
-TAX_LOCKED_LP="$(cast call "$OPERATOR" "taxLockedLp()(uint256)" --rpc-url "$RPC")"
+TAX_LOCKED_LP="$(cast call "$OPERATOR" "taxLockedLp()(uint256)" --rpc-url "$RPC" | awk '{print $1}')"
 TAX_GRAD="$(cast call "$OPERATOR" "taxGraduationPassed()(bool)" --rpc-url "$RPC")"
 test "$TAX_GRAD" = "true" || {
   echo "Tax graduation proof flag is false" >&2

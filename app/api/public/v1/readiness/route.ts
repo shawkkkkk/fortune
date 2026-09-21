@@ -6,6 +6,12 @@ import {
 } from "viem";
 import { PUBLIC_TESTNET } from "@/lib/public-testnet";
 import {
+  MAINNET_ACTIVATION_GATE_IDS,
+  MAINNET_ACTIVATION_READY,
+  MAINNET_RELEASE,
+  mainnetGateComplete,
+} from "@/lib/mainnet-release";
+import {
   configuredRpcUrls,
   probeRpcEndpoints,
   rpcCall,
@@ -159,8 +165,15 @@ export async function GET() {
     process.env.NEXT_PUBLIC_FORTUNE_PRIMARY_QUOTE_ADDRESS || "";
   const governance =
     process.env.FORTUNE_GOVERNANCE || "";
-  const releaseApproved =
+  const operatorReleaseApproved =
     process.env.FORTUNE_MAINNET_RELEASE_APPROVED === "true";
+  const releaseApproved =
+    operatorReleaseApproved && MAINNET_ACTIVATION_READY;
+  const governanceHasCode =
+    chainId === 56 &&
+    /^0x[a-fA-F0-9]{40}$/.test(governance)
+      ? await hasCode(chainId, governance)
+      : false;
 
   let factoryPaused: boolean | null = null;
   let factoryOwner: string | null = null;
@@ -227,6 +240,41 @@ export async function GET() {
     process.env.FORTUNE_REQUIRE_RPC_REDUNDANCY === "true";
   const redundancyReady =
     !redundancyRequired || urls.length >= 2;
+
+  const releaseGateLabels: Record<string, string> = {
+    independentSmartContractAudit: "Independent smart-contract audit",
+    economicCurveSimulation: "Economic curve simulation",
+    mevCrossReserveReview: "MEV / cross-reserve review",
+    oracleAssetPolicyReview: "Oracle and asset-policy review",
+    graduationAdapterAudit: "Graduation adapter audit",
+    automationVaultAudit: "Automation vault audit",
+    governanceMultisig: "Governance multisig",
+    deploymentKeyControls: "Deployment key controls",
+    legalComplianceReview: "Legal / compliance review",
+    productionRpcRedundancy: "Production RPC redundancy",
+    monitoringAlerts: "Monitoring and alerts",
+    incidentRunbook: "Incident runbook",
+    reproduciblePausedDeployment: "Reproducible paused deployment",
+    reproducibleIndexerAnalytics: "Reproducible indexer / analytics",
+    productionCanaryDrill: "Production canary drill",
+  };
+
+  const releaseManifestChecks: ReadinessCheck[] =
+    chainId === 56
+      ? MAINNET_ACTIVATION_GATE_IDS.map((id) => {
+          const complete = mainnetGateComplete(id);
+          const gate = MAINNET_RELEASE.gates[id];
+
+          return {
+            id: "release-" + id,
+            label: releaseGateLabels[id] || id,
+            status: complete ? "pass" : "fail",
+            detail: complete
+              ? gate.evidence
+              : "Required mainnet release evidence has not been recorded.",
+          };
+        })
+      : [];
 
   const checks: ReadinessCheck[] = [
     {
@@ -340,29 +388,42 @@ export async function GET() {
     },
     ...(chainId === 56
       ? [
+          ...releaseManifestChecks,
+          {
+            id: "mainnet-release-manifest",
+            label: "Mainnet release manifest",
+            status: MAINNET_ACTIVATION_READY ? "pass" : "fail",
+            detail: MAINNET_ACTIVATION_READY
+              ? `${MAINNET_RELEASE.release} is activation-ready for reviewed commit ${MAINNET_RELEASE.reviewedCommit}.`
+              : "The checked-in mainnet release manifest is still blocked or missing required evidence.",
+          } satisfies ReadinessCheck,
           {
             id: "mainnet-release-approval",
-            label: "Mainnet release approval",
+            label: "Final operator release approval",
             status: releaseApproved ? "pass" : "fail",
             detail: releaseApproved
-              ? "Operator release approval is explicitly enabled."
-              : "FORTUNE_MAINNET_RELEASE_APPROVED must remain false until independent security review and final release approval are complete.",
+              ? "The release manifest is complete and final operator approval is explicitly enabled."
+              : operatorReleaseApproved
+                ? "Operator approval is set, but the machine-enforced release manifest is not activation-ready."
+                : "FORTUNE_MAINNET_RELEASE_APPROVED must remain false until the release manifest is activation-ready.",
           } satisfies ReadinessCheck,
           {
             id: "governance-owner",
             label: "Governance ownership",
             status:
               governance &&
+              governanceHasCode &&
               factoryOwner &&
               governance.toLowerCase() === factoryOwner.toLowerCase()
                 ? "pass"
                 : "fail",
             detail:
               governance &&
+              governanceHasCode &&
               factoryOwner &&
               governance.toLowerCase() === factoryOwner.toLowerCase()
-                ? "FortuneFactory ownership matches the configured production governance address."
-                : "Factory ownership must be accepted by the configured production governance address.",
+                ? "FortuneFactory ownership is held by the configured contract-based governance wallet."
+                : "Factory ownership must be accepted by a configured contract-based governance wallet; a single-key EOA is not mainnet-ready.",
           } satisfies ReadinessCheck,
           {
             id: "primary-quote",
@@ -410,6 +471,17 @@ export async function GET() {
       },
       checks,
       chainId,
+      mainnetRelease:
+        chainId === 56
+          ? {
+              release: MAINNET_RELEASE.release,
+              status: MAINNET_RELEASE.status,
+              reviewedCommit: MAINNET_RELEASE.reviewedCommit,
+              deployReady: false,
+              activationReady: MAINNET_ACTIVATION_READY,
+              operatorApproved: operatorReleaseApproved,
+            }
+          : undefined,
     },
     {
       meta: {

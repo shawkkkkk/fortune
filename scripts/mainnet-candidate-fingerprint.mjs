@@ -15,6 +15,7 @@ const tracked = [
   "contracts/script/DeployProduction.s.sol",
   "contracts/script/ActivateProduction.s.sol",
   "contracts/script/PrepareGovernanceAcceptance.s.sol",
+  "scripts/export-mainnet-deployment.mjs",
 ];
 
 const contractFiles = execFileSync("git", [

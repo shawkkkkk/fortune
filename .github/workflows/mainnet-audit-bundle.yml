@@ -48,6 +48,9 @@ jobs:
           npm run mainnet:check
           npm run mainnet:deps:require
 
+      - name: Reject high or critical production dependency findings
+        run: npm audit --omit=dev --audit-level=high
+
       - name: Run deterministic economic stress harness
         env:
           FORTUNE_ECONOMIC_REPORT: /tmp/fortune-mainnet-economic-sim.json

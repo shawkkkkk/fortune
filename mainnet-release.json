@@ -6,7 +6,7 @@
   "scope": {
     "standardLaunches": true,
     "taxTokenLaunches": false,
-    "maximumInitialRegistryAssets": 5,
+    "maximumInitialRegistryAssets": 1,
     "restrictedRwaAssetsEnabled": false
   },
   "reviewedCommit": "",

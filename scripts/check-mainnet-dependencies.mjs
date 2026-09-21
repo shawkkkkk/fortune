@@ -23,7 +23,16 @@ if (!/^https:\/\/developer\.pancakeswap\.finance\//.test(
   errors.push("Pancake source must be the official developer docs");
 }
 if (!Array.isArray(manifest.assets)) errors.push("assets must be an array");
-if (manifest.assets.length > 5) errors.push("mainnet v1 supports at most 5 initial assets");
+const releaseManifest = JSON.parse(
+  fs.readFileSync(path.resolve(process.cwd(), "mainnet-release.json"), "utf8")
+);
+const maxAssets = releaseManifest.scope?.maximumInitialRegistryAssets;
+if (!Number.isInteger(maxAssets) || maxAssets < 1 || maxAssets > 5) {
+  errors.push("mainnet release manifest has invalid maximumInitialRegistryAssets");
+}
+if (manifest.assets.length > maxAssets) {
+  errors.push(`mainnet v1 supports at most ${maxAssets} initial asset(s)`);
+}
 
 for (const [index, asset] of manifest.assets.entries()) {
   if (!/^0x[a-fA-F0-9]{40}$/.test(asset.address || "")) {
@@ -32,8 +41,28 @@ for (const [index, asset] of manifest.assets.entries()) {
   if (!/^0x[a-fA-F0-9]{40}$/.test(asset.feed || "")) {
     errors.push(`asset[${index}] has invalid feed`);
   }
-  if (!asset.source || typeof asset.source !== "string") {
-    errors.push(`asset[${index}] is missing a primary-source reference`);
+  if (!asset.symbol || typeof asset.symbol !== "string") {
+    errors.push(`asset[${index}] is missing symbol`);
+  }
+  for (const key of ["quoteEnabled", "rewardEnabled", "graduationEnabled"]) {
+    if (typeof asset[key] !== "boolean") {
+      errors.push(`asset[${index}] has invalid ${key}`);
+    }
+  }
+  if (!asset.category || typeof asset.category !== "string") {
+    errors.push(`asset[${index}] is missing category`);
+  }
+  if (asset.restricted !== false) {
+    errors.push(`asset[${index}] must not be restricted for mainnet v1`);
+  }
+  for (const key of [
+    "tokenSource",
+    "feedSource",
+    "feedAddressVerificationSource",
+  ]) {
+    if (!asset[key] || typeof asset[key] !== "string") {
+      errors.push(`asset[${index}] is missing ${key}`);
+    }
   }
   if (!Number.isInteger(asset.maxOracleAge) || asset.maxOracleAge < 60) {
     errors.push(`asset[${index}] has invalid maxOracleAge`);

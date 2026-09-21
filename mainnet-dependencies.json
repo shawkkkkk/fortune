@@ -7,5 +7,20 @@
     "nonfungiblePositionManager": "0x46A15B0b27311cedF172AB29E4f4766fbE7F4364",
     "source": "https://developer.pancakeswap.finance/contracts/v3/addresses"
   },
-  "assets": []
+  "assets": [
+    {
+      "symbol": "WBNB",
+      "address": "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c",
+      "feed": "0x0567F2323251f0Aab15c8dFb1967E4e8A7D42aeE",
+      "maxOracleAge": 600,
+      "quoteEnabled": true,
+      "rewardEnabled": true,
+      "graduationEnabled": true,
+      "category": "Majors",
+      "restricted": false,
+      "tokenSource": "https://docs.bnbchain.org/bnb-smart-chain/benchmark/design-reference/",
+      "feedSource": "https://data.chain.link/feeds/bsc/mainnet/bnb-usd",
+      "feedAddressVerificationSource": "https://bscscan.com/address/0x0567F2323251f0Aab15c8dFb1967E4e8A7D42aeE"
+    }
+  ]
 }

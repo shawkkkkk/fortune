@@ -19,6 +19,10 @@ on:
       - "docs/ECONOMIC_SPEC.md"
       - "docs/MAINNET_*.md"
       - ".github/workflows/mainnet-audit-bundle.yml"
+      - ".github/workflows/mainnet-deploy-paused.yml"
+      - ".github/workflows/mainnet-activation-preflight.yml"
+      - ".github/workflows/mainnet-readiness.yml"
+      - ".github/workflows/mainnet-node-security.yml"
   workflow_dispatch:
 
 concurrency:

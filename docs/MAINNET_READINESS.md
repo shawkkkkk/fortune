@@ -14,7 +14,8 @@ The first real-value release is deliberately smaller than the research/testnet s
 - tokenized securities / restricted RWAs disabled in the initial registry;
 - Pancake V3 graduation only;
 - launch creation stays paused immediately after deployment;
-- contract-based governance is mandatory.
+- contract-based governance is mandatory;
+- mainnet v1 uses that same governance Safe as the immutable automation executor and protocol treasury, eliminating separate hot-key privileged roles.
 
 Expanding the registry, adding restricted RWAs, or enabling another launch architecture is a later governance/review event rather than part of the initial canary.
 
@@ -85,7 +86,7 @@ The workflow:
 - runs under the GitHub `mainnet` environment;
 - requires BSC chain ID 56;
 - requires a contract-based governance address;
-- requires a contract-based automation executor rather than a single-key EOA;
+- requires the automation executor and protocol treasury to equal the contract-based governance Safe;
 - validates Pancake dependencies contain bytecode;
 - reruns the Foundry suite with a stronger fuzz count;
 - dry-runs the deployment;

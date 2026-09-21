@@ -17,15 +17,15 @@
     "mainnet:deps:require": "node scripts/check-mainnet-dependencies.mjs --require-assets"
   },
   "dependencies": {
-    "next": "^15.2.0",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "viem": "^2.56.8"
+    "next": "16.3.5",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "viem": "2.56.8"
   },
   "devDependencies": {
-    "@types/node": "^22.10.0",
-    "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0",
-    "typescript": "^5.7.0"
+    "@types/node": "22.20.4",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "typescript": "5.9.3"
   }
 }

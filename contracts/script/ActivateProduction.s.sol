@@ -7,6 +7,7 @@ import {FortuneFactory} from "../src/FortuneFactory.sol";
 import {FortuneAssetRegistry} from "../src/FortuneAssetRegistry.sol";
 import {FortuneAutomationRegistry} from "../src/FortuneAutomationRegistry.sol";
 import {FortuneMetadataRegistry} from "../src/FortuneMetadataRegistry.sol";
+import {FortuneChainlinkOracle} from "../src/FortuneChainlinkOracle.sol";
 import {FortunePancakeV3GraduationAdapter} from "../src/FortunePancakeV3GraduationAdapter.sol";
 import {FortunePermanentLiquidityLocker} from "../src/FortunePermanentLiquidityLocker.sol";
 
@@ -111,11 +112,34 @@ contract ActivateProduction is Script {
 
         FortuneAssetRegistry.AssetConfig memory config =
             registry.assetConfig(asset);
+
+        address expectedAsset = vm.envAddress("PRODUCTION_ASSET_0");
+        address expectedFeed = vm.envAddress("PRODUCTION_FEED_0");
+        uint256 expectedMaxAge = vm.envUint("PRODUCTION_MAX_AGE_0");
+        bool expectedQuote =
+            vm.envBool("PRODUCTION_QUOTE_ENABLED_0");
+        bool expectedReward =
+            vm.envBool("PRODUCTION_REWARD_ENABLED_0");
+        bool expectedGraduation =
+            vm.envBool("PRODUCTION_GRADUATION_ENABLED_0");
+
+        require(asset == expectedAsset, "ASSET_MANIFEST_MISMATCH");
+        require(
+            uint256(config.maxOracleAge) == expectedMaxAge,
+            "ORACLE_MAX_AGE_MISMATCH"
+        );
         require(
             config.active &&
-                config.quoteEnabled &&
-                config.graduationEnabled,
-            "WBNB_CAPABILITIES_INVALID"
+                config.quoteEnabled == expectedQuote &&
+                config.rewardEnabled == expectedReward &&
+                config.graduationEnabled == expectedGraduation,
+            "WBNB_CAPABILITIES_MISMATCH"
+        );
+        require(config.oracle.code.length > 0, "ORACLE_NO_CODE");
+        require(
+            FortuneChainlinkOracle(config.oracle).feedFor(asset) ==
+                expectedFeed,
+            "ORACLE_FEED_MISMATCH"
         );
 
         (

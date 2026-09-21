@@ -6,6 +6,9 @@ Fortune is a BNB Smart Chain launch protocol built around a shared **multi-asset
 
 > **Status:** public BSC Testnet alpha. Test assets only; the contracts remain pre-audit and mainnet is intentionally disabled. Do not use with real funds.
 
+**Live public alpha:** https://fortune-rho-snowy.vercel.app/testnet  
+**System status:** https://fortune-rho-snowy.vercel.app/status
+
 ## What is built
 
 ### Web product

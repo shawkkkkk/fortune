@@ -1,6 +1,6 @@
 # Fortune Mainnet v1 Asset Policy
 
-Mainnet v1 starts with exactly one launchable quote asset: WBNB on BNB Smart Chain.
+Mainnet v1 starts with exactly one launchable quote asset: WBNB on BNB Smart Chain. The chain-56 factory enforces WBNB itself, so a registry change cannot substitute another quote asset without a new reviewed factory release.
 
 This is a canary constraint, not a claim that multi-asset curves are unsafe. Restricting the initial registry to one quote asset keeps cross-reserve arbitrage dormant while Fortune gathers real production evidence.
 
@@ -48,6 +48,10 @@ Before governance enables a second production quote asset:
 9. execute registry/factory changes through contract-based governance.
 
 Restricted tokenized securities/RWAs remain out of scope for mainnet v1.
+
+## Canary reserve ceiling
+
+The mainnet-v1 factory rejects any launch whose `graduationUsd1e18` exceeds **$10,000**. This is a protocol-enforced canary ceiling on pre-graduation accounted reserve value, not a claim that $10,000 is intrinsically safe. Raising the ceiling requires a separately reviewed factory release.
 
 ## Oracle staleness policy
 

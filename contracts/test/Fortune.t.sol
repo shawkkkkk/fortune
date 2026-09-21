@@ -345,6 +345,17 @@ contract FortuneTest is Test {
         assertEq(reason, bytes32("DUPLICATE_QUOTE"));
     }
 
+    function testMainnetV1RejectsMultipleQuoteAssetsAtProtocolBoundary() public {
+        FortuneFactory.LaunchParams memory p = _params(1_000e18);
+
+        vm.chainId(56);
+        (bool ready, bytes32 reason) = factory.preflightLaunch(p);
+
+        assertFalse(ready);
+        assertEq(reason, bytes32("MAINNET_SINGLE_QUOTE"));
+    }
+
+
     function testLaunchPreflightRejectsMissingTreasuryRoute() public {
         FortuneFactory.LaunchParams memory p = _params(1_000e18);
         p.feeBps[4] = 1;

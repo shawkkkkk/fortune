@@ -51,9 +51,13 @@ jobs:
           FACTORY_OWNER="$(cast call "$FORTUNE_FACTORY" "owner()(address)" --rpc-url "$BSC_RPC_URL")"
           REGISTRY_OWNER="$(cast call "$FORTUNE_REGISTRY" "owner()(address)" --rpc-url "$BSC_RPC_URL")"
           PAUSED="$(cast call "$FORTUNE_FACTORY" "launchesPaused()(bool)" --rpc-url "$BSC_RPC_URL")"
+          AUTOMATION_EXECUTOR="$(cast call "$FORTUNE_FACTORY" "automationExecutor()(address)" --rpc-url "$BSC_RPC_URL")"
+          PROTOCOL_TREASURY="$(cast call "$FORTUNE_FACTORY" "protocolTreasury()(address)" --rpc-url "$BSC_RPC_URL")"
 
           test "${FACTORY_OWNER,,}" = "${FORTUNE_GOVERNANCE,,}"
           test "${REGISTRY_OWNER,,}" = "${FORTUNE_GOVERNANCE,,}"
+          test "${AUTOMATION_EXECUTOR,,}" = "${FORTUNE_GOVERNANCE,,}"
+          test "${PROTOCOL_TREASURY,,}" = "${FORTUNE_GOVERNANCE,,}"
           test "$PAUSED" = "false"
 
       - name: Verify production web readiness

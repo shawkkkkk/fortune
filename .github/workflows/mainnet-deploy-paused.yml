@@ -103,6 +103,11 @@ jobs:
           grep -q "LaunchesPaused true" /tmp/fortune-mainnet-deploy.log
           grep -q "IMPORTANT: production launches remain paused" /tmp/fortune-mainnet-deploy.log
 
+      - name: Export deployed address manifest
+        env:
+          FORTUNE_MAINNET_DEPLOYMENT_MANIFEST: /tmp/fortune-mainnet-deployment-addresses.json
+        run: npm run mainnet:deployment:export
+
       - name: Record source commit
         run: git rev-parse HEAD | tee /tmp/fortune-mainnet-source-commit.txt
 
@@ -115,5 +120,6 @@ jobs:
             /tmp/fortune-mainnet-dry-run.log
             /tmp/fortune-mainnet-deploy.log
             /tmp/fortune-mainnet-source-commit.txt
+            /tmp/fortune-mainnet-deployment-addresses.json
             contracts/broadcast/DeployProduction.s.sol/56/
           retention-days: 90

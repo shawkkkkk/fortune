@@ -8,12 +8,8 @@ const manifest = JSON.parse(
   )
 );
 
-if (!Array.isArray(manifest.assets) || manifest.assets.length < 1) {
-  console.error("No pinned production assets. Refusing to export mainnet deployment environment.");
-  process.exit(1);
-}
-if (manifest.assets.length > 5) {
-  console.error("Mainnet v1 supports at most five initial assets.");
+if (!Array.isArray(manifest.assets) || manifest.assets.length !== 1) {
+  console.error("Mainnet v1 requires exactly one pinned production asset.");
   process.exit(1);
 }
 

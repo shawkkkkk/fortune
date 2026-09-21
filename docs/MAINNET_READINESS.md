@@ -9,7 +9,8 @@ The first real-value release is deliberately smaller than the research/testnet s
 - BNB Smart Chain mainnet only;
 - standard Fortune launches only;
 - tax-token mainnet launches disabled;
-- exactly one reviewed asset in the initial production registry (WBNB in the current candidate);
+- exactly one reviewed asset in the initial production registry (WBNB), with WBNB also enforced by the chain-56 factory;
+- a $10,000 maximum graduation target enforced by the chain-56 factory;
 - tokenized securities / restricted RWAs disabled in the initial registry;
 - Pancake V3 graduation only;
 - launch creation stays paused immediately after deployment;

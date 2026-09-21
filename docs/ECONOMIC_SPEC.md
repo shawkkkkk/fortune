@@ -61,7 +61,7 @@ Protocol fee and any launch tax are deducted from the gross quote output.
 
 ## Reserve accounting
 
-The generic Fortune curve supports multiple quote assets on research/testnet deployments. **Mainnet v1 does not:** on BSC chain ID 56 the factory rejects any launch whose quote-asset count is not exactly one. The initial production registry is separately constrained to one WBNB entry.
+The generic Fortune curve supports multiple quote assets on research/testnet deployments. **Mainnet v1 does not:** on BSC chain ID 56 the factory rejects any launch whose quote-asset count is not exactly one. The initial production registry is separately constrained to one WBNB entry, and the chain-56 factory itself requires WBNB as both the sole quote and primary quote.
 
 For generic deployments, each quote asset is normalized with the oracle configuration snapshotted by the curve at launch.
 
@@ -119,7 +119,7 @@ The final buy partially fills to the remaining graduation target and refunds exc
 - parameter combinations that produce zero graduation output;
 - total supply below the required sold + LP inventory plus 10% buffer.
 
-These are arithmetic/supply-safety bounds. They are **not** a production economic policy.
+On chain 56, mainnet v1 additionally requires exactly one WBNB quote and rejects graduation targets above $10,000. These canary constraints bound scope and pre-graduation reserve exposure; they are **not** a substitute for an independent production economic review.
 
 ## Mainnet parameter-policy blocker
 

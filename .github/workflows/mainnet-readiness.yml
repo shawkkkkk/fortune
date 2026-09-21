@@ -15,6 +15,7 @@ on:
       - "scripts/check-mainnet-release.mjs"
       - "scripts/check-mainnet-dependencies.mjs"
       - "scripts/export-mainnet-dependencies.mjs"
+      - "scripts/check-mainnet-contract-sizes.mjs"
       - "lib/mainnet-release.ts"
       - "contracts/src/**"
       - "contracts/script/DeployProduction.s.sol"
@@ -64,3 +65,6 @@ jobs:
       - name: Mainnet-candidate contract suite
         working-directory: contracts
         run: forge test --fuzz-runs 5000 -vvv
+
+      - name: Enforce mainnet contract-size headroom
+        run: npm run mainnet:sizes

@@ -1,0 +1,119 @@
+name: Fortune Mainnet Audit Bundle
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "contracts/src/**"
+      - "contracts/test/**"
+      - "contracts/script/DeployProduction.s.sol"
+      - "contracts/script/ActivateProduction.s.sol"
+      - "contracts/script/PrepareGovernanceAcceptance.s.sol"
+      - "mainnet-release.json"
+      - "mainnet-dependencies.json"
+      - "scripts/check-mainnet-*.mjs"
+      - "scripts/export-mainnet-dependencies.mjs"
+      - "scripts/mainnet-economic-sim.mjs"
+      - "docs/AUDIT_SCOPE.md"
+      - "docs/ECONOMIC_SPEC.md"
+      - "docs/MAINNET_*.md"
+      - ".github/workflows/mainnet-audit-bundle.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: fortune-mainnet-audit-bundle
+  cancel-in-progress: true
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install web/tooling dependencies
+        run: |
+          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+
+      - name: Validate machine-readable release inputs
+        run: |
+          npm run mainnet:check
+          npm run mainnet:deps:require
+
+      - name: Run deterministic economic stress harness
+        env:
+          FORTUNE_ECONOMIC_REPORT: /tmp/fortune-mainnet-economic-sim.json
+        run: node scripts/mainnet-economic-sim.mjs
+
+      - uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09
+        with:
+          version: v1.8.3
+
+      - name: Install pinned Solidity dependencies
+        working-directory: contracts
+        run: |
+          forge install OpenZeppelin/openzeppelin-contracts@69c8def5f222ff96f2b5beff05dfba996368aa79 --no-commit
+          forge install foundry-rs/forge-std@8bbcf6e3f8f62f419e5429a0bd89331c85c37824 --no-commit
+
+      - name: Run audit-candidate contract suite
+        working-directory: contracts
+        run: |
+          set -o pipefail
+          forge test --fuzz-runs 10000 -vvv 2>&1 | tee /tmp/fortune-mainnet-tests.log
+
+      - name: Record contract sizes
+        working-directory: contracts
+        run: |
+          set -o pipefail
+          forge build --sizes 2>&1 | tee /tmp/fortune-mainnet-contract-sizes.txt
+
+      - name: Build reproducible audit evidence package
+        run: |
+          set -euo pipefail
+          OUT=/tmp/fortune-mainnet-audit
+          mkdir -p "$OUT"
+
+          git rev-parse HEAD > "$OUT/source-commit.txt"
+          git show -s --format=fuller HEAD > "$OUT/source-commit-details.txt"
+          node --version > "$OUT/node-version.txt"
+          npm --version > "$OUT/npm-version.txt"
+          forge --version > "$OUT/forge-version.txt"
+
+          cp mainnet-release.json "$OUT/"
+          cp mainnet-dependencies.json "$OUT/"
+          cp /tmp/fortune-mainnet-economic-sim.json "$OUT/economic-simulation.json"
+          cp /tmp/fortune-mainnet-tests.log "$OUT/contract-tests.log"
+          cp /tmp/fortune-mainnet-contract-sizes.txt "$OUT/contract-sizes.txt"
+
+          cp docs/AUDIT_SCOPE.md "$OUT/"
+          cp docs/ECONOMIC_SPEC.md "$OUT/"
+          cp docs/MAINNET_READINESS.md "$OUT/"
+          cp docs/MAINNET_ASSET_POLICY.md "$OUT/"
+          cp docs/MAINNET_INCIDENT.md "$OUT/"
+          cp docs/SECURITY.md "$OUT/"
+
+          if [ -f package-lock.json ]; then cp package-lock.json "$OUT/"; fi
+          cp package.json "$OUT/"
+
+          find contracts/src contracts/test             contracts/script/DeployProduction.s.sol             contracts/script/ActivateProduction.s.sol             contracts/script/PrepareGovernanceAcceptance.s.sol             -type f -print0 |
+            sort -z |
+            xargs -0 sha256sum > "$OUT/security-source-sha256.txt"
+
+          git archive --format=tar.gz             --output="$OUT/reviewed-source.tar.gz"             HEAD             contracts/src             contracts/test             contracts/script/DeployProduction.s.sol             contracts/script/ActivateProduction.s.sol             contracts/script/PrepareGovernanceAcceptance.s.sol             mainnet-release.json             mainnet-dependencies.json             docs/AUDIT_SCOPE.md             docs/ECONOMIC_SPEC.md             docs/MAINNET_READINESS.md             docs/MAINNET_ASSET_POLICY.md             docs/MAINNET_INCIDENT.md             docs/SECURITY.md             scripts/mainnet-economic-sim.mjs             scripts/check-mainnet-release.mjs             scripts/check-mainnet-dependencies.mjs
+
+          (cd "$OUT" && sha256sum * > AUDIT_BUNDLE_SHA256.txt)
+
+      - name: Upload mainnet audit bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: fortune-mainnet-audit-bundle
+          path: /tmp/fortune-mainnet-audit/
+          retention-days: 90

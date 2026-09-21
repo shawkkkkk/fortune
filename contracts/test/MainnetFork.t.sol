@@ -226,6 +226,21 @@ contract FortuneMainnetForkTest is Test {
         assertFalse(multiReady);
         assertEq(multiReason, bytes32("MAINNET_SINGLE_QUOTE"));
 
+        FortuneFactory.LaunchParams memory highFee = p;
+        uint16[6] memory highFees = [
+            uint16(50),
+            uint16(25),
+            uint16(25),
+            uint16(15),
+            uint16(0),
+            uint16(10)
+        ];
+        highFee.feeBps = highFees;
+        (bool highFeeReady, bytes32 highFeeReason) =
+            factory.preflightLaunch(highFee);
+        assertFalse(highFeeReady);
+        assertEq(highFeeReason, bytes32("MAINNET_FEE_CAP"));
+
         // Memory struct assignments above share dynamic-array references.
         // Restore the canonical valid canary parameters before execution.
         p.quoteAssets = quotes;

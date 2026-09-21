@@ -1,0 +1,48 @@
+name: Fortune BSC Mainnet Fork Rehearsal
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "mainnet-dependencies.json"
+      - "contracts/src/**"
+      - "contracts/test/MainnetFork.t.sol"
+      - ".github/workflows/mainnet-fork-rehearsal.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: fortune-mainnet-fork-rehearsal
+  cancel-in-progress: true
+
+jobs:
+  fork-rehearsal:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      BSC_MAINNET_FORK_RPC_URL: ${{ secrets.BSC_MAINNET_FORK_RPC_URL || 'https://bsc-dataseed.bnbchain.org' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - run: npm install
+
+      - name: Require pinned production asset
+        run: npm run mainnet:deps:require
+
+      - uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Install Solidity libraries
+        working-directory: contracts
+        run: |
+          forge install OpenZeppelin/openzeppelin-contracts@v5.1.0 --no-commit
+          forge install foundry-rs/forge-std --no-commit
+
+      - name: Run BSC mainnet fork lifecycle
+        working-directory: contracts
+        run: |
+          forge test             --match-contract FortuneMainnetForkTest             --fuzz-runs 1000             -vvv

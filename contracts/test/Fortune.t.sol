@@ -674,6 +674,146 @@ contract FortuneTest is Test {
         );
     }
 
+    function testExistingCurveRejectsStaleQuotePriceUntilRefresh() public {
+        FortuneFactory.LaunchInfo memory info =
+            factory.createLaunch(_params(1_000e18));
+        FortuneCurve curve = FortuneCurve(info.curve);
+
+        vm.warp(block.timestamp + 2 hours);
+
+        vm.startPrank(user);
+        usdt.approve(address(curve), type(uint256).max);
+
+        vm.expectRevert("STALE_PRICE");
+        curve.buy(address(usdt), 10e18, 1);
+        vm.stopPrank();
+
+        oracle.setPrice(address(usdt), 1e18);
+
+        vm.prank(user);
+        uint256 out = curve.buy(address(usdt), 10e18, 1);
+        assertGt(out, 0);
+    }
+
+    function testFuzzCrossReserveRoundTripCannotCreateUsd(
+        uint96 rawAmount
+    ) public {
+        uint256 amountIn = bound(
+            uint256(rawAmount),
+            1e18,
+            100e18
+        );
+
+        FortuneFactory.LaunchInfo memory info =
+            factory.createLaunch(_params(2_000e18));
+        FortuneCurve curve = FortuneCurve(info.curve);
+        FortuneToken token = FortuneToken(info.token);
+
+        vm.warp(block.timestamp + 16);
+
+        vm.startPrank(user);
+        usdt.approve(address(curve), type(uint256).max);
+        wbnb.approve(address(curve), type(uint256).max);
+        token.approve(address(curve), type(uint256).max);
+
+        // Seed the alternate reserve so the cross-reserve sell has real depth.
+        curve.buy(address(wbnb), 1e18, 1);
+
+        (
+            ,
+            ,
+            ,
+            ,
+            ,
+            uint256 buyUsd,
+            uint256 previewTokens
+        ) = curve.previewBuy(address(usdt), amountIn);
+
+        uint256 bought =
+            curve.buy(address(usdt), amountIn, 1);
+        assertEq(bought, previewTokens);
+
+        (
+            ,
+            ,
+            ,
+            uint256 sellUsdGross
+        ) = curve.previewSell(
+            address(wbnb),
+            bought
+        );
+
+        assertLe(sellUsdGross, buyUsd);
+
+        uint256 quoteOut =
+            curve.sell(
+                address(wbnb),
+                bought,
+                0
+            );
+        vm.stopPrank();
+
+        assertLe(
+            registry.usdValue(
+                address(wbnb),
+                quoteOut
+            ),
+            buyUsd
+        );
+    }
+
+    function testFuzzOversizedFinalBuyCannotOverfundGraduation(
+        uint96 rawAmount
+    ) public {
+        uint256 amountIn = bound(
+            uint256(rawAmount),
+            200e18,
+            5_000e18
+        );
+
+        uint256 target = 100e18;
+        FortuneFactory.LaunchInfo memory info =
+            factory.createLaunch(_params(target));
+        FortuneCurve curve = FortuneCurve(info.curve);
+
+        vm.warp(block.timestamp + 16);
+        usdt.mint(user, amountIn);
+
+        vm.startPrank(user);
+        usdt.approve(address(curve), type(uint256).max);
+
+        (
+            uint256 spent,
+            uint256 refund,
+            ,
+            ,
+            ,
+            uint256 usdIn,
+            uint256 tokensOut
+        ) = curve.previewBuy(
+            address(usdt),
+            amountIn
+        );
+
+        assertEq(spent + refund, amountIn);
+        assertGt(refund, 0);
+        assertGt(tokensOut, 0);
+        assertLe(usdIn, target + 1);
+
+        curve.buy(
+            address(usdt),
+            amountIn,
+            1
+        );
+        vm.stopPrank();
+
+        assertTrue(curve.graduationReady());
+        assertLe(
+            curve.netReserveUsd1e18(),
+            target + 1
+        );
+    }
+
     function testTwoQuoteAssetsMoveOneCurve() public {
         FortuneFactory.LaunchInfo memory info = factory.createLaunch(_params(1_000e18));
         FortuneCurve curve = FortuneCurve(info.curve);

@@ -193,6 +193,39 @@ contract FortuneMainnetForkTest is Test {
         assertTrue(ready);
         assertEq(preflightReason, bytes32("OK"));
 
+        // Mainnet v1 policy is enforced by the factory itself, not just UI or
+        // registry configuration. Keep these assertions on a real chain-56 fork.
+        FortuneFactory.LaunchParams memory tooLarge = p;
+        tooLarge.graduationUsd1e18 = 10_001e18;
+        (bool largeReady, bytes32 largeReason) =
+            factory.preflightLaunch(tooLarge);
+        assertFalse(largeReady);
+        assertEq(largeReason, bytes32("MAINNET_GRADUATION_CAP"));
+
+        FortuneFactory.LaunchParams memory wrongQuote = p;
+        address[] memory wrongQuotes = new address[](1);
+        wrongQuotes[0] = address(0x1234);
+        wrongQuote.quoteAssets = wrongQuotes;
+        wrongQuote.primaryQuote = address(0x1234);
+        (bool wrongReady, bytes32 wrongReason) =
+            factory.preflightLaunch(wrongQuote);
+        assertFalse(wrongReady);
+        assertEq(wrongReason, bytes32("MAINNET_WBNB_ONLY"));
+
+        FortuneFactory.LaunchParams memory multiQuote = p;
+        address[] memory multiQuotes = new address[](2);
+        multiQuotes[0] = WBNB;
+        multiQuotes[1] = address(0x1234);
+        uint16[] memory multiWeights = new uint16[](2);
+        multiWeights[0] = 5_000;
+        multiWeights[1] = 5_000;
+        multiQuote.quoteAssets = multiQuotes;
+        multiQuote.weightsBps = multiWeights;
+        (bool multiReady, bytes32 multiReason) =
+            factory.preflightLaunch(multiQuote);
+        assertFalse(multiReady);
+        assertEq(multiReason, bytes32("MAINNET_SINGLE_QUOTE"));
+
         FortuneFactory.LaunchInfo memory info =
             factory.createLaunch(p);
         FortuneCurve curve =

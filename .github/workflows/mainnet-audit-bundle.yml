@@ -14,6 +14,7 @@ on:
       - "scripts/check-mainnet-*.mjs"
       - "scripts/export-mainnet-dependencies.mjs"
       - "scripts/mainnet-economic-sim.mjs"
+      - "scripts/mainnet-candidate-fingerprint.mjs"
       - "docs/AUDIT_SCOPE.md"
       - "docs/ECONOMIC_SPEC.md"
       - "docs/MAINNET_*.md"
@@ -56,6 +57,11 @@ jobs:
           FORTUNE_ECONOMIC_REPORT: /tmp/fortune-mainnet-economic-sim.json
         run: node scripts/mainnet-economic-sim.mjs
 
+      - name: Fingerprint exact audit candidate
+        env:
+          FORTUNE_MAINNET_FINGERPRINT: /tmp/fortune-mainnet-candidate-fingerprint.json
+        run: npm run mainnet:fingerprint
+
       - uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09
         with:
           version: v1.8.3
@@ -93,6 +99,7 @@ jobs:
           cp mainnet-release.json "$OUT/"
           cp mainnet-dependencies.json "$OUT/"
           cp /tmp/fortune-mainnet-economic-sim.json "$OUT/economic-simulation.json"
+          cp /tmp/fortune-mainnet-candidate-fingerprint.json "$OUT/candidate-fingerprint.json"
           cp /tmp/fortune-mainnet-tests.log "$OUT/contract-tests.log"
           cp /tmp/fortune-mainnet-contract-sizes.txt "$OUT/contract-sizes.txt"
 
@@ -117,7 +124,7 @@ jobs:
             sort -z |
             xargs -0 sha256sum > "$OUT/security-source-sha256.txt"
 
-          git archive --format=tar.gz             --output="$OUT/reviewed-source.tar.gz"             HEAD             contracts/src             contracts/test             contracts/script/DeployProduction.s.sol             contracts/script/ActivateProduction.s.sol             contracts/script/PrepareGovernanceAcceptance.s.sol             mainnet-release.json             mainnet-dependencies.json             docs/AUDIT_SCOPE.md             docs/ECONOMIC_SPEC.md             docs/MAINNET_READINESS.md             docs/MAINNET_ASSET_POLICY.md             docs/MAINNET_INCIDENT.md             docs/SECURITY.md             scripts/mainnet-economic-sim.mjs             scripts/check-mainnet-release.mjs             scripts/check-mainnet-dependencies.mjs             package.json             package-lock.json             next.config.ts             .github/workflows/mainnet-deploy-paused.yml             .github/workflows/mainnet-activation-preflight.yml             .github/workflows/mainnet-readiness.yml             .github/workflows/mainnet-node-security.yml             .github/workflows/mainnet-audit-bundle.yml
+          git archive --format=tar.gz             --output="$OUT/reviewed-source.tar.gz"             HEAD             contracts/src             contracts/test             contracts/script/DeployProduction.s.sol             contracts/script/ActivateProduction.s.sol             contracts/script/PrepareGovernanceAcceptance.s.sol             mainnet-release.json             mainnet-dependencies.json             docs/AUDIT_SCOPE.md             docs/ECONOMIC_SPEC.md             docs/MAINNET_READINESS.md             docs/MAINNET_ASSET_POLICY.md             docs/MAINNET_INCIDENT.md             docs/SECURITY.md             scripts/mainnet-economic-sim.mjs             scripts/mainnet-candidate-fingerprint.mjs             scripts/check-mainnet-release.mjs             scripts/check-mainnet-dependencies.mjs             package.json             package-lock.json             next.config.ts             .github/workflows/mainnet-deploy-paused.yml             .github/workflows/mainnet-activation-preflight.yml             .github/workflows/mainnet-readiness.yml             .github/workflows/mainnet-node-security.yml             .github/workflows/mainnet-audit-bundle.yml
 
           (
             cd "$OUT"

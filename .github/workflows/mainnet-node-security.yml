@@ -24,7 +24,7 @@ jobs:
 
       - name: Install exact dependency graph when locked
         run: |
-          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+          npm ci
 
       - name: Capture full dependency audit
         run: |

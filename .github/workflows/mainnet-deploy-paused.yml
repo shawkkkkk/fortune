@@ -73,8 +73,6 @@ jobs:
           test "$(cast code "$FORTUNE_GOVERNANCE" --rpc-url "$BSC_RPC_URL")" != "0x"
           test "$(cast code "$FORTUNE_AUTOMATION_EXECUTOR" --rpc-url "$BSC_RPC_URL")" != "0x"
           test "$(cast code "$FORTUNE_PROTOCOL_TREASURY" --rpc-url "$BSC_RPC_URL")" != "0x"
-          test "${FORTUNE_AUTOMATION_EXECUTOR,,}" = "${FORTUNE_GOVERNANCE,,}"
-          test "${FORTUNE_PROTOCOL_TREASURY,,}" = "${FORTUNE_GOVERNANCE,,}"
           test "$(cast code "$PANCAKE_V3_FACTORY" --rpc-url "$BSC_RPC_URL")" != "0x"
           test "$(cast code "$PANCAKE_V3_POSITION_MANAGER" --rpc-url "$BSC_RPC_URL")" != "0x"
           test "$PRODUCTION_ASSET_COUNT" = "1"
@@ -107,6 +105,42 @@ jobs:
         env:
           FORTUNE_MAINNET_DEPLOYMENT_MANIFEST: /tmp/fortune-mainnet-deployment-addresses.json
         run: npm run mainnet:deployment:export
+
+      - name: Verify paused deployment postconditions
+        run: |
+          set -euo pipefail
+
+          MANIFEST=/tmp/fortune-mainnet-deployment-addresses.json
+          FACTORY="$(node -p "require('$MANIFEST').contracts.FortuneFactory")"
+          REGISTRY="$(node -p "require('$MANIFEST').contracts.FortuneAssetRegistry")"
+          AUTOMATION_REGISTRY="$(node -p "require('$MANIFEST').contracts.FortuneAutomationRegistry")"
+          ORACLE="$(node -p "require('$MANIFEST').contracts.FortuneChainlinkOracle")"
+          METADATA="$(node -p "require('$MANIFEST').contracts.FortuneMetadataRegistry")"
+          ADAPTER="$(node -p "require('$MANIFEST').contracts.FortunePancakeV3GraduationAdapter")"
+          LOCKER="$(node -p "require('$MANIFEST').contracts.FortunePermanentLiquidityLocker")"
+
+          for address in "$FACTORY" "$REGISTRY" "$AUTOMATION_REGISTRY" "$ORACLE" "$METADATA" "$ADAPTER" "$LOCKER"; do
+            test "$(cast code "$address" --rpc-url "$BSC_RPC_URL")" != "0x"
+          done
+
+          test "$(cast call "$FACTORY" "launchesPaused()(bool)" --rpc-url "$BSC_RPC_URL")" = "true"
+
+          for target in "$FACTORY" "$REGISTRY" "$AUTOMATION_REGISTRY" "$ORACLE"; do
+            PENDING="$(cast call "$target" "pendingOwner()(address)" --rpc-url "$BSC_RPC_URL")"
+            test "${PENDING,,}" = "${FORTUNE_GOVERNANCE,,}"
+          done
+
+          test "$(cast call "$METADATA" "factory()(address)" --rpc-url "$BSC_RPC_URL" | tr '[:upper:]' '[:lower:]')" = "$(printf '%s' "$FACTORY" | tr '[:upper:]' '[:lower:]')"
+
+          LIVE_ADAPTER="$(cast call "$FACTORY" "graduationAdapter()(address)" --rpc-url "$BSC_RPC_URL")"
+          test "${LIVE_ADAPTER,,}" = "${ADAPTER,,}"
+
+          LIVE_PANCAKE_FACTORY="$(cast call "$ADAPTER" "pancakeFactory()(address)" --rpc-url "$BSC_RPC_URL")"
+          LIVE_POSITION_MANAGER="$(cast call "$ADAPTER" "positionManager()(address)" --rpc-url "$BSC_RPC_URL")"
+          test "${LIVE_PANCAKE_FACTORY,,}" = "${PANCAKE_V3_FACTORY,,}"
+          test "${LIVE_POSITION_MANAGER,,}" = "${PANCAKE_V3_POSITION_MANAGER,,}"
+
+          test "$(cast call "$LOCKER" "approvedDepositor(address)(bool)" "$ADAPTER" --rpc-url "$BSC_RPC_URL")" = "true"
 
       - name: Record source commit
         run: git rev-parse HEAD | tee /tmp/fortune-mainnet-source-commit.txt

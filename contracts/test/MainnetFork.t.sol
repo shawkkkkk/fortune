@@ -155,12 +155,12 @@ contract FortuneMainnetForkTest is Test {
         weights[0] = 10_000;
 
         uint16[6] memory fees = [
-            uint16(25),
-            uint16(25),
-            uint16(25),
-            uint16(15),
+            uint16(50),
             uint16(0),
-            uint16(10)
+            uint16(0),
+            uint16(0),
+            uint16(0),
+            uint16(50)
         ];
 
         FortuneFactory.LaunchParams memory p =
@@ -235,18 +235,37 @@ contract FortuneMainnetForkTest is Test {
 
         FortuneFactory.LaunchParams memory highFee = p;
         uint16[6] memory highFees = [
-            uint16(50),
-            uint16(25),
-            uint16(25),
-            uint16(15),
+            uint16(60),
             uint16(0),
-            uint16(10)
+            uint16(0),
+            uint16(0),
+            uint16(0),
+            uint16(50)
         ];
         highFee.feeBps = highFees;
         (bool highFeeReady, bytes32 highFeeReason) =
             factory.preflightLaunch(highFee);
         assertFalse(highFeeReady);
         assertEq(highFeeReason, bytes32("MAINNET_FEE_CAP"));
+
+        p.feeBps = fees;
+        FortuneFactory.LaunchParams memory automationFee = p;
+        uint16[6] memory automationFees = [
+            uint16(50),
+            uint16(10),
+            uint16(0),
+            uint16(0),
+            uint16(0),
+            uint16(40)
+        ];
+        automationFee.feeBps = automationFees;
+        (bool automationReady, bytes32 automationReason) =
+            factory.preflightLaunch(automationFee);
+        assertFalse(automationReady);
+        assertEq(
+            automationReason,
+            bytes32("MAINNET_AUTOMATION_DISABLED")
+        );
 
         // Restore the canonical fee schedule before execution.
         p.feeBps = fees;

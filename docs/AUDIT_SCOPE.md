@@ -4,7 +4,7 @@ Candidate auditors should review the exact commit recorded in `mainnet-release.j
 
 ## Mainnet v1 in scope
 
-Mainnet v1 deliberately excludes the tax-token launch stack and restricted tokenized-stock/RWA quote assets.
+Mainnet v1 deliberately excludes the tax-token launch stack and restricted tokenized-stock/RWA quote assets. On BSC mainnet (chain 56), `FortuneFactory.preflightLaunch` also enforces exactly one quote asset, so multi-reserve launches are unreachable in this release even if governance later adds another registry entry.
 
 Primary contracts:
 
@@ -32,15 +32,17 @@ Deployment/governance scripts:
 ### Curve and reserves
 
 - Validate integral buy and sell math, scaling, integer rounding, and overflow assumptions.
-- Determine whether any buy/sell or cross-reserve sequence can extract more normalized value than contributed absent oracle movement.
+- Determine whether same-reserve buy/sell sequences can extract more normalized value than contributed absent oracle movement.
+- Verify the chain-56 single-quote gate makes cross-reserve launch execution unreachable in mainnet v1; multi-reserve economics remain out of scope until a separately reviewed factory release.
 - Analyze partial final fills and rounding at graduation.
 - Analyze reserve accounting under donations, rebases, fee-on-transfer behavior, and unexpected ERC-20 behavior.
 - Review the seven-day rescue path and pro-rata redemption math.
 
-### Oracle and multi-asset behavior
+### Oracle and asset behavior
 
 - Validate Chainlink round completeness, timestamp, decimal normalization, and max-age behavior.
-- Analyze asynchronous oracle updates and cross-reserve arbitrage.
+- Verify WBNB is the only pinned mainnet-v1 quote asset and the production deployment contains exactly one initial asset.
+- Verify registry expansion alone cannot bypass the factory's chain-56 single-quote launch gate.
 - Determine safe production asset criteria and max-age policy.
 - Verify existing curves cannot be silently repriced by later registry edits.
 

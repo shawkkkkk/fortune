@@ -65,11 +65,14 @@ jobs:
           test -n "$BSC_RPC_URL"
           node scripts/check-mainnet-dependencies.mjs --require-assets --check-env
           test "$(cast chain-id --rpc-url "$BSC_RPC_URL")" = "56"
+          test -n "$FORTUNE_GOVERNANCE"
+          test -n "$FORTUNE_AUTOMATION_EXECUTOR"
+          test -n "$FORTUNE_PROTOCOL_TREASURY"
           test "$(cast code "$FORTUNE_GOVERNANCE" --rpc-url "$BSC_RPC_URL")" != "0x"
+          test "$(cast code "$FORTUNE_AUTOMATION_EXECUTOR" --rpc-url "$BSC_RPC_URL")" != "0x"
           test "$(cast code "$PANCAKE_V3_FACTORY" --rpc-url "$BSC_RPC_URL")" != "0x"
           test "$(cast code "$PANCAKE_V3_POSITION_MANAGER" --rpc-url "$BSC_RPC_URL")" != "0x"
-          test "$PRODUCTION_ASSET_COUNT" -ge 1
-          test "$PRODUCTION_ASSET_COUNT" -le 5
+          test "$PRODUCTION_ASSET_COUNT" = "1"
 
       - name: Install Solidity libraries
         working-directory: contracts

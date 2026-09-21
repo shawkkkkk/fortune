@@ -41,7 +41,7 @@ jobs:
 
       - name: Install web/tooling dependencies
         run: |
-          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+          npm ci
 
       - name: Validate machine-readable release inputs
         run: |

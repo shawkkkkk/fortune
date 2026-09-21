@@ -71,6 +71,13 @@ jobs:
           test "${FORTUNE_AUTOMATION_EXECUTOR,,}" = "${FORTUNE_GOVERNANCE,,}"
           test "${FORTUNE_PROTOCOL_TREASURY,,}" = "${FORTUNE_GOVERNANCE,,}"
           test "$(cast code "$FORTUNE_GOVERNANCE" --rpc-url "$BSC_RPC_URL")" != "0x"
+
+          # Mainnet v1 requires Safe-compatible multi-party governance.
+          GOVERNANCE_THRESHOLD="$(cast call "$FORTUNE_GOVERNANCE" "getThreshold()(uint256)" --rpc-url "$BSC_RPC_URL")"
+          GOVERNANCE_OWNERS="$(cast call "$FORTUNE_GOVERNANCE" "getOwners()(address[])" --rpc-url "$BSC_RPC_URL")"
+          OWNER_COUNT="$(printf '%s\n' "$GOVERNANCE_OWNERS" | grep -oE '0x[0-9a-fA-F]{40}' | wc -l | tr -d ' ')"
+          test "$GOVERNANCE_THRESHOLD" -ge 2
+          test "$OWNER_COUNT" -ge "$GOVERNANCE_THRESHOLD"
           test "$(cast code "$FORTUNE_AUTOMATION_EXECUTOR" --rpc-url "$BSC_RPC_URL")" != "0x"
           test "$(cast code "$FORTUNE_PROTOCOL_TREASURY" --rpc-url "$BSC_RPC_URL")" != "0x"
           test "$(cast code "$PANCAKE_V3_FACTORY" --rpc-url "$BSC_RPC_URL")" != "0x"

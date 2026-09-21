@@ -355,6 +355,42 @@ contract FortuneTest is Test {
         assertEq(reason, bytes32("MAINNET_SINGLE_QUOTE"));
     }
 
+    function testMainnetV1RejectsNonWbnbQuote() public {
+        FortuneFactory.LaunchParams memory p = _params(1_000e18);
+
+        address[] memory quotes = new address[](1);
+        quotes[0] = address(usdt);
+        uint16[] memory weights = new uint16[](1);
+        weights[0] = 10_000;
+        p.quoteAssets = quotes;
+        p.weightsBps = weights;
+        p.primaryQuote = address(usdt);
+
+        vm.chainId(56);
+        (bool ready, bytes32 reason) = factory.preflightLaunch(p);
+
+        assertFalse(ready);
+        assertEq(reason, bytes32("MAINNET_WBNB_ONLY"));
+    }
+
+    function testMainnetV1CapsGraduationTarget() public {
+        FortuneFactory.LaunchParams memory p = _params(10_001e18);
+
+        address[] memory quotes = new address[](1);
+        quotes[0] = address(wbnb);
+        uint16[] memory weights = new uint16[](1);
+        weights[0] = 10_000;
+        p.quoteAssets = quotes;
+        p.weightsBps = weights;
+        p.primaryQuote = address(wbnb);
+
+        vm.chainId(56);
+        (bool ready, bytes32 reason) = factory.preflightLaunch(p);
+
+        assertFalse(ready);
+        assertEq(reason, bytes32("MAINNET_GRADUATION_CAP"));
+    }
+
 
     function testLaunchPreflightRejectsMissingTreasuryRoute() public {
         FortuneFactory.LaunchParams memory p = _params(1_000e18);

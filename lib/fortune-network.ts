@@ -1,10 +1,16 @@
 import { PUBLIC_TESTNET } from "@/lib/public-testnet";
+import {
+  MAINNET_ACTIVATION_READY,
+  MAINNET_RELEASE,
+} from "@/lib/mainnet-release";
 
 const configuredChainId = Number(
   process.env.NEXT_PUBLIC_CHAIN_ID || PUBLIC_TESTNET.chainId
 );
 
 const isMainnet = configuredChainId === 56;
+const mainnetUiEnabled =
+  process.env.NEXT_PUBLIC_FORTUNE_MAINNET_UI_ENABLED === "true";
 
 export const FORTUNE_NETWORK = {
   chainId: configuredChainId,
@@ -88,11 +94,17 @@ export const FORTUNE_NETWORK_CONFIGURED =
       FORTUNE_NETWORK.contracts.graduationAdapter &&
       FORTUNE_NETWORK.contracts.liquidityLocker &&
       FORTUNE_NETWORK.primaryQuote.address
-  );
+  ) &&
+  (!FORTUNE_NETWORK.isMainnet ||
+    (mainnetUiEnabled &&
+      MAINNET_ACTIVATION_READY &&
+      MAINNET_RELEASE.scope.standardLaunches === true));
 
 
 export const FORTUNE_TAX_NETWORK_CONFIGURED =
   FORTUNE_NETWORK_CONFIGURED &&
+  (!FORTUNE_NETWORK.isMainnet ||
+    MAINNET_RELEASE.scope.taxTokenLaunches === true) &&
   Boolean(
     FORTUNE_NETWORK.contracts.taxFactory &&
       FORTUNE_NETWORK.contracts.poolRegistry &&

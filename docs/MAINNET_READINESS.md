@@ -44,7 +44,7 @@ The first command validates the manifest schema while allowing a blocked release
 
 `mainnet-dependencies.json` is the canonical source for external contracts and initial production assets used by the deploy workflow.
 
-It currently pins the official PancakeSwap V3 BSC mainnet factory and NonfungiblePositionManager. Production asset entries remain empty until each exact token contract and price feed has been independently verified from primary sources.
+It currently pins the official PancakeSwap V3 BSC mainnet factory and NonfungiblePositionManager plus the mainnet-v1 WBNB quote asset and BNB/USD Chainlink feed. Those exact addresses remain subject to independent verification from the cited primary sources before the release gates can be marked complete.
 
 Run:
 

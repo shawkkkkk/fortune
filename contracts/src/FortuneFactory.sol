@@ -241,6 +241,19 @@ contract FortuneFactory is Ownable2Step {
         ) {
             return (false, bytes32("BAD_ASSET_COUNT"));
         }
+        // Mainnet v1 is an intentionally single-reserve canary. This is
+        // enforced by the deployed protocol, not only by registry policy or UI.
+        // Enabling multi-reserve launches on BSC mainnet requires a separately
+        // reviewed factory release.
+        if (
+            block.chainid == 56 &&
+            p.quoteAssets.length != 1
+        ) {
+            return (
+                false,
+                bytes32("MAINNET_SINGLE_QUOTE")
+            );
+        }
         if (p.quoteAssets.length != p.weightsBps.length) {
             return (false, bytes32("BAD_WEIGHT_LENGTH"));
         }

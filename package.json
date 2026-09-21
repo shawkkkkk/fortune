@@ -9,7 +9,10 @@
     "lint": "next lint",
     "smoke:release": "node scripts/release-smoke.mjs",
     "load-test": "node scripts/load-test.mjs",
-    "launch-storm": "node scripts/launch-storm.mjs"
+    "launch-storm": "node scripts/launch-storm.mjs",
+    "mainnet:check": "node scripts/check-mainnet-release.mjs --phase=check",
+    "mainnet:require-deploy": "node scripts/check-mainnet-release.mjs --phase=deploy",
+    "mainnet:require-activate": "node scripts/check-mainnet-release.mjs --phase=activate"
   },
   "dependencies": {
     "next": "^15.2.0",

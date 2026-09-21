@@ -26,8 +26,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: foundry-rs/foundry-toolchain@v1
+      - uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09
 
+        with:
+
+          version: v1.8.3
       - name: Require monitor configuration
         run: |
           test -n "$BSC_RPC_URL"

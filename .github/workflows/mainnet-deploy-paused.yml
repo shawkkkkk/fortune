@@ -54,8 +54,11 @@ jobs:
           git cat-file -e "$REVIEWED^{commit}"
           git diff --exit-code "$REVIEWED"..HEAD --             contracts/src             contracts/script/DeployProduction.s.sol             contracts/script/ActivateProduction.s.sol             contracts/script/PrepareGovernanceAcceptance.s.sol             app/launch             lib/fortune-network.ts             app/api/public/v1/readiness/route.ts             mainnet-dependencies.json             scripts/check-mainnet-dependencies.mjs             scripts/export-mainnet-dependencies.mjs
 
-      - uses: foundry-rs/foundry-toolchain@v1
+      - uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09
 
+        with:
+
+          version: v1.8.3
       - name: Require mainnet credentials and dependencies
         run: |
           test -n "$PRIVATE_KEY"
@@ -71,8 +74,8 @@ jobs:
       - name: Install Solidity libraries
         working-directory: contracts
         run: |
-          forge install OpenZeppelin/openzeppelin-contracts@v5.1.0 --no-commit
-          forge install foundry-rs/forge-std --no-commit
+          forge install OpenZeppelin/openzeppelin-contracts@69c8def5f222ff96f2b5beff05dfba996368aa79 --no-commit
+          forge install foundry-rs/forge-std@8bbcf6e3f8f62f419e5429a0bd89331c85c37824 --no-commit
 
       - name: Final mainnet-candidate fuzz gate
         working-directory: contracts

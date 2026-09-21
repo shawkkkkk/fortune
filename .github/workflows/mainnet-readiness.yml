@@ -41,13 +41,16 @@ jobs:
       - name: Validate pinned mainnet dependencies
         run: npm run mainnet:deps
 
-      - uses: foundry-rs/foundry-toolchain@v1
+      - uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09
 
+        with:
+
+          version: v1.8.3
       - name: Install Solidity libraries
         working-directory: contracts
         run: |
-          forge install OpenZeppelin/openzeppelin-contracts@v5.1.0 --no-commit
-          forge install foundry-rs/forge-std --no-commit
+          forge install OpenZeppelin/openzeppelin-contracts@69c8def5f222ff96f2b5beff05dfba996368aa79 --no-commit
+          forge install foundry-rs/forge-std@8bbcf6e3f8f62f419e5429a0bd89331c85c37824 --no-commit
 
       - name: Mainnet-candidate contract suite
         working-directory: contracts

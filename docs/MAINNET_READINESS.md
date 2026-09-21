@@ -174,3 +174,15 @@ Secrets:
 Public environment variables should contain only operator-specific public addresses such as governance, automation executor, and protocol treasury. Pancake dependencies and production asset/feed addresses come from the reviewed `mainnet-dependencies.json` manifest and are checked against it during deployment.
 
 Never place a seed phrase, governance key, private RPC credential, or API secret in the repository or release manifest.
+
+
+## Reproducible toolchain
+
+Mainnet validation and deployment workflows pin:
+
+- Foundry: `v1.8.3`;
+- `foundry-rs/foundry-toolchain` action commit: `908c540300062bd5a7e473851cdb4282204cee09`;
+- OpenZeppelin Contracts v5.1.0 commit: `69c8def5f222ff96f2b5beff05dfba996368aa79`;
+- forge-std v1.10.0 commit: `8bbcf6e3f8f62f419e5429a0bd89331c85c37824`.
+
+Changing any of these is a reviewed build-system change and should invalidate a previously frozen audit/deployment candidate.

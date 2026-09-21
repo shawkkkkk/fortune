@@ -43,13 +43,20 @@ contract DeployProduction is Script {
             "ZERO_GOVERNANCE_ADDRESS"
         );
         require(
+            governance.code.length > 0,
+            "GOVERNANCE_MUST_BE_CONTRACT"
+        );
+        require(
             pancakeV3Factory.code.length > 0 &&
                 positionManager.code.length > 0,
             "PANCAKE_DEPENDENCY_NO_CODE"
         );
 
         uint256 assetCount = vm.envUint("PRODUCTION_ASSET_COUNT");
-        require(assetCount >= 1 && assetCount <= 128, "BAD_ASSET_COUNT");
+        // Mainnet v1 intentionally starts with a narrow registry. Additional
+        // assets can be added later through governance after production data
+        // and asset-specific review.
+        require(assetCount >= 1 && assetCount <= 5, "BAD_ASSET_COUNT");
 
         vm.startBroadcast(deployerKey);
 

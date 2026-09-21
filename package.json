@@ -12,7 +12,9 @@
     "launch-storm": "node scripts/launch-storm.mjs",
     "mainnet:check": "node scripts/check-mainnet-release.mjs --phase=check",
     "mainnet:require-deploy": "node scripts/check-mainnet-release.mjs --phase=deploy",
-    "mainnet:require-activate": "node scripts/check-mainnet-release.mjs --phase=activate"
+    "mainnet:require-activate": "node scripts/check-mainnet-release.mjs --phase=activate",
+    "mainnet:deps": "node scripts/check-mainnet-dependencies.mjs",
+    "mainnet:deps:require": "node scripts/check-mainnet-dependencies.mjs --require-assets"
   },
   "dependencies": {
     "next": "^15.2.0",

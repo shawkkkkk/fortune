@@ -1,0 +1,36 @@
+name: Fortune Mainnet Economic Analysis
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "contracts/src/FortuneCurve.sol"
+      - "contracts/src/FortuneFactory.sol"
+      - "contracts/test/Fortune.t.sol"
+      - "scripts/mainnet-economic-sim.mjs"
+      - "docs/ECONOMIC_SPEC.md"
+  workflow_dispatch:
+
+jobs:
+  simulate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Run deterministic economic stress harness
+        env:
+          FORTUNE_ECONOMIC_REPORT: /tmp/fortune-mainnet-economic-sim.json
+        run: node scripts/mainnet-economic-sim.mjs
+
+      - name: Upload economic simulation report
+        uses: actions/upload-artifact@v4
+        with:
+          name: fortune-mainnet-economic-simulation
+          path: /tmp/fortune-mainnet-economic-sim.json
+          retention-days: 90

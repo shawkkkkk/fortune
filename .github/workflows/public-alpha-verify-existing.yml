@@ -84,6 +84,11 @@ jobs:
           forge install OpenZeppelin/openzeppelin-contracts@v5.1.0 --no-commit
           forge install foundry-rs/forge-std --no-commit
 
+          # forge install may stage dependency metadata. Verification runs must
+          # never publish dependency gitlinks or .gitmodules back to main.
+          git -C .. reset --quiet
+          rm -f ../.gitmodules
+
       - name: Build current contracts
         run: forge build
 
@@ -184,9 +189,15 @@ jobs:
               if count != 1:
                   raise SystemExit(f"Could not update {key}")
 
+          lp_token_id = os.environ["STANDARD_LP_TOKEN_ID"].split()[0]
+          if not re.fullmatch(r"\d+", lp_token_id):
+              raise SystemExit(
+                  f"Invalid STANDARD_LP_TOKEN_ID: {os.environ['STANDARD_LP_TOKEN_ID']!r}"
+              )
+
           text, count = re.subn(
-              r'(referenceLpTokenId:\s*)\d+',
-              rf'\g<1>{os.environ["STANDARD_LP_TOKEN_ID"]}',
+              r'(referenceLpTokenId:\s*)\d+(?:\s*\[[^\]]+\])?',
+              rf'\g<1>{lp_token_id}',
               text,
               count=1,
           )
@@ -198,7 +209,19 @@ jobs:
 
           git -C .. config user.name "fortune-public-alpha"
           git -C .. config user.email "actions@users.noreply.github.com"
+
+          # Publish only the website manifest. Never allow tool-installed
+          # dependencies or generated repository metadata into this commit.
+          git -C .. reset --quiet
+          rm -f ../.gitmodules
           git -C .. add lib/public-testnet.ts
+
+          STAGED="$(git -C .. diff --cached --name-only)"
+          if [ -n "$STAGED" ] && [ "$STAGED" != "lib/public-testnet.ts" ]; then
+            echo "Refusing to publish unexpected staged files:"
+            printf '%s\n' "$STAGED"
+            exit 1
+          fi
 
           if git -C .. diff --cached --quiet; then
             echo "Website config already points at the verified stack."

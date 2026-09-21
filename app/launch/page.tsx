@@ -572,6 +572,21 @@ export default function LaunchPage() {
     setReceipt(null);
 
     try {
+      const readinessResponse = await fetch(
+        "/api/public/v1/readiness",
+        { cache: "no-store" }
+      );
+      const readinessBody = await readinessResponse.json();
+
+      if (
+        !readinessResponse.ok ||
+        readinessBody?.data?.ready !== true
+      ) {
+        throw new Error(
+          "Fortune mainnet is not release-ready. No wallet transaction was constructed."
+        );
+      }
+
       // Re-confirm the production network immediately before constructing any
       // real-value transaction; a previously connected account may have since
       // switched chains.

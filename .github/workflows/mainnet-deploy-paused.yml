@@ -68,6 +68,8 @@ jobs:
           test -n "$FORTUNE_GOVERNANCE"
           test -n "$FORTUNE_AUTOMATION_EXECUTOR"
           test -n "$FORTUNE_PROTOCOL_TREASURY"
+          test "${FORTUNE_AUTOMATION_EXECUTOR,,}" = "${FORTUNE_GOVERNANCE,,}"
+          test "${FORTUNE_PROTOCOL_TREASURY,,}" = "${FORTUNE_GOVERNANCE,,}"
           test "$(cast code "$FORTUNE_GOVERNANCE" --rpc-url "$BSC_RPC_URL")" != "0x"
           test "$(cast code "$FORTUNE_AUTOMATION_EXECUTOR" --rpc-url "$BSC_RPC_URL")" != "0x"
           test "$(cast code "$FORTUNE_PROTOCOL_TREASURY" --rpc-url "$BSC_RPC_URL")" != "0x"

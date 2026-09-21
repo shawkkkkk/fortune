@@ -12,6 +12,7 @@ on:
 jobs:
   audit:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
 
@@ -25,6 +26,9 @@ jobs:
       - name: Install exact dependency graph when locked
         run: |
           npm ci
+
+      - name: Record locked top-level runtime versions
+        run: npm ls --depth=0
 
       - name: Capture full dependency audit
         run: |

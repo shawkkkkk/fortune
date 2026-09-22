@@ -143,8 +143,13 @@ This workflow is a baseline alerting layer, not a substitute for independent inf
 
 Before marking `incidentRunbook` or `monitoringAlerts` complete in `mainnet-release.json`:
 
-1. enable the monitor against a safe paused/canary configuration;
-2. intentionally produce a failed monitor check;
-3. confirm maintainers receive the failure;
-4. exercise the pause-state verification procedure;
-5. record the workflow run and drill notes as release evidence.
+1. deploy/configure the monitor against the paused production stack with `FORTUNE_MAINNET_MONITOR_MODE=paused`;
+2. configure two distinct BSC RPC provider secrets;
+3. manually run **Fortune Mainnet Monitor** with `drill_failure=true`;
+4. confirm the normal checks pass first and the intentional final step makes the run fail;
+5. confirm maintainers receive the workflow failure notification;
+6. manually rerun with `drill_failure=false` and confirm success;
+7. exercise the pause-state verification procedure through both RPC providers;
+8. record the successful and intentionally failed workflow runs as release evidence.
+
+After governance activation, switch `FORTUNE_MAINNET_MONITOR_MODE` to `active`.

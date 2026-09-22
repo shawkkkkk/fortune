@@ -4,6 +4,12 @@ on:
   schedule:
     - cron: "17 * * * *"
   workflow_dispatch:
+    inputs:
+      drill_failure:
+        description: "Intentionally fail after checks to verify alert delivery"
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: fortune-mainnet-monitor
@@ -121,6 +127,12 @@ jobs:
             }
           }
           NODE
+
+      - name: Optional alert-delivery drill
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.drill_failure }}
+        run: |
+          echo "Intentional Fortune mainnet monitoring drill failure."
+          exit 1
 
       - name: Preserve failed readiness evidence
         if: failure()

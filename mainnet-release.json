@@ -9,15 +9,15 @@
     "maximumInitialRegistryAssets": 1,
     "restrictedRwaAssetsEnabled": false
   },
-  "reviewedCommit": "",
+  "reviewedCommit": "ae0b4abed9870cd9c3976b715da626b61b69c1dc",
   "gates": {
     "independentSmartContractAudit": {
       "passed": false,
       "evidence": ""
     },
     "economicCurveSimulation": {
-      "passed": false,
-      "evidence": ""
+      "passed": true,
+      "evidence": "github-actions:35617445741"
     },
     "mevCrossReserveReview": {
       "passed": false,

@@ -180,8 +180,17 @@ Secrets:
 
 - `FORTUNE_MAINNET_DEPLOYER_PRIVATE_KEY`
 - `BSC_MAINNET_RPC_URL`
+- `FORTUNE_MAINNET_MONITOR_RPC_URL_PRIMARY`
+- `FORTUNE_MAINNET_MONITOR_RPC_URL_SECONDARY`
 
-Public environment variables should contain only operator-specific public addresses such as governance, automation executor, and protocol treasury. Pancake dependencies and production asset/feed addresses come from the reviewed `mainnet-dependencies.json` manifest and are checked against it during deployment.
+The two monitor RPC secrets must be distinct production BSC providers. The monitoring workflow checks both providers report chain 56 and rejects excessive block-height divergence.
+
+Public environment variables should contain only operator-specific public addresses such as governance, automation executor, and protocol treasury. Monitoring additionally uses:
+
+- `FORTUNE_MAINNET_MONITOR_ENABLED` — keep false until a production stack exists;
+- `FORTUNE_MAINNET_MONITOR_MODE` — `paused` during pre-activation drills, then `active` after governance unpauses;
+- `FORTUNE_MAINNET_SITE_URL`;
+- deployed `FORTUNE_FACTORY` and `FORTUNE_REGISTRY` addresses. Pancake dependencies and production asset/feed addresses come from the reviewed `mainnet-dependencies.json` manifest and are checked against it during deployment.
 
 Never place a seed phrase, governance key, private RPC credential, or API secret in the repository or release manifest.
 

@@ -17,11 +17,13 @@ jobs:
       contents: read
 
     env:
-      BSC_RPC_URL: ${{ secrets.FORTUNE_MAINNET_MONITOR_RPC_URL }}
+      BSC_RPC_URL_PRIMARY: ${{ secrets.FORTUNE_MAINNET_MONITOR_RPC_URL_PRIMARY }}
+      BSC_RPC_URL_SECONDARY: ${{ secrets.FORTUNE_MAINNET_MONITOR_RPC_URL_SECONDARY }}
       FORTUNE_SITE_URL: ${{ vars.FORTUNE_MAINNET_SITE_URL }}
       FORTUNE_FACTORY: ${{ vars.FORTUNE_FACTORY }}
       FORTUNE_REGISTRY: ${{ vars.FORTUNE_REGISTRY }}
       FORTUNE_GOVERNANCE: ${{ vars.FORTUNE_GOVERNANCE }}
+      FORTUNE_MONITOR_MODE: ${{ vars.FORTUNE_MAINNET_MONITOR_MODE }}
 
     steps:
       - uses: actions/checkout@v4
@@ -33,32 +35,57 @@ jobs:
           version: v1.8.3
       - name: Require monitor configuration
         run: |
-          test -n "$BSC_RPC_URL"
+          test -n "$BSC_RPC_URL_PRIMARY"
+          test -n "$BSC_RPC_URL_SECONDARY"
+          test "$BSC_RPC_URL_PRIMARY" != "$BSC_RPC_URL_SECONDARY"
           test -n "$FORTUNE_SITE_URL"
           test -n "$FORTUNE_FACTORY"
           test -n "$FORTUNE_REGISTRY"
           test -n "$FORTUNE_GOVERNANCE"
+          case "$FORTUNE_MONITOR_MODE" in
+            paused|active) ;;
+            *) echo "FORTUNE_MAINNET_MONITOR_MODE must be paused or active"; exit 1 ;;
+          esac
+
+      - name: Verify independent BSC mainnet RPC providers
+        run: |
+          set -euo pipefail
+          test "$(cast chain-id --rpc-url "$BSC_RPC_URL_PRIMARY")" = "56"
+          test "$(cast chain-id --rpc-url "$BSC_RPC_URL_SECONDARY")" = "56"
+          PRIMARY_BLOCK="$(cast block-number --rpc-url "$BSC_RPC_URL_PRIMARY")"
+          SECONDARY_BLOCK="$(cast block-number --rpc-url "$BSC_RPC_URL_SECONDARY")"
+          test "$PRIMARY_BLOCK" -gt 0
+          test "$SECONDARY_BLOCK" -gt 0
+          DELTA=$(( PRIMARY_BLOCK > SECONDARY_BLOCK ? PRIMARY_BLOCK - SECONDARY_BLOCK : SECONDARY_BLOCK - PRIMARY_BLOCK ))
+          test "$DELTA" -le 25
+          printf '{"primaryBlock":%s,"secondaryBlock":%s,"delta":%s}\n' "$PRIMARY_BLOCK" "$SECONDARY_BLOCK" "$DELTA" > /tmp/fortune-mainnet-rpc-health.json
 
       - name: Verify BSC mainnet and protocol ownership
         run: |
           set -euo pipefail
 
-          test "$(cast chain-id --rpc-url "$BSC_RPC_URL")" = "56"
-          test "$(cast code "$FORTUNE_FACTORY" --rpc-url "$BSC_RPC_URL")" != "0x"
-          test "$(cast code "$FORTUNE_REGISTRY" --rpc-url "$BSC_RPC_URL")" != "0x"
-          test "$(cast code "$FORTUNE_GOVERNANCE" --rpc-url "$BSC_RPC_URL")" != "0x"
+          for RPC in "$BSC_RPC_URL_PRIMARY" "$BSC_RPC_URL_SECONDARY"; do
+            test "$(cast code "$FORTUNE_FACTORY" --rpc-url "$RPC")" != "0x"
+            test "$(cast code "$FORTUNE_REGISTRY" --rpc-url "$RPC")" != "0x"
+            test "$(cast code "$FORTUNE_GOVERNANCE" --rpc-url "$RPC")" != "0x"
 
-          FACTORY_OWNER="$(cast call "$FORTUNE_FACTORY" "owner()(address)" --rpc-url "$BSC_RPC_URL")"
-          REGISTRY_OWNER="$(cast call "$FORTUNE_REGISTRY" "owner()(address)" --rpc-url "$BSC_RPC_URL")"
-          PAUSED="$(cast call "$FORTUNE_FACTORY" "launchesPaused()(bool)" --rpc-url "$BSC_RPC_URL")"
-          AUTOMATION_EXECUTOR="$(cast call "$FORTUNE_FACTORY" "automationExecutor()(address)" --rpc-url "$BSC_RPC_URL")"
-          PROTOCOL_TREASURY="$(cast call "$FORTUNE_FACTORY" "protocolTreasury()(address)" --rpc-url "$BSC_RPC_URL")"
+            FACTORY_OWNER="$(cast call "$FORTUNE_FACTORY" "owner()(address)" --rpc-url "$RPC")"
+            REGISTRY_OWNER="$(cast call "$FORTUNE_REGISTRY" "owner()(address)" --rpc-url "$RPC")"
+            PAUSED="$(cast call "$FORTUNE_FACTORY" "launchesPaused()(bool)" --rpc-url "$RPC")"
+            AUTOMATION_EXECUTOR="$(cast call "$FORTUNE_FACTORY" "automationExecutor()(address)" --rpc-url "$RPC")"
+            PROTOCOL_TREASURY="$(cast call "$FORTUNE_FACTORY" "protocolTreasury()(address)" --rpc-url "$RPC")"
 
-          test "${FACTORY_OWNER,,}" = "${FORTUNE_GOVERNANCE,,}"
-          test "${REGISTRY_OWNER,,}" = "${FORTUNE_GOVERNANCE,,}"
-          test "${AUTOMATION_EXECUTOR,,}" = "${FORTUNE_GOVERNANCE,,}"
-          test "${PROTOCOL_TREASURY,,}" = "${FORTUNE_GOVERNANCE,,}"
-          test "$PAUSED" = "false"
+            test "${FACTORY_OWNER,,}" = "${FORTUNE_GOVERNANCE,,}"
+            test "${REGISTRY_OWNER,,}" = "${FORTUNE_GOVERNANCE,,}"
+            test "${AUTOMATION_EXECUTOR,,}" = "${FORTUNE_GOVERNANCE,,}"
+            test "${PROTOCOL_TREASURY,,}" = "${FORTUNE_GOVERNANCE,,}"
+
+            if [ "$FORTUNE_MONITOR_MODE" = "paused" ]; then
+              test "$PAUSED" = "true"
+            else
+              test "$PAUSED" = "false"
+            fi
+          done
 
       - name: Verify production web readiness
         run: |
@@ -72,15 +99,26 @@ jobs:
             fs.readFileSync("/tmp/fortune-mainnet-readiness.json", "utf8")
           );
 
-          if (body?.data?.ready !== true) {
-            console.error(JSON.stringify(body, null, 2));
-            process.exit(1);
-          }
           if (body?.data?.chainId !== 56) {
             throw new Error("Production readiness endpoint is not on BSC mainnet.");
           }
-          if (body?.data?.mainnetRelease?.activationReady !== true) {
-            throw new Error("Production release manifest is not activation-ready.");
+
+          const mode = process.env.FORTUNE_MONITOR_MODE;
+          if (mode === "active") {
+            if (body?.data?.ready !== true) {
+              console.error(JSON.stringify(body, null, 2));
+              process.exit(1);
+            }
+            if (body?.data?.mainnetRelease?.activationReady !== true) {
+              throw new Error("Production release manifest is not activation-ready.");
+            }
+          } else {
+            const activation = body?.data?.checks?.find(
+              (check) => check?.id === "launch-activation"
+            );
+            if (!activation || activation.status !== "fail") {
+              throw new Error("Paused monitor expected launch activation to remain blocked.");
+            }
           }
           NODE
 
@@ -89,6 +127,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: fortune-mainnet-monitor-failure
-          path: /tmp/fortune-mainnet-readiness.json
+          path: |
+            /tmp/fortune-mainnet-readiness.json
+            /tmp/fortune-mainnet-rpc-health.json
           if-no-files-found: ignore
           retention-days: 30

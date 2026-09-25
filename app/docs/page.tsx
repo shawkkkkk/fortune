@@ -22,12 +22,13 @@ export default function DocsPage() {
       <section className="pageHeading">
         <div>
           <span className="eyebrow">DOCS · BNB SMART CHAIN</span>
-          <h1>Fortune, in plain English.</h1>
+          <h1>Meme coins, paired with the BNB economy.</h1>
           <p>
-            Fortune is a BNB-native launchpad built around fixed-supply tokens,
-            curve trading, reviewed pair assets and locked Pancake liquidity.
-            The simple interface sits on top of explicit onchain preflight and
-            release gates.
+            Fortune is built around three rules: no reward-funded token dumping,
+            holders get paid in the pair asset, and creators can pair launches
+            with an expanding universe of reviewed BNB assets. The interface stays
+            simple while the registry, oracle and graduation checks stay explicit
+            underneath.
           </p>
         </div>
         <Link href={FORTUNE_NETWORK.isMainnet ? "/launch" : "/testnet"} className="primaryCta">Launch →</Link>
@@ -56,11 +57,12 @@ export default function DocsPage() {
         <span className="eyebrow">BURN + REWARDS</span>
         <h2>A separate, stricter launch architecture</h2>
         <p>
-          Fortune&apos;s extended tax-token stack supports immutable buy/sell tax
-          parameters plus explicit routes such as direct burn, holder dividends and
-          buyback + burn. It is intentionally separate from Standard launches so the
-          simple path stays simple and the higher-risk mechanics can be reviewed on
-          their own.
+          Fortune&apos;s production target is Burn + Rewards v2: token-side
+          market fees can only enter an irreversible burn path, while pair-asset
+          fees fund rewards and platform routing directly. Fortune should never
+          need to sell the launch token to pay holders. The older fee-on-transfer
+          stack remains research/testnet evidence and is not being silently shipped
+          as v2.
         </p>
         <p>
           Current BNB mainnet v1 status: <strong>{FORTUNE_TAX_NETWORK_CONFIGURED ? "enabled" : "not enabled"}</strong>.

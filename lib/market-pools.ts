@@ -76,17 +76,21 @@ type V2Index = { count: number; byToken: Map<string, Array<{ pair: Address; toke
 const v3Indexes = new Map<string, V3Index>();
 const v2Indexes = new Map<string, V2Index>();
 const resolved = new Map<string, OfficialPool[]>();
-const decimalsCache = new Map<string, number>();
+function boundedSet<K, V>(cache: Map<K, V>, key: K, value: V, limit = 128) {
+  if (cache.size >= limit && !cache.has(key)) cache.delete(cache.keys().next().value!);
+  cache.set(key, value);
+}
 
 function ok<T>(row: { status: string; result?: unknown }, label: string): T {
   if (row.status !== "success" || row.result === undefined) throw new Error("Pool read failed: " + label);
   return row.result as T;
 }
 
-async function readV3Index(rpc: PublicClient, locker: Address, blockNumber: bigint): Promise<V3Index> {
-  const key = locker.toLowerCase();
+async function readV3Index(rpc: PublicClient, locker: Address, blockNumber: bigint, snapshot: string): Promise<V3Index> {
+  const key = snapshot + ":" + locker.toLowerCase();
   const previous = v3Indexes.get(key) || { count: 0, byToken: new Map<string, bigint[]>() };
   const count = Number(await rpc.readContract({ address: locker, abi: v3LockerAbi, functionName: "lockedPositionCount", blockNumber }));
+  if (!Number.isSafeInteger(count) || count < 0 || count > 10_000) throw new Error("Locker index budget exceeded.");
   if (count <= previous.count) return previous;
 
   const indexes = Array.from({ length: count - previous.count }, (_, offset) => BigInt(previous.count + offset));
@@ -102,14 +106,15 @@ async function readV3Index(rpc: PublicClient, locker: Address, blockNumber: bigi
     byToken.set(token, [...(byToken.get(token) || []), tokenIds[i]]);
   });
   const next = { count, byToken };
-  v3Indexes.set(key, next);
+  boundedSet(v3Indexes, key, next);
   return next;
 }
 
-async function readV2Index(rpc: PublicClient, locker: Address, blockNumber: bigint): Promise<V2Index> {
-  const key = locker.toLowerCase();
+async function readV2Index(rpc: PublicClient, locker: Address, blockNumber: bigint, snapshot: string): Promise<V2Index> {
+  const key = snapshot + ":" + locker.toLowerCase();
   const previous = v2Indexes.get(key) || { count: 0, byToken: new Map() };
   const count = Number(await rpc.readContract({ address: locker, abi: v2LockerAbi, functionName: "lockedPairCount", blockNumber }));
+  if (!Number.isSafeInteger(count) || count < 0 || count > 10_000) throw new Error("Locker index budget exceeded.");
   if (count <= previous.count) return previous;
 
   const indexes = Array.from({ length: count - previous.count }, (_, offset) => BigInt(previous.count + offset));
@@ -130,19 +135,27 @@ async function readV2Index(rpc: PublicClient, locker: Address, blockNumber: bigi
     }
   });
   const next = { count, byToken };
-  v2Indexes.set(key, next);
+  boundedSet(v2Indexes, key, next);
   return next;
 }
 
-/** Official graduation pools for each graduated launch token (cached: they never change). */
+/** Pool provenance is cached only within a verified block hash, never across forks. */
 export async function readOfficialPools(
   rpc: PublicClient,
   launches: Array<{ token: Address; mode: "standard" | "tax"; graduated: boolean; quoteAssets: Address[] }>,
   blockNumber: bigint
 ) {
+  const chainId = await rpc.getChainId();
+  if (chainId !== FORTUNE_NETWORK.chainId) throw new Error("Wrong pool-state chain.");
+  const block = await rpc.getBlock({ blockNumber });
+  if (block.number !== blockNumber || !block.hash) throw new Error("Pool snapshot unavailable.");
+  const snapshot = chainId + ":" + block.hash;
+  const cacheKey = (launch: typeof launches[number]) => snapshot + ":" + launch.mode + ":" + launch.token.toLowerCase()
+    + ":" + launch.quoteAssets.map(asset => asset.toLowerCase()).sort().join(",");
   const result = new Map<string, OfficialPool[]>();
   const pending = launches.filter((launch) => {
-    const cached = resolved.get(launch.token.toLowerCase());
+    if (!launch.graduated) return false;
+    const cached = resolved.get(cacheKey(launch));
     if (cached) result.set(launch.token.toLowerCase(), cached);
     return launch.graduated && !cached;
   });
@@ -154,7 +167,7 @@ export async function readOfficialPools(
   const v2Locker = FORTUNE_NETWORK.contracts.taxLiquidityLocker as Address;
 
   if (standard.length && v3Locker && v3Locker !== zeroAddress) {
-    const index = await readV3Index(rpc, v3Locker, blockNumber);
+    const index = await readV3Index(rpc, v3Locker, blockNumber, snapshot);
     const positionManager = await rpc.readContract({ address: v3Locker, abi: v3LockerAbi, functionName: "positionManager", blockNumber });
     const factory = await rpc.readContract({ address: positionManager, abi: positionManagerAbi, functionName: "factory", blockNumber });
     const wanted = standard.flatMap((launch) => (index.byToken.get(launch.token.toLowerCase()) || []).map((tokenId) => ({ launch, tokenId })));
@@ -173,32 +186,38 @@ export async function readOfficialPools(
         const launchIsToken0 = key.token0.toLowerCase() === launch.token.toLowerCase();
         official.push({ address: pool, dex: "pancake-v3", launchToken: launch.token, quoteAsset: launchIsToken0 ? key.token1 : key.token0, launchIsToken0, feeTier: key.fee });
       });
-      if (official.length) resolved.set(launch.token.toLowerCase(), official);
+      if (official.length) boundedSet(resolved, cacheKey(launch), official, 4096);
       result.set(launch.token.toLowerCase(), official);
     }
   }
 
   if (tax.length && v2Locker && v2Locker !== zeroAddress) {
-    const index = await readV2Index(rpc, v2Locker, blockNumber);
+    const index = await readV2Index(rpc, v2Locker, blockNumber, snapshot);
     for (const launch of tax) {
       const official = (index.byToken.get(launch.token.toLowerCase()) || []).map(({ pair, token0, token1 }) => {
         const launchIsToken0 = token0.toLowerCase() === launch.token.toLowerCase();
         return { address: pair, dex: "pancake-v2" as const, launchToken: launch.token, quoteAsset: launchIsToken0 ? token1 : token0, launchIsToken0, feeTier: null };
       });
-      if (official.length) resolved.set(launch.token.toLowerCase(), official);
+      if (official.length) boundedSet(resolved, cacheKey(launch), official, 4096);
       result.set(launch.token.toLowerCase(), official);
     }
   }
+  if ((await rpc.getBlock({ blockNumber })).hash !== block.hash) throw new Error("Pool snapshot changed during read.");
   return result;
 }
 
 export async function readTokenDecimals(rpc: PublicClient, tokens: Address[], blockNumber: bigint) {
-  const missing = [...new Set(tokens.map((token) => token.toLowerCase()))].filter((token) => !decimalsCache.has(token));
+  const decimalsCache = new Map<string, number>();
+  const missing = [...new Set(tokens.map((token) => token.toLowerCase()))];
   if (missing.length) {
     const rows = await rpc.multicall({ blockNumber, contracts: missing.map((token) => ({ address: token as Address, abi: erc20Abi, functionName: "decimals" as const })) });
     rows.forEach((row, i) => decimalsCache.set(missing[i], Number(ok<number>(row, "decimals " + missing[i]))));
   }
-  return (token: Address) => decimalsCache.get(token.toLowerCase()) ?? 18;
+  return (token: Address) => {
+    const decimals = decimalsCache.get(token.toLowerCase());
+    if (decimals === undefined || !Number.isInteger(decimals) || decimals < 0 || decimals > 255) throw new Error("Token decimals unavailable.");
+    return decimals;
+  };
 }
 
 /** Price and balances of official pools at one block. */

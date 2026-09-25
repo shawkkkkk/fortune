@@ -61,7 +61,9 @@ type Provider = LedgerProviderConfig;
 
 // History depth a provider proved it serves; older chunks are not re-requested
 // until the note expires, so a pruned range costs one failed call per half hour.
-let retention: { depth: bigint; expires: number } | null = null;
+let retention = new WeakMap<PublicClient, { depth: bigint; expires: number }>();
+let providerIds = new WeakMap<PublicClient, number>();
+let nextProviderId = 0;
 
 class PrunedRange extends Error {}
 
@@ -83,8 +85,10 @@ let cachedProvider: Provider | null | undefined;
 /** Test hook: clears every module-level cache so each scenario starts cold. */
 export function resetLedgerState() {
   cachedProvider = undefined;
-  retention = null;
-  blockTimeSample = null;
+  retention = new WeakMap();
+  blockTimeSample = new WeakMap();
+  providerIds = new WeakMap();
+  nextProviderId = 0;
   scanCache.clear();
   scanPending.clear();
 }
@@ -117,14 +121,15 @@ export async function pinLedgerHead(rpc: PublicClient): Promise<LedgerHead> {
   return { number: block.number, hash: block.hash, timestamp: Number(block.timestamp) };
 }
 
-let blockTimeSample: { value: number; expires: number } | null = null;
+let blockTimeSample = new WeakMap<PublicClient, { value: number; expires: number }>();
 
 async function averageBlockTime(rpc: PublicClient, head: LedgerHead) {
-  if (blockTimeSample && blockTimeSample.expires > Date.now()) return blockTimeSample.value;
+  const sample = blockTimeSample.get(rpc);
+  if (sample && sample.expires > Date.now()) return sample.value;
   const span = 50_000n;
   const earlier = await rpc.getBlock({ blockNumber: head.number > span ? head.number - span : 0n });
   const value = Math.max(0.1, (head.timestamp - Number(earlier.timestamp)) / Number(head.number - (earlier.number ?? 0n)));
-  blockTimeSample = { value, expires: Date.now() + 10 * 60_000 };
+  blockTimeSample.set(rpc, { value, expires: Date.now() + 10 * 60_000 });
   return value;
 }
 
@@ -138,10 +143,19 @@ const scanPending = new Map<string, Promise<LedgerScan>>();
  * first chunk the provider cannot serve and reports the covered range.
  */
 export async function readLedger(provider: Provider, addresses: Address[], windowSeconds: number): Promise<LedgerScan> {
+  if (!Number.isSafeInteger(windowSeconds) || windowSeconds <= 0 || windowSeconds > 30 * 86_400) throw new Error("Invalid ledger window.");
+  if (provider.chunk <= 0n || !Number.isSafeInteger(provider.addressBatch) || provider.addressBatch < 1) throw new Error("Invalid ledger batching.");
+  if (await provider.client.getChainId() !== FORTUNE_NETWORK.chainId) throw new Error("Wrong ledger chain.");
+  let providerId = providerIds.get(provider.client);
+  if (providerId === undefined) { providerId = ++nextProviderId; providerIds.set(provider.client, providerId); }
   const unique = [...new Set(addresses.map((address) => address.toLowerCase()))].sort() as Address[];
-  const key = unique.join(",") + ":" + windowSeconds;
+  const key = providerId + ":" + unique.join(",") + ":" + windowSeconds;
   const cached = scanCache.get(key);
-  if (cached && cached.expires > Date.now()) return cached.scan;
+  if (cached && cached.expires > Date.now()) {
+    const anchor = await provider.client.getBlock({ blockNumber: cached.scan.head.number });
+    if (anchor.hash === cached.scan.head.hash) return cached.scan;
+    scanCache.delete(key);
+  }
   const inFlight = scanPending.get(key);
   if (inFlight) return inFlight;
 
@@ -153,10 +167,23 @@ export async function readLedger(provider: Provider, addresses: Address[], windo
     // Start a little early so a slightly slow block cadence cannot cut the window short.
     const blocksBack = BigInt(Math.ceil(Math.max(0, head.timestamp - fromTimestamp) / blockTime * 1.03) + 5);
     const wanted = head.number > blocksBack ? head.number - blocksBack : 0n;
-    const known = retention && retention.expires > Date.now() ? retention.depth : null;
+    const retained = retention.get(rpc);
+    const known = retained && retained.expires > Date.now() ? retained.depth : null;
     const startBlock = known !== null && head.number - wanted > known ? head.number - known : wanted;
 
     const logs: RawLedgerLog[] = [];
+    const seen = new Set<string>();
+    const blocks = new Map<bigint, { hash: string; timestamp: number }>([[head.number, head]]);
+    const verifiedBlock = async (number: bigint) => {
+      const cachedBlock = blocks.get(number);
+      if (cachedBlock) return cachedBlock;
+      if (blocks.size >= 2048) throw new Error("Ledger block verification budget exceeded.");
+      const block = await rpc.getBlock({ blockNumber: number });
+      if (block.number !== number || !block.hash) throw new Error("Ledger block unavailable.");
+      const value = { hash: block.hash, timestamp: Number(block.timestamp) };
+      blocks.set(number, value);
+      return value;
+    };
     let covered = head.number + 1n;
     let complete = unique.length === 0;
 
@@ -191,16 +218,20 @@ export async function readLedger(provider: Provider, addresses: Address[], windo
             to += span;
             continue;
           }
-          if (error instanceof PrunedRange) retention = { depth: head.number - covered + 1n, expires: Date.now() + 30 * 60_000 };
+          if (error instanceof PrunedRange) retention.set(rpc, { depth: head.number - covered + 1n, expires: Date.now() + 30 * 60_000 });
           else console.warn("[trade-ledger] stopping at block " + to + ": " + describe(error));
           break;
         }
         for (const row of rows) {
-          if (row.blockNumber === null || row.logIndex === null || row.transactionHash === null || row.transactionIndex === null) continue;
-          const stamp = (row as { blockTimestamp?: bigint | null }).blockTimestamp;
-          const timestamp = typeof stamp === "bigint"
-            ? Number(stamp)
-            : Math.round(head.timestamp - Number(head.number - row.blockNumber) * blockTime);
+          if (row.blockNumber === null || row.logIndex === null || row.transactionHash === null || row.transactionIndex === null || row.removed) throw new Error("Incomplete or removed ledger log.");
+          if (row.blockNumber < from || row.blockNumber > to || !unique.includes(row.address.toLowerCase() as Address)) throw new Error("Ledger log outside requested scope.");
+          const block = await verifiedBlock(row.blockNumber);
+          if (row.blockHash !== block.hash) throw new Error("Ledger log block hash mismatch.");
+          const timestamp = block.timestamp;
+          const identity = row.blockHash + ":" + row.logIndex;
+          if (seen.has(identity)) continue;
+          seen.add(identity);
+          if (logs.length >= 20_000) throw new Error("Ledger log budget exceeded.");
           const args = row.args as Record<string, unknown>;
           logs.push({
             eventName: row.eventName as RawLedgerLog["eventName"],
@@ -219,14 +250,16 @@ export async function readLedger(provider: Provider, addresses: Address[], windo
       }
     }
 
+    const fromBlock = covered > head.number ? head.number : covered;
+    const boundary = await verifiedBlock(fromBlock);
+    // Block cadence only estimates how far to scan; timestamps and coverage use headers.
+    const fromTimestamp_ = boundary.timestamp;
+    complete = complete && fromTimestamp_ <= fromTimestamp;
+
     // Reject the whole scan if the head was reorganized while it ran.
     const check = await rpc.getBlock({ blockNumber: head.number });
     if (check.hash !== head.hash) throw new Error("Chain head changed during the ledger read.");
 
-    const fromBlock = covered > head.number ? head.number : covered;
-    const fromTimestamp_ = complete
-      ? Math.max(fromTimestamp, head.timestamp - Math.round(Number(head.number - fromBlock) * blockTime))
-      : Math.round(head.timestamp - Number(head.number - fromBlock) * blockTime);
     const inWindow = logs.filter((log) => log.timestamp >= fromTimestamp);
     inWindow.sort((a, b) => Number(a.blockNumber - b.blockNumber) || a.transactionIndex - b.transactionIndex || a.logIndex - b.logIndex);
 

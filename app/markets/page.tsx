@@ -7,7 +7,7 @@ import { PairChips } from "@/components/PairAssets";
 import { FORTUNE_NETWORK } from "@/lib/fortune-network";
 import { formatAge, formatHours, formatPrice, formatUsd, shortAddress } from "@/lib/market-format";
 
-type Activity = { volumeUsd: number; trades: number; buys: number; sells: number; lastTradeAt: number | null };
+type Activity = { volumeUsd: number | null; trades: number; buys: number; sells: number; lastTradeAt: number | null };
 
 type Market = {
   id: string;
@@ -138,6 +138,8 @@ export default function MarketsPage() {
         : (zh ? "按过去 6 小时的交易笔数排序，其次按 6 小时交易量。" : "Most trades in the last 6 hours, then 6-hour volume.")) + bounded
       : !covered
         ? (zh ? "近期交易历史暂不可用，因此按最新发行排序。" : "Recent trade history is unavailable right now, so launches are shown newest first.")
+        : sort === "volume24h" && board.ledger.covers24h
+          ? (zh ? "历史美元估值不完整，因此按最新发行排序。" : "Historical USD valuations are incomplete, so launches are shown newest first.")
         : sort === "volume24h"
           ? (zh
             ? `24 小时交易量需要一整天的交易历史。当前日志服务仅提供最近 ${covered} 的数据，因此该排序暂不可用，按最新发行显示。`

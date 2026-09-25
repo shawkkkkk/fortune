@@ -184,7 +184,11 @@ export default function PriceChart({ points, trades, fromTimestamp, toTimestamp,
           {zh ? "此时间段内没有交易" : "No trades in this window"}{currentPrice !== null ? (zh ? ` · 价格 ${formatPrice(currentPrice)}` : ` · price ${formatPrice(currentPrice)}`) : ""}
         </p>
       ) : null}
-      <span className="chartVolumeLabel">{(zh ? "交易量 · " : "Volume · ") + formatUsd(trades.filter((trade) => trade.timestamp >= fromTimestamp).reduce((sum, trade) => sum + (trade.usdValue || 0), 0))}</span>
+      <span className="chartVolumeLabel">{(zh ? "所示近期交易量 · " : "Shown recent-trade volume · ") + formatUsd(
+        trades.filter(trade => trade.timestamp >= fromTimestamp && trade.timestamp <= toTimestamp).every(trade => trade.usdValue !== null)
+          ? trades.filter(trade => trade.timestamp >= fromTimestamp && trade.timestamp <= toTimestamp).reduce((sum, trade) => sum + trade.usdValue!, 0)
+          : null
+      )}</span>
     </div>
   );
 }

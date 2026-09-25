@@ -1,6 +1,6 @@
 import { isAddress, type Address } from "viem";
 import { apiError, apiOk } from "@/lib/public-api";
-import { CHART_RANGES, readTokenMarket, type ChartRange } from "@/lib/market-insights";
+import { CHART_RANGES, isChartRange, readTokenMarket, type ChartRange } from "@/lib/market-insights";
 
 export const dynamic = "force-dynamic";
 
@@ -8,7 +8,7 @@ export async function GET(request: Request, context: { params: Promise<{ token: 
   const { token } = await context.params;
   if (!isAddress(token)) return apiError("invalid_request", "Provide a BSC token address.", 400);
   const range = (new URL(request.url).searchParams.get("range") || "24h") as ChartRange;
-  if (!(range in CHART_RANGES)) return apiError("invalid_request", "range must be one of: " + Object.keys(CHART_RANGES).join(", ") + ".", 400);
+  if (!isChartRange(range)) return apiError("invalid_request", "range must be one of: " + Object.keys(CHART_RANGES).join(", ") + ".", 400);
 
   try {
     const market = await readTokenMarket(token as Address, range);
@@ -29,9 +29,7 @@ export async function GET(request: Request, context: { params: Promise<{ token: 
         ],
       },
     });
-  } catch (error) {
-    return apiError("dependency_unavailable", "Fortune could not read this market from BNB Chain.", 503, {
-      reason: error instanceof Error ? error.message : "RPC unavailable",
-    });
+  } catch {
+    return apiError("dependency_unavailable", "Fortune could not read this market from BNB Chain.", 503);
   }
 }

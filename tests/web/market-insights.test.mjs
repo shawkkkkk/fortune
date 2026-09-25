@@ -1,7 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { covers, curveSpotPrice, rankMarkets, supplyBeforeTrade } from "../../lib/market-insights.ts";
-import { v3PriceInQuote } from "../../lib/market-pools.ts";
+import { activityFor, covers, curveSpotPrice, isChartRange, rankMarkets, supplyBeforeTrade } from "../../lib/market-insights.ts";
+import { readOfficialPools, readTokenDecimals, v3PriceInQuote } from "../../lib/market-pools.ts";
+import { FORTUNE_NETWORK } from "../../lib/fortune-network.ts";
 import { readLedger, resetLedgerState } from "../../lib/trade-ledger.ts";
 import { formatPrice, formatUsd } from "../../lib/market-format.ts";
 
@@ -64,6 +65,7 @@ function fakeProvider({ head, prunedBelow, failAddressCountAbove = 9 }) {
   const blockTime = 0.45;
   const block = (number) => ({ number, hash: "0x" + number.toString(16).padStart(64, "0"), timestamp: BigInt(Math.round(2_000_000_000 - Number(head - number) * blockTime)) });
   const client = {
+    getChainId: async () => FORTUNE_NETWORK.chainId,
     getBlock: async ({ blockTag, blockNumber }) => block(blockTag === "latest" ? head : blockNumber),
     getLogs: async ({ address, fromBlock, toBlock }) => {
       calls.push({ count: address.length, fromBlock, toBlock });
@@ -88,6 +90,97 @@ test("the ledger batches addresses, narrows at the pruned edge and reports hones
   assert.ok(depth <= 89_850n && depth > 88_000n, "coverage ends close to the real history edge, got " + depth);
   assert.ok(covers(scan.coverage, 6 * 3600), "six hours is fully covered");
   assert.ok(!covers(scan.coverage, 86_400), "twenty-four hours is not");
+});
+
+test("unknown USD valuations never become zero or a partial volume total", () => {
+  const trade = usdValue => ({ timestamp: 100, side: "buy", usdValue });
+  assert.equal(activityFor([trade(7), trade(null)], 0).volumeUsd, null);
+  assert.equal(activityFor([trade(7), trade(3)], 0).volumeUsd, 10);
+  assert.equal(activityFor([], 0).volumeUsd, 0);
+  assert.equal(activityFor([trade(NaN)], 0).volumeUsd, null);
+  const items = [
+    { createdAt: 2, activity24h: { volumeUsd: null } },
+    { createdAt: 1, activity24h: { volumeUsd: 4 } },
+  ];
+  assert.equal(rankMarkets(items, "volume24h")[0].createdAt, 1);
+});
+
+test("ledger timestamps come from verified headers and duplicate logs count once", async () => {
+  resetLedgerState();
+  const head = 20_000_000n;
+  const address = "0x" + "ab".repeat(20);
+  const { provider } = fakeProvider({ head, prunedBelow: 0n });
+  const getBlock = provider.client.getBlock;
+  provider.client.getBlock = async args => {
+    const block = await getBlock(args);
+    return args.blockNumber === head - 1n ? { ...block, timestamp: 1_999_999_877n } : block;
+  };
+  provider.client.getLogs = async ({ fromBlock, toBlock }) => {
+    const rows = [];
+    for (const [number, logIndex] of [[head - 1n, 0], [head - 2n, 1]]) {
+      if (number < fromBlock || number > toBlock) continue;
+      const block = await provider.client.getBlock({ blockNumber: number });
+      const row = { address, eventName: "Bought", args: {}, blockNumber: number, blockHash: block.hash,
+        logIndex, transactionIndex: 0, transactionHash: "0x" + "12".repeat(32), removed: false };
+      rows.push(row, row);
+    }
+    return rows;
+  };
+  const scan = await readLedger(provider, [address], 60);
+  assert.equal(scan.logs.length, 1, "header timestamp excludes the older trade despite estimated cadence");
+  assert.equal(scan.logs[0].timestamp, 1_999_999_999);
+});
+
+test("ledger rejects wrong chain and stale cached fork, and isolates providers", async () => {
+  resetLedgerState();
+  const head = 20_000_000n;
+  const address = "0x" + "ab".repeat(20);
+  const { provider } = fakeProvider({ head, prunedBelow: 0n });
+  const first = await readLedger(provider, [address], 60);
+  const getBlock = provider.client.getBlock;
+  provider.client.getBlock = async args => ({ ...(await getBlock(args)), hash: "0x" + "ee".repeat(32) });
+  const second = await readLedger(provider, [address], 60);
+  assert.notEqual(first.head.hash, second.head.hash);
+  const other = fakeProvider({ head: head + 100n, prunedBelow: 0n }).provider;
+  assert.equal((await readLedger(other, [address], 60)).head.number, head + 100n);
+  provider.client.getChainId = async () => 1;
+  await assert.rejects(readLedger(provider, [address], 60), /Wrong ledger chain/);
+});
+
+test("ledger rejects invalid scan windows before contacting the provider", async () => {
+  const provider = fakeProvider({ head: 20_000_000n, prunedBelow: 0n }).provider;
+  for (const value of [NaN, -1, 0, 31 * 86_400]) await assert.rejects(readLedger(provider, [], value), /Invalid ledger window/);
+});
+
+test("pool provenance cannot reuse a same-count locker cache across a reorg", async () => {
+  const token = "0x" + "aa".repeat(20), quote = "0x" + "bb".repeat(20);
+  let fork = 1;
+  const rpc = {
+    getChainId: async () => FORTUNE_NETWORK.chainId,
+    getBlock: async ({ blockNumber }) => ({ number: blockNumber, hash: "0x" + String(fork).repeat(64) }),
+    readContract: async () => 1n,
+    multicall: async ({ contracts }) => contracts.map(c => ({ status: "success", result:
+      c.functionName === "lockedPairs" ? "0x" + String(fork).repeat(40) : c.functionName === "token0" ? token : quote })),
+  };
+  const launches = [{ token, mode: "tax", graduated: true, quoteAssets: [quote] }];
+  assert.equal((await readOfficialPools(rpc, launches, 100n)).get(token)[0].address, "0x" + "1".repeat(40));
+  fork = 2;
+  assert.equal((await readOfficialPools(rpc, launches, 100n)).get(token)[0].address, "0x" + "2".repeat(40));
+  assert.equal((await readOfficialPools(rpc, [{ ...launches[0], graduated: false }], 100n)).size, 0);
+});
+
+test("token decimals use the requested block instead of a permanent address cache", async () => {
+  const token = "0x" + "aa".repeat(20);
+  const rpc = { multicall: async ({ blockNumber }) => [{ status: "success", result: blockNumber === 1n ? 6 : 18 }] };
+  assert.equal((await readTokenDecimals(rpc, [token], 1n))(token), 6);
+  assert.equal((await readTokenDecimals(rpc, [token], 2n))(token), 18);
+});
+
+test("market range validation rejects inherited object keys without RPC calls", () => {
+  for (const range of ["constructor", "toString", "__proto__"]) {
+    assert.equal(isChartRange(range), false);
+  }
+  for (const range of ["24h", "7d", "30d"]) assert.equal(isChartRange(range), true);
 });
 
 test("a complete window is marked complete and a reorganized head is rejected", async () => {

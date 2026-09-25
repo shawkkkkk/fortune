@@ -52,7 +52,7 @@ export type PairAsset = {
 };
 
 export type MarketActivity = {
-  volumeUsd: number;
+  volumeUsd: number | null;
   trades: number;
   buys: number;
   sells: number;
@@ -161,8 +161,9 @@ function summarize(context: Context, launch: OnchainFortuneLaunch): Omit<MarketS
       }
     }
     priceSource = pools[0]?.dex || "curve";
-    priceUsd = depth > 0 ? weighted / depth : null;
-    liquidityUsd = pools.length ? depth : null;
+    const valued = pools.length > 0 && pools.every(pool => poolLiquidity.get(pool.address.toLowerCase()) != null);
+    priceUsd = valued && depth > 0 ? weighted / depth : null;
+    liquidityUsd = valued ? depth : null;
   }
 
   const supply = Number(launch.totalSupply);
@@ -253,7 +254,9 @@ async function decodeTrades(context: Context, scan: LedgerScan) {
     const { launch, pool } = poolEntry;
     const launchDecimals = decimals(pool.launchToken);
     const quoteDecimals = decimals(pool.quoteAsset);
-    const quoteUsd = assetPrice(context.assets.get(pool.quoteAsset.toLowerCase()));
+    // Today's oracle price is not evidence of a historical swap's USD value.
+    // Keep historical USD unavailable until a block-pinned valuation source exists.
+    const quoteUsd: number | null = null;
     let launchDelta: bigint;
     let quoteDelta: bigint;
     let priceInQuote: number;
@@ -289,10 +292,11 @@ async function decodeTrades(context: Context, scan: LedgerScan) {
   return { trades, anchors };
 }
 
-function activityFor(trades: LedgerTrade[], since: number): MarketActivity {
+export function activityFor(trades: LedgerTrade[], since: number): MarketActivity {
   const window = trades.filter((trade) => trade.timestamp >= since);
   return {
-    volumeUsd: window.reduce((sum, trade) => sum + (trade.usdValue || 0), 0),
+    volumeUsd: window.every(trade => trade.usdValue !== null && Number.isFinite(trade.usdValue))
+      ? window.reduce((sum, trade) => sum + trade.usdValue!, 0) : null,
     trades: window.length,
     buys: window.filter((trade) => trade.side === "buy").length,
     sells: window.filter((trade) => trade.side === "sell").length,
@@ -317,8 +321,8 @@ export function rankMarkets<T extends Rankable>(items: T[], sort: MarketSort) {
   if (sort === "newest") return items.sort((a, b) => b.createdAt - a.createdAt);
   const key = (item: T): [number, number] | null => {
     if (sort === "marketCap") return item.marketCapUsd === null ? null : [item.marketCapUsd, 0];
-    if (sort === "volume24h") return item.activity24h ? [item.activity24h.volumeUsd, 0] : null;
-    return item.activityTrending ? [item.activityTrending.trades, item.activityTrending.volumeUsd] : null;
+    if (sort === "volume24h") return item.activity24h?.volumeUsd != null ? [item.activity24h.volumeUsd, 0] : null;
+    return item.activityTrending ? [item.activityTrending.trades, item.activityTrending.volumeUsd ?? -1] : null;
   };
   return items.sort((a, b) => {
     const ka = key(a), kb = key(b);
@@ -392,7 +396,8 @@ export async function readMarketBoard(sort: MarketSort, offset: number, limit: n
     };
   });
 
-  const sortAvailable = sort === "newest" || sort === "marketCap" || (sort === "volume24h" ? covers24h : coversTrending);
+  const sortAvailable = sort === "newest" || sort === "marketCap" || (sort === "volume24h"
+    ? covers24h && items.every(item => item.activity24h?.volumeUsd != null) : coversTrending);
   if (sortAvailable) rankMarkets(items, sort);
 
   const page = sort === "newest" ? items.slice(0, limit) : items.slice(offset, offset + limit);
@@ -412,6 +417,10 @@ export async function readMarketBoard(sort: MarketSort, offset: number, limit: n
 
 export const CHART_RANGES = { "24h": DAY, "7d": 7 * DAY, "30d": 30 * DAY } as const;
 export type ChartRange = keyof typeof CHART_RANGES;
+
+export function isChartRange(value: string): value is ChartRange {
+  return Object.hasOwn(CHART_RANGES, value);
+}
 
 export type TokenMarket = {
   configured: boolean;

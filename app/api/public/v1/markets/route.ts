@@ -28,15 +28,13 @@ export async function GET(request: Request) {
         blockNumber: board.blockNumber,
         source: "Factory catalog + token/curve/locker/pool state reads + bounded eth_getLogs trade ledger",
         notes: [
-          "Prices, market caps and liquidity are state reads at blockNumber. Graduated tokens are priced from their official locked Pancake pools.",
-          "Curve trade USD values are recorded onchain; pool swap USD values use the pair asset's current registry oracle price.",
+          "Pool state is read at blockNumber; current USD valuation uses the latest healthy registry oracle observation. Graduated tokens use official locked Pancake pools.",
+          "Curve trade USD values are recorded onchain. Historical pool swap USD values remain unavailable until historical oracle valuation is implemented.",
           "Activity is null unless the ledger coverage spans the whole window. Sorts other than newest rank the " + RANK_LIMIT + " most recent launches.",
         ],
       },
     });
-  } catch (error) {
-    return apiError("dependency_unavailable", "Fortune could not read markets from BNB Chain.", 503, {
-      reason: error instanceof Error ? error.message : "RPC unavailable",
-    });
+  } catch {
+    return apiError("dependency_unavailable", "Fortune could not read markets from BNB Chain.", 503);
   }
 }

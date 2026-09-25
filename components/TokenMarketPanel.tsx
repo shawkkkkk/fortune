@@ -8,7 +8,7 @@ import { useTheme } from "@/components/ThemeProvider";
 import { FORTUNE_NETWORK } from "@/lib/fortune-network";
 import { formatAge, formatAmount, formatHours, formatPrice, formatUsd, shortAddress } from "@/lib/market-format";
 
-type Activity = { volumeUsd: number; trades: number; buys: number; sells: number; lastTradeAt: number | null };
+type Activity = { volumeUsd: number | null; trades: number; buys: number; sells: number; lastTradeAt: number | null };
 type Coverage = { fromBlock: string; toBlock: string; fromTimestamp: number; toTimestamp: number; complete: boolean; source: string };
 type Trade = {
   source: "curve" | "pancake-v3" | "pancake-v2";
@@ -191,6 +191,10 @@ export default function TokenMarketPanel({ token }: { token: string }) {
       </div>
 
       <PairAssetsPanel pairs={summary.pairs} graduated={summary.phase === 2} zh={zh} />
+
+      <p className="chartCoverage" translate="no">{zh
+        ? "历史池兑换的美元估值尚不可用；不会使用当前价格补算。下方最多显示最近 50 笔交易。"
+        : "Historical pool-swap USD values are unavailable; current prices are not substituted. Up to 50 recent trades are shown below."}</p>
 
       <section className="panel tradesPanel">
         <span className="eyebrow">RECENT TRADES</span>

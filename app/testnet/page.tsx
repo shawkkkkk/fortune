@@ -1457,9 +1457,9 @@ export default function PublicTestnetPage() {
           <h1>Build the launch you actually want.</h1>
           <p>
             Standard tokens graduate into permanently locked Pancake V3
-            liquidity. Tax tokens add immutable buy/sell tax, holder rewards,
-            buyback/burn routing and bounded anti-farmer protection before
-            graduating into permanently locked Pancake V2 liquidity.
+            liquidity. The older tax-token/Pancake V2 mode below is a testnet
+            research lab; it is separate from the proposed Burn + Rewards v2
+            architecture and has no mainnet release approval.
           </p>
         </div>
         <div className="pageHeadingActions">
@@ -1544,7 +1544,7 @@ export default function PublicTestnetPage() {
               setMode("tax");
             }}
           >
-            <strong>Tax Token</strong>
+            <strong>Legacy tax research</strong>
             <span>
               {taxReady
                 ? "Immutable tax · dividends · anti-farmer · Pancake V2"
@@ -1761,7 +1761,7 @@ export default function PublicTestnetPage() {
           </div>
         </div>
         <div className="previewFacts">
-          <div><span>Architecture</span><strong>{mode === "tax" ? "Tax Token · V2" : "Standard · V3"}</strong></div>
+          <div><span>Architecture</span><strong>{mode === "tax" ? "Legacy tax research · Pancake V2" : "Standard · Pancake V3"}</strong></div>
           <div><span>Supply</span><strong>1,000,000,000</strong></div>
           <div><span>Quote</span><strong>fUSD</strong></div>
           <div><span>Graduation target</span><strong>$1 mock USD</strong></div>

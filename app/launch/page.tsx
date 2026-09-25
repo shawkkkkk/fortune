@@ -227,6 +227,11 @@ async function connectNetwork() {
     });
   }
 
+  const activeChain = await ethereum.request({ method: "eth_chainId" });
+  if (String(activeChain).toLowerCase() !== FORTUNE_NETWORK.chainHex.toLowerCase()) {
+    throw new Error("Wallet did not switch to the selected BNB network. No transaction was submitted.");
+  }
+
   return accounts[0];
 }
 
@@ -327,10 +332,10 @@ export default function LaunchPage() {
   const [symbol, setSymbol] = useState("");
   const [description, setDescription] = useState("");
   const [imageURI, setImageURI] = useState("");
-  const [totalSupply, setTotalSupply] = useState("10000000");
+  const [totalSupply, setTotalSupply] = useState(FORTUNE_NETWORK.isTestnet ? "1000000000" : "10000000");
   const [basePrice, setBasePrice] = useState("0.001");
-  const [slope, setSlope] = useState("0.00000001");
-  const [graduationTarget, setGraduationTarget] = useState("50");
+  const [slope, setSlope] = useState(FORTUNE_NETWORK.isTestnet ? "0.000000000001" : "0.00000001");
+  const [graduationTarget, setGraduationTarget] = useState(FORTUNE_NETWORK.isTestnet ? "1" : "50");
   const [creatorPurchase, setCreatorPurchase] = useState("0");
   const [treasury, setTreasury] = useState("");
   const [website, setWebsite] = useState("");
@@ -418,22 +423,15 @@ export default function LaunchPage() {
     setReceipt(null);
 
     try {
-      if (!FORTUNE_NETWORK.isMainnet || !FORTUNE_NETWORK_CONFIGURED || mode !== "standard") {
-        throw new Error("Real-value launching is disabled until the Standard release gates pass. Burn + Rewards v2 is separate research.");
+      if (!FORTUNE_NETWORK_CONFIGURED || mode !== "standard") {
+        throw new Error("This launch stack is not configured. Mainnet stays blocked until the Standard release gates pass.");
       }
-      const readinessResponse = await fetch(
-        "/api/public/v1/readiness",
-        { cache: "no-store" }
-      );
-      const readinessBody = await readinessResponse.json();
-
-      if (
-        !readinessResponse.ok ||
-        readinessBody?.data?.ready !== true
-      ) {
-        throw new Error(
-          "Fortune mainnet is not release-ready. No wallet transaction was constructed."
-        );
+      if (FORTUNE_NETWORK.isMainnet) {
+        const readinessResponse = await fetch("/api/public/v1/readiness", { cache: "no-store" });
+        const readinessBody = await readinessResponse.json();
+        if (!readinessResponse.ok || readinessBody?.data?.ready !== true) {
+          throw new Error("Fortune mainnet is not release-ready. No wallet transaction was constructed.");
+        }
       }
 
       // Re-confirm the production network immediately before constructing any
@@ -605,7 +603,7 @@ export default function LaunchPage() {
       }
 
       setReceipt(created);
-      setMessage("Standard launch confirmed on BNB Smart Chain.");
+      setMessage("Standard launch confirmed on " + FORTUNE_NETWORK.chainName + ".");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Launch failed.");
     } finally {
@@ -628,7 +626,7 @@ export default function LaunchPage() {
         <strong>{FORTUNE_NETWORK.isMainnet ? "MAINNET RELEASE GATED" : "PUBLIC BSC TESTNET ALPHA"}</strong>
         <span>{FORTUNE_NETWORK.isMainnet
           ? "The Standard launch button unlocks only after all onchain and release checks pass."
-          : "Build your launch here, then use the live public alpha to sign a testnet transaction. No real funds."}</span>
+          : "Create a valueless testnet Standard launch here. Use the testnet lab for the mock-asset faucet and detailed research controls."}</span>
       </div>
 
       <ol className="journeySteps" aria-label="Launch steps">
@@ -705,9 +703,10 @@ export default function LaunchPage() {
             <div><span>Image URI</span><strong>{imageURI}</strong></div>
           </div>
           <p className="reviewWarning">An approved pair and wallet transaction are required. Fortune checks the current chain, release state and onchain preflight again before any submission.</p>
-          {FORTUNE_NETWORK.isMainnet ? <button className="launchButton" disabled={busy || !selected || !FORTUNE_NETWORK_CONFIGURED} onClick={() => void launch()}>{busy ? "Checking launch…" : FORTUNE_NETWORK_CONFIGURED ? "Confirm in wallet →" : "Mainnet launch paused"}</button> : <Link href="/testnet" className="primaryCta">Continue to live testnet launch →</Link>}
+          <button className="launchButton" disabled={busy || !selected || !FORTUNE_NETWORK_CONFIGURED} onClick={() => void launch()}>{busy ? "Checking launch…" : FORTUNE_NETWORK_CONFIGURED ? FORTUNE_NETWORK.isMainnet ? "Confirm in wallet →" : "Launch on BSC Testnet →" : "Launch paused"}</button>
           <button type="button" className="secondaryCta" style={{ marginLeft: 10 }} onClick={() => setReviewed(false)}>Edit details</button>
           {!FORTUNE_NETWORK_CONFIGURED && FORTUNE_NETWORK.isMainnet ? <p className="fieldHint">The release manifest and live contract checks must pass before mainnet transactions unlock.</p> : null}
+          {FORTUNE_NETWORK.isTestnet ? <p className="fieldHint">Need valueless fUSD or tBNB gas? <Link href="/testnet">Open the testnet lab and faucet →</Link></p> : null}
         </>}
       </section>
 

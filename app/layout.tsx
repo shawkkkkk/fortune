@@ -9,9 +9,6 @@ import { FORTUNE_SITE_URL } from "@/lib/site";
 
 export const metadata: Metadata = {
   metadataBase: new URL(FORTUNE_SITE_URL),
-  alternates: {
-    canonical: "/",
-  },
   title: {
     default: FORTUNE_NETWORK.isMainnet
       ? "Fortune — Launch on BNB Smart Chain"

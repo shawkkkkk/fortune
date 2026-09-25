@@ -1,9 +1,14 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import FortuneLogo from "@/components/FortuneLogo";
 import {
   FORTUNE_NETWORK,
   FORTUNE_NETWORK_CONFIGURED,
 } from "@/lib/fortune-network";
+
+export const metadata: Metadata = {
+  alternates: { canonical: "/" },
+};
 
 const pairLanes = [
   ["BNB + majors", "WBNB first · BTCB / ETH expansion"],

@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import FortuneLogo from "@/components/FortuneLogo";
 import { FORTUNE_NETWORK } from "@/lib/fortune-network";
 
 type Launch = {
@@ -98,7 +97,6 @@ export default function MarketsPage() {
     <main className="page">
       <section className="pageHeading">
         <div>
-          <FortuneLogo size="md" />
           <span className="eyebrow">LIVE ONCHAIN MARKETS</span>
           <h1>Fortune launches</h1>
           <p>

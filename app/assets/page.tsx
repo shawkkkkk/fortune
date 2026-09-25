@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import FortuneLogo from "@/components/FortuneLogo";
 
 type Row = {
   key: string;
@@ -213,7 +212,6 @@ export default function AssetsPage() {
     <main className="page">
       <section className="pageHeading">
         <div>
-          <FortuneLogo size="md" />
           <span className="eyebrow">FORTUNE ASSET UNIVERSE</span>
           <h1>Launch against the BNB economy.</h1>
           <p>

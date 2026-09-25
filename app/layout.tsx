@@ -3,6 +3,7 @@ import { Fraunces, Plus_Jakarta_Sans } from "next/font/google";
 import "@/app/globals.css";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import ScrollRevealRoot from "@/components/ScrollReveal";
 import { LanguageProvider } from "@/components/LanguageProvider";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { FORTUNE_NETWORK } from "@/lib/fortune-network";
@@ -12,7 +13,7 @@ import { FORTUNE_SITE_URL } from "@/lib/site";
 // origin; no browser request reaches a font CDN.
 const displayFont = Fraunces({
   subsets: ["latin"],
-  axes: ["SOFT"],
+  axes: ["SOFT", "opsz"],
   display: "swap",
   variable: "--font-fraunces",
 });
@@ -26,6 +27,12 @@ const sansFont = Plus_Jakarta_Sans({
 // Apply a stored dark preference before first paint to avoid a light flash.
 const themeScript =
   'try{var t=localStorage.getItem("fortune-theme");if(t==="dark"||t==="light"){document.documentElement.dataset.theme=t;document.documentElement.style.colorScheme=t}}catch(e){}';
+
+// Enable scroll-reveal hiding only when it can be undone: JavaScript runs,
+// IntersectionObserver exists and the visitor has not asked for reduced
+// motion. If the reveal observer has not started within 3.5s, show everything.
+const motionScript =
+  'try{var d=document.documentElement;if("IntersectionObserver"in window&&!matchMedia("(prefers-reduced-motion: reduce)").matches){d.dataset.motion="on";setTimeout(function(){if(!window.__fortuneReveal)delete d.dataset.motion},3500)}}catch(e){}';
 
 export const metadata: Metadata = {
   metadataBase: new URL(FORTUNE_SITE_URL),
@@ -84,6 +91,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        <script dangerouslySetInnerHTML={{ __html: motionScript }} />
       </head>
       <body>
         <ThemeProvider>
@@ -91,6 +99,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Header />
             {children}
             <Footer />
+            <ScrollRevealRoot />
           </LanguageProvider>
         </ThemeProvider>
       </body>

@@ -657,6 +657,25 @@ const ZH: Record<string, string> = {
   "Retry": "重试",
   "Loading market data…": "正在加载市场数据…",
   "Core pages render independently from optional market-data providers.": "核心页面独立渲染，不依赖可选的市场数据提供方。",
+
+  // Cinematic home: hero kicker, Q&A and closing quote.
+  "BNB Smart Chain launchpad": "BNB Smart Chain 发行平台",
+  "BEFORE YOU LAUNCH": "发行之前",
+  "System": "系统",
+  "Make your own luck,": "好运，自己创造，",
+  "then let the chain prove it.": "再交给链上来证明。",
+  "What is Fortune?": "Fortune 是什么？",
+  "A BNB Smart Chain launchpad for meme coins. Name a token, choose a reviewed pair asset, optionally make the first buy, and launch a fixed-supply token on Fortune's curve.": "一个面向 Meme 币的 BNB Smart Chain 发行平台。为代币命名，选择经审核的配对资产，可选首次买入，然后在 Fortune 曲线上发行固定供应量的代币。",
+  "Can I use real money yet?": "现在可以使用真实资金吗？",
+  "No. Fortune is a public alpha on BSC Testnet with valueless test assets. The contracts are pre-audit, and mainnet stays disabled until independent review and every release gate pass.": "不可以。Fortune 目前是 BSC 测试网上的公开测试版，只使用无价值的测试资产。合约尚未完成审计，在独立审查和所有发布闸门通过之前，主网保持关闭。",
+  "What does the Launch Shield do?": "Launch Shield 有什么作用？",
+  "Every curve opens with a 99% buy tax that decays to zero within five seconds, plus a 2% per-wallet cap for the first 15 seconds. Creators are not exempt, and shield proceeds reinforce liquidity.": "每条曲线开盘时的买入税为 99%，并在五秒内递减至零；前 15 秒内每个钱包最多买入 2%。创建者不享有豁免，护盾收入用于加强流动性。",
+  "What happens at graduation?": "毕业时会发生什么？",
+  "Anyone can finalize graduation once a curve reaches its target. Standard launches move into Pancake V3 and the LP position is locked in Fortune's locker for good. Failed graduations stay retryable, and after seven days holders can trigger a pro-rata reserve rescue.": "曲线达到目标后，任何人都可以完成毕业。Standard 发行会迁移到 Pancake V3，LP 仓位被永久锁定在 Fortune 锁仓合约中。毕业失败可以重试；七天后，持有人可以触发按比例的储备救援。",
+  "Which assets can I pair with?": "可以与哪些资产配对？",
+  "Only assets approved in the onchain registry. The Standard mainnet candidate is pinned to WBNB; stablecoins, BNB majors, DeFi tokens and tokenized stocks arrive in separate, reviewed releases.": "只能使用链上注册表批准的资产。Standard 主网候选固定为 WBNB；稳定币、BNB 主流币、DeFi 代币和代币化股票会在单独审核的版本中陆续加入。",
+  "Is Burn + Rewards live?": "Burn + Rewards 上线了吗？",
+  "Not yet. Burn + Rewards v2 is research: token-side fees would burn and holders would be paid in the pair asset without selling the meme coin. It has its own audit boundary and no real-value deployment.": "还没有。Burn + Rewards v2 仍在研究中：代币侧手续费将被销毁，持有人将以配对资产获得奖励，而无需卖出 Meme 币。它有独立的审计边界，目前没有真实资产部署。",
 };
 
 function translateText(input: string) {

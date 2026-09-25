@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useLanguage } from "@/components/LanguageProvider";
 import FortuneLogo from "@/components/FortuneLogo";
+import { FortuneCoin } from "@/components/Ornaments";
 import { useTheme } from "@/components/ThemeProvider";
 import { FORTUNE_NETWORK } from "@/lib/fortune-network";
 
@@ -33,6 +34,11 @@ const links = [
   ["/docs", "Docs"],
   ["/search", "Search"],
 ] as const;
+
+// Desktop pill: the logo is the home link, the rest sit either side of the seal.
+const pillLinks = links.filter(([href]) => href !== "/");
+const leftLinks = pillLinks.slice(0, 4);
+const rightLinks = pillLinks.slice(4);
 
 function short(address: string) {
   return address.slice(0, 6) + "…" + address.slice(-4);
@@ -92,6 +98,9 @@ export default function Header() {
   const [chainId, setChainId] = useState("");
   const [connecting, setConnecting] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  // The home hero is dark, so the floating header switches to white-on-glass
+  // while the hero sits underneath it.
+  const [overHero, setOverHero] = useState(() => pathname === "/");
   const { language, setLanguage } = useLanguage();
   const { theme, toggleTheme } = useTheme();
 
@@ -127,6 +136,21 @@ export default function Header() {
       ethereum.removeListener?.("chainChanged", handleChain);
     };
   }, []);
+
+  useEffect(() => {
+    const hero = document.getElementById("fortune-hero");
+    if (!hero || typeof IntersectionObserver === "undefined") {
+      setOverHero(false);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => setOverHero(entry.isIntersecting),
+      { rootMargin: "0px 0px -90% 0px" }
+    );
+    observer.observe(hero);
+    return () => observer.disconnect();
+  }, [pathname]);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -215,56 +239,36 @@ export default function Header() {
     </div>
   );
 
+  const navLink = ([href, label]: (typeof links)[number]) => (
+    <Link
+      key={href}
+      href={href}
+      className={pathname === href ? "navActive" : ""}
+      aria-current={pathname === href ? "page" : undefined}
+    >
+      {label}
+    </Link>
+  );
+
   return (
     <>
-      <div className="networkBar">
-        <span className="networkStatus">
-          <span
-            className={
-              "networkDot " +
-              (account && !onNetwork ? "networkWarn" : "")
-            }
-          />
-          {account
-            ? onNetwork
-              ? FORTUNE_NETWORK.isMainnet
-                ? "BNB Smart Chain wallet connected"
-                : "BSC Testnet wallet connected"
-              : "Wallet connected · switch network"
-            : FORTUNE_NETWORK.isMainnet
-              ? "Fortune · BNB Smart Chain"
-              : "Fortune · public BSC Testnet alpha"}
-        </span>
-        <span className="networkNote">
-          {FORTUNE_NETWORK.isMainnet
-            ? "Real-value network · review every transaction"
-            : "Test assets only · no real funds"}
-        </span>
-      </div>
-
-      <header className="siteHeader">
+      <header
+        className={
+          "siteHeader" +
+          (overHero && !menuOpen ? " isOverHero" : "") +
+          (menuOpen ? " isMenuOpen" : "")
+        }
+      >
         <div className="siteHeaderInner">
           <FortuneLogo size="sm" />
 
-          <nav className="navLinks" aria-label="Primary">
-            {links.map(([href, label]) => (
-              <Link
-                key={href}
-                href={href}
-                className={pathname === href ? "navActive" : ""}
-                aria-current={pathname === href ? "page" : undefined}
-              >
-                {label}
-              </Link>
-            ))}
+          <nav className="navLinks navPill liquid-glass" aria-label="Primary">
+            {leftLinks.map(navLink)}
+            <FortuneCoin className="navSeal" />
+            {rightLinks.map(navLink)}
           </nav>
 
           <div className="headerActions">
-            <div className="headerPreferences">
-              {themeToggle}
-              {languageSwitch}
-            </div>
-
             <button
               className="walletButton"
               onClick={() => void connect()}
@@ -278,11 +282,9 @@ export default function Header() {
                     ? short(account)
                     : "Connect wallet"}
             </button>
-            {account ? <Link href={"/profile/" + account} className="secondaryCta headerProfile">Profile</Link> : null}
-
             <button
               type="button"
-              className="menuToggle"
+              className="menuToggle liquid-glass"
               aria-expanded={menuOpen}
               aria-controls="fortune-mobile-menu"
               aria-label={menuOpen ? "Close menu" : "Open menu"}
@@ -332,6 +334,43 @@ export default function Header() {
           </div>
         </div>
       </header>
+
+      <div className="networkBar">
+        <span className="networkStatus">
+          <span
+            className={
+              "networkDot " +
+              (account && !onNetwork ? "networkWarn" : "")
+            }
+          />
+          {account
+            ? onNetwork
+              ? FORTUNE_NETWORK.isMainnet
+                ? "BNB Smart Chain wallet connected"
+                : "BSC Testnet wallet connected"
+              : "Wallet connected · switch network"
+            : FORTUNE_NETWORK.isMainnet
+              ? "Fortune · BNB Smart Chain"
+              : "Fortune · public BSC Testnet alpha"}
+          {account ? <Link href={"/profile/" + account} className="networkProfile">Profile</Link> : null}
+        </span>
+        <span className="networkNote">
+          {FORTUNE_NETWORK.isMainnet
+            ? "Real-value network · review every transaction"
+            : "Test assets only · no real funds"}
+        </span>
+        <div className="networkTools">
+          <nav className="networkLinks" aria-label="System">
+            <Link href="/status">Status</Link>
+            <Link href="/docs">Docs</Link>
+            <Link href="/developers">API</Link>
+          </nav>
+          <div className="networkPrefs">
+            {languageSwitch}
+            {themeToggle}
+          </div>
+        </div>
+      </div>
     </>
   );
 }

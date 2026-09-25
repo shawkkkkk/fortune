@@ -52,3 +52,48 @@ export function AuspiciousCloud({ className = "" }: OrnamentProps) {
     </svg>
   );
 }
+
+// Cloud bank used where cinematic sections hand over to the next one. Two
+// layers of overlapping circles; the rim pass leaves a thin gold edge.
+const CLOUD_BACK = [
+  [-40, 127, 84], [77, 121, 105], [173, 124, 98], [288, 121, 101], [412, 120, 77],
+  [509, 144, 91], [605, 123, 79], [732, 121, 91], [876, 125, 100], [982, 121, 104],
+  [1110, 143, 101], [1205, 120, 78], [1332, 136, 72], [1450, 125, 73],
+] as const;
+
+const CLOUD_FRONT = [
+  [-40, 193, 71], [77, 164, 63], [188, 170, 88], [285, 193, 58], [363, 161, 88],
+  [476, 189, 65], [593, 185, 86], [687, 195, 81], [790, 177, 75], [879, 173, 63],
+  [958, 177, 88], [1065, 179, 83], [1167, 196, 70], [1245, 190, 59], [1345, 179, 62],
+  [1428, 184, 83], [1504, 162, 94],
+] as const;
+
+export function CloudBand({ className = "" }: OrnamentProps) {
+  return (
+    <svg
+      className={["cloudBand", className].filter(Boolean).join(" ")}
+      viewBox="0 0 1440 260"
+      preserveAspectRatio="xMidYMax slice"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <g className="cloudBandBack">
+        {CLOUD_BACK.map(([x, y, r]) => (
+          <circle key={x} cx={x} cy={y} r={r} />
+        ))}
+        <rect x="-80" y="150" width="1600" height="110" />
+      </g>
+      <g className="cloudBandRim">
+        {CLOUD_FRONT.map(([x, y, r]) => (
+          <circle key={x} cx={x} cy={y} r={r + 2.5} />
+        ))}
+      </g>
+      <g className="cloudBandFront">
+        {CLOUD_FRONT.map(([x, y, r]) => (
+          <circle key={x} cx={x} cy={y} r={r} />
+        ))}
+        <rect x="-80" y="200" width="1600" height="60" />
+      </g>
+    </svg>
+  );
+}

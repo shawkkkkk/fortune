@@ -23,6 +23,8 @@ jobs:
       - run: npm run build
 
       - name: Boot production server
+        env:
+          FORTUNE_UPLOADS_ENABLED: "false"
         run: |
           npm run start > /tmp/fortune-next.log 2>&1 &
           echo $! > /tmp/fortune-next.pid
@@ -47,6 +49,26 @@ jobs:
 
       - name: Production-runtime smoke gate
         run: npm run smoke:release
+
+      # Keep browser tooling outside the frozen Standard dependency manifests.
+      - name: Install isolated creator-flow browser runner
+        run: |
+          npm install --prefix /tmp/fortune-browser --no-package-lock --ignore-scripts --no-audit playwright@1.63.0
+          /tmp/fortune-browser/node_modules/.bin/playwright install --with-deps chromium
+
+      - name: Desktop and mobile creator-flow regressions
+        env:
+          FORTUNE_PLAYWRIGHT_MODULE: /tmp/fortune-browser/node_modules/playwright/index.mjs
+        run: node tests/e2e/creator-flow.mjs
+
+      - name: Upload creator-flow screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: creator-flow-browser
+          path: .tmp/creator-browser/
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Show server log on failure
         if: failure()

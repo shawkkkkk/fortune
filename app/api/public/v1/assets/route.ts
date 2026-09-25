@@ -92,6 +92,8 @@ export async function GET(request: Request) {
         totalRegistered: result.assets.length,
         returned: assets.length,
         chainId: result.chainId,
+        blockNumber: result.blockNumber,
+        blockHash: result.blockHash,
       },
       {
         cacheSeconds: 8,

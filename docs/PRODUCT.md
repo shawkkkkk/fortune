@@ -34,7 +34,7 @@ Fortune's longer-term research combines:
 ## Launch wizard
 
 ### 1. Token
-Name, ticker and square image URI. Image hosting must exist before launch; a permanent upload service is not wired yet. Optional description and links are in Advanced.
+Name, ticker, square image, description and optional project links. File selection/preview and an optional authenticated IPFS upload integration are implemented in the creator-flow branch; hosting must be configured and verified before uploads work. Public URL/IPFS input remains available. Custom metadata JSON import copies supported fields into the frozen onchain record, not a metadata-URI override. See `CREATOR_FLOW.md` for exact behavior and activation prerequisites.
 
 ### 2. Launch type
 Standard or Burn + Rewards. V2 stays disabled until its hook, accounting, fork tests, audit and release gate pass.
@@ -46,7 +46,7 @@ Select only from the live onchain approved registry. Mainnet v1 is pinned to WBN
 Show the quote amount, approve if needed, simulate output and enforce a meaningful minimum. Disclose the first-five-second Launch Shield impact.
 
 ### 5. Review and launch
-Show fixed token, pair, fee and liquidity terms before signature. Standard defaults to immutable display metadata. Put supply, price slope, graduation target and optional links in Advanced.
+Show fixed token, description, links, pair, fee and liquidity terms before signature. Standard defaults to immutable display metadata. Put supply, price slope and graduation target in Advanced. Save/restore/delete browser-local drafts without persisting wallet authority or review consent; unuploaded files are not included.
 
 ## Current release boundary
 

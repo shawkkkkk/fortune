@@ -20,6 +20,11 @@ import {
 } from "@/lib/fortune-network";
 
 import { assertWalletIdentity, parseLaunchAmount, restorePendingLaunch, type PendingLaunch } from "@/lib/launch-safety";
+import TokenImageInput from "@/components/TokenImageInput";
+import PairAddressCheck from "@/components/PairAddressCheck";
+import { assets as discoveryAssets } from "@/data/assets";
+import { byteLength, importMetadataUri, validateCreatorMetadata, type CreatorMetadata } from "@/lib/creator-metadata";
+import { launchDraftKey, makeLaunchDraft, restoreLaunchDraft, type LaunchDraft } from "@/lib/launch-draft";
 
 type LaunchMode = "standard";
 
@@ -268,43 +273,6 @@ function short(value: string) {
   return value.slice(0, 8) + "…" + value.slice(-6);
 }
 
-function publicMetadataUrl(
-  label: string,
-  value: string,
-  options?: { allowIpfs?: boolean }
-) {
-  const clean = value.trim();
-  if (!clean) return "";
-  if (clean.length > 512) {
-    throw new Error(label + " must be 512 characters or fewer.");
-  }
-  if (options?.allowIpfs && clean.toLowerCase().startsWith("ipfs://")) {
-    return clean;
-  }
-
-  let parsed: URL;
-  try {
-    parsed = new URL(clean);
-  } catch {
-    throw new Error(
-      label +
-        " must be a valid http(s) URL" +
-        (options?.allowIpfs ? " or ipfs:// URI." : ".")
-    );
-  }
-
-  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
-    throw new Error(
-      label +
-        " must use http:// or https://" +
-        (options?.allowIpfs
-          ? " (image metadata may also use ipfs://)."
-          : ".")
-    );
-  }
-  return clean;
-}
-
 export default function LaunchPage() {
   const mode: LaunchMode = "standard";
   const [account, setAccount] = useState<Address | null>(null);
@@ -329,6 +297,13 @@ export default function LaunchPage() {
   const [youtube, setYoutube] = useState("");
   const [debox, setDebox] = useState("");
   const [busy, setBusy] = useState(false);
+  const [metadataBusy, setMetadataBusy] = useState(false);
+  const [metadataURI, setMetadataURI] = useState("");
+  const [importedMetadata, setImportedMetadata] = useState<CreatorMetadata | null>(null);
+  const [metadataMessage, setMetadataMessage] = useState("");
+  const [savedDraft, setSavedDraft] = useState<LaunchDraft | null>(null);
+  const [draftMessage, setDraftMessage] = useState("");
+  const [assetCategory, setAssetCategory] = useState("Approved");
   const [message, setMessage] = useState("");
   const [receipt, setReceipt] = useState<LaunchReceipt | null>(null);
   const [reviewed, setReviewed] = useState(false);
@@ -336,6 +311,54 @@ export default function LaunchPage() {
   const [storageLoaded, setStorageLoaded] = useState(false);
   const signing = useRef(false);
   const pendingKey = `fortune:launch:${FORTUNE_NETWORK.chainId}:${FORTUNE_NETWORK.contracts.factory.toLowerCase()}`;
+  const draftKey = launchDraftKey(FORTUNE_NETWORK.chainId, FORTUNE_NETWORK.contracts.factory);
+
+  function currentMetadata(): CreatorMetadata {
+    return { name, symbol, description, imageURI, website, xProfile, telegram, github, youtube, debox };
+  }
+  function applyMetadata(meta: CreatorMetadata) {
+    setName(meta.name); setSymbol(meta.symbol); setDescription(meta.description); setImageURI(meta.imageURI);
+    setWebsite(meta.website); setXProfile(meta.xProfile); setTelegram(meta.telegram);
+    setGithub(meta.github); setYoutube(meta.youtube); setDebox(meta.debox); setReviewed(false);
+  }
+  useEffect(() => {
+    try { setSavedDraft(restoreLaunchDraft(localStorage.getItem(draftKey), FORTUNE_NETWORK.chainId, FORTUNE_NETWORK.contracts.factory)); }
+    catch { setDraftMessage("Browser storage is unavailable. Drafts cannot be saved on this device."); }
+  }, [draftKey]);
+  function saveDraft() {
+    try {
+      const draft = makeLaunchDraft({ ...currentMetadata(), metadataURI, totalSupply, basePrice, slope, graduationTarget, creatorPurchase, treasury, selectedAsset }, FORTUNE_NETWORK.chainId, FORTUNE_NETWORK.contracts.factory);
+      localStorage.setItem(draftKey, JSON.stringify(draft)); setSavedDraft(draft);
+      setDraftMessage("Draft saved on this browser. No transaction submitted. Unuploaded image files are not included.");
+    } catch (e) { setDraftMessage(e instanceof Error ? e.message : "Draft could not be saved. Browser storage may be full."); }
+  }
+  function restoreDraft() {
+    if (!savedDraft) return;
+    applyMetadata(savedDraft.fields);
+    const fields = savedDraft.fields;
+    setTotalSupply(fields.totalSupply); setBasePrice(fields.basePrice); setSlope(fields.slope);
+    setGraduationTarget(fields.graduationTarget); setCreatorPurchase(fields.creatorPurchase); setTreasury(fields.treasury);
+    setMetadataURI(fields.metadataURI); setImportedMetadata(null);
+    const validPair = assets.find((asset) => asset.launchable && asset.address.toLowerCase() === fields.selectedAsset?.toLowerCase());
+    setSelectedAsset(validPair?.address || null); setReviewed(false);
+    setDraftMessage(validPair ? "Draft restored. Review every field again before launching." : "Draft restored. Choose a currently approved pair before launching.");
+  }
+  async function loadMetadata() {
+    setMetadataBusy(true); setMetadataMessage(""); setImportedMetadata(null); setReviewed(false);
+    try { setImportedMetadata(await importMetadataUri(metadataURI)); }
+    catch (e) { setMetadataMessage(e instanceof Error ? e.message : "Metadata import failed. Check the URL and CORS settings."); }
+    finally { setMetadataBusy(false); }
+  }
+  function reviewLaunch() {
+    try {
+      validateCreatorMetadata(currentMetadata());
+      parseLaunchAmount("Token supply", totalSupply); parseLaunchAmount("Opening price", basePrice);
+      parseLaunchAmount("Slope", slope); parseLaunchAmount("Graduation target", graduationTarget);
+      parseLaunchAmount("Creator first purchase", creatorPurchase, selected?.decimals ?? 18);
+      if (!selected?.launchable) throw new Error("Choose a currently approved pair.");
+      setMessage(""); setReviewed(true);
+    } catch (e) { setMessage(e instanceof Error ? e.message : "Review the launch fields."); setReviewed(false); }
+  }
 
   useEffect(() => {
     try {
@@ -427,6 +450,11 @@ export default function LaunchPage() {
     );
   }, [assets, assetSearch]);
 
+  const discoveryRows = useMemo(() => discoveryAssets.filter((asset) => asset.chain === "BSC" && asset.address &&
+    (assetCategory === "All BNB" || asset.category === assetCategory) &&
+    [asset.name, asset.symbol, asset.address].join(" ").toLowerCase().includes(assetSearch.toLowerCase().trim()) &&
+    !(FORTUNE_NETWORK.chainId === 56 && assets.some((active) => active.address.toLowerCase() === asset.address!.toLowerCase()))), [assets, assetSearch, assetCategory]);
+
   const selected = assets.find(
     (asset) => asset.address.toLowerCase() === selectedAsset?.toLowerCase()
   ) || null;
@@ -487,10 +515,11 @@ export default function LaunchPage() {
     setReceipt(null);
 
     try {
-      if (!FORTUNE_NETWORK_CONFIGURED || mode !== "standard") {
+      if (metadataBusy || !reviewed || !FORTUNE_NETWORK_CONFIGURED || mode !== "standard") {
         throw new Error("This launch stack is not configured. Mainnet stays blocked until the Standard release gates pass.");
       }
       await requireLiveRelease();
+      const validatedMetadata = validateCreatorMetadata(currentMetadata());
 
       // Re-confirm the production network immediately before constructing any
       // real-value transaction; a previously connected account may have since
@@ -502,8 +531,8 @@ export default function LaunchPage() {
         throw new Error("Choose a launchable payment asset.");
       }
 
-      const cleanName = name.trim();
-      const cleanSymbol = symbol.trim().toUpperCase();
+      const cleanName = validatedMetadata.name;
+      const cleanSymbol = validatedMetadata.symbol;
 
       if (!cleanName || cleanName.length > 64) {
         throw new Error("Token name must be 1–64 characters.");
@@ -538,16 +567,7 @@ export default function LaunchPage() {
         creatorPurchase,
         selected.decimals
       );
-      const meta = {
-        description: description.trim().slice(0, 4096),
-        imageURI: publicMetadataUrl("Image", imageURI, { allowIpfs: true }),
-        website: publicMetadataUrl("Website", website),
-        xProfile: publicMetadataUrl("X / Twitter", xProfile),
-        telegram: publicMetadataUrl("Telegram", telegram),
-        github: publicMetadataUrl("GitHub", github),
-        youtube: publicMetadataUrl("YouTube", youtube),
-        debox: publicMetadataUrl("DeBox", debox),
-      };
+      const { name: _name, symbol: _symbol, ...meta } = validatedMetadata;
 
       const { publicClient, walletClient } = clients(wallet);
       let hash: Hex;
@@ -689,7 +709,13 @@ export default function LaunchPage() {
 
       <div className="launchLayout">
         <div className="launchMain">
-          <fieldset aria-label="Token launch details" disabled={busy || Boolean(pending)} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
+          <fieldset aria-label="Token launch details" disabled={busy || metadataBusy || Boolean(pending)} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
+          <section className="creatorDraftBar" aria-label="Launch draft">
+            <div className="creatorToolbar"><strong>Your launch draft</strong><button type="button" className="secondaryCta" onClick={saveDraft}>Save draft</button>
+              {savedDraft ? <><button type="button" className="secondaryCta" onClick={restoreDraft}>Restore draft</button><button type="button" className="secondaryCta" onClick={() => { try { localStorage.removeItem(draftKey); setSavedDraft(null); setDraftMessage("Saved draft deleted. Current form is unchanged."); } catch { setDraftMessage("Could not delete the saved draft."); } }}>Delete saved draft</button></> : null}
+            </div><p className="fieldHint">Saved only in this browser, not to your wallet or the cloud. Restore replaces the current form. No funds move.</p>
+            {draftMessage ? <p role="status" className="fieldHint">{draftMessage}</p> : null}
+          </section>
           <ol className="journeySteps" aria-label="Launch steps">
             <li><span>1</span>Name + ticker + image</li><li><span>2</span>Launch type</li><li><span>3</span>Pair asset</li><li><span>4</span>First buy</li><li><span>5</span>Review + launch</li>
           </ol>
@@ -698,9 +724,28 @@ export default function LaunchPage() {
             <div className="formSectionTitle"><span>01</span><div><h2>Token identity</h2><p>These details are visible to everyone.</p></div></div>
             <div className="fieldGrid">
               <label>Token name<input value={name} maxLength={64} onChange={(event) => { setName(event.target.value); setReviewed(false); }} placeholder="Your token name" /></label>
-              <label>Ticker<input value={symbol} maxLength={16} onChange={(event) => { setSymbol(event.target.value.toUpperCase()); setReviewed(false); }} placeholder="LUCK" /></label>
-              <label>Image URL or IPFS URI<input value={imageURI} onChange={(event) => { setImageURI(event.target.value); setReviewed(false); }} placeholder="https://… or ipfs://…" /><small className="fieldHint">Host a square image publicly first. Fortune records this link immutably at launch; image upload hosting is still being prepared.</small></label>
+              <label>Ticker<input value={symbol} maxLength={16} onChange={(event) => { setSymbol(event.target.value); setReviewed(false); }} placeholder="LUCK" /></label>
             </div>
+            <TokenImageInput value={imageURI} disabled={busy || metadataBusy || Boolean(pending)} onChange={(value) => { setImageURI(value); setReviewed(false); }} onBusy={setMetadataBusy} />
+            <label>Description · optional<textarea value={description} maxLength={4096} rows={4} onChange={(event) => { setDescription(event.target.value); setReviewed(false); }} placeholder="What is your token about?" /><small className="fieldHint">{byteLength(description)} / 4096 UTF-8 bytes</small></label>
+            <h3>Project links</h3><p className="fieldHint">Optional. Stored as fixed onchain metadata with your token.</p>
+            <div className="fieldGrid">
+              <label>Website · optional<input value={website} maxLength={512} onChange={(event) => { setWebsite(event.target.value); setReviewed(false); }} placeholder="https://…" /></label>
+              <label>X · optional<input value={xProfile} maxLength={512} onChange={(event) => { setXProfile(event.target.value); setReviewed(false); }} placeholder="https://x.com/…" /></label>
+              <label>Telegram · optional<input value={telegram} maxLength={512} onChange={(event) => { setTelegram(event.target.value); setReviewed(false); }} placeholder="https://t.me/…" /></label>
+            </div>
+            <details className="creatorExtraLinks"><summary>More project links</summary><div className="fieldGrid">
+              <label>GitHub · optional<input value={github} maxLength={512} onChange={(event) => { setGithub(event.target.value); setReviewed(false); }} placeholder="https://github.com/…" /></label>
+              <label>YouTube · optional<input value={youtube} maxLength={512} onChange={(event) => { setYoutube(event.target.value); setReviewed(false); }} placeholder="https://youtube.com/…" /></label>
+              <label>DeBox · optional<input value={debox} maxLength={512} onChange={(event) => { setDebox(event.target.value); setReviewed(false); }} placeholder="https://…" /></label>
+            </div></details>
+            <details className="creatorExtraLinks"><summary>Advanced · custom metadata URI</summary>
+              <p className="fieldHint">Import JSON into the fields above. Standard stores those fields onchain, not the JSON URI. Unknown JSON fields are ignored; imported fields replace the current identity only when you apply them.</p>
+              <div className="creatorToolbar"><label>Metadata URI<input value={metadataURI} maxLength={512} onChange={(e) => { setMetadataURI(e.target.value); setImportedMetadata(null); }} placeholder="https://…/metadata.json or ipfs://…" /></label><button type="button" className="secondaryCta" disabled={!metadataURI.trim()} onClick={() => void loadMetadata()}>Load metadata</button></div>
+              <p className="fieldHint">The JSON must include name, symbol and image. Public HTTPS hosts must allow CORS. No server proxy or wallet signature is used.</p>
+              {importedMetadata ? <div className="metadataImportPreview"><strong translate="no">{importedMetadata.name} · {importedMetadata.symbol}</strong><p translate="no">{importedMetadata.description}</p><p translate="no">{importedMetadata.imageURI}</p><button type="button" className="secondaryCta" onClick={() => { applyMetadata(importedMetadata); setImportedMetadata(null); setMetadataMessage("Metadata fields imported. Check the description, image and every link before reviewing."); }}>Apply imported fields</button></div> : null}
+              {metadataMessage ? <p role="status" className="fieldHint">{metadataMessage}</p> : null}
+            </details>
           </section>
 
           <section className="formCard">
@@ -708,11 +753,17 @@ export default function LaunchPage() {
             <div className="launchModeRow">
               <button type="button" className="selectedMode" aria-pressed="true"><strong>Standard</strong><span>Fixed supply · Pancake V3 · permanently locked LP position</span></button>
               <button type="button" disabled aria-disabled="true" title="Separate testnet research and audit required"><strong>Burn + Rewards</strong><span>Pair-asset holder claims via Infinity hook · v2 in research</span></button>
+              <button type="button" disabled aria-disabled="true"><strong>Dev Launch</strong><span>Custom creator-fee model · not implemented or approved</span></button>
             </div>
           </section>
 
           <section className="formCard">
             <div className="formSectionTitle"><span>03</span><div><h2>Pair asset</h2><p>Only live registry-approved assets are selectable.</p></div></div>
+            <div className="poolScope"><strong>One pair · one graduation pool</strong><p className="fieldHint">Two-to-five-pool launches require a separate reviewed release. This form does not enable multi-pair research or change the frozen Standard candidate.</p></div>
+            <div className="creatorTabs" aria-label="Pair categories">
+              {["Approved", "All BNB", "Majors", "Stablecoins", "DeFi", "RWAs", "xStocks", "Any token"].map((category) => <button type="button" key={category} className={assetCategory === category ? "active" : ""} aria-pressed={assetCategory === category} onClick={() => setAssetCategory(category)}>{category}</button>)}
+            </div>
+            {assetCategory === "Any token" ? <PairAddressCheck onSelect={(address) => { const match = assets.find((asset) => asset.launchable && asset.address.toLowerCase() === address.toLowerCase()); if (!match) return false; setSelectedAsset(match.address); setReviewed(false); return true; }} /> : <>
             <div className="assetPickerToolbar">
               <input aria-label="Search approved pair assets" value={assetSearch} onChange={(event) => setAssetSearch(event.target.value)} placeholder="Search approved BNB assets" />
               <Link href="/assets" className="secondaryCta">Pair policy →</Link>
@@ -720,10 +771,13 @@ export default function LaunchPage() {
             {assetError ? <div className="registryNotice statusError"><strong>ASSET READ FAILED</strong><span>{assetError}</span></div> : null}
             {visibleAssets.length === 0 && !assetError ? <div className="emptyPanel"><strong>No approved pair found.</strong><p>Asset discovery alone does not mean an asset is safe to pair.</p></div> : null}
             <div className="launchAssetGrid">
-              {visibleAssets.map((asset) => <button type="button" key={asset.address} className={selectedAsset?.toLowerCase() === asset.address.toLowerCase() ? "assetOption assetSelected" : "assetOption"} aria-pressed={selectedAsset?.toLowerCase() === asset.address.toLowerCase()} onClick={() => { setSelectedAsset(asset.address); setReviewed(false); }}>
+              {visibleAssets.filter((asset) => assetCategory === "Approved" || assetCategory === "All BNB" || asset.category === assetCategory).map((asset) => <button type="button" key={asset.address} className={selectedAsset?.toLowerCase() === asset.address.toLowerCase() ? "assetOption assetSelected" : "assetOption"} aria-pressed={selectedAsset?.toLowerCase() === asset.address.toLowerCase()} onClick={() => { setSelectedAsset(asset.address); setReviewed(false); }}>
                 <span className="assetIconLarge">{asset.symbol.slice(0, 2)}</span><span><strong>{asset.symbol}</strong><small>{asset.name}</small></span><em>{asset.category}</em>
               </button>)}
+              {assetCategory !== "Approved" ? discoveryRows.map((asset) => <div className="assetOption discoveryPair" key={asset.id}><span className="assetIconLarge" translate="no">{asset.symbol.slice(0, 2)}</span><span><strong translate="no">{asset.symbol}</strong><small>{asset.name}</small><small>Discovery only · not selectable</small></span><em>{asset.category}</em></div>) : null}
             </div>
+            {assetCategory !== "Approved" ? <p className="fieldHint">Catalog entries are not registry approval. Mainnet Standard is WBNB-only; testnet uses its own valueless assets. Tokenized stocks require a verified compatible BSC deployment and separate eligibility review. <Link href="/assets">Explore pair research →</Link></p> : null}
+            </>}
           </section>
 
           <section className="formCard">
@@ -733,7 +787,7 @@ export default function LaunchPage() {
           </section>
 
           <details className="advancedLaunch">
-            <summary>Advanced · curve economics and profile links</summary>
+            <summary>Advanced · curve economics</summary>
             <p>These research defaults mirror the mainnet fork rehearsal. They remain subject to independent economic review and onchain preflight.</p>
             <div className="fieldGrid">
               <label>Total token supply<input value={totalSupply} inputMode="decimal" onChange={(event) => { setTotalSupply(event.target.value); setReviewed(false); }} /></label>
@@ -741,19 +795,12 @@ export default function LaunchPage() {
               <label>Slope · USD per token<input value={slope} inputMode="decimal" onChange={(event) => { setSlope(event.target.value); setReviewed(false); }} /></label>
               <label>Graduation target · USD<input value={graduationTarget} inputMode="decimal" onChange={(event) => { setGraduationTarget(event.target.value); setReviewed(false); }} /></label>
               <label>Community treasury · optional<input value={treasury} onChange={(event) => { setTreasury(event.target.value); setReviewed(false); }} placeholder="Defaults to creator wallet" /></label>
-              <label>Website · optional<input value={website} onChange={(event) => { setWebsite(event.target.value); setReviewed(false); }} placeholder="https://…" /></label>
-              <label>X · optional<input value={xProfile} onChange={(event) => { setXProfile(event.target.value); setReviewed(false); }} placeholder="https://x.com/…" /></label>
-              <label>Telegram · optional<input value={telegram} onChange={(event) => { setTelegram(event.target.value); setReviewed(false); }} placeholder="https://t.me/…" /></label>
-              <label>GitHub · optional<input value={github} onChange={(event) => { setGithub(event.target.value); setReviewed(false); }} /></label>
-              <label>YouTube · optional<input value={youtube} onChange={(event) => { setYoutube(event.target.value); setReviewed(false); }} /></label>
-              <label>DeBox · optional<input value={debox} onChange={(event) => { setDebox(event.target.value); setReviewed(false); }} /></label>
             </div>
-            <label>Description · optional<textarea value={description} maxLength={4096} onChange={(event) => { setDescription(event.target.value); setReviewed(false); }} /></label>
           </details>
 
           <section className="formCard">
             <div className="formSectionTitle"><span>05</span><div><h2>Review and launch</h2><p>Confirm the immutable details before signing.</p></div></div>
-            {!reviewed ? <button className="launchButton" disabled={!name.trim() || !symbol.trim() || !imageURI.trim() || !selected} onClick={() => { setMessage(""); setReviewed(true); }}>Review launch →</button> : <>
+            {!reviewed ? <button className="launchButton" disabled={!name.trim() || !symbol.trim() || !imageURI.trim() || !selected} onClick={reviewLaunch}>Review launch →</button> : <>
               <div className="reviewSummary">
                 <div><span>Token</span><strong translate="no">{name.trim()} · {symbol.trim()}</strong></div>
                 <div><span>Pair</span><strong>{selected?.symbol || "—"} · {selected ? short(selected.address) : "—"}</strong></div>
@@ -762,6 +809,8 @@ export default function LaunchPage() {
                 <div><span>Fee route</span><strong>0.5% creator · 0.5% protocol</strong></div>
                 <div><span>Liquidity / mode</span><strong>Pancake V3 · Standard · fixed metadata</strong></div>
                 <div><span>Image URI</span><strong translate="no">{imageURI}</strong></div>
+                <div><span>Description</span><strong translate="no">{description || "—"}</strong></div>
+                {[["Website", website], ["X", xProfile], ["Telegram", telegram], ["GitHub", github], ["YouTube", youtube], ["DeBox", debox]].filter(([, url]) => url).map(([label, url]) => <div key={label}><span>{label}</span><strong translate="no">{url}</strong></div>)}
               </div>
               <p className="reviewWarning">An approved pair and wallet transaction are required. Fortune checks the current chain, release state and onchain preflight again before any submission.</p>
               <div className="reviewActions">

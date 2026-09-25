@@ -93,7 +93,7 @@ export async function GET(request: Request) {
             },
           },
           responses: {
-            "200": { description: "Static compatibility and Fortune approval state" },
+            "200": { description: "Active-chain contract reads, live registry eligibility and Standard asset-policy restrictions at a verified block. Not an audit or transaction authorization." },
             "400": { description: "Invalid address or JSON" },
             "503": { description: "BSC RPC unavailable or not configured" },
           },
@@ -163,6 +163,13 @@ export async function GET(request: Request) {
             },
           ],
           responses: { "200": { description: "Token markets" } },
+        },
+      },
+      "/tokens/{id}/metadata": {
+        get: {
+          tags: ["Markets"], summary: "Verified Standard project metadata with onchain provenance",
+          parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+          responses: { "200": { description: "Creator-supplied metadata, filtered public links, registry/factory/creator binding, frozen flag and block evidence" }, "404": { description: "Not a verified Standard launch" }, "503": { description: "Onchain metadata unavailable" } },
         },
       },
       "/tokens/{id}": {

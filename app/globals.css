@@ -1891,6 +1891,28 @@ label.fieldGrid {
   background: var(--surface-sunk);
 }
 
+.creatorDraftBar { margin: 0 0 24px; padding: 18px; border: 1px solid var(--line); border-radius: 16px; }
+.creatorToolbar { display: flex; align-items: end; flex-wrap: wrap; gap: 12px; margin: 12px 0; }
+.creatorToolbar label { flex: 1 1 220px; min-width: 0; }
+.creatorToolbar > span, .metadataImportPreview { overflow-wrap: anywhere; }
+.creatorImageInput { margin: 20px 0; }
+.imageDropzone { display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 10px; border: 1px dashed var(--red); border-radius: 16px; padding: 24px; text-align: center; background: var(--surface); cursor: pointer; }
+.imageDropzone img { object-fit: cover; border-radius: 18px; }
+.imageDropzone input { max-width: 100%; width: auto; padding: 8px; }
+.imageDropzone span { font-size: 13px; }
+.imageDropzone .uploadGlyph { font-size: 36px; color: var(--red); }
+.creatorExtraLinks { margin-top: 20px; }
+.creatorExtraLinks summary { cursor: pointer; font-weight: 700; padding: 8px 0; }
+.creatorTabs { display: flex; gap: 8px; flex-wrap: wrap; margin: 18px 0; }
+.creatorTabs button { border: 1px solid var(--line); background: transparent; color: inherit; border-radius: 24px; padding: 9px 15px; cursor: pointer; }
+.creatorTabs button.active { background: var(--ink); border-color: var(--ink); color: var(--surface); }
+.poolScope { margin-top: 18px; }
+.discoveryPair { opacity: .7; cursor: default; }
+.metadataImportPreview { padding: 14px; margin-top: 12px; border: 1px solid var(--line); border-radius: 12px; }
+.reviewSummary strong { overflow-wrap: anywhere; white-space: pre-wrap; }
+.tokenProjectProfile { margin-top: 24px; }
+.tokenProjectProfile img { object-fit: cover; border-radius: 16px; margin: 12px 0; }
+.projectDescription { white-space: pre-wrap; overflow-wrap: anywhere; }
 .assetPickerToolbar {
   display: flex;
   align-items: center;

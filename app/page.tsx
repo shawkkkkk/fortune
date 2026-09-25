@@ -22,18 +22,15 @@ export default function HomePage() {
       <section className="heroSection">
         <div>
           <div className="heroBrandLockup"><FortuneLogo size="lg" /></div>
-          <div className="eyebrow">THE BNB-NATIVE LAUNCHPAD</div>
-          <h1>Launch a token. Pick what it trades against. Graduate to locked liquidity.</h1>
+          <div className="eyebrow">LET&apos;S MAKE SOMETHING FUN.</div>
+          <h1>Meme coins, paired with the BNB economy.</h1>
           <p>
-            Fortune combines bonding-curve discovery with BNB Chain&apos;s asset
-            universe. Start simple with BNB, then expand into stables, DeFi,
-            tokenized stocks and reviewed BEP-20 pairs without turning the launch
-            flow into a control panel.
+            Launch against BNB, stablecoins, BNB-native assets, tokenized stocks,
+            or eventually any compatible BEP-20 that passes Fortune&apos;s checks.
           </p>
           <div className="heroActions">
-            <Link href={launchHref} className="primaryCta">Launch →</Link>
-            <Link href="/explore" className="secondaryCta">Explore</Link>
-            <Link href="/docs" className="secondaryCta">How it works</Link>
+            <Link href={launchHref} className="primaryCta">Launch a token</Link>
+            <Link href="/explore" className="secondaryCta">Explore tokens</Link>
           </div>
           <p className="dataDisclaimer">
             {FORTUNE_NETWORK.isMainnet
@@ -63,25 +60,52 @@ export default function HomePage() {
       <section className="contentSection">
         <div className="sectionHeader">
           <div>
-            <span className="eyebrow">THE SIMPLE FLOW</span>
-            <h2>One launch flow. BNB-sized expansion underneath.</h2>
+            <span className="eyebrow">THREE RULES</span>
+            <h2>The whole product should fit in your head.</h2>
           </div>
         </div>
         <div className="automationGrid">
           <article className="automationCard">
-            <div className="automationTop"><span className="automationIcon">01</span><span className="automationStatus statusHealthy">CREATE</span></div>
-            <h2>Pick a launch type</h2>
-            <p>Standard keeps the token simple. Burn + Rewards adds immutable burn/reward mechanics only when the separate reviewed stack is available.</p>
+            <div className="automationTop">
+              <span className="automationIcon">01</span>
+              <span className="automationStatus statusHealthy">
+                {FORTUNE_TAX_NETWORK_CONFIGURED ? "ENABLED" : "V2 IN REVIEW"}
+              </span>
+            </div>
+            <h2>No dumping</h2>
+            <p>
+              Burn + Rewards v2 is being built so Fortune never sells the
+              launch-token fee stream to fund rewards. Token-side fees burn.
+              Pair-asset fees stay pair assets.
+            </p>
+            <strong>No reward-funded sell pressure.</strong>
           </article>
           <article className="automationCard">
-            <div className="automationTop"><span className="automationIcon">02</span><span className="automationStatus statusHealthy">PAIR</span></div>
-            <h2>Choose the pair</h2>
-            <p>The pair asset is what traders contribute on the curve, what graduates into the pool, and what future reward designs can account in.</p>
+            <div className="automationTop">
+              <span className="automationIcon">02</span>
+              <span className="automationStatus statusHealthy">
+                {FORTUNE_TAX_NETWORK_CONFIGURED ? "ENABLED" : "V2 IN REVIEW"}
+              </span>
+            </div>
+            <h2>Holders get paid</h2>
+            <p>
+              The target Burn + Rewards market pays holder rewards in the pair
+              asset itself — BNB, a stablecoin, a stock representation, or
+              another reviewed BNB asset — without selling the meme coin first.
+            </p>
+            <strong>Rewards in what the token trades against.</strong>
           </article>
           <article className="automationCard">
-            <div className="automationTop"><span className="automationIcon">03</span><span className="automationStatus statusHealthy">GRADUATE</span></div>
-            <h2>Lock the market</h2>
-            <p>Eligible standard launches graduate atomically into Pancake V3 and the resulting LP-position NFT is permanently locked by Fortune.</p>
+            <div className="automationTop">
+              <span className="automationIcon">03</span>
+              <span className="automationStatus statusHealthy">BNB NATIVE</span>
+            </div>
+            <h2>Pair with anything</h2>
+            <p>
+              Start with BNB. Expand into USDT/USDC, BTCB, ETH, CAKE,
+              tokenized stocks/RWAs and eventually compatibility-checked BEP-20s.
+            </p>
+            <strong>The BNB economy becomes the pair menu.</strong>
           </article>
         </div>
       </section>

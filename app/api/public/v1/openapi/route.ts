@@ -200,6 +200,37 @@ export async function GET(request: Request) {
           responses: { "200": { description: "Launch ledger" } },
         },
       },
+      "/markets": {
+        get: {
+          tags: ["Markets"],
+          summary: "Explore board: live prices, market caps, pair assets and bounded trade activity",
+          description:
+            "Graduated tokens are priced from the official Pancake pools that hold Fortune's locked liquidity. Activity comes from a bounded eth_getLogs ledger and is null unless its coverage spans the whole window; ledger.coverage states the exact block range. Sorts other than newest rank the 100 most recent launches.",
+          parameters: [
+            { name: "sort", in: "query", schema: { type: "string", enum: ["newest", "volume24h", "trending", "marketCap"] } },
+            { name: "offset", in: "query", schema: { type: "integer", minimum: 0 } },
+            { name: "limit", in: "query", schema: { type: "integer", minimum: 1, maximum: 25 } },
+          ],
+          responses: {
+            "200": { description: "Ranked markets; sortAvailable is false when the ledger cannot support the requested ranking" },
+            "400": { description: "Unknown sort or out-of-range offset" },
+          },
+        },
+      },
+      "/markets/{token}": {
+        get: {
+          tags: ["Markets"],
+          summary: "One market: live summary, pair weights and reserves, canonical price chart and recent trades",
+          parameters: [
+            { name: "token", in: "path", required: true, schema: { type: "string" } },
+            { name: "range", in: "query", schema: { type: "string", enum: ["24h", "7d", "30d"] } },
+          ],
+          responses: {
+            "200": { description: "Market detail; chart.ledger.coversRange is false when the log provider could not serve the whole range" },
+            "404": { description: "Not recorded by the configured Fortune factories" },
+          },
+        },
+      },
       "/launches/preview": {
         post: {
           tags: ["Launches"],

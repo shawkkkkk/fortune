@@ -1,0 +1,32 @@
+name: Burn and Rewards v2 Research
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "contracts-v2/**"
+      - ".github/workflows/burn-rewards-v2-research.yml"
+  pull_request:
+    paths:
+      - "contracts-v2/**"
+      - ".github/workflows/burn-rewards-v2-research.yml"
+  workflow_dispatch:
+
+jobs:
+  isolated-v2:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09
+        with:
+          version: v1.8.3
+      - name: Install pinned research dependencies
+        working-directory: contracts
+        run: |
+          forge install OpenZeppelin/openzeppelin-contracts@69c8def5f222ff96f2b5beff05dfba996368aa79 --no-commit
+          forge install foundry-rs/forge-std@8bbcf6e3f8f62f419e5429a0bd89331c85c37824 --no-commit
+      - name: Run isolated reward accounting fuzz suite
+        working-directory: contracts-v2
+        run: forge test --fuzz-runs 1000 -vv

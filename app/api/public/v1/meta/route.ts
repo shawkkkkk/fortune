@@ -1,4 +1,5 @@
 import { apiOk } from "@/lib/public-api";
+import { MAINNET_ACTIVATION_READY, MAINNET_RELEASE } from "@/lib/mainnet-release";
 
 export const revalidate = 3600;
 
@@ -26,16 +27,23 @@ export async function GET() {
         "cache public reads; isolate writes",
         "never auto-resubmit an uncertain transaction",
       ],
-      features: {
+      productionScope: {
+        mainnetActivationReady: MAINNET_ACTIVATION_READY,
+        standardLaunches: MAINNET_ACTIVATION_READY && MAINNET_RELEASE.scope.standardLaunches,
+        maximumInitialRegistryAssets: MAINNET_RELEASE.scope.maximumInitialRegistryAssets,
+        burnRewardsV2: false,
+        tokenizedStocksAndRwas: false,
+      },
+      researchCapabilities: {
         basketCurve: true,
-        multiQuoteAssets: 5,
+        testnetMultiQuoteAssets: 5,
         launchShield: true,
         vanitySuffix: "fe",
         editableDisplayMetadata: true,
-        stockTokenPairing: true,
+        stockTokenPairing: "research; gated by exact BSC contract and policy",
         stockFloor: true,
         preIpoPerpReference: true,
-        automations: true,
+        automations: "testnet research; disabled in mainnet v1 fee routes",
         graduationPreflight: true,
         graduationRetryTelemetry: true,
         finalBuyPartialFillRefund: true,

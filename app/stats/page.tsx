@@ -1,54 +1,46 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import {
-  FORTUNE_NETWORK,
-  FORTUNE_NETWORK_CONFIGURED,
-  FORTUNE_TAX_NETWORK_CONFIGURED,
-} from "@/lib/fortune-network";
+import { FORTUNE_NETWORK } from "@/lib/fortune-network";
+
+type Stats = {
+  chainId: number;
+  totalLaunches: number;
+  asOf: string;
+};
 
 export default function StatsPage() {
-  return (
-    <main className="page">
-      <section className="pageHeading">
-        <div>
-          <span className="eyebrow">FORTUNE STATS</span>
-          <h1>Protocol state, not vanity numbers.</h1>
-          <p>
-            Fortune separates measured release evidence from live market
-            aggregates. Volume, revenue, burns and rewards stay blank until they
-            can be rebuilt from public BNB Chain data.
-          </p>
-        </div>
-        <Link href="/analytics" className="secondaryCta">Release evidence →</Link>
-      </section>
+  const [stats, setStats] = useState<Stats | null>(null);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
 
-      <div className="metricsGrid five">
-        <div className="metric"><span>Network</span><strong>{FORTUNE_NETWORK.chainName}</strong><small>Chain {FORTUNE_NETWORK.chainId}</small></div>
-        <div className="metric"><span>Standard stack</span><strong>{FORTUNE_NETWORK_CONFIGURED ? "Configured" : "Gated"}</strong><small>Factory + registry + graduation</small></div>
-        <div className="metric"><span>Burn + Rewards</span><strong>{FORTUNE_TAX_NETWORK_CONFIGURED ? "Enabled" : "Gated"}</strong><small>Separate review boundary</small></div>
-        <div className="metric"><span>Live aggregates</span><strong>Indexer pending</strong><small>No placeholder volume</small></div>
-        <div className="metric"><span>Primary DEX</span><strong>PancakeSwap</strong><small>BNB-native graduation path</small></div>
-      </div>
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch("/api/public/v1/stats", { signal: controller.signal, cache: "no-store" })
+      .then(async (response) => {
+        const body = await response.json();
+        if (!response.ok || !body.data) throw new Error(body.error?.message || "Onchain statistics unavailable.");
+        setStats(body.data);
+      })
+      .catch((reason) => { if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : "Onchain statistics unavailable."); })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    return () => controller.abort();
+  }, []);
 
-      <div className="twoColumn">
-        <section className="panel">
-          <span className="eyebrow">PUBLIC LEDGERS</span>
-          <div className="statRows">
-            <div><span>Burns</span><strong>Awaiting production indexer</strong></div>
-            <div><span>Holder rewards</span><strong>Awaiting production indexer</strong></div>
-            <div><span>Protocol revenue</span><strong>Awaiting production indexer</strong></div>
-            <div><span>Launch volume</span><strong>Awaiting production indexer</strong></div>
-          </div>
-        </section>
-        <section className="panel">
-          <span className="eyebrow">BNB EXPANSION LANES</span>
-          <div className="statRows">
-            <div><span>BNB / majors</span><strong>Core</strong></div>
-            <div><span>Stablecoins</span><strong>Registry review</strong></div>
-            <div><span>Tokenized stocks / RWAs</span><strong>Eligibility + oracle review</strong></div>
-            <div><span>Any BEP-20</span><strong>Compatibility-gated</strong></div>
-          </div>
-        </section>
-      </div>
-    </main>
-  );
+  return <main className="page">
+    <section className="pageHeading"><div><span className="eyebrow">FORTUNE STATS</span><h1>Numbers you can verify.</h1><p>Launch counts come from the configured onchain factories. Burns, rewards, revenue and volume appear only when their full event ledgers can be reconstructed.</p></div><Link href="/status" className="secondaryCta">System status →</Link></section>
+    {error ? <div className="registryNotice statusError"><strong>DATA UNAVAILABLE</strong><span>{error}</span></div> : null}
+    <div className="metricsGrid five">
+      <div className="metric"><span>Network</span><strong>{FORTUNE_NETWORK.chainName}</strong><small>Chain {FORTUNE_NETWORK.chainId}</small></div>
+      <div className="metric"><span>Verified launches</span><strong>{loading ? "Checking…" : stats ? stats.totalLaunches.toLocaleString() : "Unavailable"}</strong><small>Factory launchCount</small></div>
+      <div className="metric"><span>Markets</span><strong><Link href="/explore">Explore →</Link></strong><small>Recent onchain launch details</small></div>
+      <div className="metric"><span>Burn + Rewards v2</span><strong>Research</strong><small>Separate audit boundary</small></div>
+      <div className="metric"><span>Primary DEX</span><strong>PancakeSwap</strong><small>Standard graduation path</small></div>
+    </div>
+    <div className="twoColumn">
+      <section className="panel"><span className="eyebrow">ONCHAIN RECORD</span><p>The launch total comes directly from the configured Standard and legacy testnet factories. Explore reads token and curve details from those contracts. A complete indexed phase and trading ledger is pending, so no aggregate phase or volume count is shown here.</p><p className="dataDisclaimer">Last checked: {stats ? new Date(stats.asOf).toLocaleString() : "—"}.</p></section>
+      <section className="panel"><span className="eyebrow">EVENT LEDGERS</span><div className="statRows"><div><span>Volume</span><strong>Not indexed</strong></div><div><span>Burns</span><strong>Not indexed</strong></div><div><span>Holder rewards</span><strong>Not indexed</strong></div><div><span>Revenue</span><strong>Not indexed</strong></div></div><p className="dataDisclaimer">No simulated volume, payout, or revenue totals.</p></section>
+    </div>
+  </main>;
 }

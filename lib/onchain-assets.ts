@@ -88,7 +88,7 @@ function client() {
   const urls = configuredRpcUrls(FORTUNE_NETWORK.chainId);
   const transports = (
     urls.length ? urls : [FORTUNE_NETWORK.publicRpcUrl]
-  ).map((url) => http(url, { timeout: 4500 }));
+  ).map((url) => http(url, { timeout: 10000 }));
 
   return createPublicClient({
     chain:
@@ -154,59 +154,38 @@ export async function readFortuneAssetUniverse() {
     })
   );
 
-  const addresses = await Promise.all(
-    Array.from({ length: count }, (_, index) =>
-      rpc.readContract({
-        address: registry,
-        abi: registryAbi,
-        functionName: "allAssets",
-        args: [BigInt(index)],
-      })
-    )
-  );
-
-  const assets = await Promise.all(
-    addresses.map(async (address) => {
-      const [
-        config,
-        health,
-        decimals,
-        name,
-        symbol,
-      ] = await Promise.all([
-        rpc.readContract({
-          address: registry,
-          abi: registryAbi,
-          functionName: "assetConfig",
-          args: [address],
-        }),
-        rpc.readContract({
-          address: registry,
-          abi: registryAbi,
-          functionName: "assetHealth",
-          args: [address],
-        }),
-        rpc.readContract({
-          address: registry,
-          abi: registryAbi,
-          functionName: "registeredDecimals",
-          args: [address],
-        }),
-        rpc
-          .readContract({
-            address,
-            abi: erc20Abi,
-            functionName: "name",
-          })
-          .catch(() => "Unknown asset"),
-        rpc
-          .readContract({
-            address,
-            abi: erc20Abi,
-            functionName: "symbol",
-          })
-          .catch(() => "TOKEN"),
-      ]);
+  const addressResults = await rpc.multicall({ contracts:
+    Array.from({ length: count }, (_, index) => ({
+      address: registry, abi: registryAbi,
+      functionName: "allAssets" as const, args: [BigInt(index)] as const,
+    }))
+  });
+  if (addressResults.some((item) => item.status !== "success")) {
+    throw new Error("Could not read the complete onchain asset registry.");
+  }
+  const addresses = addressResults.map((item) => item.result as Address);
+  const details = addresses.length ? await rpc.multicall({ contracts:
+    addresses.flatMap((address) => [
+      { address: registry, abi: registryAbi, functionName: "assetConfig" as const, args: [address] as const },
+      { address: registry, abi: registryAbi, functionName: "assetHealth" as const, args: [address] as const },
+      { address: registry, abi: registryAbi, functionName: "registeredDecimals" as const, args: [address] as const },
+      { address, abi: erc20Abi, functionName: "name" as const },
+      { address, abi: erc20Abi, functionName: "symbol" as const },
+    ]),
+  }) : [];
+  const assets = addresses.map((address, index) => {
+      const row = details.slice(index * 5, index * 5 + 5);
+      if (row.slice(0, 3).some((item) => item.status !== "success")) {
+        throw new Error("Could not verify the configuration and health of " + address);
+      }
+      const config = row[0].result as {
+        oracle: Address; maxOracleAge: number; quoteEnabled: boolean;
+        rewardEnabled: boolean; graduationEnabled: boolean; active: boolean; category: string;
+      };
+      const health = row[1].result as readonly [boolean, `0x${string}`, bigint, bigint];
+      const decimals = row[2].result as number;
+      const name = row[3].status === "success" ? String(row[3].result) : "Unknown asset";
+      const symbol = row[4].status === "success" ? String(row[4].result) : "TOKEN";
 
       const healthy = Boolean(health[0]);
       const quoteEnabled = Boolean(config.quoteEnabled);
@@ -237,8 +216,7 @@ export async function readFortuneAssetUniverse() {
           quoteEnabled &&
           graduationEnabled,
       } satisfies FortuneRegistryAsset;
-    })
-  );
+    });
 
   return {
     configured: true,

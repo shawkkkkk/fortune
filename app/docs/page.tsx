@@ -1,7 +1,6 @@
 import Link from "next/link";
 import {
   FORTUNE_NETWORK,
-  FORTUNE_TAX_NETWORK_CONFIGURED,
 } from "@/lib/fortune-network";
 
 const sections = [
@@ -31,7 +30,7 @@ export default function DocsPage() {
             underneath.
           </p>
         </div>
-        <Link href={FORTUNE_NETWORK.isMainnet ? "/launch" : "/testnet"} className="primaryCta">Launch →</Link>
+        <Link href="/launch" className="primaryCta">Launch →</Link>
       </section>
 
       <section className="panel">
@@ -65,7 +64,7 @@ export default function DocsPage() {
           as v2.
         </p>
         <p>
-          Current BNB mainnet v1 status: <strong>{FORTUNE_TAX_NETWORK_CONFIGURED ? "enabled" : "not enabled"}</strong>.
+          Burn + Rewards v2 status: <strong>research only, disabled for real funds</strong>.
         </p>
       </section>
 

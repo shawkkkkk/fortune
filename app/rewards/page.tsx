@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { FORTUNE_TAX_NETWORK_CONFIGURED } from "@/lib/fortune-network";
 
 export default function RewardsPage() {
   return (
@@ -9,17 +8,17 @@ export default function RewardsPage() {
           <span className="eyebrow">HOLDER REWARDS</span>
           <h1>Rewards should come from transparent routing, with a public ledger.</h1>
           <p>
-            Fortune&apos;s extended stack includes holder-dividend vault and epoch
-            accounting primitives. The BNB mainnet v1 candidate intentionally
-            keeps automation fee routes disabled until those mechanisms receive
-            their own production review.
+            Burn + Rewards v2 targets direct, onchain claims in the pair asset.
+            The current Standard mainnet candidate keeps holder reward routes
+            disabled, and the older tax-token vault remains testnet research.
           </p>
         </div>
+        <img className="mascotSectionArt" src="/fortune-cat-rewards.webp" width="215" height="215" alt="Fortune cat offering pair-asset coins" />
         <Link href="/docs#rewards" className="secondaryCta">Reward design →</Link>
       </section>
 
       <section className="registryNotice">
-        <strong>{FORTUNE_TAX_NETWORK_CONFIGURED ? "REWARD STACK ENABLED" : "REWARDS GATED ON MAINNET V1"}</strong>
+        <strong>BURN + REWARDS V2 · RESEARCH</strong>
         <span>
           Rewards are never displayed as live unless Fortune can tie them to
           chain-backed vault/epoch/distribution evidence.

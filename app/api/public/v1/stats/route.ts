@@ -1,48 +1,28 @@
-import { apiOk } from "@/lib/public-api";
+import { apiError, apiOk } from "@/lib/public-api";
+import { readFortuneLaunchCounts } from "@/lib/onchain-launches";
 
-export const revalidate = 60;
+export const dynamic = "force-dynamic";
 
 export async function GET() {
-  return apiOk(
-    {
-      liveMarketAggregatesAvailable: false,
-      releaseValidation: {
-        httpRequests: 7500,
-        httpSuccesses: 7500,
-        peakConcurrency: 500,
-        peakThroughputRps: 840.9,
-        p95AtPeakConcurrencyMs: 935,
-        p95ReleaseLimitMs: 2500,
-        realConcurrentLoadGraduations: {
-          requested: 3,
-          completed: 3,
-        },
-        foundryTests: {
-          passed: 39,
-          failed: 0,
-        },
-        fuzzRuns: 1000,
-        graduationInvariantChecks: {
-          beforeStorm: "16/16",
-          afterStorm: "16/16",
-        },
-      },
-      reliability: {
-        graduationPreflight: true,
-        atomicGraduation: true,
-        retryTelemetry: true,
-        graduationPriceAnchor: true,
-        launchShield: true,
-      },
-    },
-    {
-      cacheSeconds: 60,
-      staleSeconds: 300,
-      meta: {
-        dataMode: "release_evidence",
-        note:
-          "These are measured release-test results, not live market analytics. Live aggregates require the public onchain indexer.",
-      },
+  try {
+    const ledger = await readFortuneLaunchCounts();
+    if (!ledger.configured) {
+      return apiError("protocol_not_configured", "No active Fortune deployment is configured for this network.", 503, { chainId: ledger.chainId });
     }
-  );
+
+    return apiOk({
+      chainId: ledger.chainId,
+      totalLaunches: ledger.total,
+      volumeUsd: null,
+      revenueUsd: null,
+      burns: null,
+      rewards: null,
+      asOf: new Date().toISOString(),
+    }, { cacheSeconds: 8, staleSeconds: 20, meta: {
+      dataMode: "onchain",
+      source: "Configured Fortune factories' launchCount via one onchain multicall; no estimated volume, revenue, burn or reward values",
+    } });
+  } catch {
+    return apiError("dependency_unavailable", "Fortune could not verify statistics from BNB Chain RPC.", 503);
+  }
 }

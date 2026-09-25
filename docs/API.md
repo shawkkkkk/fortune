@@ -186,17 +186,21 @@ Resolves a transaction directly from the configured BSC RPC and returns one of:
 
 The endpoint deliberately returns `safeToBlindlyResubmit: false` in every state. A not-found transaction still requires nonce/propagation recovery before another signed transaction is created.
 
-### GET /tokens
-### GET /tokens/{id}
-### GET /launches
+### GET /tokens, /tokens/{id}, /launches
+
+These expose direct onchain records for the latest 25 factory launches at most. Searches, token lookup and creator profiles inherit that window limit. `totalOnchain` comes from the factories' launch counts; unavailable per-token reads are omitted. They are not a full-history indexer.
+
 ### GET /stats
-### GET /automations
-### GET /revenue
 
-These currently expose clearly labelled demo data until the onchain indexer is
-connected.
+Returns an exact onchain factory launch count through a single multicall. Volume, revenue, burns and rewards are `null` until reproducible event ledgers exist.
 
-Production versions must derive claims from chain events.
+### GET /release
+
+Returns the version-controlled Standard mainnet release gates and the separate Burn + Rewards v2 research status. It does not attest an independent audit.
+
+### GET /automations, /revenue
+
+Capability and availability responses; no fabricated activity totals.
 
 ## High-load design
 

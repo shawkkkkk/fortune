@@ -26,14 +26,12 @@ declare global {
 const links = [
   ["/", "Home"],
   ["/explore", "Explore"],
-  [
-    FORTUNE_NETWORK.isMainnet ? "/launch" : "/testnet",
-    "Launch",
-  ],
+  ["/launch", "Launch"],
   ["/burns", "Burns"],
   ["/rewards", "Rewards"],
   ["/stats", "Stats"],
   ["/docs", "Docs"],
+  ["/search", "Search"],
 ] as const;
 
 function short(address: string) {
@@ -242,6 +240,7 @@ export default function Header() {
                   ? short(account)
                   : "Connect wallet"}
           </button>
+          {account ? <Link href={"/profile/" + account} className="secondaryCta">Profile</Link> : null}
         </div>
       </header>
     </>

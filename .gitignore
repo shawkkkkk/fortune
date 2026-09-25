@@ -9,3 +9,6 @@ contracts/cache
 contracts/out
 contracts/broadcast
 contracts/lib
+contracts-v2/cache
+contracts-v2/out
+tsconfig.tsbuildinfo

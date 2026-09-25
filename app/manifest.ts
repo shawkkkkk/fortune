@@ -2,10 +2,10 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Fortune Public Alpha",
+    name: "Fortune",
     short_name: "Fortune",
     description:
-      "Fortune public alpha on BNB Smart Chain Testnet.",
+      "Meme coins, paired with the BNB economy.",
     start_url: "/",
     display: "standalone",
     background_color: "#ffffff",

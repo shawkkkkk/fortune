@@ -3,7 +3,6 @@ import FortuneLogo from "@/components/FortuneLogo";
 import {
   FORTUNE_NETWORK,
   FORTUNE_NETWORK_CONFIGURED,
-  FORTUNE_TAX_NETWORK_CONFIGURED,
 } from "@/lib/fortune-network";
 
 const pairLanes = [
@@ -15,7 +14,7 @@ const pairLanes = [
 ] as const;
 
 export default function HomePage() {
-  const launchHref = FORTUNE_NETWORK.isMainnet ? "/launch" : "/testnet";
+  const launchHref = "/launch";
 
   return (
     <main className="page">
@@ -39,21 +38,9 @@ export default function HomePage() {
           </p>
         </div>
 
-        <div className="heroManifest">
-          <div className="manifestLabel">TWO LAUNCH TYPES</div>
-          <div className="bigBasket">
-            <span>Standard</span>
-            <span>Burn + Rewards</span>
-            <span>Locked liquidity</span>
-            <span>Pair-asset markets</span>
-          </div>
-          <div className="manifestRule" />
-          <div className="manifestRows">
-            <div><span>Network</span><strong>BNB Smart Chain</strong></div>
-            <div><span>Primary DEX path</span><strong>PancakeSwap</strong></div>
-            <div><span>Standard stack</span><strong>{FORTUNE_NETWORK_CONFIGURED ? "Configured" : "Gated"}</strong></div>
-            <div><span>Burn + Rewards</span><strong>{FORTUNE_TAX_NETWORK_CONFIGURED ? "Enabled" : "In review"}</strong></div>
-          </div>
+        <div className="fortuneHeroArt">
+          <img src="/fortune-cat-scene.jpg" alt="Fortune's white lucky cat in a red and gold outfit holding a fortune cookie" width="1254" height="1254" fetchPriority="high" />
+          <div className="heroArtCaption"><span>FORTUNE ON BNB</span><strong>Make your own luck.</strong></div>
         </div>
       </section>
 
@@ -69,7 +56,7 @@ export default function HomePage() {
             <div className="automationTop">
               <span className="automationIcon">01</span>
               <span className="automationStatus statusHealthy">
-                {FORTUNE_TAX_NETWORK_CONFIGURED ? "ENABLED" : "V2 IN REVIEW"}
+                V2 IN REVIEW
               </span>
             </div>
             <h2>No dumping</h2>
@@ -84,7 +71,7 @@ export default function HomePage() {
             <div className="automationTop">
               <span className="automationIcon">02</span>
               <span className="automationStatus statusHealthy">
-                {FORTUNE_TAX_NETWORK_CONFIGURED ? "ENABLED" : "V2 IN REVIEW"}
+                V2 IN REVIEW
               </span>
             </div>
             <h2>Holders get paid</h2>

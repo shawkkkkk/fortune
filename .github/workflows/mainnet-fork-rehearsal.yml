@@ -9,6 +9,8 @@ on:
       - "contracts/test/MainnetFork.t.sol"
       - ".github/workflows/mainnet-fork-rehearsal.yml"
   workflow_dispatch:
+  schedule:
+    - cron: "17 9 * * 1"
 
 concurrency:
   group: fortune-mainnet-fork-rehearsal

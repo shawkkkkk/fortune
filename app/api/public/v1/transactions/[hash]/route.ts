@@ -1,5 +1,9 @@
 import { apiError, apiOk } from "@/lib/public-api";
 import { configuredRpcUrls, rpcCall } from "@/lib/bsc-rpc";
+import { decodeEventLog, parseAbi } from "viem";
+import { FORTUNE_NETWORK } from "@/lib/fortune-network";
+
+const launchEventAbi = parseAbi(["event LaunchCreated(uint256 indexed launchId, address indexed creator, address indexed token, address curve, bytes32 manifestHash)"]);
 
 export const dynamic = "force-dynamic";
 
@@ -95,8 +99,25 @@ export async function GET(
       );
     }
 
+    if (receipt.transactionHash?.toLowerCase() !== hash.toLowerCase() || !["0x0", "0x1"].includes(receipt.status)) {
+      return apiError("dependency_unavailable", "RPC returned an unverifiable transaction receipt.", 503);
+    }
     const success =
       receipt.status === "0x1";
+
+    let launch: { token: string; curve: string; creator: string } | null = null;
+    const factory = FORTUNE_NETWORK.contracts.factory.toLowerCase();
+    if (success && factory && receipt.to?.toLowerCase() === factory) {
+      for (const log of receipt.logs || []) {
+        if (log.address?.toLowerCase() !== factory) continue;
+        try {
+          const event = decodeEventLog({ abi: launchEventAbi, eventName: "LaunchCreated", data: log.data, topics: log.topics });
+          if (event.args.creator.toLowerCase() !== receipt.from?.toLowerCase()) continue;
+          launch = { token: event.args.token, curve: event.args.curve, creator: event.args.creator };
+          break;
+        } catch { /* An unrelated log is not proof of a Fortune launch. */ }
+      }
+    }
 
     return apiOk(
       {
@@ -106,6 +127,7 @@ export async function GET(
           ? "confirmed"
           : "reverted",
         success,
+        launch,
         blockNumber: receipt.blockNumber,
         transactionIndex:
           receipt.transactionIndex,
@@ -130,13 +152,7 @@ export async function GET(
       "dependency_unavailable",
       "BSC RPC could not resolve the transaction right now.",
       503,
-      {
-        chainId,
-        reason:
-          error instanceof Error
-            ? error.message
-            : "RPC unavailable",
-      }
+      { chainId }
     );
   }
 }

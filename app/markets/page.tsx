@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import FortuneLogo from "@/components/FortuneLogo";
 import { FORTUNE_NETWORK } from "@/lib/fortune-network";
 
 type Launch = {
@@ -28,6 +27,7 @@ type LaunchResponse = {
     items: Launch[];
     totalOnchain: number;
     chainId: number;
+    page?: { nextCursor: string | null; hasMore: boolean };
   };
   error?: {
     message?: string;
@@ -36,35 +36,39 @@ type LaunchResponse = {
 
 function money(value: string) {
   const number = Number(value);
+  if (!value.trim() || !Number.isFinite(number)) return "Unavailable";
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
     notation: number >= 1_000_000 ? "compact" : "standard",
     maximumFractionDigits: number < 1 ? 8 : 2,
-  }).format(Number.isFinite(number) ? number : 0);
+  }).format(number);
 }
 
 function short(value: string) {
   return value.slice(0, 6) + "…" + value.slice(-4);
 }
 
-function statusLabel(status: Launch["status"]) {
+function statusLabel(status: Launch["status"], mode: Launch["mode"]) {
   if (status === "GraduationReady") return "Ready to graduate";
-  if (status === "Pancake") return "Pancake V3";
+  if (status === "Pancake") return mode === "tax" ? "Pancake V2" : "Pancake V3";
   return status;
 }
 
 export default function MarketsPage() {
   const [launches, setLaunches] = useState<Launch[]>([]);
-  const [total, setTotal] = useState(0);
+  const [total, setTotal] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     try {
+      setLoading(true);
       setError("");
       const response = await fetch(
-        "/api/public/v1/launches?limit=25",
+        "/api/public/v1/launches?limit=25" + (cursor ? "&cursor=" + encodeURIComponent(cursor) : ""),
         { cache: "no-store" }
       );
       const body = (await response.json()) as LaunchResponse;
@@ -76,7 +80,9 @@ export default function MarketsPage() {
       }
 
       setLaunches(body.data.items || []);
-      setTotal(body.data.totalOnchain || 0);
+      setTotal(Number.isSafeInteger(body.data.totalOnchain) && body.data.totalOnchain >= 0
+        ? body.data.totalOnchain : null);
+      setNextCursor(body.data.page?.nextCursor || null);
     } catch (nextError) {
       setError(
         nextError instanceof Error
@@ -86,7 +92,7 @@ export default function MarketsPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [cursor]);
 
   useEffect(() => {
     void refresh();
@@ -98,7 +104,6 @@ export default function MarketsPage() {
     <main className="page">
       <section className="pageHeading">
         <div>
-          <FortuneLogo size="md" />
           <span className="eyebrow">LIVE ONCHAIN MARKETS</span>
           <h1>Fortune launches</h1>
           <p>
@@ -116,7 +121,7 @@ export default function MarketsPage() {
             {loading ? "Refreshing…" : "Refresh"}
           </button>
           <Link
-            href={FORTUNE_NETWORK.isMainnet ? "/launch" : "/testnet"}
+            href="/launch"
             className="primaryCta"
           >
             {FORTUNE_NETWORK.isMainnet
@@ -132,9 +137,10 @@ export default function MarketsPage() {
             ? "BNB CHAIN MAINNET"
             : "BSC TESTNET"}
         </strong>
-        <span>
-          {total} onchain Fortune launch{total === 1 ? "" : "es"} found on
-          chain {FORTUNE_NETWORK.chainId}.
+        <span role="status">
+          {total === null
+            ? loading ? "Reading onchain launches…" : "Onchain launch count unavailable."
+            : `${total} onchain Fortune launch${total === 1 ? "" : "es"} found on chain ${FORTUNE_NETWORK.chainId}.`}
         </span>
       </section>
 
@@ -190,7 +196,7 @@ export default function MarketsPage() {
                         : "")
                   }
                 >
-                  {statusLabel(launch.status)}
+                  {statusLabel(launch.status, launch.mode)}
                 </span>
               </div>
 
@@ -227,6 +233,7 @@ export default function MarketsPage() {
           ))}
         </div>
       )}
+    <div className="heroActions">{cursor ? <button className="secondaryCta" disabled={loading} onClick={() => setCursor(null)}>Newest launches</button> : null}{nextCursor ? <button className="secondaryCta" disabled={loading} onClick={() => setCursor(nextCursor)}>Older launches →</button> : null}{cursor ? <span>Browsing a fixed block snapshot. Return to newest launches for live updates.</span> : null}</div>
     </main>
   );
 }

@@ -3,6 +3,8 @@
 import Link from "next/link";
 import FortuneLogo from "@/components/FortuneLogo";
 import { useLanguage } from "@/components/LanguageProvider";
+import { FortuneCoin } from "@/components/Ornaments";
+import { FORTUNE_X_HANDLE, FORTUNE_X_URL } from "@/lib/site";
 import { FORTUNE_NETWORK } from "@/lib/fortune-network";
 
 export default function Footer() {
@@ -23,39 +25,53 @@ export default function Footer() {
                 ? "BSC 测试网上的公开 Alpha。仅限无价值测试资产，主网尚未开放。"
                 : "Public alpha on BSC Testnet. Valueless test assets only; mainnet is not enabled."}
           </p>
+          <span className="siteFooterMotto">
+            <FortuneCoin />
+            {zh ? "好运，自己创造。" : "Make your own luck."}
+          </span>
         </div>
 
-        <div className="siteFooterLinks">
-          <Link href="/explore">{zh ? "探索" : "Explore"}</Link>
-          <Link href="/launch">
-            {zh ? "发行" : "Launch"}
-          </Link>
-          {FORTUNE_NETWORK.isTestnet ? <Link href="/testnet">{zh ? "测试网实验室" : "Testnet lab"}</Link> : null}
-          <Link href="/burns">{zh ? "销毁" : "Burns"}</Link>
-          <Link href="/rewards">{zh ? "奖励" : "Rewards"}</Link>
-          <Link href="/stats">{zh ? "数据" : "Stats"}</Link>
-          <Link href="/docs">{zh ? "文档" : "Docs"}</Link>
-          <Link href="/status">{zh ? "系统状态" : "Status"}</Link>
-          <Link href="/developers">{zh ? "开发者 API" : "API"}</Link>
-          <a
-            href={
-              FORTUNE_NETWORK.contracts.factory
-                ? FORTUNE_NETWORK.explorerUrl + "/address/" + FORTUNE_NETWORK.contracts.factory
-                : FORTUNE_NETWORK.explorerUrl
-            }
-            target="_blank"
-            rel="noreferrer"
-          >
-            BscScan ↗
-          </a>
-          <a
-            href="https://github.com/shawkkkkk/fortune/issues/new?template=testnet-bug.yml"
-            target="_blank"
-            rel="noreferrer"
-          >
-            {zh ? "报告问题 ↗" : "Report a bug ↗"}
-          </a>
-        </div>
+        <nav className="siteFooterLinks" aria-label={zh ? "页脚" : "Footer"}>
+          <div>
+            <h2>{zh ? "产品" : "Product"}</h2>
+            <Link href="/explore">{zh ? "探索" : "Explore"}</Link>
+            <Link href="/launch">
+              {zh ? "发行" : "Launch"}
+            </Link>
+            {FORTUNE_NETWORK.isTestnet ? <Link href="/testnet">{zh ? "测试网实验室" : "Testnet lab"}</Link> : null}
+          </div>
+          <div>
+            <h2>{zh ? "公开证明" : "Proof"}</h2>
+            <Link href="/burns">{zh ? "销毁" : "Burns"}</Link>
+            <Link href="/rewards">{zh ? "奖励" : "Rewards"}</Link>
+            <Link href="/stats">{zh ? "数据" : "Stats"}</Link>
+            <Link href="/status">{zh ? "系统状态" : "Status"}</Link>
+          </div>
+          <div>
+            <h2>{zh ? "构建" : "Build"}</h2>
+            <Link href="/docs">{zh ? "文档" : "Docs"}</Link>
+            <a href={FORTUNE_X_URL} target="_blank" rel="noreferrer">X · {FORTUNE_X_HANDLE} ↗</a>
+            <Link href="/developers">{zh ? "开发者 API" : "API"}</Link>
+            <a
+              href={
+                FORTUNE_NETWORK.contracts.factory
+                  ? FORTUNE_NETWORK.explorerUrl + "/address/" + FORTUNE_NETWORK.contracts.factory
+                  : FORTUNE_NETWORK.explorerUrl
+              }
+              target="_blank"
+              rel="noreferrer"
+            >
+              BscScan ↗
+            </a>
+            <a
+              href="https://github.com/shawkkkkk/fortune/issues/new?template=testnet-bug.yml"
+              target="_blank"
+              rel="noreferrer"
+            >
+              {zh ? "报告问题 ↗" : "Report a bug ↗"}
+            </a>
+          </div>
+        </nav>
       </div>
 
       <div className="siteFooterBottom">

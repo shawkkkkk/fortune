@@ -18,6 +18,8 @@ jobs:
         run: npm run mainnet:check
       - name: Validate pinned mainnet dependencies
         run: npm run mainnet:deps
+      - name: Web transaction and factory-catalog regressions
+        run: node --import ./scripts/register-ts.mjs --test tests/web/*.test.mjs
       - run: npm run build
 
       - name: Boot production server

@@ -6,13 +6,15 @@ import {
   type Address,
 } from "viem";
 import { bsc, bscTestnet } from "viem/chains";
+import { readFactoryCatalog } from "@/lib/factory-catalog";
+import { FORTUNE_READ_NETWORK_CONFIGURED } from "@/lib/read-network";
 import { configuredRpcUrls } from "@/lib/bsc-rpc";
 import {
   FORTUNE_NETWORK,
-  FORTUNE_NETWORK_CONFIGURED,
+  FORTUNE_TAX_NETWORK_CONFIGURED,
 } from "@/lib/fortune-network";
 
-const factoryAbi = [
+export const factoryAbi = [
   {
     type: "function",
     name: "launchCount",
@@ -156,7 +158,7 @@ function sources() {
     factory: Address;
     mode: OnchainFortuneLaunch["mode"];
   }> = [{ factory: FORTUNE_NETWORK.contracts.factory as Address, mode: "standard" }];
-  if (FORTUNE_NETWORK.contracts.taxFactory) {
+  if (FORTUNE_TAX_NETWORK_CONFIGURED && FORTUNE_NETWORK.contracts.taxFactory) {
     entries.push({ factory: FORTUNE_NETWORK.contracts.taxFactory as Address, mode: "tax" });
   }
   return entries;
@@ -170,11 +172,15 @@ function required<T>(result: { status: string; result?: T }, label: string): T {
 }
 
 export async function readFortuneLaunchCounts() {
-  if (!FORTUNE_NETWORK_CONFIGURED || !FORTUNE_NETWORK.contracts.factory) {
+  if (!FORTUNE_READ_NETWORK_CONFIGURED || !FORTUNE_NETWORK.contracts.factory) {
     return { configured: false, chainId: FORTUNE_NETWORK.chainId, total: 0 };
   }
   const rpc = client();
+  if (await rpc.getChainId() !== FORTUNE_NETWORK.chainId) throw new Error("Stats RPC is on the wrong chain.");
+  const block = await rpc.getBlock({ blockTag: "latest" });
+  if (block.number === null || !block.hash) throw new Error("Stats block unavailable.");
   const counts = await rpc.multicall({
+    blockNumber: block.number,
     contracts: sources().map(({ factory }) => ({
       address: factory, abi: factoryAbi, functionName: "launchCount" as const,
     })),
@@ -182,46 +188,44 @@ export async function readFortuneLaunchCounts() {
   const total = counts.reduce(
     (sum, count, index) => sum + Number(required(count, "launchCount " + index)), 0
   );
-  return { configured: true, chainId: FORTUNE_NETWORK.chainId, total };
+  if ((await rpc.getBlock({ blockNumber: block.number })).hash !== block.hash) throw new Error("Stats block changed during read.");
+  return { configured: true, chainId: FORTUNE_NETWORK.chainId, total, blockNumber: block.number.toString(), blockHash: block.hash };
 }
 
-export async function readRecentFortuneLaunches(limit = 12) {
-  if (
-    !FORTUNE_NETWORK_CONFIGURED ||
-    !FORTUNE_NETWORK.contracts.factory
-  ) {
-    return {
-      configured: false,
-      chainId: FORTUNE_NETWORK.chainId,
-      total: 0,
-      launches: [] as OnchainFortuneLaunch[],
-    };
+export async function readFortuneLaunchCatalog(atBlock?: bigint) {
+  if (!FORTUNE_READ_NETWORK_CONFIGURED || !FORTUNE_NETWORK.contracts.factory) {
+    return { configured: false as const, chainId: FORTUNE_NETWORK.chainId, total: 0, entries: [], blockNumber: null, blockHash: null };
   }
+  const snapshot = await readFactoryCatalog(client(), sources(), FORTUNE_NETWORK.chainId, atBlock);
+  return { configured: true as const, chainId: FORTUNE_NETWORK.chainId, ...snapshot };
+}
 
+export async function readFortuneLaunchByToken(token: string) {
+  const catalog = await readFortuneLaunchCatalog();
+  const entry = catalog.entries.find(({ info }) => info[1].toLowerCase() === token.toLowerCase());
+  const launches = entry && catalog.blockNumber !== null
+    ? await readLaunchDetails([entry], catalog.blockNumber, catalog.blockHash!) : [];
+  return { ...catalog, entries: undefined, launch: launches[0] || null };
+}
+
+export async function readCreatorFortuneLaunches(creator: string, offset = 0, limit = 25, atBlock?: bigint) {
+  const catalog = await readFortuneLaunchCatalog(atBlock);
+  const matching = catalog.entries.filter(({ info }) => info[0].toLowerCase() === creator.toLowerCase());
+  const selected = matching.slice(offset, offset + limit);
+  const launches = catalog.blockNumber !== null ? await readLaunchDetails(selected, catalog.blockNumber, catalog.blockHash!) : [];
+  return { ...catalog, entries: undefined, launches, creatorTotal: matching.length, hasMore: offset + launches.length < matching.length };
+}
+
+export async function readRecentFortuneLaunches(limit = 12, offset = 0, atBlock?: bigint) {
+  const catalog = await readFortuneLaunchCatalog(atBlock);
+  const safeLimit = Math.max(1, Math.min(Math.trunc(limit), 25));
+  const selected = catalog.entries.slice(offset, offset + safeLimit);
+  const launches = catalog.blockNumber !== null ? await readLaunchDetails(selected, catalog.blockNumber, catalog.blockHash!) : [];
+  return { ...catalog, entries: undefined, launches, hasMore: offset + launches.length < catalog.total };
+}
+
+async function readLaunchDetails(valid: Awaited<ReturnType<typeof readFactoryCatalog>>["entries"], blockNumber: bigint, blockHash: string) {
   const rpc = client();
-  const safeLimit = Math.max(1, Math.min(limit, 25));
-
-  const factories = sources();
-  const counts = await rpc.multicall({ contracts: factories.map(({ factory }) => ({
-    address: factory, abi: factoryAbi, functionName: "launchCount" as const,
-  })) });
-  const total = counts.reduce((sum, count, index) =>
-    sum + Number(required(count, "launchCount " + index)), 0);
-
-  const positions = factories.flatMap((source, sourceIndex) => {
-    const count = Number(required(counts[sourceIndex], "launchCount"));
-    return Array.from({ length: Math.min(count, safeLimit) }, (_, offset) => ({
-      ...source, index: count - offset - 1,
-    }));
-  });
-  if (!positions.length) return { configured: true, chainId: FORTUNE_NETWORK.chainId, total, launches: [] as OnchainFortuneLaunch[] };
-
-  const rawLaunches = await rpc.multicall({ contracts: positions.map(({ factory, index }) => ({
-    address: factory, abi: factoryAbi, functionName: "launches" as const, args: [BigInt(index)] as const,
-  })) });
-  const valid = positions.flatMap((position, index) => rawLaunches[index].status === "success" && rawLaunches[index].result
-    ? [{ ...position, info: rawLaunches[index].result! }] : []);
-
   const fieldCalls = valid.flatMap(({ info }) => [
     { address: info[1], abi: tokenAbi, functionName: "name" as const },
     { address: info[1], abi: tokenAbi, functionName: "symbol" as const },
@@ -232,23 +236,23 @@ export async function readRecentFortuneLaunches(limit = 12) {
     { address: info[2], abi: curveAbi, functionName: "graduationUsd1e18" as const },
     { address: info[2], abi: curveAbi, functionName: "quoteAssetCount" as const },
   ]);
-  const fields = valid.length ? await rpc.multicall({ contracts: fieldCalls }) : [];
+  const fields = valid.length ? await rpc.multicall({ blockNumber, contracts: fieldCalls }) : [];
   const prepared = valid.flatMap((position, index) => {
     const row = fields.slice(index * 8, index * 8 + 8);
-    if (row.some((value) => value.status !== "success")) return [];
+    if (row.some((value) => value.status !== "success")) throw new Error("Could not verify every requested token and curve field.");
     return [{ ...position, row: row.map((value) => value.result) }];
   });
   const quoteCalls = prepared.flatMap(({ info, row }) =>
     Array.from({ length: Math.min(Number(row[7]), 5) }, (_, index) => ({
       address: info[2], abi: curveAbi, functionName: "quoteAssets" as const, args: [BigInt(index)] as const,
     })));
-  const quotes = quoteCalls.length ? await rpc.multicall({ contracts: quoteCalls }) : [];
+  const quotes = quoteCalls.length ? await rpc.multicall({ blockNumber, contracts: quoteCalls }) : [];
   let quoteOffset = 0;
   const launches = prepared.flatMap(({ mode, factory, index, info, row }) => {
     const quoteCount = Math.min(Number(row[7]), 5);
     const values = quotes.slice(quoteOffset, quoteOffset + quoteCount);
     quoteOffset += quoteCount;
-    if (values.some((value) => value.status !== "success")) return [];
+    if (values.some((value) => value.status !== "success")) throw new Error("Could not verify every quote asset.");
     const [name, symbol, supply, phaseRaw, price, reserve, target] = row as [string, string, bigint, number, bigint, bigint, bigint];
     const phase = Number(phaseRaw);
     return [{
@@ -261,12 +265,8 @@ export async function readRecentFortuneLaunches(limit = 12) {
       totalSupply: formatUnits(supply, 18),
       quoteAssets: values.map((value) => value.result as Address),
     } satisfies OnchainFortuneLaunch];
-  }).sort((a, b) => b.createdAt - a.createdAt).slice(0, safeLimit);
+  });
 
-  return {
-    configured: true,
-    chainId: FORTUNE_NETWORK.chainId,
-    total,
-    launches,
-  };
+  if ((await rpc.getBlock({ blockNumber })).hash !== blockHash) throw new Error("Launch snapshot block changed during read.");
+  return launches;
 }

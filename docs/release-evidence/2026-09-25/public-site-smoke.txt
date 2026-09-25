@@ -1,0 +1,13 @@
+PASS /api/health
+PASS /api/ready
+PASS /api/public/v1/meta
+PASS /testnet
+PASS /launch
+PASS /robots.txt
+PASS /sitemap.xml
+PASS /
+PASS /api/public/v1/release
+PASS /api/public/v1/stats
+PASS /api/public/v1/launches?limit=2
+PASS /api/public/v1/assets?launchable=true
+Fortune production-runtime smoke gate passed.

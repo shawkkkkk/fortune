@@ -8,6 +8,7 @@ type Stats = {
   chainId: number;
   totalLaunches: number;
   asOf: string;
+  blockNumber: string;
 };
 
 export default function StatsPage() {
@@ -39,7 +40,7 @@ export default function StatsPage() {
       <div className="metric"><span>Primary DEX</span><strong>PancakeSwap</strong><small>Standard graduation path</small></div>
     </div>
     <div className="twoColumn">
-      <section className="panel"><span className="eyebrow">ONCHAIN RECORD</span><p>The launch total comes directly from the configured Standard and legacy testnet factories. Explore reads token and curve details from those contracts. A complete indexed phase and trading ledger is pending, so no aggregate phase or volume count is shown here.</p><p className="dataDisclaimer">Last checked: {stats ? new Date(stats.asOf).toLocaleString() : "—"}.</p></section>
+      <section className="panel"><span className="eyebrow">ONCHAIN RECORD</span><p>The launch total comes directly from the configured Standard and legacy testnet factories. Explore reads token and curve details from those contracts. A complete indexed phase and trading ledger is pending, so no aggregate phase or volume count is shown here.</p><p className="dataDisclaimer">Last checked: {stats ? new Date(stats.asOf).toLocaleString() : "—"}. {stats?.blockNumber ? <a href={`${FORTUNE_NETWORK.explorerUrl}/block/${stats.blockNumber}`} target="_blank" rel="noreferrer">Verify block {stats.blockNumber} ↗</a> : null}</p></section>
       <section className="panel"><span className="eyebrow">EVENT LEDGERS</span><div className="statRows"><div><span>Volume</span><strong>Not indexed</strong></div><div><span>Burns</span><strong>Not indexed</strong></div><div><span>Holder rewards</span><strong>Not indexed</strong></div><div><span>Revenue</span><strong>Not indexed</strong></div></div><p className="dataDisclaimer">No simulated volume, payout, or revenue totals.</p></section>
     </div>
   </main>;

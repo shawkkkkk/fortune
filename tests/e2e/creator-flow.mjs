@@ -12,6 +12,23 @@ await mkdir(output, { recursive: true });
 const pair = "0x1bDcF1500866E273Cb11E99cC1832Aa2436Db17d";
 const unapproved = "0x1111111111111111111111111111111111111111";
 const fixtureOrigin = "https://example.com";
+const stock = "0x02FcA66C1D1Afb4e2a7884261Eb00F63598a7436";
+const universeItem = (fields) => ({
+  underlying: null, leveraged: false, decimals: 18, controls: null, image: null, venue: null, hot: false, isNew: false, notice: null, noticeSource: null,
+  market: { priceUsd: 1, change24h: null, volume24h: null, marketCap: null, source: "registry" }, ...fields,
+});
+// Pair-universe fixture: one launchable registry asset and one mainnet stock that must stay unselectable.
+const universe = { data: {
+  chainId: 97, snapshot: { generatedAt: "2026-09-25T00:00:00.000Z", verifiedAtBlock: 1, chainId: 56 },
+  coverage: { registry: true, marketData: true, preIpoReferences: true },
+  featured: [`registry:97:${pair.toLowerCase()}`, "nvdab"],
+  items: [
+    universeItem({ id: `registry:97:${pair.toLowerCase()}`, symbol: "fUSD", name: "Fortune Public Test USD", group: "crypto", kind: "token", provider: "Fortune registry", chainId: 97, address: pair, fortune: { status: "launchable", reasons: [] } }),
+    universeItem({ id: "nvdab", symbol: "NVDAB", name: "NVIDIA", group: "stocks", kind: "stock", provider: "bStocks", underlying: "NVDA", chainId: 56, address: stock,
+      controls: { upgradeable: true, pausable: false, rebasing: false }, market: { priceUsd: 225, change24h: 0.3, volume24h: 1e7, marketCap: 3.4e7, source: "coingecko" },
+      fortune: { status: "discovery", reasons: ["MAINNET_ONLY", "RWA_OUT_OF_SCOPE_V1"] } }),
+  ],
+} };
 const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=", "base64");
 const metadata = {
   name: "Imported Fortune", symbol: "CaT", description: "Imported description — fixture only",
@@ -44,6 +61,7 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
       address: unapproved, chainId: 97, metadata: { name: "Unapproved fixture", symbol: "NOPE" },
       launchability: { launchableNow: false, reasonCodes: ["ASSET_NOT_REGISTERED"] },
     } } });
+    if (url.pathname === "/api/public/v1/universe") return route.fulfill({ json: universe });
     if (url.pathname === "/api/public/v1/assets") return route.fulfill({ json: { data: { items: [{
       address: pair, name: "Fortune Public Test USD", symbol: "fUSD", decimals: 18,
       category: "Fortune Public Testnet", healthy: true, launchable: true,
@@ -67,7 +85,7 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
     await dialog.getByRole("checkbox").check();
     await dialog.getByRole("button", { name: "Continue to Fortune →" }).click();
     await dialog.waitFor({ state: "detached" });
-    await page.locator(".assetSelected").waitFor();
+    await page.locator(".pickTile.selected").waitFor();
 
     assert.equal(await page.getByLabel(/^Description/).isVisible(), true);
     assert.equal(await page.getByLabel("Website · optional", { exact: true }).isVisible(), true);
@@ -84,7 +102,7 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
     await click("Save draft");
     await page.getByText(/^Draft saved on this browser/).waitFor();
     await page.reload();
-    await page.locator(".assetSelected").waitFor();
+    await page.locator(".pickTile.selected").waitFor();
     await click("Restore draft");
     await page.getByText(/^Draft restored\. Review every field/).waitFor();
     await value("Token name", "Fortune UI fixture");
@@ -109,7 +127,7 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
     assert.match(await page.getByAltText("Selected token image preview").getAttribute("src"), /^blob:/);
     await click("Save draft");
     await page.reload();
-    await page.locator(".assetSelected").waitFor();
+    await page.locator(".pickTile.selected").waitFor();
     await click("Restore draft");
     await value("Image URL or IPFS URI", "");
     assert.equal(await page.getByAltText("Selected token image preview").count(), 0);
@@ -130,7 +148,13 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
     await page.getByText("Not available for this launch.", { exact: true }).waitFor();
     assert.equal(await page.getByRole("button", { name: "Use checked pair", exact: true }).count(), 0);
     assert.match(await page.locator(".launchPreviewFacts").innerText(), /fUSD/);
-    await click("Approved");
+    // Discovery rows explain why they are unavailable and never replace the approved pair.
+    await click("Stocks");
+    await page.locator(".pickTile", { hasText: "NVDAB" }).click();
+    await page.getByText("Not available for Fortune launches yet", { exact: true }).waitFor();
+    assert.match(await page.locator(".launchPreviewFacts").innerText(), /fUSD/);
+    await click("Featured");
+    await page.locator(".pickTile.selected").waitFor();
 
     // HTML maxlength counts characters; the review gate also enforces Solidity bytes.
     await page.getByLabel("Token name", { exact: true }).fill("猫".repeat(22));

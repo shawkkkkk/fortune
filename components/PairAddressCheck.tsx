@@ -3,8 +3,8 @@ import { useRef, useState } from "react";
 import { FORTUNE_NETWORK } from "@/lib/fortune-network";
 
 type Check = { address: string; chainId: number; metadata: { name: string | null; symbol: string | null }; launchability: { launchableNow: boolean; reasonCodes: string[] } };
-export default function PairAddressCheck({ onSelect }: { onSelect: (address: string) => boolean }) {
-  const [address, setAddress] = useState("");
+export default function PairAddressCheck({ onSelect, initialAddress = "" }: { onSelect: (address: string) => boolean; initialAddress?: string }) {
+  const [address, setAddress] = useState(initialAddress);
   const [result, setResult] = useState<Check | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);

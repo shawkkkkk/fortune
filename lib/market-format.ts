@@ -22,7 +22,8 @@ export function formatUsd(value: number | null | undefined) {
   if (value === null || value === undefined || !Number.isFinite(value)) return "—";
   const abs = Math.abs(value);
   if (abs >= 1000) {
-    return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", notation: "compact", maximumFractionDigits: 2 }).format(value);
+    // Explicit minimum digits: Node and browser ICU disagree on the compact currency default ("$1M" vs "$1.00M").
+    return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", notation: "compact", minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(value);
   }
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: abs < 10 ? 2 : 0, minimumFractionDigits: abs < 10 && abs > 0 ? 2 : 0 }).format(value);
 }

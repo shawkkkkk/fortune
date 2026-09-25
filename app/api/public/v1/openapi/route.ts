@@ -99,6 +99,15 @@ export async function GET(request: Request) {
           },
         },
       },
+      "/universe": {
+        get: {
+          tags: ["Assets"],
+          summary: "Pair universe: BNB tokenized stocks, funds, gold, pre-IPO tokens and majors with live prices and Fortune launchability",
+          description:
+            "Contract identity comes from Fortune's reviewed snapshot, where every address answered onchain with a matching symbol. Prices come live from CoinGecko, DexScreener and Lighter. fortune.status is launchable only for assets the active onchain Asset Registry approves; discovery and reference rows are never approval.",
+          responses: { "200": { description: "Items with live market data, issuer controls and launchability reasons, featured ids and data coverage" } },
+        },
+      },
       "/pairs": {
         get: {
           tags: ["Assets"],

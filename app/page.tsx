@@ -258,7 +258,7 @@ export default function HomePage() {
               <div key={label} className="liquid-glass reveal" style={stagger(index, 0.12, 0.25)}>
                 <dt>{label}</dt>
                 <dd>{value}</dd>
-                <span>{detail}</span>
+                <dd className="shieldDetail">{detail}</dd>
               </div>
             ))}
           </dl>

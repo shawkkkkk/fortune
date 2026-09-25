@@ -335,7 +335,7 @@ export default function Header() {
         </div>
       </header>
 
-      <div className="networkBar">
+      <aside className="networkBar" aria-label="Network status">
         <span className="networkStatus">
           <span
             className={
@@ -370,7 +370,7 @@ export default function Header() {
             {themeToggle}
           </div>
         </div>
-      </div>
+      </aside>
     </>
   );
 }

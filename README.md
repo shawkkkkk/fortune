@@ -15,16 +15,14 @@ The product direction is **no dumping, holders get paid, pair with anything**. T
 
 ### Web product
 
-- **Explore** — launch discovery with basket/reward/graduation metadata
-- **Launch** — Basket Curve, **Stock Floor**, and experimental **Pre-IPO Perp** launch engines; fee routing, rewards, dev buy and immutable manifest preview
-- **Assets** — transparent Fortune Asset Registry UI
-- **Forum** — market-native discussion feed with attached launch cards
-- **Analytics** — protocol, basket, graduation and fee-routing analytics surfaces
-- **Automations** — holder rewards, buybacks, LP reinforcement, graduation queue, oracle health and public execution ledger
-- **Portfolio** — holdings/reward/creator/referral dashboard shell
-- **Token market pages** — canonical curve, quote-asset trade selector, basket view and manifest
-- **Injected EVM wallet connect** — recognizes BSC mainnet/testnet
-- **BSC discovery API** — imports up to 400 BSC token candidates from PancakeSwap's extended token list
+- **Home, Explore, Search** — Fortune positioning and the most recent factory-backed launches
+- **Launch** — short Standard form with reviewed pair, optional creator first buy, onchain preflight and a valueless testnet signing path; Burn + Rewards v2 is disabled
+- **Burns, Rewards, Stats** — clear research status and exact factory launch counts; no fabricated payout or volume totals
+- **Token pages and creator profiles** — latest-window direct onchain reads; full-history indexing pending
+- **Assets and status** — onchain registry capabilities, explicit deployment and release gates
+- **Testnet lab** — wallet faucet, Standard trade/graduation exercise and the older tax-token/Pancake V2 research controls
+- **Forum and portfolio** — honest pending states until user activity and holdings are backed by real data
+- **BSC discovery API** — separately identifies candidate assets; discovery does not authorize a pair
 
 The current Explore, search, token, profile and Stats surfaces use direct onchain reads where available. Unsupported totals and charts remain unavailable rather than displaying invented figures. Older experimental pages and API endpoints remain research surfaces; check each endpoint's data-mode metadata before integrating.
 

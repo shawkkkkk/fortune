@@ -11,7 +11,7 @@ export default function ErrorPage({
       <section className="panel emptyPanel statePanel">
         <img className="mascotEmpty" src="/fortune-cat-cutout.webp" alt="Fortune lucky cat" width="124" height="124" loading="lazy" />
         <span className="eyebrow">DEGRADED MODE</span>
-        <h2>This part of Fortune hit an error.</h2>
+        <h1>This part of Fortune hit an error.</h1>
         <p>
           The rest of the app can remain available. Retry this view without
           reconnecting your wallet or resubmitting a transaction.

@@ -1314,6 +1314,7 @@ html[data-theme="dark"] .registryNotice.statusError {
   gap: 10px;
 }
 
+.statePanel h1,
 .statePanel h2 {
   max-width: 24ch;
   margin: 2px 0 4px;
@@ -2684,9 +2685,12 @@ label.fieldGrid {
   line-height: 1.05;
 }
 
-.shieldStats span {
+.shieldStats dd.shieldDetail {
+  margin: 0;
   color: #ffd6cb;
+  font-family: var(--font-sans);
   font-size: 13.5px;
+  font-weight: 400;
   line-height: 1.45;
 }
 
@@ -3258,6 +3262,222 @@ label.fieldGrid {
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+.docsDisclaimer {
+  border-color: var(--gold-line);
+  background: var(--slip);
+}
+
+.docsRiskList {
+  display: grid;
+  gap: 16px;
+  margin: 14px 0 0;
+}
+
+.docsRiskList dt {
+  color: var(--ink);
+  font-weight: 800;
+}
+
+.docsRiskList dd {
+  margin: 4px 0 0;
+  color: var(--ink-soft);
+  line-height: 1.6;
+}
+
+/* --------------------------------------------------------------------------
+   Entry disclaimer
+   -------------------------------------------------------------------------- */
+
+html.entryGateOpen {
+  overflow: hidden;
+}
+
+.entryGate {
+  width: min(600px, calc(100vw - 32px));
+  max-width: none;
+  max-height: calc(100dvh - 32px);
+  padding: 0;
+  overflow: auto;
+  border: 1px solid var(--gold-line);
+  border-radius: 28px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: inset 0 3px 0 var(--gold-bright), 0 48px 120px -30px rgba(38, 6, 9, 0.65);
+}
+
+.entryGate::backdrop {
+  background:
+    radial-gradient(90% 70% at 50% 30%, rgba(184, 13, 21, 0.35), transparent 70%),
+    rgba(38, 6, 9, 0.6);
+  -webkit-backdrop-filter: blur(12px) saturate(1.2);
+  backdrop-filter: blur(12px) saturate(1.2);
+}
+
+.entryGate[open] {
+  animation: entry-gate-in 0.45s var(--ease-out-soft) both;
+}
+
+@keyframes entry-gate-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.entryGateInner {
+  display: grid;
+  gap: 16px;
+  padding: clamp(20px, 4.5vw, 32px);
+}
+
+.entryGateTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.entryGateSeal {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border: 1px solid rgba(242, 196, 109, 0.7);
+  border-radius: 15px;
+  background: var(--red-lacquer);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), 0 12px 24px -14px rgba(184, 13, 21, 0.85);
+}
+
+.entryGateSeal svg {
+  width: 26px;
+  height: 26px;
+  fill: none;
+  stroke: var(--gold-pale);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.entryGateLang {
+  min-width: 54px;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.entryGateLang:hover {
+  border-color: var(--red);
+  color: var(--red);
+}
+
+.entryGate h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.75rem, 5vw, 2.3rem);
+  font-weight: 650;
+  font-variation-settings: "SOFT" 100;
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+}
+
+.entryGateLead {
+  margin: 8px 0 0;
+  color: var(--muted);
+}
+
+.entryGateRisks {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+}
+
+.entryGateRisks dt {
+  font-weight: 800;
+}
+
+.entryGateRisks dd {
+  margin: 2px 0 0;
+  color: var(--ink-soft);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.entryGateTestnet {
+  padding: 12px 14px;
+  border: 1px solid var(--gold-line);
+  border-radius: var(--radius);
+  background: var(--slip);
+}
+
+.entryGateTestnet dt {
+  color: var(--gold-ink);
+}
+
+.entryGateChecks {
+  display: grid;
+  gap: 10px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.entryGateCheck {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  color: var(--ink);
+  font-weight: 650;
+  line-height: 1.45;
+  cursor: pointer;
+}
+
+.entryGateCheck input {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  accent-color: var(--red);
+  cursor: pointer;
+}
+
+.entryGateContinue {
+  width: 100%;
+  min-height: 50px;
+  font-size: 16px;
+}
+
+.entryGateContinue:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.entryGateFoot {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  text-align: center;
+}
+
+.entryGateFoot a {
+  color: var(--red);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.entryGateFoot span {
+  color: var(--muted);
+  font-size: 12.5px;
 }
 
 /* --------------------------------------------------------------------------

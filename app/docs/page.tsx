@@ -2,8 +2,14 @@ import Link from "next/link";
 import {
   FORTUNE_NETWORK,
 } from "@/lib/fortune-network";
+import {
+  ELIGIBILITY_NOTE,
+  RISK_POINTS,
+  TESTNET_POINT,
+} from "@/lib/disclaimer";
 
 const sections = [
+  ["disclaimer", "Risk disclaimer"],
   ["how", "How a Fortune launch works"],
   ["burns", "Burn + Rewards"],
   ["graduation", "Locked Pancake liquidity"],
@@ -42,6 +48,31 @@ export default function DocsPage() {
         </nav>
 
         <div className="docsBody">
+          <section className="panel docsDisclaimer" id="disclaimer">
+            <span className="eyebrow">RISK DISCLAIMER</span>
+            <h2>Read this before you trade</h2>
+            <dl className="docsRiskList">
+              {[...RISK_POINTS, ...(FORTUNE_NETWORK.isMainnet ? [] : [TESTNET_POINT])].map((point) => (
+                <div key={point.title}>
+                  <dt>{point.title}</dt>
+                  <dd>{point.body}</dd>
+                </div>
+              ))}
+              <div>
+                <dt>Eligibility</dt>
+                <dd>{ELIGIBILITY_NOTE}</dd>
+              </div>
+              <div>
+                <dt>Data can lag</dt>
+                <dd>
+                  Prices, charts, volume and rankings come from public BNB Chain RPC endpoints and
+                  can be delayed, incomplete or briefly unavailable. Confirm amounts and addresses in
+                  your wallet before you sign.
+                </dd>
+              </div>
+            </dl>
+          </section>
+
           <section className="panel" id="how">
             <span className="eyebrow">HOW</span>
             <h2>How a Fortune launch works</h2>

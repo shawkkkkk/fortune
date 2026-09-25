@@ -6,7 +6,7 @@ export default function NotFound() {
       <section className="panel emptyPanel statePanel">
         <img className="mascotEmpty" src="/fortune-cat-cutout.webp" alt="Fortune lucky cat" width="124" height="124" loading="lazy" />
         <span className="eyebrow">404</span>
-        <h2>That Fortune market was not found.</h2>
+        <h1>That Fortune market was not found.</h1>
         <p>It may not be indexed yet, or the address/link may be incorrect.</p>
         <div className="heroActions">
           <Link href="/explore" className="primaryCta">

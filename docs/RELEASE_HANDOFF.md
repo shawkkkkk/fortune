@@ -15,6 +15,8 @@ The frozen Standard candidate supports WBNB-only, single-pair launches on chain 
 
 Burn + Rewards v2 is isolated research. Its direct pair-asset accounting prototype is not a deployed Infinity hook. It must not be advertised as live or activated with real funds. Broader assets, tokenized securities, multi-pair launches and legacy tax-token mechanics are outside this first mainnet release.
 
+The Brew/LESGO comparison is recorded in `BREW_REVIEW.md`. The owner's GO revenue reference is captured separately in `PLATFORM_REVENUE.md`: platform buybacks must not consume holder rewards or liquidity. It is a proposed architecture with no deployed Fortune token, configured percentage or release approval.
+
 ## Engineering changes in this preparation
 
 - Preserve the redesigned frontend and official mascot; add the official X link and social metadata.

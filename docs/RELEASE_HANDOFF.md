@@ -6,6 +6,7 @@
 - Official X: https://x.com/fortunepad (`@fortunepad`, confirmed by the project owner).
 - Intended domain: `fortunepad.fun`. Apex and www still served Squarespace when checked on September 25. Domain attachment, DNS and HTTPS must be verified before merging the domain cutover PR #12.
 - Claude's frontend redesign PR #14 and canonical metadata correction PR #13 are merged.
+- Release preparation PR #15 is merged at `a7c3e2344af3389769f4b0a5fcf12659f2cefcec`. GitHub Actions run `36182869836` passed; Vercel production deployment `dpl_ApGRY9nLpHjuVK3UW6n47wyNn3AX` reached READY. Browser checks confirmed `@fortunepad` in the footer and social metadata.
 - Mainnet contract deployment and activation remain blocked. There is no published official mainnet token CA in this release.
 
 ## Release scope
@@ -45,6 +46,7 @@ The output includes the chain, block/hash, every included factory record and a S
 - Production Next.js build passed. Ten new web regression tests passed.
 - Foundry v1.8.3: 53 tests passed at 1,000 fuzz runs. The separately executed live BSC-mainnet fork lifecycle passed. Isolated rewards v2: four tests passed at 1,000 fuzz runs.
 - Production-runtime checks passed, including all seven testnet launches paginated at one fixed block, oldest-token API/page lookup, malformed-input rejection, release status and metadata. See `release-evidence/2026-09-25/runtime.json`.
+- All 12 smoke checks also passed against the public production URL after PR #15 deployed, including live readiness, stats, launches and launchable assets. See `release-evidence/2026-09-25/public-site-smoke.txt`. This is a point-in-time observation, not an uptime guarantee.
 - Testnet readiness passed with one of two providers responding (degraded redundancy). Slow public testnet responses exceeded the earlier two-second probe budget; only the testnet liveness budgets were increased. Mainnet budgets and gates are unchanged. See `release-evidence/2026-09-25/testnet-readiness.json`.
 - npm audit returned zero reported vulnerabilities. This is dependency evidence, not a smart-contract audit.
 

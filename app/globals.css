@@ -1408,6 +1408,14 @@ html[data-theme="dark"] .registryNotice.statusError {
   grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
+/* Token and market tiles show raw onchain values; a long price widens its
+   own column instead of breaking mid-number. */
+@media (min-width: 761px) {
+  .metricsGrid.four {
+    grid-template-columns: repeat(4, auto);
+  }
+}
+
 .metric {
   min-width: 0;
   display: flex;
@@ -4164,6 +4172,25 @@ label.fieldGrid {
 
   .metricsGrid.five .metric:last-child:nth-child(odd) {
     grid-column: 1 / -1;
+  }
+
+  /* Price first and last across the full width, the middle pair side by side. */
+  .metricsGrid.four .metric:first-child,
+  .metricsGrid.four .metric:last-child {
+    grid-column: 1 / -1;
+    border-right: 0;
+  }
+
+  .metricsGrid.four .metric:nth-child(2) {
+    border-right: 1px solid var(--line);
+  }
+
+  .metricsGrid.four .metric:nth-child(3) {
+    border-right: 0;
+  }
+
+  .metricsGrid.four .metric:nth-child(n + 2) {
+    border-top: 1px solid var(--line);
   }
 
   .fieldGrid,

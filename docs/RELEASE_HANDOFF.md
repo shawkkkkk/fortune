@@ -30,8 +30,8 @@ The Brew/LESGO comparison is recorded in `BREW_REVIEW.md`. The owner's GO revenu
 
 ## Data boundary
 
-Creator-flow follow-up (review branch, not a production claim): see
-`CREATOR_FLOW.md`. It adds visible project fields, local drafts, bounded JSON
+Creator-flow follow-up ([draft PR #22](https://github.com/shawkkkkk/fortune/pull/22),
+not a production claim): see `CREATOR_FLOW.md`. It adds visible project fields, local drafts, bounded JSON
 import, credential-gated IPFS uploads, metadata provenance and registry-backed
 address inspection. Storage/pinning credentials and real-provider upload checks
 remain owner/operator prerequisites. Multi-pool, Dev Launch and unrestricted
@@ -52,6 +52,7 @@ The output includes the chain, block/hash, every included factory record and a S
 
 ## Observed verification
 
+- Creator-flow PR #22: [CI run 36195640178](https://github.com/shawkkkkk/fortune/actions/runs/36195640178) passed on September 25: 22 web tests, production build/runtime smoke and 53 contract tests with 1,000 fuzz runs. The normal contract suite does not independently establish a live fork pass. Follow-up [web job 108273239958](https://github.com/shawkkkkk/fortune/actions/runs/36196438248/job/108273239958) also passed desktop/mobile browser checks at 22:24 UTC, with four screenshots retained in the `creator-flow-browser` artifact. Those UI checks use localhost fixtures, not production chain or provider evidence.
 - Production Next.js build passed. Ten new web regression tests passed.
 - Foundry v1.8.3: 53 tests passed at 1,000 fuzz runs. The separately executed live BSC-mainnet fork lifecycle passed. Isolated rewards v2: four tests passed at 1,000 fuzz runs.
 - Production-runtime checks passed, including all seven testnet launches paginated at one fixed block, oldest-token API/page lookup, malformed-input rejection, release status and metadata. See `release-evidence/2026-09-25/runtime.json`.
@@ -105,7 +106,7 @@ The economic simulation gate already contains evidence; this work does not chang
 ## Account / domain tasks for the owner
 
 1. Reauthorize the Vercel connection for team `hoque-industries` and project `fortune` (`prj_QwYhAacsiUZe6B6uuWL79mYu0gZG`). Deployment listing works, but project access and authenticated preview access returned scope-related 403 responses.
-2. Add apex and www in that project's Domains settings. Copy the exact A/CNAME and any ownership TXT values Vercel shows into Squarespace. Preserve unrelated DNS/email records. Configure www to redirect to apex and wait for valid HTTPS before merging PR #12.
+2. Verify the existing apex/www attachment in that project's Domains settings and compare Squarespace DNS with the exact A/CNAME and any ownership TXT values Vercel requires. Public HTTPS and the www-to-apex redirect now pass; do not replace working records unnecessarily. Preserve unrelated DNS/email records. Keep PR #12 draft until authenticated attachment/ownership and DNS checks also pass.
 3. Provide the completed external reviews, public Safe address and signer availability. Configure dedicated RPC/deployer secrets through the protected services, not chat. Funding and governance signatures require the actual wallet owners.
 4. Provision durable indexer storage/worker and image hosting credentials if those product paths are to be included. Image URLs/IPFS URIs work today; upload hosting is not configured.
 

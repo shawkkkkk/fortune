@@ -36,27 +36,28 @@ type LaunchResponse = {
 
 function money(value: string) {
   const number = Number(value);
+  if (!value.trim() || !Number.isFinite(number)) return "Unavailable";
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
     notation: number >= 1_000_000 ? "compact" : "standard",
     maximumFractionDigits: number < 1 ? 8 : 2,
-  }).format(Number.isFinite(number) ? number : 0);
+  }).format(number);
 }
 
 function short(value: string) {
   return value.slice(0, 6) + "…" + value.slice(-4);
 }
 
-function statusLabel(status: Launch["status"]) {
+function statusLabel(status: Launch["status"], mode: Launch["mode"]) {
   if (status === "GraduationReady") return "Ready to graduate";
-  if (status === "Pancake") return "Pancake V3";
+  if (status === "Pancake") return mode === "tax" ? "Pancake V2" : "Pancake V3";
   return status;
 }
 
 export default function MarketsPage() {
   const [launches, setLaunches] = useState<Launch[]>([]);
-  const [total, setTotal] = useState(0);
+  const [total, setTotal] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [cursor, setCursor] = useState<string | null>(null);
@@ -79,7 +80,8 @@ export default function MarketsPage() {
       }
 
       setLaunches(body.data.items || []);
-      setTotal(body.data.totalOnchain || 0);
+      setTotal(Number.isSafeInteger(body.data.totalOnchain) && body.data.totalOnchain >= 0
+        ? body.data.totalOnchain : null);
       setNextCursor(body.data.page?.nextCursor || null);
     } catch (nextError) {
       setError(
@@ -135,9 +137,10 @@ export default function MarketsPage() {
             ? "BNB CHAIN MAINNET"
             : "BSC TESTNET"}
         </strong>
-        <span>
-          {total} onchain Fortune launch{total === 1 ? "" : "es"} found on
-          chain {FORTUNE_NETWORK.chainId}.
+        <span role="status">
+          {total === null
+            ? loading ? "Reading onchain launches…" : "Onchain launch count unavailable."
+            : `${total} onchain Fortune launch${total === 1 ? "" : "es"} found on chain ${FORTUNE_NETWORK.chainId}.`}
         </span>
       </section>
 
@@ -193,7 +196,7 @@ export default function MarketsPage() {
                         : "")
                   }
                 >
-                  {statusLabel(launch.status)}
+                  {statusLabel(launch.status, launch.mode)}
                 </span>
               </div>
 

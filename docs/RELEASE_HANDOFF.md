@@ -4,7 +4,7 @@
 
 - Public BSC Testnet alpha: https://fortune-rho-snowy.vercel.app
 - Official X: https://x.com/fortunepad (`@fortunepad`, confirmed by the project owner).
-- Intended domain: `fortunepad.fun`. Apex and www still served Squarespace when checked on September 25. Domain attachment, DNS and HTTPS must be verified before merging the domain cutover PR #12.
+- Intended domain: `fortunepad.fun`. A fresh public check at 22:08–22:11 UTC on September 25 returned HTTPS 200 from Vercel for the apex and HTTPS 308 from www to the apex, replacing the earlier Squarespace observation. Authenticated project inspection still returns 403, so project attachment/ownership and full DNS verification are not yet confirmed. Keep domain cutover PR #12 draft pending those checks.
 - Claude's frontend redesign PR #14 and canonical metadata correction PR #13 are merged.
 - Release preparation PR #15 is merged at `a7c3e2344af3389769f4b0a5fcf12659f2cefcec`. GitHub Actions run `36182869836` passed; Vercel production deployment `dpl_ApGRY9nLpHjuVK3UW6n47wyNn3AX` reached READY. Browser checks confirmed `@fortunepad` in the footer and social metadata.
 - Mainnet contract deployment and activation remain blocked. There is no published official mainnet token CA in this release.
@@ -29,6 +29,13 @@ The Brew/LESGO comparison is recorded in `BREW_REVIEW.md`. The owner's GO revenu
 - Add transaction/catalog regression tests to CI and a scheduled public-site monitor. GitHub scheduling is best-effort; a configured workflow is not evidence of delivered production incident alerts.
 
 ## Data boundary
+
+Creator-flow follow-up (review branch, not a production claim): see
+`CREATOR_FLOW.md`. It adds visible project fields, local drafts, bounded JSON
+import, credential-gated IPFS uploads, metadata provenance and registry-backed
+address inspection. Storage/pinning credentials and real-provider upload checks
+remain owner/operator prerequisites. Multi-pool, Dev Launch and unrestricted
+pairing are not activated. Existing Standard/mainnet evidence is unchanged.
 
 The RPC catalog is an interim read path with an explicit 10,000-entry maximum across configured factories. It fails rather than truncates beyond that bound. It is not a durable event indexer or a high-volume production SLA. Name/ticker search still covers recent entries; exact token addresses and creator pages use the complete bounded catalog.
 

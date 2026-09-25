@@ -1,261 +1,51 @@
-import { assets } from "@/data/assets";
-import {
-  apiError,
-  apiOk,
-  normalizeAddress,
-} from "@/lib/public-api";
-import {
-  configuredRpcUrls,
-  rpcCall,
-} from "@/lib/bsc-rpc";
+import { createPublicClient, fallback, http, parseAbi, type Address } from "viem";
+import { configuredRpcUrls } from "@/lib/bsc-rpc";
+import { FORTUNE_NETWORK } from "@/lib/fortune-network";
+import { readFortuneAssetUniverse } from "@/lib/onchain-assets";
+import { pairEligibility } from "@/lib/pair-policy";
+import { readLimitedBytes } from "@/lib/creator-metadata";
+import { apiError, apiOk, normalizeAddress } from "@/lib/public-api";
 
 export const dynamic = "force-dynamic";
-
-function decodeUint(hex: string | null) {
-  if (!hex || hex === "0x") return null;
-
-  try {
-    return BigInt(hex).toString();
-  } catch {
-    return null;
-  }
-}
-
-function decodeString(hex: string | null) {
-  if (!hex || hex === "0x") return null;
-  const value = hex.startsWith("0x")
-    ? hex.slice(2)
-    : hex;
-
-  try {
-    // Some older ERC-20s return bytes32 instead of ABI dynamic strings.
-    if (value.length === 64) {
-      const bytes = Buffer.from(value, "hex");
-      return bytes
-        .toString("utf8")
-        .replace(/\0+$/g, "")
-        .trim() || null;
-    }
-
-    if (value.length < 128) return null;
-
-    const offset =
-      Number(BigInt("0x" + value.slice(0, 64))) * 2;
-    if (
-      !Number.isSafeInteger(offset) ||
-      offset < 0 ||
-      offset + 64 > value.length
-    ) {
-      return null;
-    }
-
-    const length = Number(
-      BigInt("0x" + value.slice(offset, offset + 64))
-    );
-
-    if (
-      !Number.isSafeInteger(length) ||
-      length < 0
-    ) {
-      return null;
-    }
-
-    const start = offset + 64;
-    const end = start + length * 2;
-    if (end > value.length) return null;
-
-    return Buffer.from(
-      value.slice(start, end),
-      "hex"
-    ).toString("utf8");
-  } catch {
-    return null;
-  }
-}
+const tokenAbi = parseAbi(["function name() view returns (string)", "function symbol() view returns (string)", "function decimals() view returns (uint8)", "function totalSupply() view returns (uint256)"]);
 
 export async function POST(request: Request) {
-  let suppliedAddress: string | null = null;
-
+  let address: Address;
   try {
-    const body = await request.json();
-    suppliedAddress =
-      typeof body?.address === "string"
-        ? body.address
-        : null;
-  } catch {
-    return apiError(
-      "invalid_request",
-      "Request body must be valid JSON.",
-      400
-    );
-  }
-
-  const address = normalizeAddress(suppliedAddress);
-  if (!address) {
-    return apiError(
-      "invalid_request",
-      "Provide a valid 20-byte BSC token contract address.",
-      400
-    );
-  }
-
-  const chainId = 56;
-  const rpcUrls = configuredRpcUrls(chainId);
-  if (!rpcUrls.length) {
-    return apiError(
-      "protocol_not_configured",
-      "BSC_RPC_URL is required for custom-token compatibility checks.",
-      503
-    );
-  }
-
+    const body = JSON.parse(new TextDecoder().decode(await readLimitedBytes(request, 2048)));
+    const clean = normalizeAddress(typeof body.address === "string" ? body.address : null);
+    if (!clean || /^0x0{40}$/i.test(clean)) throw new Error("address");
+    address = clean as Address;
+  } catch { return apiError("invalid_request", "Provide a valid token address on the active BNB network.", 400); }
   try {
-    const call = async (data: string) =>
-      (
-        await rpcCall(
-          chainId,
-          "eth_call",
-          [{ to: address, data }, "latest"]
-        )
-      ).result as string | null;
-
-    const [
-      codeResponse,
-      decimalsRaw,
-      symbolRaw,
-      nameRaw,
-      supplyRaw,
-    ] = await Promise.all([
-      rpcCall(chainId, "eth_getCode", [
-        address,
-        "latest",
-      ]),
-      call("0x313ce567").catch(() => null),
-      call("0x95d89b41").catch(() => null),
-      call("0x06fdde03").catch(() => null),
-      call("0x18160ddd").catch(() => null),
+    const universe = await readFortuneAssetUniverse();
+    if (!universe.configured || !universe.blockNumber) return apiError("protocol_not_configured", "The active onchain registry is not configured.", 503);
+    const urls = configuredRpcUrls(FORTUNE_NETWORK.chainId);
+    const rpc = createPublicClient({ transport: fallback((urls.length ? urls : [FORTUNE_NETWORK.publicRpcUrl]).map((url) => http(url, { timeout: 5000, retryCount: 0 }))) });
+    if (await rpc.getChainId() !== universe.chainId) throw new Error("chain mismatch");
+    const blockNumber = BigInt(universe.blockNumber);
+    const [code, name, symbol, decimals, supply] = await Promise.all([
+      rpc.getCode({ address, blockNumber }),
+      rpc.readContract({ address, abi: tokenAbi, functionName: "name", blockNumber }).catch(() => null),
+      rpc.readContract({ address, abi: tokenAbi, functionName: "symbol", blockNumber }).catch(() => null),
+      rpc.readContract({ address, abi: tokenAbi, functionName: "decimals", blockNumber }).catch(() => null),
+      rpc.readContract({ address, abi: tokenAbi, functionName: "totalSupply", blockNumber }).catch(() => null),
     ]);
-
-    const code = codeResponse.result as string | null;
-
-    const decimalsText =
-      decodeUint(decimalsRaw);
-    const decimals =
-      decimalsText == null
-        ? null
-        : Number(decimalsText);
-
-    const symbol = decodeString(symbolRaw);
-    const name = decodeString(nameRaw);
-    const totalSupplyRaw =
-      decodeUint(supplyRaw);
-
-    const hasCode =
-      Boolean(code) &&
-      code !== "0x" &&
-      code !== "0x0";
-
-    const registryAsset = assets.find(
-      (asset) =>
-        asset.address?.toLowerCase() ===
-        address.toLowerCase()
-    );
-
-    const reasonCodes: string[] = [];
-    if (!hasCode) {
-      reasonCodes.push("NO_CONTRACT_CODE");
-    }
-    if (
-      decimals == null ||
-      !Number.isInteger(decimals) ||
-      decimals < 0 ||
-      decimals > 36
-    ) {
-      reasonCodes.push("UNSUPPORTED_DECIMALS");
-    }
-    if (!symbol) {
-      reasonCodes.push("SYMBOL_UNREADABLE");
-    }
-    if (!totalSupplyRaw) {
-      reasonCodes.push("SUPPLY_UNREADABLE");
-    }
-
-    const staticErc20Compatible =
-      reasonCodes.length === 0;
-
-    const fortuneApproved =
-      Boolean(registryAsset) &&
-      registryAsset!.chain === "BSC" &&
-      registryAsset!.verification !==
-        "Unavailable";
-
-    const quoteEnabled =
-      fortuneApproved &&
-      registryAsset!.capabilities.includes(
-        "quote"
-      );
-
-    const graduationEnabled =
-      fortuneApproved &&
-      registryAsset!.capabilities.includes(
-        "graduation"
-      );
-
+    if ((await rpc.getBlock({ blockNumber })).hash !== universe.blockHash) throw new Error("snapshot changed");
+    const asset = universe.assets.find((item) => item.address.toLowerCase() === address.toLowerCase());
+    const hasCode = Boolean(code && code !== "0x");
+    const reasons = pairEligibility(asset, universe.chainId).reasons;
+    if (!hasCode) reasons.push("NO_CONTRACT_CODE");
+    if (decimals == null || decimals > 36) reasons.push("UNSUPPORTED_DECIMALS");
+    if (!symbol || symbol.length > 128) reasons.push("SYMBOL_UNREADABLE");
+    if (supply == null) reasons.push("SUPPLY_UNREADABLE");
     return apiOk({
-      chainId,
-      rpc: {
-        configuredProviders: rpcUrls.length,
-        providerIndex: codeResponse.providerIndex,
-      },
-      address,
-      metadata: {
-        name,
-        symbol,
-        decimals,
-        totalSupplyRaw,
-      },
-      staticChecks: {
-        hasCode,
-        staticErc20Compatible,
-        reasonCodes,
-      },
-      fortuneRegistry: registryAsset
-        ? {
-            id: registryAsset.id,
-            verification:
-              registryAsset.verification,
-            category: registryAsset.category,
-            capabilities:
-              registryAsset.capabilities,
-          }
-        : null,
-      launchability: {
-        fortuneApproved,
-        quoteEnabled,
-        graduationEnabled,
-        launchableNow:
-          staticErc20Compatible &&
-          quoteEnabled &&
-          graduationEnabled,
-      },
-      runtimeChecksStillRequired: [
-        "exact transfer-in / transfer-out accounting",
-        "fee-on-transfer behavior",
-        "rebasing or share-accounting behavior",
-        "blacklist / pause / transfer restrictions",
-        "oracle availability and freshness",
-        "minimum external liquidity",
-        "graduation-adapter pool compatibility",
-      ],
-      policy:
-        "Passing metadata/code checks does not automatically approve a custom token. Fortune Registry approval is required before it can hold user launch reserves.",
+      chainId: universe.chainId, blockNumber: universe.blockNumber, blockHash: universe.blockHash, address,
+      metadata: { name: name?.slice(0, 128) || null, symbol: symbol?.slice(0, 128) || null, decimals, totalSupplyRaw: supply?.toString() ?? null },
+      fortuneRegistry: asset ? { category: asset.category, active: asset.active, healthy: asset.healthy } : null,
+      launchability: { fortuneApproved: Boolean(asset?.active), quoteEnabled: Boolean(asset?.quoteEnabled), graduationEnabled: Boolean(asset?.graduationEnabled), launchableNow: reasons.length === 0, reasonCodes: reasons },
+      policy: "Eligibility is from the active onchain registry and release asset policy, never the discovery catalog. This is not an audit; launch preflight and release readiness are still required.",
+      runtimeChecksStillRequired: ["transfer taxes and rebasing", "blacklist and transfer restrictions", "oracle freshness", "graduation liquidity and compatibility", "current factory preflight and release readiness"],
     });
-  } catch (error) {
-    return apiError(
-      "dependency_unavailable",
-      "BSC RPC could not inspect this token right now.",
-      503,
-
-    );
-  }
+  } catch { return apiError("dependency_unavailable", "The active network could not verify this token. No pair has been approved.", 503); }
 }

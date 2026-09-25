@@ -676,6 +676,29 @@ const ZH: Record<string, string> = {
   "Only assets approved in the onchain registry. The Standard mainnet candidate is pinned to WBNB; stablecoins, BNB majors, DeFi tokens and tokenized stocks arrive in separate, reviewed releases.": "只能使用链上注册表批准的资产。Standard 主网候选固定为 WBNB；稳定币、BNB 主流币、DeFi 代币和代币化股票会在单独审核的版本中陆续加入。",
   "Is Burn + Rewards live?": "Burn + Rewards 上线了吗？",
   "Not yet. Burn + Rewards v2 is research: token-side fees would burn and holders would be paid in the pair asset without selling the meme coin. It has its own audit boundary and no real-value deployment.": "还没有。Burn + Rewards v2 仍在研究中：代币侧手续费将被销毁，持有人将以配对资产获得奖励，而无需卖出 Meme 币。它有独立的审计边界，目前没有真实资产部署。",
+
+  // Entry disclaimer and the full disclaimer in Docs.
+  "Network status": "网络状态",
+  "Before you enter Fortune": "进入 Fortune 之前",
+  "Please read and confirm before continuing.": "请阅读并确认后再继续。",
+  "Trading risk": "交易风险",
+  "Meme coins are speculative. Prices can swing sharply, liquidity can disappear and you can lose everything you trade.": "Meme 币具有投机性。价格可能剧烈波动，流动性可能消失，你可能损失全部交易资金。",
+  "Not financial advice": "非投资建议",
+  "Fortune provides software and onchain data, not investment advice. Listings, rankings and charts are not endorsements, and no return is promised.": "Fortune 提供软件和链上数据，而非投资建议。上架、排名和图表均不构成背书，也不承诺任何回报。",
+  "Your responsibility": "你的责任",
+  "Check every token, approval and transaction in your wallet. Contracts can fail, scams exist and confirmed transactions cannot be reversed. Network fees apply.": "请在钱包中核对每个代币、每次授权和每笔交易。合约可能出错，骗局确实存在，已确认的交易无法撤销。交易需支付网络费用。",
+  "Public testnet alpha": "公开测试网 Alpha",
+  "Fortune currently runs on BSC Testnet with valueless test assets. The contracts are pre-audit and mainnet is disabled.": "Fortune 目前运行在 BSC 测试网上，使用无价值的测试资产。合约尚未审计，主网处于停用状态。",
+  "I understand these risks and take responsibility for my own transactions.": "我了解上述风险，并对自己的交易负责。",
+  "Continue to Fortune →": "继续进入 Fortune →",
+  "Read the full disclaimer ↗": "阅读完整免责声明 ↗",
+  "Risk disclaimer": "风险免责声明",
+  "RISK DISCLAIMER": "风险免责声明",
+  "Read this before you trade": "交易前请先阅读",
+  "Eligibility": "使用资格",
+  "Eligibility and jurisdiction terms will come from Fortune's legal review, which is still an open mainnet release gate. Confirming this disclaimer does not replace that review.": "使用资格和适用司法辖区条款将由 Fortune 的法律审查确定，该审查仍是尚未完成的主网发布关卡。确认本免责声明并不能替代该审查。",
+  "Data can lag": "数据可能延迟",
+  "Prices, charts, volume and rankings come from public BNB Chain RPC endpoints and can be delayed, incomplete or briefly unavailable. Confirm amounts and addresses in your wallet before you sign.": "价格、图表、交易量和排名来自公共 BNB Chain RPC 节点，可能延迟、不完整或短暂不可用。签名前请在钱包中确认金额和地址。",
 };
 
 function translateText(input: string) {

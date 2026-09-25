@@ -4,6 +4,7 @@ import "@/app/globals.css";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import ScrollRevealRoot from "@/components/ScrollReveal";
+import EntryDisclaimer from "@/components/EntryDisclaimer";
 import { LanguageProvider } from "@/components/LanguageProvider";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { FORTUNE_NETWORK } from "@/lib/fortune-network";
@@ -98,6 +99,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             {children}
             <Footer />
             <ScrollRevealRoot />
+            <EntryDisclaimer />
           </LanguageProvider>
         </ThemeProvider>
       </body>

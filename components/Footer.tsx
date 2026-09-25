@@ -26,14 +26,16 @@ export default function Footer() {
         </div>
 
         <div className="siteFooterLinks">
-          <Link href="/markets">{zh ? "市场" : "Markets"}</Link>
+          <Link href="/explore">{zh ? "探索" : "Explore"}</Link>
           <Link href={FORTUNE_NETWORK.isMainnet ? "/launch" : "/testnet"}>
-            {FORTUNE_NETWORK.isMainnet
-              ? zh ? "发行" : "Launch"
-              : zh ? "公开 Alpha" : "Public Alpha"}
+            {zh ? "发行" : "Launch"}
           </Link>
+          <Link href="/burns">{zh ? "销毁" : "Burns"}</Link>
+          <Link href="/rewards">{zh ? "奖励" : "Rewards"}</Link>
+          <Link href="/stats">{zh ? "数据" : "Stats"}</Link>
+          <Link href="/docs">{zh ? "文档" : "Docs"}</Link>
           <Link href="/status">{zh ? "系统状态" : "Status"}</Link>
-          <Link href="/developers">{zh ? "开发者 API" : "Developer API"}</Link>
+          <Link href="/developers">{zh ? "开发者 API" : "API"}</Link>
           <a
             href={
               FORTUNE_NETWORK.explorerUrl +

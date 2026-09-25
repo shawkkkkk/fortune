@@ -5,9 +5,15 @@ import { FORTUNE_SITE_URL } from "@/lib/site";
 export default function sitemap(): MetadataRoute.Sitemap {
   const routes = [
     "/",
+    "/explore",
     "/markets",
     "/assets",
+    "/launch",
     "/testnet",
+    "/burns",
+    "/rewards",
+    "/stats",
+    "/docs",
     "/status",
     "/developers",
   ];

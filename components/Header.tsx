@@ -24,15 +24,16 @@ declare global {
 }
 
 const links = [
-  ["/", "Overview"],
-  ["/markets", "Markets"],
-  ["/assets", "Assets"],
+  ["/", "Home"],
+  ["/explore", "Explore"],
   [
     FORTUNE_NETWORK.isMainnet ? "/launch" : "/testnet",
-    FORTUNE_NETWORK.isMainnet ? "Launch" : "Public Alpha",
+    "Launch",
   ],
-  ["/status", "Status"],
-  ["/developers", "API"],
+  ["/burns", "Burns"],
+  ["/rewards", "Rewards"],
+  ["/stats", "Stats"],
+  ["/docs", "Docs"],
 ] as const;
 
 function short(address: string) {

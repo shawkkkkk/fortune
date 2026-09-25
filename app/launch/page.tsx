@@ -766,7 +766,7 @@ export default function LaunchPage() {
         const taxFactory =
           FORTUNE_NETWORK.contracts.taxFactory as Address;
 
-        setMessage("Running tax-token launch preflight…");
+        setMessage("Running Burn + Rewards launch preflight…");
 
         const [ready, reasonCode] = await publicClient.readContract({
           address: taxFactory,
@@ -777,7 +777,7 @@ export default function LaunchPage() {
 
         if (!ready) {
           throw new Error(
-            "Tax launch preflight failed: " +
+            "Burn + Rewards preflight failed: " +
               (decodeReason(reasonCode) || reasonCode)
           );
         }
@@ -791,8 +791,8 @@ export default function LaunchPage() {
 
         setMessage(
           initial > 0n
-            ? "Confirm the tax-token launch. Your creator purchase follows as a separate BSC transaction."
-            : "Confirm the tax-token launch transaction."
+            ? "Confirm the Burn + Rewards launch. Your creator purchase follows as a separate BSC transaction."
+            : "Confirm the Burn + Rewards launch transaction."
         );
 
         hash = await walletClient.writeContract({
@@ -871,7 +871,7 @@ export default function LaunchPage() {
       if (mode === "tax" && initial > 0n) {
         try {
           setMessage(
-            "Tax launch confirmed. Approve the quote asset, then confirm your creator first purchase."
+            "Burn + Rewards launch confirmed. Approve the pair asset, then confirm your creator first purchase."
           );
 
           const approveHash = await walletClient.writeContract({
@@ -891,11 +891,11 @@ export default function LaunchPage() {
           await publicClient.waitForTransactionReceipt({ hash: buyHash });
 
           setMessage(
-            "Tax launch and creator first purchase confirmed on BNB Smart Chain."
+            "Burn + Rewards launch and creator first purchase confirmed on BNB Smart Chain."
           );
         } catch (error) {
           setMessage(
-            "Tax token launch succeeded, but the optional creator first purchase did not complete. " +
+            "Burn + Rewards launch succeeded, but the optional creator first purchase did not complete. " +
               (error instanceof Error
                 ? error.message
                 : "The follow-up transaction failed.") +
@@ -978,10 +978,10 @@ export default function LaunchPage() {
             disabled={!FORTUNE_TAX_NETWORK_CONFIGURED}
             onClick={() => setMode("tax")}
           >
-            <strong>Tax Token</strong>
+            <strong>Burn + Rewards</strong>
             <span>
               {FORTUNE_TAX_NETWORK_CONFIGURED
-                ? "Tax + dividends + anti-farmer · Pancake V2"
+                ? "Burns + pair-asset holder rewards · Pancake V2"
                 : "Available after the production tax stack passes release gates"}
             </span>
           </button>
@@ -992,7 +992,7 @@ export default function LaunchPage() {
         <div className="formSectionTitle">
           <span>02</span>
           <div>
-            <h2>Payment asset</h2>
+            <h2>Pair asset</h2>
             <p>
               The picker is sourced from the live Fortune registry, not a
               hard-coded token list.
@@ -1004,10 +1004,10 @@ export default function LaunchPage() {
           <input
             value={assetSearch}
             onChange={(event) => setAssetSearch(event.target.value)}
-            placeholder="Search the launchable asset universe"
+            placeholder="Search BNB, stables, DeFi, stocks or a reviewed pair"
           />
           <Link href="/assets" className="secondaryCta">
-            Browse full universe
+            Browse BNB pair universe
           </Link>
         </div>
 
@@ -1156,7 +1156,7 @@ export default function LaunchPage() {
             <div className="formSectionTitle">
               <span>05</span>
               <div>
-                <h2>Tax + anti-farmer</h2>
+                <h2>Burn + Rewards settings</h2>
                 <p>Immutable at launch. Rates cannot later be raised.</p>
               </div>
             </div>
@@ -1184,7 +1184,7 @@ export default function LaunchPage() {
             <div className="formSectionTitle">
               <span>06</span>
               <div>
-                <h2>Tax allocation</h2>
+                <h2>Burn + rewards routing</h2>
                 <p>Total must equal exactly 100%.</p>
               </div>
             </div>

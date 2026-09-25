@@ -7,7 +7,7 @@ import ScrollRevealRoot from "@/components/ScrollReveal";
 import { LanguageProvider } from "@/components/LanguageProvider";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { FORTUNE_NETWORK } from "@/lib/fortune-network";
-import { FORTUNE_SITE_URL } from "@/lib/site";
+import { FORTUNE_SITE_URL, FORTUNE_X_HANDLE } from "@/lib/site";
 
 // next/font downloads these at build time and serves them from Fortune's own
 // origin; no browser request reaches a font CDN.
@@ -57,6 +57,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
+    site: FORTUNE_X_HANDLE,
+    creator: FORTUNE_X_HANDLE,
     title: FORTUNE_NETWORK.isMainnet
       ? "Fortune — Launch on BNB Smart Chain"
       : "Fortune — Public Alpha on BSC Testnet",

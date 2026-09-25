@@ -1,0 +1,66 @@
+{
+  "ready": true,
+  "degraded": true,
+  "service": "fortune",
+  "environment": "public-bsc-testnet-alpha",
+  "chainId": 97,
+  "stackReady": true,
+  "releaseReady": true,
+  "stack": {
+    "factory": {
+      "configured": true,
+      "hasCode": true
+    },
+    "graduationAdapter": {
+      "configured": true,
+      "hasCode": true
+    },
+    "taxLiquidityLocker": {
+      "configured": true,
+      "hasCode": true
+    },
+    "taxGraduationAdapter": {
+      "configured": true,
+      "hasCode": true
+    },
+    "registry": {
+      "configured": true,
+      "hasCode": true
+    },
+    "taxFactory": {
+      "configured": true,
+      "hasCode": true
+    },
+    "poolRegistry": {
+      "configured": true,
+      "hasCode": true
+    },
+    "mockQuote": {
+      "configured": true,
+      "hasCode": true
+    },
+    "liquidityLocker": {
+      "configured": true,
+      "hasCode": true
+    }
+  },
+  "rpc": {
+    "configured": 2,
+    "healthy": 1,
+    "redundancyRequired": false,
+    "redundancyConfigured": true,
+    "probes": [
+      {
+        "index": 0,
+        "ok": true,
+        "observedChainId": 97
+      },
+      {
+        "index": 1,
+        "ok": false,
+        "observedChainId": null
+      }
+    ]
+  },
+  "timestamp": "2026-09-25T19:56:09.004Z"
+}

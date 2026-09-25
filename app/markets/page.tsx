@@ -27,6 +27,7 @@ type LaunchResponse = {
     items: Launch[];
     totalOnchain: number;
     chainId: number;
+    page?: { nextCursor: string | null; hasMore: boolean };
   };
   error?: {
     message?: string;
@@ -58,12 +59,15 @@ export default function MarketsPage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     try {
+      setLoading(true);
       setError("");
       const response = await fetch(
-        "/api/public/v1/launches?limit=25",
+        "/api/public/v1/launches?limit=25" + (cursor ? "&cursor=" + encodeURIComponent(cursor) : ""),
         { cache: "no-store" }
       );
       const body = (await response.json()) as LaunchResponse;
@@ -76,6 +80,7 @@ export default function MarketsPage() {
 
       setLaunches(body.data.items || []);
       setTotal(body.data.totalOnchain || 0);
+      setNextCursor(body.data.page?.nextCursor || null);
     } catch (nextError) {
       setError(
         nextError instanceof Error
@@ -85,7 +90,7 @@ export default function MarketsPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [cursor]);
 
   useEffect(() => {
     void refresh();
@@ -114,7 +119,7 @@ export default function MarketsPage() {
             {loading ? "Refreshing…" : "Refresh"}
           </button>
           <Link
-            href={FORTUNE_NETWORK.isMainnet ? "/launch" : "/testnet"}
+            href="/launch"
             className="primaryCta"
           >
             {FORTUNE_NETWORK.isMainnet
@@ -225,6 +230,7 @@ export default function MarketsPage() {
           ))}
         </div>
       )}
+    <div className="heroActions">{cursor ? <button className="secondaryCta" disabled={loading} onClick={() => setCursor(null)}>Newest launches</button> : null}{nextCursor ? <button className="secondaryCta" disabled={loading} onClick={() => setCursor(nextCursor)}>Older launches →</button> : null}{cursor ? <span>Browsing a fixed block snapshot. Return to newest launches for live updates.</span> : null}</div>
     </main>
   );
 }

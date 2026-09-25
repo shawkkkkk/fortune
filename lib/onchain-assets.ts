@@ -5,10 +5,10 @@ import {
   type Address,
 } from "viem";
 import { bsc, bscTestnet } from "viem/chains";
+import { FORTUNE_READ_NETWORK_CONFIGURED } from "@/lib/read-network";
 import { configuredRpcUrls } from "@/lib/bsc-rpc";
 import {
   FORTUNE_NETWORK,
-  FORTUNE_NETWORK_CONFIGURED,
 } from "@/lib/fortune-network";
 
 const registryAbi = [
@@ -132,7 +132,7 @@ export type FortuneRegistryAsset = {
 
 export async function readFortuneAssetUniverse() {
   if (
-    !FORTUNE_NETWORK_CONFIGURED ||
+    !FORTUNE_READ_NETWORK_CONFIGURED ||
     !FORTUNE_NETWORK.contracts.registry
   ) {
     return {

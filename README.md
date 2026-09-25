@@ -279,3 +279,10 @@ See `docs/SECURITY.md`, `docs/ARCHITECTURE.md`, and `docs/LAUNCH_ENGINES.md`.
 ## License
 
 MIT
+
+## Official channels
+
+- X: [@fortunepad](https://x.com/fortunepad)
+- Public alpha: https://fortune-rho-snowy.vercel.app
+- Intended domain: `fortunepad.fun` (DNS/HTTPS cutover remains pending)
+- Current release handoff: [docs/RELEASE_HANDOFF.md](docs/RELEASE_HANDOFF.md)

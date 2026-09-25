@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import {
   createPublicClient,
   createWalletClient,
@@ -9,7 +9,7 @@ import {
   decodeEventLog,
   defineChain,
   isAddress,
-  parseUnits,
+  type TransactionReceipt,
   type Address,
   type EIP1193Provider,
   type Hex,
@@ -18,6 +18,8 @@ import {
   FORTUNE_NETWORK,
   FORTUNE_NETWORK_CONFIGURED,
 } from "@/lib/fortune-network";
+
+import { assertWalletIdentity, parseLaunchAmount, restorePendingLaunch, type PendingLaunch } from "@/lib/launch-safety";
 
 type LaunchMode = "standard";
 
@@ -266,24 +268,6 @@ function short(value: string) {
   return value.slice(0, 8) + "…" + value.slice(-6);
 }
 
-function parseTokenAmount(
-  label: string,
-  value: string,
-  decimals: number
-) {
-  const clean = value.trim() || "0";
-  if (!/^\d+(?:\.\d+)?$/.test(clean)) {
-    throw new Error(label + " must be a non-negative number.");
-  }
-  const fractional = clean.split(".")[1] || "";
-  if (fractional.length > decimals) {
-    throw new Error(
-      label + " supports at most " + decimals + " decimal places."
-    );
-  }
-  return parseUnits(clean, decimals);
-}
-
 function publicMetadataUrl(
   label: string,
   value: string,
@@ -348,6 +332,83 @@ export default function LaunchPage() {
   const [message, setMessage] = useState("");
   const [receipt, setReceipt] = useState<LaunchReceipt | null>(null);
   const [reviewed, setReviewed] = useState(false);
+  const [pending, setPending] = useState<PendingLaunch | null>(null);
+  const [storageLoaded, setStorageLoaded] = useState(false);
+  const signing = useRef(false);
+  const pendingKey = `fortune:launch:${FORTUNE_NETWORK.chainId}:${FORTUNE_NETWORK.contracts.factory.toLowerCase()}`;
+
+  useEffect(() => {
+    try {
+      const saved = restorePendingLaunch(localStorage.getItem(pendingKey), FORTUNE_NETWORK.chainId, FORTUNE_NETWORK.contracts.factory);
+      setPending(saved);
+      if (saved) setMessage("A submitted launch needs confirmation. Check its status before starting another launch.");
+    } catch { /* Storage may be unavailable; the current session still tracks submission. */ }
+    setStorageLoaded(true);
+  }, [pendingKey]);
+
+  function rememberPending(value: PendingLaunch | null) {
+    setPending(value);
+    try {
+      if (value) localStorage.setItem(pendingKey, JSON.stringify(value));
+      else localStorage.removeItem(pendingKey);
+    } catch { /* Never misreport a submitted transaction as failed if storage is full. */ }
+  }
+
+  async function requireLiveRelease() {
+    if (!FORTUNE_NETWORK.isMainnet) return;
+    const response = await fetch("/api/public/v1/readiness", { cache: "no-store" });
+    const body = await response.json();
+    if (!response.ok || body?.data?.ready !== true || body?.data?.chainId !== 56) {
+      throw new Error("Fortune mainnet is not release-ready. No wallet transaction was constructed.");
+    }
+  }
+
+  function acceptReceipt(txReceipt: TransactionReceipt, hash: Hex) {
+    if (txReceipt.status !== "success") {
+      rememberPending(null);
+      setMessage("The launch transaction reverted. No launch was created; gas may have been spent.");
+      return;
+    }
+    for (const log of txReceipt.logs) {
+      if (log.address.toLowerCase() !== FORTUNE_NETWORK.contracts.factory.toLowerCase()) continue;
+      try {
+        const event = decodeEventLog({ abi: standardFactoryAbi, eventName: "LaunchCreated", data: log.data, topics: log.topics });
+        setReceipt({ mode, token: event.args.token, curve: event.args.curve, transactionHash: hash });
+        rememberPending(null);
+        setMessage("Standard launch confirmed on " + FORTUNE_NETWORK.chainName + ".");
+        return;
+      } catch { /* Ignore other events emitted by the factory. */ }
+    }
+    setMessage("Transaction confirmed, but its launch event could not be verified. Inspect the transaction before starting another launch.");
+  }
+
+  async function recoverLaunch() {
+    if (!pending || signing.current) return;
+    signing.current = true;
+    setBusy(true);
+    try {
+      const response = await fetch(`/api/public/v1/transactions/${pending.hash}`, { cache: "no-store" });
+      const body = await response.json();
+      const data = body?.data;
+      if (!response.ok || data?.chainId !== pending.chainId) throw new Error("Transaction status is unavailable. Keep the saved hash and check again.");
+      if (data.state === "confirmed" || data.state === "reverted") {
+        if (data.from?.toLowerCase() !== pending.account.toLowerCase() || data.to?.toLowerCase() !== pending.factory.toLowerCase()) throw new Error("Transaction identity could not be verified. Inspect it on BscScan.");
+        if (data.state === "reverted") {
+          rememberPending(null);
+          setMessage("The saved launch reverted. Review the inputs before trying again; gas may have been spent.");
+        } else if (data.launch) {
+          setReceipt({ mode, token: data.launch.token, curve: data.launch.curve, transactionHash: pending.hash });
+          rememberPending(null);
+          setMessage("Your submitted launch is confirmed. Open its market below.");
+        } else {
+          setMessage("Transaction confirmed but no Fortune launch event was verified. Inspect it on BscScan before proceeding.");
+        }
+      } else {
+        setMessage("The submitted transaction is pending or not yet visible to RPC. Do not resubmit; check again or inspect its nonce in your wallet.");
+      }
+    } catch (error) { setMessage(error instanceof Error ? error.message : "Could not recover the launch yet."); }
+    finally { signing.current = false; setBusy(false); }
+  }
 
   const visibleAssets = useMemo(() => {
     const needle = assetSearch.trim().toLowerCase();
@@ -418,6 +479,9 @@ export default function LaunchPage() {
   }, []);
 
   async function launch() {
+    if (signing.current || pending || !storageLoaded) return;
+    signing.current = true;
+    let submittedHash: Hex | null = null;
     setBusy(true);
     setMessage("");
     setReceipt(null);
@@ -426,13 +490,7 @@ export default function LaunchPage() {
       if (!FORTUNE_NETWORK_CONFIGURED || mode !== "standard") {
         throw new Error("This launch stack is not configured. Mainnet stays blocked until the Standard release gates pass.");
       }
-      if (FORTUNE_NETWORK.isMainnet) {
-        const readinessResponse = await fetch("/api/public/v1/readiness", { cache: "no-store" });
-        const readinessBody = await readinessResponse.json();
-        if (!readinessResponse.ok || readinessBody?.data?.ready !== true) {
-          throw new Error("Fortune mainnet is not release-ready. No wallet transaction was constructed.");
-        }
-      }
+      await requireLiveRelease();
 
       // Re-confirm the production network immediately before constructing any
       // real-value transaction; a previously connected account may have since
@@ -475,7 +533,7 @@ export default function LaunchPage() {
       const destination = treasuryInput
         ? (treasuryInput as Address)
         : wallet;
-      const initial = parseTokenAmount(
+      const initial = parseLaunchAmount(
         "Creator first purchase",
         creatorPurchase,
         selected.decimals
@@ -498,13 +556,13 @@ export default function LaunchPage() {
         const params = {
           name: cleanName,
           symbol: cleanSymbol,
-          totalSupply: parseUnits(totalSupply, 18),
+          totalSupply: parseLaunchAmount("Token supply", totalSupply),
           quoteAssets: [selected.address],
           weightsBps: [10_000],
           primaryQuote: selected.address,
-          basePriceUsd1e18: parseUnits(basePrice, 18),
-          slopeUsd1e18: parseUnits(slope || "0", 18),
-          graduationUsd1e18: parseUnits(graduationTarget, 18),
+          basePriceUsd1e18: parseLaunchAmount("Opening price", basePrice),
+          slopeUsd1e18: parseLaunchAmount("Slope", slope),
+          graduationUsd1e18: parseLaunchAmount("Graduation target", graduationTarget),
           adaptiveGraduation: true,
           // Chain-56 v1 rejects holder, buyback and liquidity fee routes.
           feeBps: [50, 0, 0, 0, 0, 50] as const,
@@ -538,13 +596,16 @@ export default function LaunchPage() {
 
         if (initial > 0n) {
           setMessage("Approve the creator purchase, then confirm the atomic launch + first buy.");
+          await requireLiveRelease();
+          await assertWalletIdentity(provider(), wallet, FORTUNE_NETWORK.chainId);
           const approveHash = await walletClient.writeContract({
             address: selected.address,
             abi: erc20Abi,
             functionName: "approve",
             args: [FORTUNE_NETWORK.contracts.factory as Address, initial],
           });
-          await publicClient.waitForTransactionReceipt({ hash: approveHash });
+          const approval = await publicClient.waitForTransactionReceipt({ hash: approveHash });
+          if (approval.status !== "success") throw new Error("Pair-asset approval reverted. No launch was submitted.");
 
           setMessage("Simulating the atomic first buy and its opening shield fee…");
           const simulation = await publicClient.simulateContract({
@@ -560,6 +621,8 @@ export default function LaunchPage() {
           }
           const minTokensOut = (expectedTokens * 95n) / 100n;
 
+          await requireLiveRelease();
+          await assertWalletIdentity(provider(), wallet, FORTUNE_NETWORK.chainId);
           hash = await walletClient.writeContract({
             address: FORTUNE_NETWORK.contracts.factory as Address,
             abi: standardFactoryAbi,
@@ -567,7 +630,10 @@ export default function LaunchPage() {
             args: [params, salt, initial, minTokensOut > 0n ? minTokensOut : 1n],
           });
         } else {
+          await publicClient.simulateContract({ account: wallet, address: FORTUNE_NETWORK.contracts.factory as Address, abi: standardFactoryAbi, functionName: "createLaunchPrepared", args: [params, salt] });
           setMessage("Confirm the launch transaction in your wallet.");
+          await requireLiveRelease();
+          await assertWalletIdentity(provider(), wallet, FORTUNE_NETWORK.chainId);
           hash = await walletClient.writeContract({
             address: FORTUNE_NETWORK.contracts.factory as Address,
             abi: standardFactoryAbi,
@@ -577,36 +643,24 @@ export default function LaunchPage() {
         }
       }
 
-      const txReceipt = await publicClient.waitForTransactionReceipt({ hash });
-      let created: LaunchReceipt | null = null;
-
-      for (const log of txReceipt.logs) {
-        try {
-          if (log.address.toLowerCase() !== FORTUNE_NETWORK.contracts.factory.toLowerCase()) continue;
-          const event = decodeEventLog({
-            abi: standardFactoryAbi,
-            eventName: "LaunchCreated",
-            data: log.data,
-            topics: log.topics,
-          });
-          created = { mode, token: event.args.token, curve: event.args.curve, transactionHash: hash };
-          break;
-        } catch {
-          // Ignore unrelated logs.
-        }
+      submittedHash = hash;
+      rememberPending({ hash, account: wallet, chainId: FORTUNE_NETWORK.chainId, factory: FORTUNE_NETWORK.contracts.factory as Address });
+      setMessage("Launch submitted. Waiting for onchain confirmation…");
+      const txReceipt = await publicClient.waitForTransactionReceipt({ hash, onReplaced: ({ transactionReceipt }) => {
+        submittedHash = transactionReceipt.transactionHash;
+        rememberPending({ hash: transactionReceipt.transactionHash, account: wallet, chainId: FORTUNE_NETWORK.chainId, factory: FORTUNE_NETWORK.contracts.factory as Address });
+      } });
+      if (txReceipt.to?.toLowerCase() !== FORTUNE_NETWORK.contracts.factory.toLowerCase()) {
+        rememberPending(null);
+        setMessage("The launch was replaced by another transaction. No Fortune launch was verified. Review your wallet before trying again.");
+        return;
       }
-
-      if (!created) {
-        throw new Error(
-          "The transaction confirmed, but Fortune could not decode the launch event."
-        );
-      }
-
-      setReceipt(created);
-      setMessage("Standard launch confirmed on " + FORTUNE_NETWORK.chainName + ".");
+      acceptReceipt(txReceipt, txReceipt.transactionHash);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Launch failed.");
+      const detail = error instanceof Error ? error.message : "Launch could not complete.";
+      setMessage(submittedHash ? "Transaction submitted. Check its onchain status before any retry. " + detail : detail);
     } finally {
+      signing.current = false;
       setBusy(false);
     }
   }
@@ -635,6 +689,7 @@ export default function LaunchPage() {
 
       <div className="launchLayout">
         <div className="launchMain">
+          <fieldset aria-label="Token launch details" disabled={busy || Boolean(pending)} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
           <ol className="journeySteps" aria-label="Launch steps">
             <li><span>1</span>Name + ticker + image</li><li><span>2</span>Launch type</li><li><span>3</span>Pair asset</li><li><span>4</span>First buy</li><li><span>5</span>Review + launch</li>
           </ol>
@@ -710,20 +765,22 @@ export default function LaunchPage() {
               </div>
               <p className="reviewWarning">An approved pair and wallet transaction are required. Fortune checks the current chain, release state and onchain preflight again before any submission.</p>
               <div className="reviewActions">
-                <button className="launchButton" disabled={busy || !selected || !FORTUNE_NETWORK_CONFIGURED} onClick={() => void launch()}>{busy ? "Checking launch…" : FORTUNE_NETWORK_CONFIGURED ? FORTUNE_NETWORK.isMainnet ? "Confirm in wallet →" : "Launch on BSC Testnet →" : "Launch paused"}</button>
-                <button type="button" className="secondaryCta" onClick={() => setReviewed(false)}>Edit details</button>
+                <button className="launchButton" disabled={busy || Boolean(pending) || !storageLoaded || !selected || !FORTUNE_NETWORK_CONFIGURED} onClick={() => void launch()}>{busy ? "Checking launch…" : FORTUNE_NETWORK_CONFIGURED ? FORTUNE_NETWORK.isMainnet ? "Confirm in wallet →" : "Launch on BSC Testnet →" : "Launch paused"}</button>
+                <button type="button" disabled={busy} className="secondaryCta" onClick={() => setReviewed(false)}>Edit details</button>
               </div>
               {!FORTUNE_NETWORK_CONFIGURED && FORTUNE_NETWORK.isMainnet ? <p className="fieldHint">The release manifest and live contract checks must pass before mainnet transactions unlock.</p> : null}
               {FORTUNE_NETWORK.isTestnet ? <p className="fieldHint">Need valueless fUSD or tBNB gas? <Link href="/testnet">Open the testnet lab and faucet →</Link></p> : null}
             </>}
           </section>
 
-          <section className="panel launchStatus">
+          </fieldset>
+          <section className="panel launchStatus" aria-live="polite">
             <span className="eyebrow">STATUS</span>
             <p className="launchDescription">
               {message || "No transaction submitted yet."}
             </p>
 
+            {pending ? <div className="heroActions"><a className="secondaryCta" href={`${FORTUNE_NETWORK.explorerUrl}/tx/${pending.hash}`} target="_blank" rel="noreferrer">Submitted transaction ↗</a><button className="primaryCta" disabled={busy} onClick={() => void recoverLaunch()}>Check submitted launch</button></div> : null}
             {receipt ? (
               <div className="heroActions">
                 <a

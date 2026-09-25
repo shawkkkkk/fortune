@@ -4,6 +4,7 @@ import Link from "next/link";
 import FortuneLogo from "@/components/FortuneLogo";
 import { useLanguage } from "@/components/LanguageProvider";
 import { FortuneCoin } from "@/components/Ornaments";
+import { FORTUNE_X_HANDLE, FORTUNE_X_URL } from "@/lib/site";
 import { FORTUNE_NETWORK } from "@/lib/fortune-network";
 
 export default function Footer() {
@@ -49,6 +50,7 @@ export default function Footer() {
           <div>
             <h2>{zh ? "构建" : "Build"}</h2>
             <Link href="/docs">{zh ? "文档" : "Docs"}</Link>
+            <a href={FORTUNE_X_URL} target="_blank" rel="noreferrer">X · {FORTUNE_X_HANDLE} ↗</a>
             <Link href="/developers">{zh ? "开发者 API" : "API"}</Link>
             <a
               href={

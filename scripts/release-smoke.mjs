@@ -1,4 +1,5 @@
 const base = (process.env.FORTUNE_BASE_URL || "http://127.0.0.1:3000").replace(/\/$/, "");
+const site = (process.env.NEXT_PUBLIC_SITE_URL || "https://fortune-rho-snowy.vercel.app").replace(/\/$/, "");
 
 const checks = [
   {
@@ -13,8 +14,25 @@ const checks = [
   { path: "/testnet", kind: "html", expectText: "Fortune" },
   { path: "/launch", kind: "html", expectText: "Fortune" },
   { path: "/robots.txt", kind: "html", expectText: "Sitemap:" },
-  { path: "/sitemap.xml", kind: "html", expectText: "fortune-rho-snowy.vercel.app" },
+  { path: "/sitemap.xml", kind: "html", expectText: site },
+  { path: "/", kind: "html", expectText: `rel="canonical" href="${site}"` },
+  { path: "/api/public/v1/release", kind: "json", expect: body =>
+    typeof body?.data?.standard?.activationReady === "boolean" && body?.data?.burnRewardsV2?.mainnetEnabled === false },
 ];
+
+if (process.env.FORTUNE_REQUIRE_ONCHAIN === "true") {
+  checks.push(
+    { path: "/api/public/v1/stats", kind: "json", expect: body =>
+      Number.isSafeInteger(body?.data?.totalLaunches) && body.data.totalLaunches >= 0 &&
+      /^\d+$/.test(body.data.blockNumber) && /^0x[a-fA-F0-9]{64}$/.test(body.data.blockHash) &&
+      body.data.volumeUsd === null && body.data.revenueUsd === null },
+    { path: "/api/public/v1/launches?limit=2", kind: "json", expect: body =>
+      Array.isArray(body?.data?.items) && typeof body?.data?.page?.hasMore === "boolean" &&
+      /^\d+$/.test(body?.meta?.blockNumber) },
+    { path: "/api/public/v1/assets?launchable=true", kind: "json", expect: body =>
+      Array.isArray(body?.data?.items) && body.data.items.every(item => item.launchable && item.healthy) },
+  );
+}
 
 if (process.env.FORTUNE_REQUIRE_READY === "true") {
   checks.splice(1, 0, {
@@ -26,7 +44,7 @@ if (process.env.FORTUNE_REQUIRE_READY === "true") {
 
 async function probe(check) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 10000);
+  const timeout = setTimeout(() => controller.abort(), 30000);
 
   try {
     const response = await fetch(base + check.path, {

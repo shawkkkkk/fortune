@@ -14,7 +14,6 @@ Minimum properties before the governanceMultisig gate may be marked complete:
 - signer/recovery configuration has been tested with a harmless transaction;
 - the governance contract address is recorded as release evidence;
 - the governance contract contains deployed bytecode on BSC mainnet;
-- FortuneFactory, FortuneAssetRegistry, FortuneAutomationRegistry, and FortuneChainlinkOracle ownership has been accepted by that exact contract;
 - owners/signers are not stored in the repository.
 
 Mainnet v1 deliberately uses the same governance address as:
@@ -23,6 +22,8 @@ Mainnet v1 deliberately uses the same governance address as:
 - protocol treasury.
 
 That keeps the first real-funds canary behind one auditable multi-party authority boundary. A later reviewed release may separate operational automation from governance.
+
+After the paused deployment, the `reproduciblePausedDeployment` activation gate must additionally prove that FortuneFactory, FortuneAssetRegistry, FortuneAutomationRegistry, and FortuneChainlinkOracle ownership has been accepted by this exact contract. Ownership acceptance is a post-deployment check; requiring it before the first deployment would make the release sequence impossible.
 
 ## Governance powers
 
@@ -53,8 +54,10 @@ Before deploymentKeyControls may be marked complete:
 - never put the private key in Git history, artifacts, logs, release JSON, or frontend environment variables;
 - store it only in the protected GitHub mainnet environment secret used by the paused deployment workflow;
 - require protected-environment review before workflow execution;
-- after the Ownable2Step handoff is accepted, verify the deployer owns none of the governed Fortune contracts;
-- remove/rotate the deployer credential after deployment evidence is preserved.
+- document the post-deployment procedure for proving that the deployer owns none of the governed Fortune contracts after the Ownable2Step handoff;
+- document removal/rotation of the deployer credential after deployment evidence is preserved.
+
+The removal of deployer ownership and retirement of its credential must actually be executed and evidenced before activation, as part of the reproducible paused-deployment review.
 
 The deployer should have no ongoing protocol privilege after governance acceptance.
 

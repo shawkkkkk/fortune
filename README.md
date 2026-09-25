@@ -6,8 +6,9 @@ Fortune is a BNB Smart Chain launchpad. The creator-facing path is **name → ti
 
 > **Status:** public BSC Testnet alpha. Test assets only; the contracts remain pre-audit and mainnet is intentionally disabled. Do not use with real funds.
 
-**Live public alpha:** https://fortune-rho-snowy.vercel.app/testnet  
-**System status:** https://fortune-rho-snowy.vercel.app/status
+**Live public alpha:** https://fortunepad.fun/testnet
+
+**System status:** https://fortunepad.fun/status
 
 The product direction is **no dumping, holders get paid, pair with anything**. These are goals for the separate Burn + Rewards v2 architecture, not active Standard payout claims. V2 must burn any launch-token-side fee and fund direct holder claims from the pair-asset side without selling the launch token. Its isolated reward-accounting prototype is in `contracts-v2/`; no Infinity hook or real-value deployment exists yet. `docs/BURN_REWARDS_V2.md` has the proof requirements.
 

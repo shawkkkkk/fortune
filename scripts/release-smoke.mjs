@@ -1,6 +1,8 @@
 const base = (process.env.FORTUNE_BASE_URL || "http://127.0.0.1:3000").replace(/\/$/, "");
+const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "https://fortunepad.fun").replace(/\/$/, "");
 
 const checks = [
+  { path: "/", kind: "html", expectText: `<link rel="canonical" href="${siteUrl}"` },
   {
     path: "/api/health",
     kind: "json",
@@ -12,8 +14,8 @@ const checks = [
   { path: "/api/public/v1/meta", kind: "json", expect: (body) => body && typeof body === "object" },
   { path: "/testnet", kind: "html", expectText: "Fortune" },
   { path: "/launch", kind: "html", expectText: "Fortune" },
-  { path: "/robots.txt", kind: "html", expectText: "Sitemap:" },
-  { path: "/sitemap.xml", kind: "html", expectText: "fortune-rho-snowy.vercel.app" },
+  { path: "/robots.txt", kind: "html", expectText: `Sitemap: ${siteUrl}/sitemap.xml` },
+  { path: "/sitemap.xml", kind: "html", expectText: `${siteUrl}/` },
 ];
 
 if (process.env.FORTUNE_REQUIRE_READY === "true") {

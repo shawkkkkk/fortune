@@ -611,15 +611,19 @@ export default function LaunchPage() {
     }
   }
 
+  const cleanNamePreview = name.trim();
+  const cleanSymbolPreview = symbol.trim();
+  const firstBuyPreview = Number(creatorPurchase) > 0 ? creatorPurchase.trim() + " " + (selected?.symbol || "") : "";
+
   return (
-    <main className="page narrowPage">
-      <section className="pageHeading">
+    <main className="page launchPage">
+      <section className="pageHeading launchHeading">
         <div>
           <span className="eyebrow">BNB CHAIN · CREATE</span>
           <h1>Make your own luck.</h1>
           <p>Name it, choose a reviewed pair, then inspect the exact launch before your wallet signs.</p>
         </div>
-        <img src="/fortune-cat-cutout.webp" alt="Fortune lucky cat holding a fortune cookie" width="130" height="130" style={{ objectFit: "contain" }} />
+        <img className="launchHeadingArt" src="/fortune-cat-cutout.webp" alt="Fortune lucky cat holding a fortune cookie" width="170" height="170" />
       </section>
 
       <div className="registryNotice">
@@ -629,131 +633,160 @@ export default function LaunchPage() {
           : "Create a valueless testnet Standard launch here. Use the testnet lab for the mock-asset faucet and detailed research controls."}</span>
       </div>
 
-      <ol className="journeySteps" aria-label="Launch steps">
-        <li>1 Name + ticker + image</li><li>2 Launch type</li><li>3 Pair asset</li><li>4 First buy</li><li>5 Review + launch</li>
-      </ol>
+      <div className="launchLayout">
+        <div className="launchMain">
+          <ol className="journeySteps" aria-label="Launch steps">
+            <li><span>1</span>Name + ticker + image</li><li><span>2</span>Launch type</li><li><span>3</span>Pair asset</li><li><span>4</span>First buy</li><li><span>5</span>Review + launch</li>
+          </ol>
 
-      <section className="formCard">
-        <div className="formSectionTitle"><span>01</span><div><h2>Token identity</h2><p>These details are visible to everyone.</p></div></div>
-        <div className="fieldGrid">
-          <label>Token name<input value={name} maxLength={64} onChange={(event) => { setName(event.target.value); setReviewed(false); }} placeholder="Your token name" /></label>
-          <label>Ticker<input value={symbol} maxLength={16} onChange={(event) => { setSymbol(event.target.value.toUpperCase()); setReviewed(false); }} placeholder="LUCK" /></label>
-          <label>Image URL or IPFS URI<input value={imageURI} onChange={(event) => { setImageURI(event.target.value); setReviewed(false); }} placeholder="https://… or ipfs://…" /><small className="fieldHint">Host a square image publicly first. Fortune records this link immutably at launch; image upload hosting is still being prepared.</small></label>
+          <section className="formCard">
+            <div className="formSectionTitle"><span>01</span><div><h2>Token identity</h2><p>These details are visible to everyone.</p></div></div>
+            <div className="fieldGrid">
+              <label>Token name<input value={name} maxLength={64} onChange={(event) => { setName(event.target.value); setReviewed(false); }} placeholder="Your token name" /></label>
+              <label>Ticker<input value={symbol} maxLength={16} onChange={(event) => { setSymbol(event.target.value.toUpperCase()); setReviewed(false); }} placeholder="LUCK" /></label>
+              <label>Image URL or IPFS URI<input value={imageURI} onChange={(event) => { setImageURI(event.target.value); setReviewed(false); }} placeholder="https://… or ipfs://…" /><small className="fieldHint">Host a square image publicly first. Fortune records this link immutably at launch; image upload hosting is still being prepared.</small></label>
+            </div>
+          </section>
+
+          <section className="formCard">
+            <div className="formSectionTitle"><span>02</span><div><h2>Launch type</h2><p>Standard is the only mainnet candidate.</p></div></div>
+            <div className="launchModeRow">
+              <button type="button" className="selectedMode" aria-pressed="true"><strong>Standard</strong><span>Fixed supply · Pancake V3 · permanently locked LP position</span></button>
+              <button type="button" disabled aria-disabled="true" title="Separate testnet research and audit required"><strong>Burn + Rewards</strong><span>Pair-asset holder claims via Infinity hook · v2 in research</span></button>
+            </div>
+          </section>
+
+          <section className="formCard">
+            <div className="formSectionTitle"><span>03</span><div><h2>Pair asset</h2><p>Only live registry-approved assets are selectable.</p></div></div>
+            <div className="assetPickerToolbar">
+              <input aria-label="Search approved pair assets" value={assetSearch} onChange={(event) => setAssetSearch(event.target.value)} placeholder="Search approved BNB assets" />
+              <Link href="/assets" className="secondaryCta">Pair policy →</Link>
+            </div>
+            {assetError ? <div className="registryNotice statusError"><strong>ASSET READ FAILED</strong><span>{assetError}</span></div> : null}
+            {visibleAssets.length === 0 && !assetError ? <div className="emptyPanel"><strong>No approved pair found.</strong><p>Asset discovery alone does not mean an asset is safe to pair.</p></div> : null}
+            <div className="launchAssetGrid">
+              {visibleAssets.map((asset) => <button type="button" key={asset.address} className={selectedAsset?.toLowerCase() === asset.address.toLowerCase() ? "assetOption assetSelected" : "assetOption"} aria-pressed={selectedAsset?.toLowerCase() === asset.address.toLowerCase()} onClick={() => { setSelectedAsset(asset.address); setReviewed(false); }}>
+                <span className="assetIconLarge">{asset.symbol.slice(0, 2)}</span><span><strong>{asset.symbol}</strong><small>{asset.name}</small></span><em>{asset.category}</em>
+              </button>)}
+            </div>
+          </section>
+
+          <section className="formCard">
+            <div className="formSectionTitle"><span>04</span><div><h2>Optional first buy</h2><p>Zero means launch without a creator purchase.</p></div></div>
+            <div className="fieldGrid"><label>Amount in {selected?.symbol || "pair asset"}<input value={creatorPurchase} inputMode="decimal" onChange={(event) => { setCreatorPurchase(event.target.value); setReviewed(false); }} placeholder="0" /></label></div>
+            <p className="reviewWarning">The Launch Shield charges up to 99% on buys in the first five seconds, including a creator first buy. Fortune simulates the atomic transaction and sets a minimum token output before submitting it.</p>
+          </section>
+
+          <details className="advancedLaunch">
+            <summary>Advanced · curve economics and profile links</summary>
+            <p>These research defaults mirror the mainnet fork rehearsal. They remain subject to independent economic review and onchain preflight.</p>
+            <div className="fieldGrid">
+              <label>Total token supply<input value={totalSupply} inputMode="decimal" onChange={(event) => { setTotalSupply(event.target.value); setReviewed(false); }} /></label>
+              <label>Opening price · USD<input value={basePrice} inputMode="decimal" onChange={(event) => { setBasePrice(event.target.value); setReviewed(false); }} /></label>
+              <label>Slope · USD per token<input value={slope} inputMode="decimal" onChange={(event) => { setSlope(event.target.value); setReviewed(false); }} /></label>
+              <label>Graduation target · USD<input value={graduationTarget} inputMode="decimal" onChange={(event) => { setGraduationTarget(event.target.value); setReviewed(false); }} /></label>
+              <label>Community treasury · optional<input value={treasury} onChange={(event) => { setTreasury(event.target.value); setReviewed(false); }} placeholder="Defaults to creator wallet" /></label>
+              <label>Website · optional<input value={website} onChange={(event) => { setWebsite(event.target.value); setReviewed(false); }} placeholder="https://…" /></label>
+              <label>X · optional<input value={xProfile} onChange={(event) => { setXProfile(event.target.value); setReviewed(false); }} placeholder="https://x.com/…" /></label>
+              <label>Telegram · optional<input value={telegram} onChange={(event) => { setTelegram(event.target.value); setReviewed(false); }} placeholder="https://t.me/…" /></label>
+              <label>GitHub · optional<input value={github} onChange={(event) => { setGithub(event.target.value); setReviewed(false); }} /></label>
+              <label>YouTube · optional<input value={youtube} onChange={(event) => { setYoutube(event.target.value); setReviewed(false); }} /></label>
+              <label>DeBox · optional<input value={debox} onChange={(event) => { setDebox(event.target.value); setReviewed(false); }} /></label>
+            </div>
+            <label>Description · optional<textarea value={description} maxLength={4096} onChange={(event) => { setDescription(event.target.value); setReviewed(false); }} /></label>
+          </details>
+
+          <section className="formCard">
+            <div className="formSectionTitle"><span>05</span><div><h2>Review and launch</h2><p>Confirm the immutable details before signing.</p></div></div>
+            {!reviewed ? <button className="launchButton" disabled={!name.trim() || !symbol.trim() || !imageURI.trim() || !selected} onClick={() => { setMessage(""); setReviewed(true); }}>Review launch →</button> : <>
+              <div className="reviewSummary">
+                <div><span>Token</span><strong translate="no">{name.trim()} · {symbol.trim()}</strong></div>
+                <div><span>Pair</span><strong>{selected?.symbol || "—"} · {selected ? short(selected.address) : "—"}</strong></div>
+                <div><span>Supply / target</span><strong>{totalSupply} tokens · ${graduationTarget}</strong></div>
+                <div><span>Creator first buy</span><strong>{creatorPurchase || "0"} {selected?.symbol || ""}</strong></div>
+                <div><span>Fee route</span><strong>0.5% creator · 0.5% protocol</strong></div>
+                <div><span>Liquidity / mode</span><strong>Pancake V3 · Standard · fixed metadata</strong></div>
+                <div><span>Image URI</span><strong translate="no">{imageURI}</strong></div>
+              </div>
+              <p className="reviewWarning">An approved pair and wallet transaction are required. Fortune checks the current chain, release state and onchain preflight again before any submission.</p>
+              <div className="reviewActions">
+                <button className="launchButton" disabled={busy || !selected || !FORTUNE_NETWORK_CONFIGURED} onClick={() => void launch()}>{busy ? "Checking launch…" : FORTUNE_NETWORK_CONFIGURED ? FORTUNE_NETWORK.isMainnet ? "Confirm in wallet →" : "Launch on BSC Testnet →" : "Launch paused"}</button>
+                <button type="button" className="secondaryCta" onClick={() => setReviewed(false)}>Edit details</button>
+              </div>
+              {!FORTUNE_NETWORK_CONFIGURED && FORTUNE_NETWORK.isMainnet ? <p className="fieldHint">The release manifest and live contract checks must pass before mainnet transactions unlock.</p> : null}
+              {FORTUNE_NETWORK.isTestnet ? <p className="fieldHint">Need valueless fUSD or tBNB gas? <Link href="/testnet">Open the testnet lab and faucet →</Link></p> : null}
+            </>}
+          </section>
+
+          <section className="panel launchStatus">
+            <span className="eyebrow">STATUS</span>
+            <p className="launchDescription">
+              {message || "No transaction submitted yet."}
+            </p>
+
+            {receipt ? (
+              <div className="heroActions">
+                <a
+                  className="secondaryCta"
+                  href={
+                    FORTUNE_NETWORK.explorerUrl +
+                    "/tx/" +
+                    receipt.transactionHash
+                  }
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Transaction ↗
+                </a>
+                <a
+                  className="secondaryCta"
+                  href={
+                    FORTUNE_NETWORK.explorerUrl +
+                    "/address/" +
+                    receipt.token
+                  }
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Token ↗
+                </a>
+                <Link
+                  className="primaryCta"
+                  href={
+                    "/market/" +
+                    receipt.curve
+                  }
+                >
+                  Open market →
+                </Link>
+              </div>
+            ) : null}
+          </section>
         </div>
-      </section>
 
-      <section className="formCard" style={{ marginTop: 14 }}>
-        <div className="formSectionTitle"><span>02</span><div><h2>Launch type</h2><p>Standard is the only mainnet candidate.</p></div></div>
-        <div className="launchModeRow">
-          <button type="button" className="selectedMode" aria-pressed="true"><strong>Standard</strong><span>Fixed supply · Pancake V3 · permanently locked LP position</span></button>
-          <button type="button" disabled aria-disabled="true" title="Separate testnet research and audit required"><strong>Burn + Rewards</strong><span>Pair-asset holder claims via Infinity hook · v2 in research</span></button>
-        </div>
-      </section>
-
-      <section className="formCard" style={{ marginTop: 14 }}>
-        <div className="formSectionTitle"><span>03</span><div><h2>Pair asset</h2><p>Only live registry-approved assets are selectable.</p></div></div>
-        <div className="assetPickerToolbar">
-          <input aria-label="Search approved pair assets" value={assetSearch} onChange={(event) => setAssetSearch(event.target.value)} placeholder="Search approved BNB assets" />
-          <Link href="/assets" className="secondaryCta">Pair policy →</Link>
-        </div>
-        {assetError ? <div className="registryNotice statusError"><strong>ASSET READ FAILED</strong><span>{assetError}</span></div> : null}
-        {visibleAssets.length === 0 && !assetError ? <div className="emptyPanel"><strong>No approved pair found.</strong><p>Asset discovery alone does not mean an asset is safe to pair.</p></div> : null}
-        <div className="launchAssetGrid">
-          {visibleAssets.map((asset) => <button type="button" key={asset.address} className={selectedAsset?.toLowerCase() === asset.address.toLowerCase() ? "assetOption assetSelected" : "assetOption"} aria-pressed={selectedAsset?.toLowerCase() === asset.address.toLowerCase()} onClick={() => { setSelectedAsset(asset.address); setReviewed(false); }}>
-            <span className="assetIconLarge">{asset.symbol.slice(0, 2)}</span><span><strong>{asset.symbol}</strong><small>{asset.name}</small></span><em>{asset.category}</em>
-          </button>)}
-        </div>
-      </section>
-
-      <section className="formCard" style={{ marginTop: 14 }}>
-        <div className="formSectionTitle"><span>04</span><div><h2>Optional first buy</h2><p>Zero means launch without a creator purchase.</p></div></div>
-        <div className="fieldGrid"><label>Amount in {selected?.symbol || "pair asset"}<input value={creatorPurchase} inputMode="decimal" onChange={(event) => { setCreatorPurchase(event.target.value); setReviewed(false); }} placeholder="0" /></label></div>
-        <p className="reviewWarning">The Launch Shield charges up to 99% on buys in the first five seconds, including a creator first buy. Fortune simulates the atomic transaction and sets a minimum token output before submitting it.</p>
-      </section>
-
-      <details className="advancedLaunch">
-        <summary>Advanced · curve economics and profile links</summary>
-        <p>These research defaults mirror the mainnet fork rehearsal. They remain subject to independent economic review and onchain preflight.</p>
-        <div className="fieldGrid">
-          <label>Total token supply<input value={totalSupply} inputMode="decimal" onChange={(event) => { setTotalSupply(event.target.value); setReviewed(false); }} /></label>
-          <label>Opening price · USD<input value={basePrice} inputMode="decimal" onChange={(event) => { setBasePrice(event.target.value); setReviewed(false); }} /></label>
-          <label>Slope · USD per token<input value={slope} inputMode="decimal" onChange={(event) => { setSlope(event.target.value); setReviewed(false); }} /></label>
-          <label>Graduation target · USD<input value={graduationTarget} inputMode="decimal" onChange={(event) => { setGraduationTarget(event.target.value); setReviewed(false); }} /></label>
-          <label>Community treasury · optional<input value={treasury} onChange={(event) => { setTreasury(event.target.value); setReviewed(false); }} placeholder="Defaults to creator wallet" /></label>
-          <label>Website · optional<input value={website} onChange={(event) => { setWebsite(event.target.value); setReviewed(false); }} placeholder="https://…" /></label>
-          <label>X · optional<input value={xProfile} onChange={(event) => { setXProfile(event.target.value); setReviewed(false); }} placeholder="https://x.com/…" /></label>
-          <label>Telegram · optional<input value={telegram} onChange={(event) => { setTelegram(event.target.value); setReviewed(false); }} placeholder="https://t.me/…" /></label>
-          <label>GitHub · optional<input value={github} onChange={(event) => { setGithub(event.target.value); setReviewed(false); }} /></label>
-          <label>YouTube · optional<input value={youtube} onChange={(event) => { setYoutube(event.target.value); setReviewed(false); }} /></label>
-          <label>DeBox · optional<input value={debox} onChange={(event) => { setDebox(event.target.value); setReviewed(false); }} /></label>
-        </div>
-        <label>Description · optional<textarea value={description} maxLength={4096} onChange={(event) => { setDescription(event.target.value); setReviewed(false); }} /></label>
-      </details>
-
-      <section className="formCard" style={{ marginTop: 14 }}>
-        <div className="formSectionTitle"><span>05</span><div><h2>Review and launch</h2><p>Confirm the immutable details before signing.</p></div></div>
-        {!reviewed ? <button className="launchButton" disabled={!name.trim() || !symbol.trim() || !imageURI.trim() || !selected} onClick={() => { setMessage(""); setReviewed(true); }}>Review launch →</button> : <>
-          <div className="reviewSummary">
-            <div><span>Token</span><strong>{name.trim()} · {symbol.trim()}</strong></div>
-            <div><span>Pair</span><strong>{selected?.symbol || "—"} · {selected ? short(selected.address) : "—"}</strong></div>
-            <div><span>Supply / target</span><strong>{totalSupply} tokens · ${graduationTarget}</strong></div>
-            <div><span>Creator first buy</span><strong>{creatorPurchase || "0"} {selected?.symbol || ""}</strong></div>
-            <div><span>Fee route</span><strong>0.5% creator · 0.5% protocol</strong></div>
-            <div><span>Liquidity / mode</span><strong>Pancake V3 · Standard · fixed metadata</strong></div>
-            <div><span>Image URI</span><strong>{imageURI}</strong></div>
+        <aside className="launchAside" aria-label="Launch preview">
+          <div className="launchPreviewCard">
+            <span className="eyebrow">LIVE PREVIEW</span>
+            <div className="launchPreviewToken">
+              <span className="tokenAvatar tokenAvatarLarge" translate="no">{(cleanSymbolPreview || "LU").slice(0, 2)}</span>
+              <div>
+                {cleanNamePreview ? <strong translate="no">{cleanNamePreview}</strong> : <strong>Your token</strong>}
+                <span translate="no">{cleanSymbolPreview ? "$" + cleanSymbolPreview : "$TICKER"}</span>
+              </div>
+            </div>
+            <dl className="launchPreviewFacts">
+              <div><dt>Launch type</dt><dd>Standard</dd></div>
+              <div><dt>Pair</dt><dd>{selected?.symbol || "Choose a pair"}</dd></div>
+              <div><dt>First buy</dt><dd>{firstBuyPreview || "None"}</dd></div>
+              <div><dt>Fee route</dt><dd>0.5% creator · 0.5% protocol</dd></div>
+              <div><dt>Graduation</dt><dd>Pancake V3 · locked LP</dd></div>
+              <div><dt>Token address</dt><dd>Ends in fe</dd></div>
+            </dl>
+            <p className="launchPreviewNote">Fortune repeats the onchain preflight before your wallet signs.</p>
           </div>
-          <p className="reviewWarning">An approved pair and wallet transaction are required. Fortune checks the current chain, release state and onchain preflight again before any submission.</p>
-          <button className="launchButton" disabled={busy || !selected || !FORTUNE_NETWORK_CONFIGURED} onClick={() => void launch()}>{busy ? "Checking launch…" : FORTUNE_NETWORK_CONFIGURED ? FORTUNE_NETWORK.isMainnet ? "Confirm in wallet →" : "Launch on BSC Testnet →" : "Launch paused"}</button>
-          <button type="button" className="secondaryCta" style={{ marginLeft: 10 }} onClick={() => setReviewed(false)}>Edit details</button>
-          {!FORTUNE_NETWORK_CONFIGURED && FORTUNE_NETWORK.isMainnet ? <p className="fieldHint">The release manifest and live contract checks must pass before mainnet transactions unlock.</p> : null}
-          {FORTUNE_NETWORK.isTestnet ? <p className="fieldHint">Need valueless fUSD or tBNB gas? <Link href="/testnet">Open the testnet lab and faucet →</Link></p> : null}
-        </>}
-      </section>
-
-      <section className="panel" style={{ marginTop: 14 }}>
-        <span className="eyebrow">STATUS</span>
-        <p className="launchDescription" style={{ minHeight: 0 }}>
-          {message || "No transaction submitted yet."}
-        </p>
-
-        {receipt ? (
-          <div className="heroActions">
-            <a
-              className="secondaryCta"
-              href={
-                FORTUNE_NETWORK.explorerUrl +
-                "/tx/" +
-                receipt.transactionHash
-              }
-              target="_blank"
-              rel="noreferrer"
-            >
-              Transaction ↗
-            </a>
-            <a
-              className="secondaryCta"
-              href={
-                FORTUNE_NETWORK.explorerUrl +
-                "/address/" +
-                receipt.token
-              }
-              target="_blank"
-              rel="noreferrer"
-            >
-              Token ↗
-            </a>
-            <Link
-              className="primaryCta"
-              href={
-                "/market/" +
-                receipt.curve
-              }
-            >
-              Open market →
-            </Link>
-          </div>
-        ) : null}
-      </section>
+          <img className="launchAsideArt" src="/fortune-cat-rewards.webp" alt="" width="1254" height="1254" loading="lazy" />
+        </aside>
+      </div>
     </main>
   );
 }

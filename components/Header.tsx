@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useLanguage } from "@/components/LanguageProvider";
 import FortuneLogo from "@/components/FortuneLogo";
+import { FortuneCoin } from "@/components/Ornaments";
 import { useTheme } from "@/components/ThemeProvider";
 import { FORTUNE_NETWORK } from "@/lib/fortune-network";
 
@@ -33,6 +34,11 @@ const links = [
   ["/docs", "Docs"],
   ["/search", "Search"],
 ] as const;
+
+// Desktop pill: the logo is the home link, the rest sit either side of the seal.
+const pillLinks = links.filter(([href]) => href !== "/");
+const leftLinks = pillLinks.slice(0, 4);
+const rightLinks = pillLinks.slice(4);
 
 function short(address: string) {
   return address.slice(0, 6) + "…" + address.slice(-4);
@@ -73,11 +79,28 @@ async function switchToNetwork(ethereum: InjectedEthereum) {
   }
 }
 
+function ThemeIcon({ theme }: { theme: "light" | "dark" }) {
+  return theme === "light" ? (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M20.5 14.3A8.5 8.5 0 0 1 9.7 3.5a8.5 8.5 0 1 0 10.8 10.8Z" />
+    </svg>
+  ) : (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <circle cx="12" cy="12" r="4.2" />
+      <path d="M12 2.5v2.2M12 19.3v2.2M4.6 4.6l1.6 1.6M17.8 17.8l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.6 19.4l1.6-1.6M17.8 6.2l1.6-1.6" />
+    </svg>
+  );
+}
+
 export default function Header() {
   const pathname = usePathname();
   const [account, setAccount] = useState("");
   const [chainId, setChainId] = useState("");
   const [connecting, setConnecting] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  // The home hero is dark, so the floating header switches to white-on-glass
+  // while the hero sits underneath it.
+  const [overHero, setOverHero] = useState(() => pathname === "/");
   const { language, setLanguage } = useLanguage();
   const { theme, toggleTheme } = useTheme();
 
@@ -113,6 +136,32 @@ export default function Header() {
       ethereum.removeListener?.("chainChanged", handleChain);
     };
   }, []);
+
+  useEffect(() => {
+    const hero = document.getElementById("fortune-hero");
+    if (!hero || typeof IntersectionObserver === "undefined") {
+      setOverHero(false);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => setOverHero(entry.isIntersecting),
+      { rootMargin: "0px 0px -90% 0px" }
+    );
+    observer.observe(hero);
+    return () => observer.disconnect();
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMenuOpen(false);
+    };
+
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [menuOpen]);
 
   async function connect() {
     const ethereum = window.ethereum;
@@ -151,98 +200,177 @@ export default function Header() {
 
   const onNetwork = chainId === FORTUNE_NETWORK.chainHex;
 
+  const themeToggle = (
+    <button
+      className="themeToggle"
+      type="button"
+      onClick={toggleTheme}
+      aria-label={theme === "light" ? "Dark mode" : "Light mode"}
+      title={theme === "light" ? "Dark mode" : "Light mode"}
+    >
+      <ThemeIcon theme={theme} />
+    </button>
+  );
+
+  const languageSwitch = (
+    <div
+      className="languageSwitch"
+      role="group"
+      aria-label="Language"
+    >
+      <button
+        className={
+          language === "en" ? "languageActive" : ""
+        }
+        onClick={() => setLanguage("en")}
+        aria-pressed={language === "en"}
+      >
+        EN
+      </button>
+      <button
+        className={
+          language === "zh" ? "languageActive" : ""
+        }
+        onClick={() => setLanguage("zh")}
+        aria-pressed={language === "zh"}
+      >
+        中文
+      </button>
+    </div>
+  );
+
+  const navLink = ([href, label]: (typeof links)[number]) => (
+    <Link
+      key={href}
+      href={href}
+      className={pathname === href ? "navActive" : ""}
+      aria-current={pathname === href ? "page" : undefined}
+    >
+      {label}
+    </Link>
+  );
+
   return (
     <>
+      <header
+        className={
+          "siteHeader" +
+          (overHero && !menuOpen ? " isOverHero" : "") +
+          (menuOpen ? " isMenuOpen" : "")
+        }
+      >
+        <div className="siteHeaderInner">
+          <FortuneLogo size="sm" />
+
+          <nav className="navLinks navPill liquid-glass" aria-label="Primary">
+            {leftLinks.map(navLink)}
+            <FortuneCoin className="navSeal" />
+            {rightLinks.map(navLink)}
+          </nav>
+
+          <div className="headerActions">
+            <button
+              className="walletButton"
+              onClick={() => void connect()}
+              disabled={connecting}
+            >
+              {connecting
+                ? "Connecting…"
+                : account && !onNetwork
+                  ? "Switch network"
+                  : account
+                    ? short(account)
+                    : "Connect wallet"}
+            </button>
+            <button
+              type="button"
+              className="menuToggle liquid-glass"
+              aria-expanded={menuOpen}
+              aria-controls="fortune-mobile-menu"
+              aria-label={menuOpen ? "Close menu" : "Open menu"}
+              onClick={() => setMenuOpen((open) => !open)}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                {menuOpen ? (
+                  <path d="M6 6l12 12M18 6L6 18" />
+                ) : (
+                  <path d="M4 7h16M4 12h16M4 17h16" />
+                )}
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div
+          id="fortune-mobile-menu"
+          className="mobileMenu"
+          hidden={!menuOpen}
+        >
+          <nav className="mobileMenuLinks" aria-label="Mobile">
+            {links.map(([href, label]) => (
+              <Link
+                key={href}
+                href={href}
+                className={pathname === href ? "navActive" : ""}
+                aria-current={pathname === href ? "page" : undefined}
+                onClick={() => setMenuOpen(false)}
+              >
+                {label}
+              </Link>
+            ))}
+            {account ? (
+              <Link
+                href={"/profile/" + account}
+                className={pathname === "/profile/" + account ? "navActive" : ""}
+                onClick={() => setMenuOpen(false)}
+              >
+                Profile
+              </Link>
+            ) : null}
+          </nav>
+          <div className="mobileMenuControls">
+            {languageSwitch}
+            {themeToggle}
+          </div>
+        </div>
+      </header>
+
       <div className="networkBar">
-        <span
-          className={
-            "networkDot " +
-            (account && !onNetwork ? "networkWarn" : "")
-          }
-        />
-        {account
-          ? onNetwork
-            ? FORTUNE_NETWORK.isMainnet
-              ? "BNB Smart Chain wallet connected"
-              : "BSC Testnet wallet connected"
-            : "Wallet connected · switch network"
-          : FORTUNE_NETWORK.isMainnet
-            ? "Fortune · BNB Smart Chain"
-            : "Fortune · public BSC Testnet alpha"}
+        <span className="networkStatus">
+          <span
+            className={
+              "networkDot " +
+              (account && !onNetwork ? "networkWarn" : "")
+            }
+          />
+          {account
+            ? onNetwork
+              ? FORTUNE_NETWORK.isMainnet
+                ? "BNB Smart Chain wallet connected"
+                : "BSC Testnet wallet connected"
+              : "Wallet connected · switch network"
+            : FORTUNE_NETWORK.isMainnet
+              ? "Fortune · BNB Smart Chain"
+              : "Fortune · public BSC Testnet alpha"}
+          {account ? <Link href={"/profile/" + account} className="networkProfile">Profile</Link> : null}
+        </span>
         <span className="networkNote">
           {FORTUNE_NETWORK.isMainnet
             ? "Real-value network · review every transaction"
             : "Test assets only · no real funds"}
         </span>
-      </div>
-
-      <header className="siteHeader">
-        <FortuneLogo size="sm" />
-
-        <nav className="navLinks">
-          {links.map(([href, label]) => (
-            <Link
-              key={href}
-              href={href}
-              className={pathname === href ? "navActive" : ""}
-            >
-              {label}
-            </Link>
-          ))}
-        </nav>
-
-        <div className="headerActions">
-          <button
-            className="themeToggle"
-            type="button"
-            onClick={toggleTheme}
-            aria-label={theme === "light" ? "Dark mode" : "Light mode"}
-            title={theme === "light" ? "Dark mode" : "Light mode"}
-          >
-            <span aria-hidden="true">{theme === "light" ? "☾" : "☀"}</span>
-          </button>
-
-          <div
-            className="languageSwitch"
-            role="group"
-            aria-label="Language"
-          >
-            <button
-              className={
-                language === "en" ? "languageActive" : ""
-              }
-              onClick={() => setLanguage("en")}
-              aria-pressed={language === "en"}
-            >
-              EN
-            </button>
-            <button
-              className={
-                language === "zh" ? "languageActive" : ""
-              }
-              onClick={() => setLanguage("zh")}
-              aria-pressed={language === "zh"}
-            >
-              中文
-            </button>
+        <div className="networkTools">
+          <nav className="networkLinks" aria-label="System">
+            <Link href="/status">Status</Link>
+            <Link href="/docs">Docs</Link>
+            <Link href="/developers">API</Link>
+          </nav>
+          <div className="networkPrefs">
+            {languageSwitch}
+            {themeToggle}
           </div>
-
-          <button
-            className="walletButton"
-            onClick={() => void connect()}
-            disabled={connecting}
-          >
-            {connecting
-              ? "Connecting…"
-              : account && !onNetwork
-                ? "Switch network"
-                : account
-                  ? short(account)
-                  : "Connect wallet"}
-          </button>
-          {account ? <Link href={"/profile/" + account} className="secondaryCta">Profile</Link> : null}
         </div>
-      </header>
+      </div>
     </>
   );
 }

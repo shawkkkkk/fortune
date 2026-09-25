@@ -6,7 +6,11 @@
 
 The three promises are **no dumping**, **holders get paid**, and **pair with anything**. Each requires an actual onchain implementation and eligibility policy before it can be advertised as active. Standard is a frozen, WBNB-only mainnet candidate and has no holder rewards. Burn + Rewards v2, multiple pairs, and arbitrary BEP-20 support remain separately gated.
 
-The product follows LESGO's short launch path and candid lifecycle/trust documentation while adapting the implementation to BNB Chain. Sender informs compatibility checks and direct holder claims; its no-migration pool design is a different architecture from Fortune's frozen Standard curve. Fortune's longer-term research combines:
+The product follows LESGO's short launch path and candid lifecycle/trust documentation while adapting the implementation to BNB Chain. Sender informs compatibility checks and direct holder claims; its no-migration pool design is a different architecture from Fortune's frozen Standard curve.
+
+Brew is the direct BNB competitor. Use [BREW_REVIEW.md](BREW_REVIEW.md) for its feature comparison and the actual Fortune gaps. Direct pair-asset holder rewards are the v2 target; buyback-and-burn must never be labeled a wallet payout. Keep the interface simple as capabilities expand.
+
+Fortune's longer-term research combines:
 
 1. one canonical Basket Curve;
 2. 1–5 approved quote assets;

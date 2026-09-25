@@ -2,6 +2,8 @@
 
 This document records architecture lessons used to shape Fortune. It is not a claim of affiliation with any other product.
 
+**Release boundary (2026-09-25):** descriptions of multi-reserve curves, Fee Matrix destinations, Stock Floor, automations and broad asset support below describe research architecture or targets. The frozen Standard mainnet candidate is single-pair/WBNB-only and remains blocked. Burn + Rewards v2 is an isolated prototype. See [the current Brew comparison](BREW_REVIEW.md) for implemented features, gaps and acceptance criteria; architectural discussion must not be quoted as a live-feature claim.
+
 ## Primary reference: LESGO
 
 [LESGO's docs](https://www.lesgo.fun/docs) make the product legible: a small identity/type/pair/review launch form, an explicit curve-to-locked-pool path, pair-asset rewards, public burns/payouts and a plain list of operator trust assumptions. Fortune adopts that interface order and disclosure style on BNB Chain. It does not copy Solana Token-2022, Raydium or Meteora settlement. LESGO's rewards use scheduled offchain snapshots/payouts; Fortune v2 instead researches onchain corrections with a direct claim fallback. That is a different trust and gas tradeoff and still needs proof.
@@ -229,7 +231,8 @@ Fortune should adopt it only when it improves one of:
 - BNB-native asset breadth;
 - transparent creator/holder economics.
 
-The strongest differentiators remain Fortune's shared multi-reserve Basket
-Curve, demand-weighted multi-market graduation, tokenized-stock/penny-stock
-pairing, Stock Floor, programmable Fee Matrix, Launch Shield, transparent
-metadata revisions and reliability-first graduation.
+The intended differentiators are simple creation, direct pair-asset holder claims,
+burn-only launch-token fee handling, compatibility-checked BNB assets and
+recoverable graduation. Each must be proven within its own release scope.
+Multi-reserve curves, multi-market graduation and stock-focused features remain
+separate expansion work; their presence in a design document is not readiness evidence.

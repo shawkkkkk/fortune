@@ -13,6 +13,8 @@ export async function GET() {
     return apiOk({
       chainId: ledger.chainId,
       totalLaunches: ledger.total,
+      blockNumber: ledger.blockNumber,
+      blockHash: ledger.blockHash,
       volumeUsd: null,
       revenueUsd: null,
       burns: null,

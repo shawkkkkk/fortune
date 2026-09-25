@@ -255,12 +255,7 @@ export async function POST(request: Request) {
       "dependency_unavailable",
       "BSC RPC could not inspect this token right now.",
       503,
-      {
-        reason:
-          error instanceof Error
-            ? error.message
-            : "RPC unavailable",
-      }
+
     );
   }
 }

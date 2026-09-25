@@ -110,12 +110,7 @@ export async function GET(request: Request) {
       "dependency_unavailable",
       "Fortune could not read the active onchain asset universe.",
       503,
-      {
-        reason:
-          error instanceof Error
-            ? error.message
-            : "RPC unavailable",
-      }
+
     );
   }
 }

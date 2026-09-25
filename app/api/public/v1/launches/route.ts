@@ -1,14 +1,21 @@
 import { apiError, apiOk, parseLimit } from "@/lib/public-api";
 import { readRecentFortuneLaunches } from "@/lib/onchain-launches";
 
+import { decodeCatalogCursor, encodeCatalogCursor } from "@/lib/catalog-cursor";
+
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const limit = parseLimit(url.searchParams.get("limit"), 12, 25);
 
+  let position: ReturnType<typeof decodeCatalogCursor>;
+  try { position = decodeCatalogCursor(url.searchParams.get("cursor")); }
+  catch { return apiError("invalid_request", "Invalid catalog cursor. Start from the first page.", 400); }
+  const { offset, blockNumber } = position;
+
   try {
-    const result = await readRecentFortuneLaunches(limit);
+    const result = await readRecentFortuneLaunches(limit, offset, blockNumber);
 
     if (!result.configured) {
       return apiError(
@@ -24,12 +31,14 @@ export async function GET(request: Request) {
         items: result.launches,
         totalOnchain: result.total,
         chainId: result.chainId,
+        page: { limit, hasMore: result.hasMore, nextCursor: result.hasMore ? encodeCatalogCursor(offset + result.launches.length, result.blockNumber!) : null },
       },
       {
         cacheSeconds: 8,
         staleSeconds: 20,
         meta: {
           dataMode: "onchain",
+          blockNumber: result.blockNumber?.toString(), blockHash: result.blockHash,
           source:
             "FortuneFactory.launchCount + launches + direct token/curve reads",
         },
@@ -40,10 +49,7 @@ export async function GET(request: Request) {
       "dependency_unavailable",
       "Fortune could not read the launch ledger from BNB Chain.",
       503,
-      {
-        reason:
-          error instanceof Error ? error.message : "RPC unavailable",
-      }
+
     );
   }
 }

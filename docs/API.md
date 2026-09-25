@@ -252,3 +252,16 @@ GET /api/public/v1/openapi
 
 The OpenAPI document is intentionally useful before the production indexer is
 online; demo-backed endpoints identify their data mode in response metadata.
+
+
+## September 2026 release preparation: catalog and recovery
+
+`GET /api/public/v1/launches` and `GET /api/public/v1/tokens` accept `limit` (1–25) and an opaque `cursor` returned in `data.page.nextCursor`. Follow that cursor unchanged: it pins subsequent pages to the same block, avoiding shifts when new launches arrive. Invalid cursors return 400. `meta.blockNumber` and `meta.blockHash` identify the queried chain state.
+
+`GET /api/public/v1/tokens/{address}` checks the complete bounded factory catalog, including launches older than the newest 25. Creator profiles use that catalog too. The current RPC fallback is bounded at 10,000 total entries and requires a production indexer beyond that limit; failures return 503 rather than partial data.
+
+`GET /api/public/v1/stats` exposes `data.blockNumber` and `data.blockHash` alongside direct factory counts. Unindexed financial aggregates remain null.
+
+`GET /api/public/v1/transactions/{hash}` can return `data.launch` only for a successful receipt addressed to the configured Standard factory with a matching factory `LaunchCreated` event and creator. Pending/not-found responses never authorize blind resubmission. Raw upstream RPC error details are not included in public responses.
+
+Read-only catalog/registry inspection can operate while mainnet is paused. Wallet transaction permission still requires the unchanged release gates. `/api/ready` also checks full mainnet release readiness on chain 56.

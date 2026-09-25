@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { GET as releaseReadiness } from "@/app/api/public/v1/readiness/route";
 import { PUBLIC_TESTNET } from "@/lib/public-testnet";
 import {
   configuredRpcUrls,
@@ -40,7 +41,9 @@ export async function GET() {
     chainId === 56 ||
     process.env.FORTUNE_REQUIRE_RPC_REDUNDANCY === "true";
 
-  const rpc = await probeRpcEndpoints(chainId);
+  // Public testnet nodes can take several seconds to respond. Keep production's
+  // stricter budgets, and never turn a timeout into a successful probe.
+  const rpc = await probeRpcEndpoints(chainId, chainId === 97 ? 8000 : 2000);
   const redundancyConfigured =
     !redundancyRequired || urls.length >= 2;
 
@@ -99,7 +102,7 @@ export async function GET() {
             chainId,
             "eth_getCode",
             [address, "latest"],
-            { timeoutMs: 2500 }
+            { timeoutMs: chainId === 97 ? 8000 : 2500 }
           );
 
           stack[label] = {
@@ -130,7 +133,11 @@ export async function GET() {
       return probe?.configured && probe.hasCode;
     });
 
+  const releaseReady = chainId !== 56 || (await (await releaseReadiness()).json())?.data?.ready === true;
+
   const ready =
+    (chainId === 56 || chainId === 97) &&
+    releaseReady &&
     stackReady &&
     rpc.healthy >= 1 &&
     redundancyConfigured;
@@ -153,6 +160,7 @@ export async function GET() {
             : "custom",
       chainId,
       stackReady,
+      releaseReady,
       stack,
       rpc: {
         configured: rpc.configured,

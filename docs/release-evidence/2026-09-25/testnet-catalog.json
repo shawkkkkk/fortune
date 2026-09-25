@@ -1,0 +1,130 @@
+{
+  "schemaVersion": 1,
+  "kind": "fortune-factory-catalog",
+  "chainId": 97,
+  "blockNumber": "133152717",
+  "blockHash": "0x886facdc8ebc0d77cd7bc3958f39d28b850afe3d345ebdc2832fd8ee023b0d18",
+  "total": 7,
+  "entries": [
+    {
+      "mode": "tax",
+      "factory": "0xB4510F1F134B0582298934fdFbCc77bECED8d0f5",
+      "index": 2,
+      "creator": "0x6B6dA1c6dD5938Ab01074A0A52431709FD0bcb14",
+      "token": "0x586C005C7D82d2255Ee82Cbf3047743290e67Ffe",
+      "curve": "0x16912134E11db9EbEE26E1259F3e67722c4Fbb18",
+      "components": [
+        "0x0b9de4AE80D5D0657109e47B65dA9D089870Bd54",
+        "0x334fFbf0EFA8c7C3Bef587CA403E1f620FEDbe61",
+        "0x398254722c7B8dC56F35e73E3F9A987025048E11",
+        "0x219041947dC865a93A35ADF49aA6D2CCe980FAE5"
+      ],
+      "manifestHash": "0x31509705b3badf243b495fccc656faa65be37d9696d11e90fa761e70748be545",
+      "vanitySalt": "0xdb7f9ddbbee0e5a2aceb18b157ed2d757bd4beb3af4f3795935d87351c2c7101",
+      "createdAt": "1789946766"
+    },
+    {
+      "mode": "standard",
+      "factory": "0x70641975E43c5807621146874022fd9d1b735AA1",
+      "index": 3,
+      "creator": "0x6B6dA1c6dD5938Ab01074A0A52431709FD0bcb14",
+      "token": "0xF2A934B924C50566eCAB90ea8D5644378237D9fE",
+      "curve": "0xE768cc50dC03Bf9CF838953a4b76057D63D8995D",
+      "components": [
+        "0x63413Eb981ad0B97170A49c1669e09ECbe57ED73",
+        "0x6940905101930D5dec9E0A26294dcAB2Edb34Aa4",
+        "0x25d425C60f2F84c4C37e80F272AFe2223Db22480",
+        "0xE264dE7ff8E101d31d1543CBDf99508cf5F89469"
+      ],
+      "manifestHash": "0xdbd3b057410588953f11dc86cd3c094489de20cf058ce505084230c5e2f9f3ab",
+      "vanitySalt": "0xb0c7e2dbb71798cbeb65aa70014b706479d956a3bfbb4309540577d2a2b1bb9e",
+      "createdAt": "1789946748"
+    },
+    {
+      "mode": "standard",
+      "factory": "0x70641975E43c5807621146874022fd9d1b735AA1",
+      "index": 2,
+      "creator": "0x063C6508B74E6Aad9355082900aaF78117cA6B78",
+      "token": "0x89F30d8E7a8A07556260551544d3964127920dfe",
+      "curve": "0x77Ab986E8FD969FD5d71be68Dc8C8D63d3a505fB",
+      "components": [
+        "0x79F97ECB766C117E834Af72B952AD460c4909aAc",
+        "0x5A37F810166025014E6781956f27F97b54F98529",
+        "0x17229A555fe3223301C2B1cBA5915000CfF800bE",
+        "0x0592713D8E417733712F3993BE4Ea461C6dCE202"
+      ],
+      "manifestHash": "0xc9260cf378d31dd8bb7f633343aff20295f45d8261850aef0beb5fe190ed8504",
+      "vanitySalt": "0x5210b6954de9bbab2dc617ea601562f7adcc9afe88ea88632a78e9cab8fa0a24",
+      "createdAt": "1789946356"
+    },
+    {
+      "mode": "tax",
+      "factory": "0xB4510F1F134B0582298934fdFbCc77bECED8d0f5",
+      "index": 1,
+      "creator": "0x1d5865E993Be281ebdFc059F9F04b82529c1dcBF",
+      "token": "0xFe5A7126365EC311de47C8D6d25D1444167BAfFe",
+      "curve": "0x133Ddca93229C1EB8dd593e6438037A4a64ACA37",
+      "components": [
+        "0xddB23F72f171874318DE381a91aC2f9EcD5955b9",
+        "0xBf68F1d5B8CCe4610f9076ac5Ec16F52C59B15D4",
+        "0x598712BaE0a8D4FAf029B46c6C03d6019b0A91B2",
+        "0x6adF56c96Bd84318f391b3188816C7158334DD0B"
+      ],
+      "manifestHash": "0xda80e10f8424a491dd068c801553b95cb27e98c4468c536edb3c6c281ad29cbf",
+      "vanitySalt": "0x8f97846c6e54c2c5e8d75726d03d08713342dc13193c007437014816aa26ff0b",
+      "createdAt": "1789946034"
+    },
+    {
+      "mode": "standard",
+      "factory": "0x70641975E43c5807621146874022fd9d1b735AA1",
+      "index": 1,
+      "creator": "0x1d5865E993Be281ebdFc059F9F04b82529c1dcBF",
+      "token": "0xc8C73E98690E5fb0284Bbc38AD3447250bC163fE",
+      "curve": "0xb3781fE704BB81EB58b6A9d5352D5A8A488F8Ff6",
+      "components": [
+        "0x865137058CcB246B50F8C73300081c357C5200C7",
+        "0x4b5356DdfAffc6927CbbbF77B5388D8EDC4aa0c2",
+        "0xfF5C2277cE27414e753a0C8a945e89a33aCed1Ee",
+        "0x5A0Be08318c63a59a0abe32f26634ebDD2927abe"
+      ],
+      "manifestHash": "0xddb7b9a2d041737d1fb93217da8c3f64eb9f6c414705aac794cabcf100dc4a40",
+      "vanitySalt": "0xc46fcc567f79cc1fb190c5aaa939d86a90f673f2becec0781357d2b728957cff",
+      "createdAt": "1789946026"
+    },
+    {
+      "mode": "tax",
+      "factory": "0xB4510F1F134B0582298934fdFbCc77bECED8d0f5",
+      "index": 0,
+      "creator": "0xDB01B662E85f9a588fC5810b4889F1bF3F14ceaC",
+      "token": "0x99801f077Ecca030898664c7708Ba9857b8E5EFe",
+      "curve": "0xb7f86e7E71Fc08E1c3cC4306DC33684D88e4019d",
+      "components": [
+        "0x9Be29B2D32088d0B0eCbD59da0d025922C86dD43",
+        "0x37B7E38fFE164b6c0775ba212a4ca6F4B57427F3",
+        "0xf2eB2e59e44bA658C0eD62c04eBEBc60206d8BBc",
+        "0xFA84Cfc036de5f79a1e083D193785C71499B806b"
+      ],
+      "manifestHash": "0x7d775e5e8b981cc6d11ae2cc571de38c6bfe363c9dd5417370f56977e64c343c",
+      "vanitySalt": "0x092cd5e05d6b3c2b5be36d46b31d836f0eddef3f6782c3a322f386dbaf77952e",
+      "createdAt": "1789942306"
+    },
+    {
+      "mode": "standard",
+      "factory": "0x70641975E43c5807621146874022fd9d1b735AA1",
+      "index": 0,
+      "creator": "0xDB01B662E85f9a588fC5810b4889F1bF3F14ceaC",
+      "token": "0xDCb92C2B3062F246D93a0BF1712c17a2Be4d39FE",
+      "curve": "0x48A7353F28e5A237bdA85E73217cc670fCf58e17",
+      "components": [
+        "0x15139B16D098deF389408ec7ef89A0e863447624",
+        "0xBEd250C8045D215D6B7F5f9BEC2f605017A04989",
+        "0x54D416D3Ba7DaeCE1e0Fbf4c46Bc889A7ea167B2",
+        "0xC669a3E36fe541d3e46657a0Cb0A2fc2CdFA8E62"
+      ],
+      "manifestHash": "0xb80c80836d7afc2341e56e265e1f3ac1bc332124c5be1851ae30e56c71e26afb",
+      "vanitySalt": "0x4f183390d60fc6d9acdbb77465685c86ccaecaf46aceb0a1081fdb9d280e008f",
+      "createdAt": "1789942295"
+    }
+  ],
+  "scope": "Complete configured factory launch records at the specified block; no trade, revenue, burn or rewards aggregates. Block may reorganize; validate blockHash before relying on it."
+}

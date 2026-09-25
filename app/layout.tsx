@@ -29,18 +29,16 @@ export const metadata: Metadata = {
     title: FORTUNE_NETWORK.isMainnet
       ? "Fortune — Launch on BNB Smart Chain"
       : "Fortune — Public Alpha on BSC Testnet",
-    description: FORTUNE_NETWORK.isMainnet
-      ? "A non-custodial token launch protocol on BNB Smart Chain."
-      : "Launch, trade, and graduate real testnet markets through Fortune on BNB Smart Chain Testnet.",
+    description: "Meme coins, paired with the BNB economy. No dumping, pair-asset holder rewards in research, and an expanding approved pair universe.",
+    images: [{ url: "/opengraph-image", width: 1200, height: 630, alt: "Fortune lucky cat and the BNB economy" }],
   },
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
     title: FORTUNE_NETWORK.isMainnet
       ? "Fortune — Launch on BNB Smart Chain"
       : "Fortune — Public Alpha on BSC Testnet",
-    description: FORTUNE_NETWORK.isMainnet
-      ? "A non-custodial token launch protocol on BNB Smart Chain."
-      : "Launch, trade, and graduate real testnet markets through Fortune on BNB Smart Chain Testnet.",
+    description: "Meme coins, paired with the BNB economy. Standard is in public testnet alpha; Burn + Rewards v2 is in research.",
+    images: ["/opengraph-image"],
   },
   robots: {
     index: true,
@@ -48,6 +46,7 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: "/icon.svg",
+    apple: "/apple-icon",
   },
 };
 

@@ -1,13 +1,15 @@
 # Fortune
 
-**Launch against anything.**
+**Meme coins, paired with the BNB economy.**
 
-Fortune is a BNB Smart Chain launch protocol built around a shared **multi-asset Basket Curve**. A launch can accept **1–5 approved BSC quote assets**, maintain **one canonical launch price**, route trading fees through an immutable **Fee Matrix**, and graduate reserves into multiple destination markets.
+Fortune is a BNB Smart Chain launchpad. The creator-facing path is **name → ticker → image → Standard or Burn + Rewards → reviewed pair asset → optional first buy → review → launch**. Curve and economic controls live behind Advanced. The Standard mainnet candidate is frozen to one pinned WBNB pair; broader asset support and Burn + Rewards v2 are separate research and release work.
 
 > **Status:** public BSC Testnet alpha. Test assets only; the contracts remain pre-audit and mainnet is intentionally disabled. Do not use with real funds.
 
 **Live public alpha:** https://fortune-rho-snowy.vercel.app/testnet  
 **System status:** https://fortune-rho-snowy.vercel.app/status
+
+The product direction is **no dumping, holders get paid, pair with anything**. These are goals for the separate Burn + Rewards v2 architecture, not active Standard payout claims. V2 must burn any launch-token-side fee and fund direct holder claims from the pair-asset side without selling the launch token. Its isolated reward-accounting prototype is in `contracts-v2/`; no Infinity hook or real-value deployment exists yet. `docs/BURN_REWARDS_V2.md` has the proof requirements.
 
 ## What is built
 
@@ -24,7 +26,7 @@ Fortune is a BNB Smart Chain launch protocol built around a shared **multi-asset
 - **Injected EVM wallet connect** — recognizes BSC mainnet/testnet
 - **BSC discovery API** — imports up to 400 BSC token candidates from PancakeSwap's extended token list
 
-Demo market/analytics values are deliberately marked as placeholders until onchain deployments and indexers exist.
+The current Explore, search, token, profile and Stats surfaces use direct onchain reads where available. Unsupported totals and charts remain unavailable rather than displaying invented figures. Older experimental pages and API endpoints remain research surfaces; check each endpoint's data-mode metadata before integrating.
 
 ### Contracts
 

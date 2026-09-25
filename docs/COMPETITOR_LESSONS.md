@@ -1,7 +1,14 @@
-# Competitive protocol lessons: Pons v1/v2 and Brew
+# Competitive protocol lessons: LESGO, Sender, Pons and Brew
 
-This document records architecture lessons used to shape Fortune. It is not a
-claim of affiliation with Pons or Brew.
+This document records architecture lessons used to shape Fortune. It is not a claim of affiliation with any other product.
+
+## Primary reference: LESGO
+
+[LESGO's docs](https://www.lesgo.fun/docs) make the product legible: a small identity/type/pair/review launch form, an explicit curve-to-locked-pool path, pair-asset rewards, public burns/payouts and a plain list of operator trust assumptions. Fortune adopts that interface order and disclosure style on BNB Chain. It does not copy Solana Token-2022, Raydium or Meteora settlement. LESGO's rewards use scheduled offchain snapshots/payouts; Fortune v2 instead researches onchain corrections with a direct claim fallback. That is a different trust and gas tradeoff and still needs proof.
+
+## Secondary reference: Sender
+
+[Sender's docs](https://sender.family/docs) show how to state fixed fee destinations, owner powers, compatibility-tested custom assets and creator opening purchases. Its holder route pays in the paired asset and offers direct claims. Its Ethereum Uniswap v4 pool starts trading without a separate curve or migration, while Fortune's frozen Standard candidate graduates from a curve to Pancake V3. Sender's disclosures are a useful model for distinguishing tested properties from audits and commercial promises. Fortune's v2 Infinity hook remains research; it must prove both swap directions and token-side burn-only routing before activation.
 
 ## Why compare generations, not feature lists
 

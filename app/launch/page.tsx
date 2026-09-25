@@ -17,11 +17,9 @@ import {
 import {
   FORTUNE_NETWORK,
   FORTUNE_NETWORK_CONFIGURED,
-  FORTUNE_TAX_NETWORK_CONFIGURED,
 } from "@/lib/fortune-network";
-import FortuneLogo from "@/components/FortuneLogo";
 
-type LaunchMode = "standard" | "tax";
+type LaunchMode = "standard";
 
 type LaunchAsset = {
   address: Address;
@@ -54,31 +52,6 @@ const standardParams = [
   { name: "feeBps", type: "uint16[6]" },
   { name: "treasury", type: "address" },
   { name: "metadataEditable", type: "bool" },
-  { name: "description", type: "string" },
-  { name: "imageURI", type: "string" },
-  { name: "website", type: "string" },
-  { name: "xProfile", type: "string" },
-  { name: "telegram", type: "string" },
-  { name: "github", type: "string" },
-  { name: "youtube", type: "string" },
-  { name: "debox", type: "string" },
-] as const;
-
-const taxParams = [
-  { name: "name", type: "string" },
-  { name: "symbol", type: "string" },
-  { name: "totalSupply", type: "uint256" },
-  { name: "quoteAsset", type: "address" },
-  { name: "basePriceUsd1e18", type: "uint256" },
-  { name: "slopeUsd1e18", type: "uint256" },
-  { name: "graduationUsd1e18", type: "uint256" },
-  { name: "feeBps", type: "uint16[6]" },
-  { name: "treasury", type: "address" },
-  { name: "buyTaxBps", type: "uint16" },
-  { name: "sellTaxBps", type: "uint16" },
-  { name: "antiFarmerDuration", type: "uint32" },
-  { name: "minimumDividendBalance", type: "uint256" },
-  { name: "taxAllocationBps", type: "uint16[7]" },
   { name: "description", type: "string" },
   { name: "imageURI", type: "string" },
   { name: "website", type: "string" },
@@ -135,7 +108,21 @@ const standardFactoryAbi = [
       { name: "amountIn", type: "uint256" },
       { name: "minTokensOut", type: "uint256" },
     ],
-    outputs: [],
+    outputs: [
+      { name: "info", type: "tuple", components: [
+        { name: "creator", type: "address" },
+        { name: "token", type: "address" },
+        { name: "curve", type: "address" },
+        { name: "feeRouter", type: "address" },
+        { name: "holderVault", type: "address" },
+        { name: "buybackVault", type: "address" },
+        { name: "liquidityVault", type: "address" },
+        { name: "manifestHash", type: "bytes32" },
+        { name: "vanitySalt", type: "bytes32" },
+        { name: "createdAt", type: "uint64" },
+      ] },
+      { name: "tokensOut", type: "uint256" },
+    ],
   },
   {
     type: "event",
@@ -147,84 +134,6 @@ const standardFactoryAbi = [
       { name: "curve", type: "address", indexed: false },
       { name: "manifestHash", type: "bytes32", indexed: false },
     ],
-  },
-] as const;
-
-const taxFactoryAbi = [
-  {
-    type: "function",
-    name: "preflightLaunch",
-    stateMutability: "view",
-    inputs: [{ name: "p", type: "tuple", components: taxParams }],
-    outputs: [
-      { name: "ready", type: "bool" },
-      { name: "reasonCode", type: "bytes32" },
-    ],
-  },
-  {
-    type: "function",
-    name: "previewPreparedVanity",
-    stateMutability: "view",
-    inputs: [
-      { name: "creator", type: "address" },
-      { name: "p", type: "tuple", components: taxParams },
-    ],
-    outputs: [
-      { name: "vanitySalt", type: "bytes32" },
-      { name: "predictedToken", type: "address" },
-      { name: "manifestHash", type: "bytes32" },
-      { name: "launchNonce", type: "uint256" },
-    ],
-  },
-  {
-    type: "function",
-    name: "createLaunchPrepared",
-    stateMutability: "nonpayable",
-    inputs: [
-      { name: "p", type: "tuple", components: taxParams },
-      { name: "vanitySalt", type: "bytes32" },
-    ],
-    outputs: [],
-  },
-  {
-    type: "function",
-    name: "createLaunchPreparedAndBuy",
-    stateMutability: "nonpayable",
-    inputs: [
-      { name: "p", type: "tuple", components: taxParams },
-      { name: "vanitySalt", type: "bytes32" },
-      { name: "amountIn", type: "uint256" },
-      { name: "minTokensOut", type: "uint256" },
-    ],
-    outputs: [],
-  },
-  {
-    type: "event",
-    name: "TaxLaunchCreated",
-    inputs: [
-      { name: "launchId", type: "uint256", indexed: true },
-      { name: "creator", type: "address", indexed: true },
-      { name: "token", type: "address", indexed: true },
-      { name: "curve", type: "address", indexed: false },
-      { name: "quoteAsset", type: "address", indexed: false },
-      { name: "taxProcessor", type: "address", indexed: false },
-      { name: "dividendVault", type: "address", indexed: false },
-      { name: "manifestHash", type: "bytes32", indexed: false },
-    ],
-  },
-] as const;
-
-const curveBuyAbi = [
-  {
-    type: "function",
-    name: "buy",
-    stateMutability: "nonpayable",
-    inputs: [
-      { name: "quoteAsset", type: "address" },
-      { name: "amountIn", type: "uint256" },
-      { name: "minTokensOut", type: "uint256" },
-    ],
-    outputs: [{ name: "tokensOut", type: "uint256" }],
   },
 ] as const;
 
@@ -260,16 +169,6 @@ const chain = defineChain({
   },
   testnet: !FORTUNE_NETWORK.isMainnet,
 });
-
-const allocationLabels = [
-  "Creator",
-  "Direct burn",
-  "Holder dividends",
-  "Buyback + burn",
-  "Liquidity",
-  "Community treasury",
-  "Protocol",
-] as const;
 
 function provider() {
   const injected = (
@@ -418,7 +317,7 @@ function publicMetadataUrl(
 }
 
 export default function LaunchPage() {
-  const [mode, setMode] = useState<LaunchMode>("standard");
+  const mode: LaunchMode = "standard";
   const [account, setAccount] = useState<Address | null>(null);
   const [assets, setAssets] = useState<LaunchAsset[]>([]);
   const [assetSearch, setAssetSearch] = useState("");
@@ -428,18 +327,11 @@ export default function LaunchPage() {
   const [symbol, setSymbol] = useState("");
   const [description, setDescription] = useState("");
   const [imageURI, setImageURI] = useState("");
-  const [totalSupply, setTotalSupply] = useState("1000000000");
-  const [basePrice, setBasePrice] = useState("");
-  const [slope, setSlope] = useState("0");
-  const [graduationTarget, setGraduationTarget] = useState("");
+  const [totalSupply, setTotalSupply] = useState("10000000");
+  const [basePrice, setBasePrice] = useState("0.001");
+  const [slope, setSlope] = useState("0.00000001");
+  const [graduationTarget, setGraduationTarget] = useState("50");
   const [creatorPurchase, setCreatorPurchase] = useState("0");
-  const [buyTax, setBuyTax] = useState("1");
-  const [sellTax, setSellTax] = useState("1");
-  const [antiFarmerDays, setAntiFarmerDays] = useState("30");
-  const [minimumDividendBalance, setMinimumDividendBalance] = useState("0");
-  const [taxAllocation, setTaxAllocation] = useState([
-    20, 10, 20, 20, 15, 5, 10,
-  ]);
   const [treasury, setTreasury] = useState("");
   const [website, setWebsite] = useState("");
   const [xProfile, setXProfile] = useState("");
@@ -450,11 +342,7 @@ export default function LaunchPage() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [receipt, setReceipt] = useState<LaunchReceipt | null>(null);
-
-  const allocationTotal = useMemo(
-    () => taxAllocation.reduce((sum, value) => sum + value, 0),
-    [taxAllocation]
-  );
+  const [reviewed, setReviewed] = useState(false);
 
   const visibleAssets = useMemo(() => {
     const needle = assetSearch.trim().toLowerCase();
@@ -478,7 +366,7 @@ export default function LaunchPage() {
   ) || null;
 
   useEffect(() => {
-    if (!FORTUNE_NETWORK.isMainnet || !FORTUNE_NETWORK_CONFIGURED) return;
+    if (!FORTUNE_NETWORK_CONFIGURED) return;
 
     let cancelled = false;
 
@@ -524,54 +412,15 @@ export default function LaunchPage() {
     };
   }, []);
 
-  if (!FORTUNE_NETWORK.isMainnet) {
-    return (
-      <main className="page narrowPage">
-        <section className="pageHeading">
-          <div>
-            <FortuneLogo size="md" />
-            <span className="eyebrow">PRODUCTION LAUNCH</span>
-            <h1>Mainnet is not active on this deployment.</h1>
-            <p>
-              Use the public BSC Testnet alpha to exercise the same launch
-              architecture without real assets.
-            </p>
-          </div>
-          <Link href="/testnet" className="primaryCta">
-            Open public alpha →
-          </Link>
-        </section>
-      </main>
-    );
-  }
-
-  if (!FORTUNE_NETWORK_CONFIGURED) {
-    return (
-      <main className="page narrowPage">
-        <section className="pageHeading">
-          <div>
-            <FortuneLogo size="md" />
-            <span className="eyebrow">PRODUCTION LAUNCH</span>
-            <h1>Mainnet contracts are not fully configured.</h1>
-            <p>
-              Fortune will not construct real-value launch transactions until
-              the production stack and approved quote assets are configured.
-            </p>
-          </div>
-          <Link href="/status" className="secondaryCta">
-            View readiness
-          </Link>
-        </section>
-      </main>
-    );
-  }
-
   async function launch() {
     setBusy(true);
     setMessage("");
     setReceipt(null);
 
     try {
+      if (!FORTUNE_NETWORK.isMainnet || !FORTUNE_NETWORK_CONFIGURED || mode !== "standard") {
+        throw new Error("Real-value launching is disabled until the Standard release gates pass. Burn + Rewards v2 is separate research.");
+      }
       const readinessResponse = await fetch(
         "/api/public/v1/readiness",
         { cache: "no-store" }
@@ -618,9 +467,6 @@ export default function LaunchPage() {
       if (!graduationTarget || Number(graduationTarget) <= 0) {
         throw new Error("Enter a positive graduation target in USD.");
       }
-      if (mode === "tax" && !FORTUNE_TAX_NETWORK_CONFIGURED) {
-        throw new Error("The production tax-token stack is not activated.");
-      }
 
       const treasuryInput = treasury.trim();
       if (treasuryInput && !isAddress(treasuryInput)) {
@@ -650,7 +496,7 @@ export default function LaunchPage() {
       const { publicClient, walletClient } = clients(wallet);
       let hash: Hex;
 
-      if (mode === "standard") {
+      {
         const params = {
           name: cleanName,
           symbol: cleanSymbol,
@@ -662,9 +508,10 @@ export default function LaunchPage() {
           slopeUsd1e18: parseUnits(slope || "0", 18),
           graduationUsd1e18: parseUnits(graduationTarget, 18),
           adaptiveGraduation: true,
-          feeBps: [25, 25, 25, 15, 0, 10] as const,
+          // Chain-56 v1 rejects holder, buyback and liquidity fee routes.
+          feeBps: [50, 0, 0, 0, 0, 50] as const,
           treasury: destination,
-          metadataEditable: true,
+          metadataEditable: false,
           ...meta,
         };
 
@@ -701,11 +548,25 @@ export default function LaunchPage() {
           });
           await publicClient.waitForTransactionReceipt({ hash: approveHash });
 
-          hash = await walletClient.writeContract({
+          setMessage("Simulating the atomic first buy and its opening shield fee…");
+          const simulation = await publicClient.simulateContract({
+            account: wallet,
             address: FORTUNE_NETWORK.contracts.factory as Address,
             abi: standardFactoryAbi,
             functionName: "createLaunchPreparedAndBuy",
             args: [params, salt, initial, 1n],
+          });
+          const expectedTokens = simulation.result[1];
+          if (expectedTokens <= 1n) {
+            throw new Error("The first-buy simulation produced no usable token output. No launch was submitted.");
+          }
+          const minTokensOut = (expectedTokens * 95n) / 100n;
+
+          hash = await walletClient.writeContract({
+            address: FORTUNE_NETWORK.contracts.factory as Address,
+            abi: standardFactoryAbi,
+            functionName: "createLaunchPreparedAndBuy",
+            args: [params, salt, initial, minTokensOut > 0n ? minTokensOut : 1n],
           });
         } else {
           setMessage("Confirm the launch transaction in your wallet.");
@@ -716,91 +577,6 @@ export default function LaunchPage() {
             args: [params, salt],
           });
         }
-      } else {
-        const buyTaxBps = Math.round(Number(buyTax) * 100);
-        const sellTaxBps = Math.round(Number(sellTax) * 100);
-        const days = Math.round(Number(antiFarmerDays));
-
-        if (
-          buyTaxBps < 0 ||
-          sellTaxBps < 0 ||
-          buyTaxBps > 1000 ||
-          sellTaxBps > 1000 ||
-          buyTaxBps + sellTaxBps === 0
-        ) {
-          throw new Error("Buy and sell tax must each be between 0% and 10%, with at least one non-zero.");
-        }
-        if (!Number.isInteger(days) || days < 0 || days > 365) {
-          throw new Error("Anti-farmer duration must be 0–365 days.");
-        }
-        if (allocationTotal !== 100) {
-          throw new Error("Tax allocation must total exactly 100%.");
-        }
-
-        const allocationBps = taxAllocation.map(
-          (value) => Math.round(value * 100)
-        ) as [number, number, number, number, number, number, number];
-
-        const params = {
-          name: cleanName,
-          symbol: cleanSymbol,
-          totalSupply: parseUnits(totalSupply, 18),
-          quoteAsset: selected.address,
-          basePriceUsd1e18: parseUnits(basePrice, 18),
-          slopeUsd1e18: parseUnits(slope || "0", 18),
-          graduationUsd1e18: parseUnits(graduationTarget, 18),
-          feeBps: [25, 25, 25, 15, 0, 10] as const,
-          treasury: destination,
-          buyTaxBps,
-          sellTaxBps,
-          antiFarmerDuration: days * 24 * 60 * 60,
-          minimumDividendBalance: parseTokenAmount(
-            "Minimum dividend balance",
-            minimumDividendBalance,
-            18
-          ),
-          taxAllocationBps: allocationBps,
-          ...meta,
-        };
-
-        const taxFactory =
-          FORTUNE_NETWORK.contracts.taxFactory as Address;
-
-        setMessage("Running Burn + Rewards launch preflight…");
-
-        const [ready, reasonCode] = await publicClient.readContract({
-          address: taxFactory,
-          abi: taxFactoryAbi,
-          functionName: "preflightLaunch",
-          args: [params],
-        });
-
-        if (!ready) {
-          throw new Error(
-            "Burn + Rewards preflight failed: " +
-              (decodeReason(reasonCode) || reasonCode)
-          );
-        }
-
-        const [salt] = await publicClient.readContract({
-          address: taxFactory,
-          abi: taxFactoryAbi,
-          functionName: "previewPreparedVanity",
-          args: [wallet, params],
-        });
-
-        setMessage(
-          initial > 0n
-            ? "Confirm the Burn + Rewards launch. Your creator purchase follows as a separate BSC transaction."
-            : "Confirm the Burn + Rewards launch transaction."
-        );
-
-        hash = await walletClient.writeContract({
-          address: taxFactory,
-          abi: taxFactoryAbi,
-          functionName: "createLaunchPrepared",
-          args: [params, salt],
-        });
       }
 
       const txReceipt = await publicClient.waitForTransactionReceipt({ hash });
@@ -808,49 +584,14 @@ export default function LaunchPage() {
 
       for (const log of txReceipt.logs) {
         try {
-          if (mode === "standard") {
-            if (
-              log.address.toLowerCase() !==
-              FORTUNE_NETWORK.contracts.factory.toLowerCase()
-            ) {
-              continue;
-            }
-
-            const event = decodeEventLog({
-              abi: standardFactoryAbi,
-              eventName: "LaunchCreated",
-              data: log.data,
-              topics: log.topics,
-            });
-
-            created = {
-              mode,
-              token: event.args.token,
-              curve: event.args.curve,
-              transactionHash: hash,
-            };
-          } else {
-            if (
-              log.address.toLowerCase() !==
-              FORTUNE_NETWORK.contracts.taxFactory.toLowerCase()
-            ) {
-              continue;
-            }
-
-            const event = decodeEventLog({
-              abi: taxFactoryAbi,
-              eventName: "TaxLaunchCreated",
-              data: log.data,
-              topics: log.topics,
-            });
-
-            created = {
-              mode,
-              token: event.args.token,
-              curve: event.args.curve,
-              transactionHash: hash,
-            };
-          }
+          if (log.address.toLowerCase() !== FORTUNE_NETWORK.contracts.factory.toLowerCase()) continue;
+          const event = decodeEventLog({
+            abi: standardFactoryAbi,
+            eventName: "LaunchCreated",
+            data: log.data,
+            topics: log.topics,
+          });
+          created = { mode, token: event.args.token, curve: event.args.curve, transactionHash: hash };
           break;
         } catch {
           // Ignore unrelated logs.
@@ -863,49 +604,8 @@ export default function LaunchPage() {
         );
       }
 
-      // The launch itself is final before any optional tax-token follow-up buy.
-      // Surface it immediately so a rejected second transaction cannot make the
-      // successfully created token appear lost.
       setReceipt(created);
-
-      if (mode === "tax" && initial > 0n) {
-        try {
-          setMessage(
-            "Burn + Rewards launch confirmed. Approve the pair asset, then confirm your creator first purchase."
-          );
-
-          const approveHash = await walletClient.writeContract({
-            address: selected.address,
-            abi: erc20Abi,
-            functionName: "approve",
-            args: [created.curve, initial],
-          });
-          await publicClient.waitForTransactionReceipt({ hash: approveHash });
-
-          const buyHash = await walletClient.writeContract({
-            address: created.curve,
-            abi: curveBuyAbi,
-            functionName: "buy",
-            args: [selected.address, initial, 1n],
-          });
-          await publicClient.waitForTransactionReceipt({ hash: buyHash });
-
-          setMessage(
-            "Burn + Rewards launch and creator first purchase confirmed on BNB Smart Chain."
-          );
-        } catch (error) {
-          setMessage(
-            "Burn + Rewards launch succeeded, but the optional creator first purchase did not complete. " +
-              (error instanceof Error
-                ? error.message
-                : "The follow-up transaction failed.") +
-              " The confirmed token remains available below."
-          );
-          return;
-        }
-      } else {
-        setMessage("Launch confirmed on BNB Smart Chain.");
-      }
+      setMessage("Standard launch confirmed on BNB Smart Chain.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Launch failed.");
     } finally {
@@ -917,359 +617,98 @@ export default function LaunchPage() {
     <main className="page narrowPage">
       <section className="pageHeading">
         <div>
-          <FortuneLogo size="md" />
-          <span className="eyebrow">BNB CHAIN · PRODUCTION</span>
-          <h1>Launch against the BNB economy.</h1>
-          <p>
-            Pick any asset admitted to Fortune&apos;s live onchain registry.
-            Standard tokens use Pancake V3. Tax tokens add immutable tax,
-            holder rewards, buyback/burn routing and bounded anti-farmer
-            protection before Pancake V2 graduation.
-          </p>
+          <span className="eyebrow">BNB CHAIN · CREATE</span>
+          <h1>Make your own luck.</h1>
+          <p>Name it, choose a reviewed pair, then inspect the exact launch before your wallet signs.</p>
         </div>
-        <button
-          className="secondaryCta"
-          disabled={busy}
-          onClick={async () => {
-            try {
-              const wallet = await connectNetwork();
-              setAccount(wallet);
-            } catch (error) {
-              setMessage(
-                error instanceof Error
-                  ? error.message
-                  : "Wallet connection failed."
-              );
-            }
-          }}
-        >
-          {account
-            ? account.slice(0, 6) + "…" + account.slice(-4)
-            : "Connect wallet"}
-        </button>
+        <img src="/fortune-cat-cutout.webp" alt="Fortune lucky cat holding a fortune cookie" width="130" height="130" style={{ objectFit: "contain" }} />
       </section>
 
-      <section className="registryNotice">
-        <strong>REAL-VALUE NETWORK</strong>
-        <span>
-          Transactions spend real assets. Fortune runs a live registry/oracle
-          preflight before any launch can be created.
-        </span>
-      </section>
+      <div className="registryNotice">
+        <strong>{FORTUNE_NETWORK.isMainnet ? "MAINNET RELEASE GATED" : "PUBLIC BSC TESTNET ALPHA"}</strong>
+        <span>{FORTUNE_NETWORK.isMainnet
+          ? "The Standard launch button unlocks only after all onchain and release checks pass."
+          : "Build your launch here, then use the live public alpha to sign a testnet transaction. No real funds."}</span>
+      </div>
+
+      <ol className="journeySteps" aria-label="Launch steps">
+        <li>1 Name + ticker + image</li><li>2 Launch type</li><li>3 Pair asset</li><li>4 First buy</li><li>5 Review + launch</li>
+      </ol>
 
       <section className="formCard">
-        <div className="formSectionTitle">
-          <span>01</span>
-          <div>
-            <h2>Launch architecture</h2>
-            <p>Choose the immutable token model.</p>
-          </div>
-        </div>
-        <div className="modeRow launchModeRow">
-          <button
-            className={mode === "standard" ? "selectedMode" : ""}
-            onClick={() => setMode("standard")}
-          >
-            <strong>Standard</strong>
-            <span>0% transfer tax · Pancake V3 · permanent NFT LP lock</span>
-          </button>
-          <button
-            className={mode === "tax" ? "selectedMode" : ""}
-            disabled={!FORTUNE_TAX_NETWORK_CONFIGURED}
-            onClick={() => setMode("tax")}
-          >
-            <strong>Burn + Rewards</strong>
-            <span>
-              {FORTUNE_TAX_NETWORK_CONFIGURED
-                ? "Burns + pair-asset holder rewards · Pancake V2"
-                : "Available after the production tax stack passes release gates"}
-            </span>
-          </button>
+        <div className="formSectionTitle"><span>01</span><div><h2>Token identity</h2><p>These details are visible to everyone.</p></div></div>
+        <div className="fieldGrid">
+          <label>Token name<input value={name} maxLength={64} onChange={(event) => { setName(event.target.value); setReviewed(false); }} placeholder="Your token name" /></label>
+          <label>Ticker<input value={symbol} maxLength={16} onChange={(event) => { setSymbol(event.target.value.toUpperCase()); setReviewed(false); }} placeholder="LUCK" /></label>
+          <label>Image URL or IPFS URI<input value={imageURI} onChange={(event) => { setImageURI(event.target.value); setReviewed(false); }} placeholder="https://… or ipfs://…" /><small className="fieldHint">Host a square image publicly first. Fortune records this link immutably at launch; image upload hosting is still being prepared.</small></label>
         </div>
       </section>
 
       <section className="formCard" style={{ marginTop: 14 }}>
-        <div className="formSectionTitle">
-          <span>02</span>
-          <div>
-            <h2>Pair asset</h2>
-            <p>
-              The picker is sourced from the live Fortune registry, not a
-              hard-coded token list.
-            </p>
-          </div>
+        <div className="formSectionTitle"><span>02</span><div><h2>Launch type</h2><p>Standard is the only mainnet candidate.</p></div></div>
+        <div className="launchModeRow">
+          <button type="button" className="selectedMode" aria-pressed="true"><strong>Standard</strong><span>Fixed supply · Pancake V3 · permanently locked LP position</span></button>
+          <button type="button" disabled aria-disabled="true" title="Separate testnet research and audit required"><strong>Burn + Rewards</strong><span>Pair-asset holder claims via Infinity hook · v2 in research</span></button>
         </div>
+      </section>
 
+      <section className="formCard" style={{ marginTop: 14 }}>
+        <div className="formSectionTitle"><span>03</span><div><h2>Pair asset</h2><p>Only live registry-approved assets are selectable.</p></div></div>
         <div className="assetPickerToolbar">
-          <input
-            value={assetSearch}
-            onChange={(event) => setAssetSearch(event.target.value)}
-            placeholder="Search BNB, stables, DeFi, stocks or a reviewed pair"
-          />
-          <Link href="/assets" className="secondaryCta">
-            Browse BNB pair universe
-          </Link>
+          <input aria-label="Search approved pair assets" value={assetSearch} onChange={(event) => setAssetSearch(event.target.value)} placeholder="Search approved BNB assets" />
+          <Link href="/assets" className="secondaryCta">Pair policy →</Link>
         </div>
-
-        {assetError ? (
-          <div className="registryNotice statusError">
-            <strong>ASSET READ FAILED</strong>
-            <span>{assetError}</span>
-          </div>
-        ) : null}
-
+        {assetError ? <div className="registryNotice statusError"><strong>ASSET READ FAILED</strong><span>{assetError}</span></div> : null}
+        {visibleAssets.length === 0 && !assetError ? <div className="emptyPanel"><strong>No approved pair found.</strong><p>Asset discovery alone does not mean an asset is safe to pair.</p></div> : null}
         <div className="launchAssetGrid">
-          {visibleAssets.map((asset) => (
-            <button
-              key={asset.address}
-              className={
-                selectedAsset?.toLowerCase() === asset.address.toLowerCase()
-                  ? "assetOption assetSelected"
-                  : "assetOption"
-              }
-              onClick={() => setSelectedAsset(asset.address)}
-            >
-              <span className="assetIconLarge">
-                {asset.symbol.slice(0, 2)}
-              </span>
-              <span>
-                <strong>{asset.symbol}</strong>
-                <small>{asset.name}</small>
-              </span>
-              <em>{asset.category}</em>
-            </button>
-          ))}
+          {visibleAssets.map((asset) => <button type="button" key={asset.address} className={selectedAsset?.toLowerCase() === asset.address.toLowerCase() ? "assetOption assetSelected" : "assetOption"} aria-pressed={selectedAsset?.toLowerCase() === asset.address.toLowerCase()} onClick={() => { setSelectedAsset(asset.address); setReviewed(false); }}>
+            <span className="assetIconLarge">{asset.symbol.slice(0, 2)}</span><span><strong>{asset.symbol}</strong><small>{asset.name}</small></span><em>{asset.category}</em>
+          </button>)}
         </div>
       </section>
 
       <section className="formCard" style={{ marginTop: 14 }}>
-        <div className="formSectionTitle">
-          <span>03</span>
-          <div>
-            <h2>Token identity</h2>
-            <p>Immutable ERC-20 name, ticker and fixed supply.</p>
-          </div>
-        </div>
-
-        <div className="fieldGrid">
-          <label>
-            Token name
-            <input
-              value={name}
-              maxLength={64}
-              onChange={(event) => setName(event.target.value)}
-              placeholder="Fortune Example"
-            />
-          </label>
-          <label>
-            Ticker
-            <input
-              value={symbol}
-              maxLength={16}
-              onChange={(event) => setSymbol(event.target.value)}
-              placeholder="FORT"
-            />
-          </label>
-          <label>
-            Total supply
-            <input
-              value={totalSupply}
-              inputMode="decimal"
-              onChange={(event) => setTotalSupply(event.target.value)}
-            />
-          </label>
-          <label>
-            Creator first purchase · {selected?.symbol || "quote"}
-            <input
-              value={creatorPurchase}
-              inputMode="decimal"
-              onChange={(event) => setCreatorPurchase(event.target.value)}
-              placeholder="0"
-            />
-          </label>
-        </div>
-
-        <label>
-          Description
-          <textarea
-            value={description}
-            maxLength={4096}
-            onChange={(event) => setDescription(event.target.value)}
-          />
-        </label>
+        <div className="formSectionTitle"><span>04</span><div><h2>Optional first buy</h2><p>Zero means launch without a creator purchase.</p></div></div>
+        <div className="fieldGrid"><label>Amount in {selected?.symbol || "pair asset"}<input value={creatorPurchase} inputMode="decimal" onChange={(event) => { setCreatorPurchase(event.target.value); setReviewed(false); }} placeholder="0" /></label></div>
+        <p className="reviewWarning">The Launch Shield charges up to 99% on buys in the first five seconds, including a creator first buy. Fortune simulates the atomic transaction and sets a minimum token output before submitting it.</p>
       </section>
 
-      <section className="formCard" style={{ marginTop: 14 }}>
-        <div className="formSectionTitle">
-          <span>04</span>
-          <div>
-            <h2>Curve economics</h2>
-            <p>USD-denominated values enforced by Fortune&apos;s live oracle.</p>
-          </div>
-        </div>
-
+      <details className="advancedLaunch">
+        <summary>Advanced · curve economics and profile links</summary>
+        <p>These research defaults mirror the mainnet fork rehearsal. They remain subject to independent economic review and onchain preflight.</p>
         <div className="fieldGrid">
-          <label>
-            Opening price · USD
-            <input
-              value={basePrice}
-              inputMode="decimal"
-              onChange={(event) => setBasePrice(event.target.value)}
-              placeholder="e.g. 0.00001"
-            />
-          </label>
-          <label>
-            Linear slope · USD per token
-            <input
-              value={slope}
-              inputMode="decimal"
-              onChange={(event) => setSlope(event.target.value)}
-              placeholder="0 for flat curve"
-            />
-          </label>
-          <label>
-            Graduation target · USD
-            <input
-              value={graduationTarget}
-              inputMode="decimal"
-              onChange={(event) => setGraduationTarget(event.target.value)}
-              placeholder="Enter target reserve value"
-            />
-          </label>
-          <label>
-            Selected quote
-            <input
-              value={
-                selected
-                  ? selected.symbol + " · " + short(selected.address)
-                  : "Choose an asset above"
-              }
-              readOnly
-            />
-          </label>
+          <label>Total token supply<input value={totalSupply} inputMode="decimal" onChange={(event) => { setTotalSupply(event.target.value); setReviewed(false); }} /></label>
+          <label>Opening price · USD<input value={basePrice} inputMode="decimal" onChange={(event) => { setBasePrice(event.target.value); setReviewed(false); }} /></label>
+          <label>Slope · USD per token<input value={slope} inputMode="decimal" onChange={(event) => { setSlope(event.target.value); setReviewed(false); }} /></label>
+          <label>Graduation target · USD<input value={graduationTarget} inputMode="decimal" onChange={(event) => { setGraduationTarget(event.target.value); setReviewed(false); }} /></label>
+          <label>Community treasury · optional<input value={treasury} onChange={(event) => { setTreasury(event.target.value); setReviewed(false); }} placeholder="Defaults to creator wallet" /></label>
+          <label>Website · optional<input value={website} onChange={(event) => { setWebsite(event.target.value); setReviewed(false); }} placeholder="https://…" /></label>
+          <label>X · optional<input value={xProfile} onChange={(event) => { setXProfile(event.target.value); setReviewed(false); }} placeholder="https://x.com/…" /></label>
+          <label>Telegram · optional<input value={telegram} onChange={(event) => { setTelegram(event.target.value); setReviewed(false); }} placeholder="https://t.me/…" /></label>
+          <label>GitHub · optional<input value={github} onChange={(event) => { setGithub(event.target.value); setReviewed(false); }} /></label>
+          <label>YouTube · optional<input value={youtube} onChange={(event) => { setYoutube(event.target.value); setReviewed(false); }} /></label>
+          <label>DeBox · optional<input value={debox} onChange={(event) => { setDebox(event.target.value); setReviewed(false); }} /></label>
         </div>
-      </section>
-
-      {mode === "tax" ? (
-        <>
-          <section className="formCard" style={{ marginTop: 14 }}>
-            <div className="formSectionTitle">
-              <span>05</span>
-              <div>
-                <h2>Burn + Rewards settings</h2>
-                <p>Immutable at launch. Rates cannot later be raised.</p>
-              </div>
-            </div>
-            <div className="fieldGrid">
-              <label>
-                Buy tax · %
-                <input type="number" min="0" max="10" step="0.1" value={buyTax} onChange={(e) => setBuyTax(e.target.value)} />
-              </label>
-              <label>
-                Sell tax · %
-                <input type="number" min="0" max="10" step="0.1" value={sellTax} onChange={(e) => setSellTax(e.target.value)} />
-              </label>
-              <label>
-                Anti-farmer · days
-                <input type="number" min="0" max="365" step="1" value={antiFarmerDays} onChange={(e) => setAntiFarmerDays(e.target.value)} />
-              </label>
-              <label>
-                Minimum dividend balance
-                <input value={minimumDividendBalance} inputMode="decimal" onChange={(e) => setMinimumDividendBalance(e.target.value)} />
-              </label>
-            </div>
-          </section>
-
-          <section className="formCard" style={{ marginTop: 14 }}>
-            <div className="formSectionTitle">
-              <span>06</span>
-              <div>
-                <h2>Burn + rewards routing</h2>
-                <p>Total must equal exactly 100%.</p>
-              </div>
-            </div>
-            <div className={allocationTotal === 100 ? "registryNotice" : "registryNotice statusError"}>
-              <strong>{allocationTotal}% allocated</strong>
-              <span>{100 - allocationTotal}% remaining</span>
-            </div>
-            <div className="taxAllocationGrid">
-              {allocationLabels.map((label, index) => (
-                <label key={label}>
-                  {label}
-                  <div className="taxAllocationInput">
-                    <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      step="1"
-                      value={taxAllocation[index]}
-                      onChange={(event) => {
-                        const next = [...taxAllocation];
-                        next[index] = Math.max(
-                          0,
-                          Math.min(100, Number(event.target.value) || 0)
-                        );
-                        setTaxAllocation(next);
-                      }}
-                    />
-                    <span>%</span>
-                  </div>
-                </label>
-              ))}
-            </div>
-            <label>
-              Community treasury recipient · optional
-              <input
-                value={treasury}
-                onChange={(e) => setTreasury(e.target.value)}
-                placeholder="Defaults to creator wallet"
-              />
-            </label>
-          </section>
-        </>
-      ) : null}
+        <label>Description · optional<textarea value={description} maxLength={4096} onChange={(event) => { setDescription(event.target.value); setReviewed(false); }} /></label>
+      </details>
 
       <section className="formCard" style={{ marginTop: 14 }}>
-        <div className="formSectionTitle">
-          <span>{mode === "tax" ? "07" : "05"}</span>
-          <div>
-            <h2>Links</h2>
-            <p>Optional public token profile links.</p>
+        <div className="formSectionTitle"><span>05</span><div><h2>Review and launch</h2><p>Confirm the immutable details before signing.</p></div></div>
+        {!reviewed ? <button className="launchButton" disabled={!name.trim() || !symbol.trim() || !imageURI.trim() || !selected} onClick={() => { setMessage(""); setReviewed(true); }}>Review launch →</button> : <>
+          <div className="reviewSummary">
+            <div><span>Token</span><strong>{name.trim()} · {symbol.trim()}</strong></div>
+            <div><span>Pair</span><strong>{selected?.symbol || "—"} · {selected ? short(selected.address) : "—"}</strong></div>
+            <div><span>Supply / target</span><strong>{totalSupply} tokens · ${graduationTarget}</strong></div>
+            <div><span>Creator first buy</span><strong>{creatorPurchase || "0"} {selected?.symbol || ""}</strong></div>
+            <div><span>Fee route</span><strong>0.5% creator · 0.5% protocol</strong></div>
+            <div><span>Liquidity / mode</span><strong>Pancake V3 · Standard · fixed metadata</strong></div>
+            <div><span>Image URI</span><strong>{imageURI}</strong></div>
           </div>
-        </div>
-        <div className="fieldGrid">
-          <label>
-            Token image
-            <input
-              value={imageURI}
-              onChange={(e) => setImageURI(e.target.value)}
-              placeholder="https://... or ipfs://..."
-            />
-            <small className="fieldHint">
-              Public image URL or IPFS URI.
-            </small>
-          </label>
-          <label>Website<input value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://..." /></label>
-          <label>X / Twitter<input value={xProfile} onChange={(e) => setXProfile(e.target.value)} placeholder="https://x.com/..." /></label>
-          <label>Telegram<input value={telegram} onChange={(e) => setTelegram(e.target.value)} placeholder="https://t.me/..." /></label>
-          <label>GitHub<input value={github} onChange={(e) => setGithub(e.target.value)} placeholder="https://github.com/..." /></label>
-          <label>YouTube<input value={youtube} onChange={(e) => setYoutube(e.target.value)} placeholder="https://youtube.com/..." /></label>
-          <label>DeBox<input value={debox} onChange={(e) => setDebox(e.target.value)} placeholder="https://debox.pro/..." /></label>
-        </div>
-
-        <button
-          className="launchButton"
-          disabled={
-            busy ||
-            !selected ||
-            (mode === "tax" && allocationTotal !== 100)
-          }
-          onClick={() => void launch()}
-        >
-          {busy
-            ? "Preparing launch…"
-            : "Preflight + launch on BNB Chain →"}
-        </button>
+          <p className="reviewWarning">An approved pair and wallet transaction are required. Fortune checks the current chain, release state and onchain preflight again before any submission.</p>
+          {FORTUNE_NETWORK.isMainnet ? <button className="launchButton" disabled={busy || !selected || !FORTUNE_NETWORK_CONFIGURED} onClick={() => void launch()}>{busy ? "Checking launch…" : FORTUNE_NETWORK_CONFIGURED ? "Confirm in wallet →" : "Mainnet launch paused"}</button> : <Link href="/testnet" className="primaryCta">Continue to live testnet launch →</Link>}
+          <button type="button" className="secondaryCta" style={{ marginLeft: 10 }} onClick={() => setReviewed(false)}>Edit details</button>
+          {!FORTUNE_NETWORK_CONFIGURED && FORTUNE_NETWORK.isMainnet ? <p className="fieldHint">The release manifest and live contract checks must pass before mainnet transactions unlock.</p> : null}
+        </>}
       </section>
 
       <section className="panel" style={{ marginTop: 14 }}>
@@ -1308,8 +747,7 @@ export default function LaunchPage() {
               className="primaryCta"
               href={
                 "/market/" +
-                receipt.curve +
-                (receipt.mode === "tax" ? "?mode=tax" : "")
+                receipt.curve
               }
             >
               Open market →

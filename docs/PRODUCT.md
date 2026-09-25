@@ -2,9 +2,11 @@
 
 ## Positioning
 
-**Fortune — Launch against anything.**
+**Fortune — Meme coins, paired with the BNB economy.**
 
-The differentiator is not merely "more pair buttons." Fortune combines:
+The three promises are **no dumping**, **holders get paid**, and **pair with anything**. Each requires an actual onchain implementation and eligibility policy before it can be advertised as active. Standard is a frozen, WBNB-only mainnet candidate and has no holder rewards. Burn + Rewards v2, multiple pairs, and arbitrary BEP-20 support remain separately gated.
+
+The product follows LESGO's short launch path and candid lifecycle/trust documentation while adapting the implementation to BNB Chain. Sender informs compatibility checks and direct holder claims; its no-migration pool design is a different architecture from Fortune's frozen Standard curve. Fortune's longer-term research combines:
 
 1. one canonical Basket Curve;
 2. 1–5 approved quote assets;
@@ -16,30 +18,33 @@ The differentiator is not merely "more pair buttons." Fortune combines:
 
 ## Navigation
 
-- **Explore** — market discovery
-- **Launch** — creation wizard
-- **Forum** — social layer
-- **Analytics** — transparent protocol data
-- **Automations** — operational state and execution ledger
-- **Portfolio** — wallet holdings, rewards and creator revenue
+- **Home** — positioning and live release state
+- **Explore** — onchain market discovery
+- **Launch** — short creation flow
+- **Burns / Rewards** — verifiable activity ledgers when v2 is proven
+- **Stats / Docs / Status** — onchain facts, protocol terms and release gates
+- **Search / token pages / profiles** — discover verified launches and creators
 
 ## Launch wizard
 
 ### 1. Token
-Name, symbol, description, image and social links.
+Name, ticker and square image URI. Image hosting must exist before launch; a permanent upload service is not wired yet. Optional description and links are in Advanced.
 
-### 2. Fortune Basket
-Select 1–5 approved BSC assets.
-Choose a primary market.
-Choose fixed or demand-weighted graduation.
+### 2. Launch type
+Standard or Burn + Rewards. V2 stays disabled until its hook, accounting, fork tests, audit and release gate pass.
 
-### 3. Economics
-Standard, holder rewards, buyback/burn or custom Fee Matrix.
-Optional developer first buy.
-Reward asset may differ from quote assets.
+### 3. Pair asset
+Select only from the live onchain approved registry. Mainnet v1 is pinned to WBNB. Expand to stablecoins, BTCB/ETH, BNB majors, DeFi, eligible RWAs and compatibility-checked BEP-20 assets in separate releases.
 
-### 4. Manifest
-Show the complete immutable economic configuration before signature.
+### 4. Optional first buy
+Show the quote amount, approve if needed, simulate output and enforce a meaningful minimum. Disclose the first-five-second Launch Shield impact.
+
+### 5. Review and launch
+Show fixed token, pair, fee and liquidity terms before signature. Standard defaults to immutable display metadata. Put supply, price slope, graduation target and optional links in Advanced.
+
+## Current release boundary
+
+The BSC testnet alpha is live. The Standard mainnet candidate is paused pending the independent audit, governance signatures, production infrastructure and legal/asset policy gates in `mainnet-release.json`. The isolated v2 reward token has no Infinity hook, factory, indexer, or deployment and must never inherit Standard approval.
 
 ## Registry categories
 

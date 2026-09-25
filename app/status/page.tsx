@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useLanguage } from "@/components/LanguageProvider";
 import { FORTUNE_NETWORK } from "@/lib/fortune-network";
+import { MAINNET_ACTIVATION_GATE_IDS, MAINNET_RELEASE, mainnetGateComplete } from "@/lib/mainnet-release";
 
 type BasicStatus = {
   ready: boolean;
@@ -266,15 +267,14 @@ export default function StatusPage() {
       <section className="twoColumn contentSection">
         <div className="panel">
           <span className="eyebrow">
-            {zh ? "发布证据" : "RELEASE EVIDENCE"}
+            {zh ? "主网发布闸门" : "MAINNET RELEASE GATES"}
           </span>
+          <h2>{MAINNET_RELEASE.status === "blocked" ? "Paused" : MAINNET_RELEASE.status}</h2>
+          <p>Machine-readable gate evidence is published with the source. Missing independent reviews and governance controls keep real-value launches disabled.</p>
           <div className="statRows">
-            <div><span>Foundry</span><strong>39 / 39</strong></div>
-            <div><span>{zh ? "模糊测试" : "Fuzz runs"}</span><strong>1,000</strong></div>
-            <div><span>{zh ? "网页请求" : "HTTP requests"}</span><strong>7,500 / 7,500</strong></div>
-            <div><span>{zh ? "真实毕业" : "Real graduations"}</span><strong>3 / 3</strong></div>
-            <div><span>500 {zh ? "并发 p95" : "concurrent p95"}</span><strong>935 ms</strong></div>
+            {MAINNET_ACTIVATION_GATE_IDS.map((id) => <div key={id}><span>{id.replace(/([A-Z])/g, " $1")}</span><strong>{mainnetGateComplete(id) ? "Evidence recorded" : "Open"}</strong></div>)}
           </div>
+          <p className="dataDisclaimer">Burn + Rewards v2 has its own audit boundary and is not included in these Standard gates.</p>
         </div>
 
         <div className="panel">
@@ -290,13 +290,13 @@ export default function StatusPage() {
             ].map(([label, address]) => (
               <div key={label}>
                 <span>{label}</span>
-                <a
+                {address ? <a
                   href={FORTUNE_NETWORK.explorerUrl + "/address/" + address}
                   target="_blank"
                   rel="noreferrer"
                 >
                   <strong>View ↗</strong>
-                </a>
+                </a> : <strong>Not configured</strong>}
               </div>
             ))}
           </div>

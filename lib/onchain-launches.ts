@@ -133,7 +133,7 @@ function client() {
   const urls = configuredRpcUrls(FORTUNE_NETWORK.chainId);
   const transports = (
     urls.length ? urls : [FORTUNE_NETWORK.publicRpcUrl]
-  ).map((url) => http(url, { timeout: 4500 }));
+  ).map((url) => http(url, { timeout: 10000 }));
 
   return createPublicClient({
     chain:
@@ -151,149 +151,38 @@ function statusForPhase(
   return "Curve";
 }
 
-async function readOneFactory(
-  rpc: ReturnType<typeof client>,
-  factory: Address,
-  mode: OnchainFortuneLaunch["mode"],
-  limit: number
-) {
-  const count = await rpc.readContract({
-    address: factory,
-    abi: factoryAbi,
-    functionName: "launchCount",
+function sources() {
+  const entries: Array<{
+    factory: Address;
+    mode: OnchainFortuneLaunch["mode"];
+  }> = [{ factory: FORTUNE_NETWORK.contracts.factory as Address, mode: "standard" }];
+  if (FORTUNE_NETWORK.contracts.taxFactory) {
+    entries.push({ factory: FORTUNE_NETWORK.contracts.taxFactory as Address, mode: "tax" });
+  }
+  return entries;
+}
+
+function required<T>(result: { status: string; result?: T }, label: string): T {
+  if (result.status !== "success" || result.result === undefined) {
+    throw new Error("Onchain read failed: " + label);
+  }
+  return result.result;
+}
+
+export async function readFortuneLaunchCounts() {
+  if (!FORTUNE_NETWORK_CONFIGURED || !FORTUNE_NETWORK.contracts.factory) {
+    return { configured: false, chainId: FORTUNE_NETWORK.chainId, total: 0 };
+  }
+  const rpc = client();
+  const counts = await rpc.multicall({
+    contracts: sources().map(({ factory }) => ({
+      address: factory, abi: factoryAbi, functionName: "launchCount" as const,
+    })),
   });
-
-  const total = Number(count);
-  const safeLimit = Math.max(1, Math.min(limit, 25));
-  const start = Math.max(0, total - safeLimit);
-  const indexes = Array.from(
-    { length: total - start },
-    (_, offset) => start + offset
-  ).reverse();
-
-  const launches = await Promise.all(
-    indexes.map(async (index) => {
-      try {
-        const info = await rpc.readContract({
-          address: factory,
-          abi: factoryAbi,
-          functionName: "launches",
-          args: [BigInt(index)],
-        });
-
-        const creator = info[0];
-        const token = info[1];
-        const curve = info[2];
-        const createdAt = Number(info[9]);
-
-        const [
-          name,
-          symbol,
-          totalSupply,
-          phaseRaw,
-          currentPrice,
-          reserveUsd,
-          graduationUsd,
-          quoteCountRaw,
-        ] = await Promise.all([
-          rpc.readContract({
-            address: token,
-            abi: tokenAbi,
-            functionName: "name",
-          }),
-          rpc.readContract({
-            address: token,
-            abi: tokenAbi,
-            functionName: "symbol",
-          }),
-          rpc.readContract({
-            address: token,
-            abi: tokenAbi,
-            functionName: "totalSupply",
-          }),
-          rpc.readContract({
-            address: curve,
-            abi: curveAbi,
-            functionName: "phase",
-          }),
-          rpc.readContract({
-            address: curve,
-            abi: curveAbi,
-            functionName: "currentPriceUsd1e18",
-          }),
-          rpc.readContract({
-            address: curve,
-            abi: curveAbi,
-            functionName: "netReserveUsd1e18",
-          }),
-          rpc.readContract({
-            address: curve,
-            abi: curveAbi,
-            functionName: "graduationUsd1e18",
-          }),
-          rpc.readContract({
-            address: curve,
-            abi: curveAbi,
-            functionName: "quoteAssetCount",
-          }),
-        ]);
-
-        const quoteCount = Math.min(Number(quoteCountRaw), 5);
-        const quoteAssets = await Promise.all(
-          Array.from({ length: quoteCount }, (_, quoteIndex) =>
-            rpc.readContract({
-              address: curve,
-              abi: curveAbi,
-              functionName: "quoteAssets",
-              args: [BigInt(quoteIndex)],
-            })
-          )
-        );
-
-        const phase = Number(phaseRaw);
-        const progress =
-          graduationUsd === 0n
-            ? 0
-            : Math.min(
-                100,
-                Number(
-                  (reserveUsd * 10_000n) /
-                    graduationUsd
-                ) / 100
-              );
-
-        return {
-          id: mode + ":" + String(index),
-          mode,
-          factory,
-          creator,
-          token,
-          curve,
-          name,
-          symbol,
-          createdAt,
-          phase,
-          status: statusForPhase(phase),
-          currentPriceUsd: formatUnits(currentPrice, 18),
-          reserveUsd: formatUnits(reserveUsd, 18),
-          graduationUsd: formatUnits(graduationUsd, 18),
-          graduationProgress: progress,
-          totalSupply: formatUnits(totalSupply, 18),
-          quoteAssets,
-        } satisfies OnchainFortuneLaunch;
-      } catch {
-        return null;
-      }
-    })
+  const total = counts.reduce(
+    (sum, count, index) => sum + Number(required(count, "launchCount " + index)), 0
   );
-
-  return {
-    total,
-    launches: launches.filter(
-      (launch): launch is OnchainFortuneLaunch =>
-        launch !== null
-    ),
-  };
+  return { configured: true, chainId: FORTUNE_NETWORK.chainId, total };
 }
 
 export async function readRecentFortuneLaunches(limit = 12) {
@@ -312,47 +201,67 @@ export async function readRecentFortuneLaunches(limit = 12) {
   const rpc = client();
   const safeLimit = Math.max(1, Math.min(limit, 25));
 
-  const sources: Array<{
-    factory: Address;
-    mode: OnchainFortuneLaunch["mode"];
-  }> = [
-    {
-      factory:
-        FORTUNE_NETWORK.contracts.factory as Address,
-      mode: "standard",
-    },
-  ];
+  const factories = sources();
+  const counts = await rpc.multicall({ contracts: factories.map(({ factory }) => ({
+    address: factory, abi: factoryAbi, functionName: "launchCount" as const,
+  })) });
+  const total = counts.reduce((sum, count, index) =>
+    sum + Number(required(count, "launchCount " + index)), 0);
 
-  if (
-    FORTUNE_NETWORK.contracts.taxFactory
-  ) {
-    sources.push({
-      factory:
-        FORTUNE_NETWORK.contracts.taxFactory as Address,
-      mode: "tax",
-    });
-  }
+  const positions = factories.flatMap((source, sourceIndex) => {
+    const count = Number(required(counts[sourceIndex], "launchCount"));
+    return Array.from({ length: Math.min(count, safeLimit) }, (_, offset) => ({
+      ...source, index: count - offset - 1,
+    }));
+  });
+  if (!positions.length) return { configured: true, chainId: FORTUNE_NETWORK.chainId, total, launches: [] as OnchainFortuneLaunch[] };
 
-  const results = await Promise.all(
-    sources.map((source) =>
-      readOneFactory(
-        rpc,
-        source.factory,
-        source.mode,
-        safeLimit
-      )
-    )
-  );
+  const rawLaunches = await rpc.multicall({ contracts: positions.map(({ factory, index }) => ({
+    address: factory, abi: factoryAbi, functionName: "launches" as const, args: [BigInt(index)] as const,
+  })) });
+  const valid = positions.flatMap((position, index) => rawLaunches[index].status === "success" && rawLaunches[index].result
+    ? [{ ...position, info: rawLaunches[index].result! }] : []);
 
-  const total = results.reduce(
-    (sum, result) => sum + result.total,
-    0
-  );
-
-  const launches = results
-    .flatMap((result) => result.launches)
-    .sort((a, b) => b.createdAt - a.createdAt)
-    .slice(0, safeLimit);
+  const fieldCalls = valid.flatMap(({ info }) => [
+    { address: info[1], abi: tokenAbi, functionName: "name" as const },
+    { address: info[1], abi: tokenAbi, functionName: "symbol" as const },
+    { address: info[1], abi: tokenAbi, functionName: "totalSupply" as const },
+    { address: info[2], abi: curveAbi, functionName: "phase" as const },
+    { address: info[2], abi: curveAbi, functionName: "currentPriceUsd1e18" as const },
+    { address: info[2], abi: curveAbi, functionName: "netReserveUsd1e18" as const },
+    { address: info[2], abi: curveAbi, functionName: "graduationUsd1e18" as const },
+    { address: info[2], abi: curveAbi, functionName: "quoteAssetCount" as const },
+  ]);
+  const fields = valid.length ? await rpc.multicall({ contracts: fieldCalls }) : [];
+  const prepared = valid.flatMap((position, index) => {
+    const row = fields.slice(index * 8, index * 8 + 8);
+    if (row.some((value) => value.status !== "success")) return [];
+    return [{ ...position, row: row.map((value) => value.result) }];
+  });
+  const quoteCalls = prepared.flatMap(({ info, row }) =>
+    Array.from({ length: Math.min(Number(row[7]), 5) }, (_, index) => ({
+      address: info[2], abi: curveAbi, functionName: "quoteAssets" as const, args: [BigInt(index)] as const,
+    })));
+  const quotes = quoteCalls.length ? await rpc.multicall({ contracts: quoteCalls }) : [];
+  let quoteOffset = 0;
+  const launches = prepared.flatMap(({ mode, factory, index, info, row }) => {
+    const quoteCount = Math.min(Number(row[7]), 5);
+    const values = quotes.slice(quoteOffset, quoteOffset + quoteCount);
+    quoteOffset += quoteCount;
+    if (values.some((value) => value.status !== "success")) return [];
+    const [name, symbol, supply, phaseRaw, price, reserve, target] = row as [string, string, bigint, number, bigint, bigint, bigint];
+    const phase = Number(phaseRaw);
+    return [{
+      id: mode + ":" + String(index), mode, factory,
+      creator: info[0], token: info[1], curve: info[2], createdAt: Number(info[9]),
+      name, symbol, phase, status: statusForPhase(phase),
+      currentPriceUsd: formatUnits(price, 18), reserveUsd: formatUnits(reserve, 18),
+      graduationUsd: formatUnits(target, 18),
+      graduationProgress: target === 0n ? 0 : Math.min(100, Number((reserve * 10_000n) / target) / 100),
+      totalSupply: formatUnits(supply, 18),
+      quoteAssets: values.map((value) => value.result as Address),
+    } satisfies OnchainFortuneLaunch];
+  }).sort((a, b) => b.createdAt - a.createdAt).slice(0, safeLimit);
 
   return {
     configured: true,

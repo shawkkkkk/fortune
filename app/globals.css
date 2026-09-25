@@ -1270,3 +1270,42 @@ html[data-theme="dark"] .launchAssetGrid .assetOption em{
     max-height:520px;
   }
 }
+
+/* Fortune mascot and the short creator journey. */
+.fortuneHeroArt{position:relative;overflow:hidden;aspect-ratio:1;border-radius:30px;background:#dc1c27;box-shadow:0 28px 76px rgba(139,17,25,.17)}
+.fortuneHeroArt img{display:block;width:100%;height:100%;object-fit:cover}
+.heroArtCaption{position:absolute;left:20px;bottom:20px;display:flex;flex-direction:column;gap:3px;border:1px solid rgba(255,255,255,.5);border-radius:13px;padding:10px 14px;background:rgba(111,12,21,.70);backdrop-filter:blur(8px);color:white}
+.heroArtCaption span{font-size:.75rem;letter-spacing:.12em;font-weight:800}
+.heroArtCaption strong{color:white;font-size:1.1rem}
+.heroSection{grid-template-columns:minmax(0,1fr) minmax(310px,.8fr);gap:clamp(25px,5vw,70px)}
+.heroSection h1{max-width:760px}
+.heroSection p,.pageHeading p{font-size:1rem;line-height:1.55}
+.heroActions{flex-wrap:wrap}
+.formCard label,.fieldGrid label{font-size:.9rem}
+.fieldHint,.launchWarning{font-size:.8rem!important;line-height:1.5}
+.registryNotice span,.registryNotice strong{font-size:.85rem}
+.automationCard>p{font-size:.9rem;line-height:1.55}
+.automationCard>strong{font-size:1rem}
+.navLinks a,.primaryCta,.secondaryCta,.launchButton{font-size:.88rem}
+.journeyHeader{display:flex;gap:14px;align-items:center;margin-bottom:15px}
+.journeyHeader img{width:72px;height:72px;object-fit:contain}
+.journeyHeader p{margin:3px 0 0;color:#76696b}
+.journeySteps{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 20px;padding:0;list-style:none}
+.journeySteps li{border:1px solid #eed9da;background:#fff8f8;border-radius:999px;padding:7px 10px;font-size:.82rem;font-weight:700}
+.advancedLaunch{margin-top:14px;border:1px solid #e8d8d9;border-radius:14px;padding:15px;background:#fffafa}
+.advancedLaunch summary{cursor:pointer;font-size:.95rem;font-weight:800}
+.advancedLaunch[open] summary{margin-bottom:18px}
+.reviewSummary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:12px}
+.reviewSummary div{border:1px solid #eedddd;border-radius:12px;background:#fffafa;padding:12px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.reviewSummary span{color:#77696a;font-size:.8rem}
+.reviewSummary strong{overflow-wrap:anywhere;font-size:.95rem}
+.reviewWarning{margin:14px 0;color:#7a5254;font-size:.87rem;line-height:1.5}
+.marketSearch{width:100%;min-height:50px;font-size:1rem}
+.profileLink{color:#b71922;text-decoration:underline;text-underline-offset:3px}
+.mascotEmpty{width:110px;height:110px;object-fit:contain;margin:0 auto 12px;display:block}
+.mascotSectionArt{width:clamp(130px,20vw,215px);height:auto;object-fit:contain;margin-left:auto}
+html[data-theme="dark"] .journeySteps li,html[data-theme="dark"] .advancedLaunch,html[data-theme="dark"] .reviewSummary div{background:#211719;border-color:#4d3033}
+html[data-theme="dark"] .journeyHeader p,html[data-theme="dark"] .reviewSummary span,html[data-theme="dark"] .reviewWarning{color:#c9adaf}
+@media(max-width:1050px){.heroSection{grid-template-columns:1fr}.fortuneHeroArt{max-width:680px;margin:auto}}
+@media(max-width:760px){.fortuneHeroArt{border-radius:20px}.reviewSummary{grid-template-columns:1fr}.heroSection{gap:18px}.heroSection h1{font-size:clamp(2.65rem,10vw,4.3rem)}.siteHeader{flex-wrap:wrap;padding:10px 14px}.navLinks{display:flex;order:3;flex-basis:100%;overflow-x:auto;white-space:nowrap}.navLinks a{flex-shrink:0}}
+@media(max-width:760px){.mascotSectionArt{margin:0 auto}}

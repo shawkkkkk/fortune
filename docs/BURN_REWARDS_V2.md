@@ -2,6 +2,14 @@
 
 Status: research / implementation target. This document does not enable mainnet.
 
+## Implementation snapshot
+
+The independent `contracts-v2/` Foundry workspace now contains an unaudited fixed-supply token and pair-asset reward-accounting prototype. It tests transfer corrections, immutable reward exclusions, burn entitlement, direct holder claims and solvency under 1,000 randomized transfer/burn/fund/claim sequences. It has no factory or market integration and is not deployed. The Standard candidate in `contracts/` is unchanged. The legacy tax-token/Pancake V2 contracts are not this v2 implementation.
+
+Infinity pool fees cannot be inferred from a token transfer tax. The official [PancakeSwap hook guide](https://developer.pancakeswap.finance/contracts/infinity/guides/develop-a-hook) and [fee hook example](https://developer.pancakeswap.finance/contracts/infinity/guides/hook-examples/taking-fee-via-hook) show hook permissions and return-delta settlement. A dedicated v2 hook still needs pinned Infinity interfaces, direction-sensitive exact-input/output tests, vault settlement proofs, reward-pot funding, and real BSC mainnet fork swaps. This reward-accounting prototype does not meet any of those hook gates.
+
+The prototype rejects reward deposits while no eligible holders exist. A future hook must define and audit an immutable zero-holder routing policy so swaps never silently trap funds or award past fees to buyers who arrive later. Tiny integer-division remainder remains in the pair-asset contract balance; ledger views must show both funded and claimed amounts instead of treating every wei as distributed.
+
 Fortune Burn + Rewards v2 is the BNB-native successor to the existing fee-on-transfer / Pancake V2 research stack.
 
 The design goal is simple:

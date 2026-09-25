@@ -36,9 +36,6 @@ const motionScript =
 
 export const metadata: Metadata = {
   metadataBase: new URL(FORTUNE_SITE_URL),
-  alternates: {
-    canonical: "/",
-  },
   title: {
     default: FORTUNE_NETWORK.isMainnet
       ? "Fortune — Launch on BNB Smart Chain"
@@ -51,7 +48,6 @@ export const metadata: Metadata = {
   applicationName: "Fortune",
   openGraph: {
     type: "website",
-    url: FORTUNE_SITE_URL,
     siteName: "Fortune",
     title: FORTUNE_NETWORK.isMainnet
       ? "Fortune — Launch on BNB Smart Chain"

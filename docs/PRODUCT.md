@@ -10,6 +10,8 @@ The product follows LESGO's short launch path and candid lifecycle/trust documen
 
 Brew is the direct BNB competitor. Use [BREW_REVIEW.md](BREW_REVIEW.md) for its feature comparison and the actual Fortune gaps. Direct pair-asset holder rewards are the v2 target; buyback-and-burn must never be labeled a wallet payout. Keep the interface simple as capabilities expand.
 
+The owner's LESGO / GO reference also informs [platform revenue recirculation](PLATFORM_REVENUE.md). This is a separately gated proposal funded only from earned protocol allocations; it cannot spend holder liabilities or launch liquidity. No Fortune platform-token CA or recirculation percentage is established by the current release.
+
 Fortune's longer-term research combines:
 
 1. one canonical Basket Curve;

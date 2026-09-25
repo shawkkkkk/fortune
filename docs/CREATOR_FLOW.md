@@ -93,6 +93,21 @@ unrestricted arbitrary-token reserves remain outside Standard mainnet v1.
 The research `/launches/preview` endpoint cannot authorize a transaction;
 `prepare.ready` stays false. A static catalog is never launch permission.
 
+## Verification boundaries
+
+`tests/e2e/creator-flow.mjs` exercises the production app in isolated Chromium
+profiles at desktop and mobile widths. The CI browser runner is installed
+outside the frozen package manifests. It verifies visible fields, case-preserving
+draft restore/delete, review invalidation, non-persistence of local files,
+upload-disabled behavior, explicit metadata import, rejected pair handling,
+UTF-8 limits, horizontal layout and unhandled browser errors. Screenshots are
+retained as CI artifacts for seven days.
+
+These UI tests use clearly scoped localhost asset/metadata fixtures and submit
+no wallet transactions or real uploads. They do not prove chain compatibility,
+real Pinata/Redis operation, an audit, or mainnet readiness. The separate
+contract suite and live fork rehearsal remain necessary.
+
 ## Next product advantages to prove
 
 1. Pair evidence cards: exact issuer/address, transfer restrictions, oracle

@@ -24,8 +24,8 @@ function Coin({ symbol, size = "md" }: { symbol: string; size?: "sm" | "md" }) {
 export function PairChips({ pairs, zh = false }: { pairs: Array<Pick<PairAssetView, "address" | "symbol">>; zh?: boolean }) {
   if (!pairs.length) return null;
   return (
-    <div className="pairChips" translate="no" aria-label={(zh ? "配对资产：" : "Paired with ") + pairs.map((pair) => pair.symbol).join(", ")}>
-      <span className="pairChipStack" aria-hidden="true">
+    <div className="pairChips" aria-label={(zh ? "配对资产：" : "Paired with: ") + pairs.map((pair) => pair.symbol).join(", ")}>
+      <span className="pairChipStack" aria-hidden="true" translate="no">
         {pairs.slice(0, 5).map((pair) => <Coin key={pair.address} symbol={pair.symbol} size="sm" />)}
       </span>
       <span className="pairChipLabel" translate="no">{pairs.map((pair) => pair.symbol).join(" · ")}</span>

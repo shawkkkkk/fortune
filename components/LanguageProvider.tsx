@@ -945,6 +945,26 @@ const ZH: Record<string, string> = {
   "Creator history →": "创建者历史 →",
   "Portfolio": "投资组合",
   "Skip to content": "跳到主要内容",
+  "/ 4096 UTF-8 bytes": "/ 4096 UTF-8 字节",
+  "https://… or ipfs://…": "https://… 或 ipfs://…",
+  "https://…/metadata.json or ipfs://…": "https://…/metadata.json 或 ipfs://…",
+  "· Curve": "· 曲线",
+  "% of target": "%（占毕业目标）",
+  "WALLET · CHAIN": "钱包 · 链",
+  "ONCHAIN TOKEN · CHAIN": "链上代币 · 链",
+  "Accounted reserve": "已记账储备",
+  "ONCHAIN IDENTIFIERS": "链上标识",
+  "Trade on market →": "前往市场交易 →",
+  "Creator record": "创建者记录",
+  "Paired with:": "配对资产：",
+  "Token launch details": "代币发行详情",
+  "Launch draft": "发行草稿",
+  "Live BSC Testnet service readiness": "BSC 测试网服务实时就绪状态",
+  "Full protocol + Pancake infrastructure readiness": "完整协议与 Pancake 基础设施就绪状态",
+  "Published public-alpha protocol configuration": "已发布的公开测试版协议配置",
+  "Measured release-validation results": "发布验证的实测结果",
+  "Validate a launch configuration": "验证发行配置",
+  "Resolve transaction status before retrying": "重试前确认交易状态",
   "Launches recorded by the Fortune factories, newest first": "Fortune 工厂记录的发行，最新的在前",
   "Prices, market caps and trade activity; ?tokens= for a watchlist": "价格、市值和交易活动；使用 ?tokens= 查询关注列表",
   "One market: chart, pair reserves, supply split and recent trades": "单个市场：图表、配对储备、供应量分布和最近交易",
@@ -953,7 +973,9 @@ const ZH: Record<string, string> = {
   "BNB Chain stocks, RWA, pre-IPO and crypto pair assets with eligibility": "BNB Chain 上的股票、RWA、IPO 前和加密配对资产及其资格",
 };
 
-const UNTRANSLATED_TAGS = new Set(["SCRIPT", "STYLE", "NOSCRIPT", "TEMPLATE", "TEXTAREA"]);
+// Code containers are skipped entirely. A textarea's typed text is never
+// translated, but its placeholder and label attributes still are.
+const UNTRANSLATED_TAGS = new Set(["SCRIPT", "STYLE", "NOSCRIPT", "TEMPLATE"]);
 const UNTRANSLATED_SELECTOR = '[translate="no"], script, style, noscript, template, textarea';
 
 function translateText(input: string) {
@@ -1054,6 +1076,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
         if (current !== next) node.setAttribute(attr, next);
       }
 
+      if (node.tagName === "TEXTAREA") return;
       node.childNodes.forEach(translateNode);
     };
 

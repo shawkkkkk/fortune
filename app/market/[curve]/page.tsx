@@ -783,9 +783,9 @@ export default function MarketPage() {
           </span>
           <div>
             <span className="eyebrow">FORTUNE MARKET</span>
-            <h1>{market.name}</h1>
+            <h1 translate="no">{market.name}</h1>
             <p>
-              {market.symbol} · Curve {short(curve)}
+              <span translate="no">{market.symbol}</span> · Curve <span translate="no">{short(curve)}</span>
             </p>
           </div>
         </div>

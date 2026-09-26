@@ -64,6 +64,13 @@ const tokenAbi = [
     inputs: [],
     outputs: [{ type: "uint256" }],
   },
+  {
+    type: "function",
+    name: "balanceOf",
+    stateMutability: "view",
+    inputs: [{ type: "address" }],
+    outputs: [{ type: "uint256" }],
+  },
 ] as const;
 
 const curveAbi = [
@@ -219,12 +226,88 @@ export async function readFortuneLaunchesByTokens(tokens: string[]) {
   return { ...catalog, entries: undefined, launches };
 }
 
+export type CreatorPhases = { curve: number; ready: number; graduated: number; rescued: number };
+
+/** Tallies curve phases the way statusForPhase names them; unknown values count as on the curve. */
+export function countPhases(values: number[]): CreatorPhases {
+  const phases: CreatorPhases = { curve: 0, ready: 0, graduated: 0, rescued: 0 };
+  for (const phase of values) {
+    if (phase === 1) phases.ready += 1;
+    else if (phase === 2) phases.graduated += 1;
+    else if (phase === 3) phases.rescued += 1;
+    else phases.curve += 1;
+  }
+  return phases;
+}
+
+/**
+ * One page of a creator's launches, plus how every one of their launches stands
+ * today (phase counts read at the same block) and the creator's own balance of
+ * each token on the page.
+ */
 export async function readCreatorFortuneLaunches(creator: string, offset = 0, limit = 25, atBlock?: bigint) {
   const catalog = await readFortuneLaunchCatalog(atBlock);
   const matching = catalog.entries.filter(({ info }) => info[0].toLowerCase() === creator.toLowerCase());
   const selected = matching.slice(offset, offset + limit);
-  const launches = catalog.blockNumber !== null ? await readLaunchDetails(selected, catalog.blockNumber, catalog.blockHash!) : [];
-  return { ...catalog, entries: undefined, launches, creatorTotal: matching.length, hasMore: offset + launches.length < matching.length };
+  if (catalog.blockNumber === null || !matching.length) {
+    return { ...catalog, entries: undefined, launches: [], creatorBalances: [] as string[], creatorTotal: matching.length, phases: countPhases([]), hasMore: false };
+  }
+  const rpc = client();
+  const [launches, phaseRows, balanceRows] = await Promise.all([
+    readLaunchDetails(selected, catalog.blockNumber, catalog.blockHash!),
+    inBatches(matching, (chunk) => rpc.multicall({ blockNumber: catalog.blockNumber!, contracts: chunk.map(({ info }) => ({ address: info[2], abi: curveAbi, functionName: "phase" as const })) })),
+    inBatches(selected, (chunk) => rpc.multicall({ blockNumber: catalog.blockNumber!, contracts: chunk.map(({ info }) => ({ address: info[1], abi: tokenAbi, functionName: "balanceOf" as const, args: [info[0]] as const })) })),
+  ]);
+  const phases = countPhases(phaseRows.map((row) => Number(required(row, "phase"))));
+  const creatorBalances = balanceRows.map((row) => formatUnits(required(row, "creator balance") as bigint, 18));
+  return { ...catalog, entries: undefined, launches, creatorBalances, creatorTotal: matching.length, phases, hasMore: offset + launches.length < matching.length };
+}
+
+/** Positions detailed per holder; anything beyond is counted but not priced. */
+export const HOLDINGS_LIMIT = 100;
+
+/**
+ * Every Fortune launch an address holds. Balances are read for the whole bounded
+ * catalog at the catalog block, so an old position is never missed; the newest
+ * HOLDINGS_LIMIT positions are returned with full launch details.
+ */
+export async function readFortuneHoldings(owner: Address) {
+  const catalog = await readFortuneLaunchCatalog();
+  if (!catalog.configured || catalog.blockNumber === null) {
+    return { configured: catalog.configured, chainId: catalog.chainId, total: 0, blockNumber: null, blockHash: null, created: 0, held: 0, positions: [] };
+  }
+  const rpc = client();
+  const blockNumber = catalog.blockNumber;
+  // One eth_call per batch of 250 balances (viem would otherwise split every ~28 calls).
+  const rows = await inBatches(catalog.entries, (chunk) => rpc.multicall({ blockNumber, batchSize: 16_384, contracts: chunk.map(({ info }) => ({
+    address: info[1], abi: tokenAbi, functionName: "balanceOf" as const, args: [owner] as const,
+  })) }));
+  const held = catalog.entries.flatMap((entry, index) => {
+    const balance = required(rows[index], "balanceOf") as bigint;
+    return balance > 0n ? [{ entry, balance }] : [];
+  });
+  const detailed = held.slice(0, HOLDINGS_LIMIT);
+  const launches = detailed.length ? await readLaunchDetails(detailed.map(({ entry }) => entry), catalog.blockNumber, catalog.blockHash) : [];
+  if (!detailed.length && (await rpc.getBlock({ blockNumber: catalog.blockNumber })).hash !== catalog.blockHash) {
+    throw new Error("Holdings block changed during read.");
+  }
+  return {
+    configured: true as const,
+    chainId: catalog.chainId,
+    total: catalog.total,
+    blockNumber: catalog.blockNumber,
+    blockHash: catalog.blockHash,
+    created: catalog.entries.filter(({ info }) => info[0].toLowerCase() === owner.toLowerCase()).length,
+    held: held.length,
+    positions: launches.map((launch, index) => ({ launch, balance: formatUnits(detailed[index].balance, 18) })),
+  };
+}
+
+/** Reads in fixed-size multicall batches, one after another, so a large catalog never becomes one oversized eth_call. */
+async function inBatches<T, R>(items: T[], read: (chunk: T[]) => Promise<R[]>, size = 250): Promise<R[]> {
+  const rows: R[] = [];
+  for (let start = 0; start < items.length; start += size) rows.push(...(await read(items.slice(start, start + size))));
+  return rows;
 }
 
 export async function readRecentFortuneLaunches(limit = 12, offset = 0, atBlock?: bigint) {

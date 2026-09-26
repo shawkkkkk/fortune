@@ -5997,3 +5997,341 @@ html.entryGateOpen {
 .launchStatus .shareBar {
   margin: 14px 0 0;
 }
+
+/* --------------------------------------------------------------------------
+   Portfolio and creator profiles
+   -------------------------------------------------------------------------- */
+
+.holdingsPanel {
+  margin-bottom: 22px;
+}
+
+.holdingsHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px 28px;
+  margin-bottom: 14px;
+}
+
+.holdingsHead h2 {
+  margin: 4px 0 0;
+}
+
+.holdingsTotals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 28px;
+  margin: 0;
+}
+
+.holdingsTotals div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.holdingsTotals dt {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.holdingsTotals dd {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+.holdingsList {
+  display: grid;
+  gap: 10px;
+  margin: 0 0 14px;
+  padding: 0;
+  list-style: none;
+}
+
+.holdingRow {
+  display: grid;
+  grid-template-columns: minmax(0, 2.2fr) repeat(3, minmax(0, 1fr)) auto;
+  align-items: center;
+  gap: 14px 18px;
+  padding: 14px 16px;
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.holdingToken {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.holdingToken > div {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.holdingName {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--ink);
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.holdingName span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.holdingName:hover strong {
+  color: var(--red);
+}
+
+.holdingStatus {
+  color: var(--gold-ink);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.holdingStatus.graduated {
+  color: var(--jade);
+}
+
+.holdingToken .pairChips {
+  margin: 0;
+}
+
+.holdingFigure {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-self: start;
+  gap: 2px;
+}
+
+.holdingFigure span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.holdingFigure strong {
+  overflow-wrap: anywhere;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+
+.holdingFigure small {
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.holdingValue strong {
+  color: var(--ink);
+  font-size: 16px;
+}
+
+.holdingActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.holdingActions .secondaryCta {
+  min-height: 38px;
+  padding: 7px 14px;
+  font-size: 14px;
+}
+
+@media (max-width: 760px) {
+  .holdingRow {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .holdingToken,
+  .holdingActions {
+    grid-column: 1 / -1;
+  }
+
+  .holdingName {
+    white-space: normal;
+  }
+
+  /* Prices such as $0.0009191 stay on one line at phone widths. */
+  .holdingFigure strong {
+    overflow-wrap: normal;
+    font-size: 14px;
+    white-space: nowrap;
+  }
+
+  .holdingActions .secondaryCta {
+    flex: 1;
+  }
+}
+
+.portfolioViewing {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  margin: 0 0 16px;
+  color: var(--ink-soft);
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.portfolioViewing code {
+  padding: 2px 8px;
+  border-radius: 8px;
+  background: var(--surface-sunk);
+  font-size: 13px;
+}
+
+.portfolioViewing a {
+  color: var(--red);
+}
+
+.portfolioConnect {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 28px;
+}
+
+.portfolioConnect h2 {
+  margin: 0 0 8px;
+}
+
+.portfolioConnect p {
+  margin: 0 0 16px;
+  color: var(--muted);
+}
+
+.portfolioConnect form {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.portfolioConnect form label {
+  width: 100%;
+}
+
+.portfolioLookup {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.portfolioLookup label {
+  flex: 1 1 320px;
+}
+
+.portfolioLookup .secondaryCta {
+  min-height: 58px;
+}
+
+.portfolioLookup .fieldError {
+  flex-basis: 100%;
+}
+
+@media (max-width: 760px) {
+  .portfolioConnect {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.fieldError {
+  margin: 0;
+  color: var(--red-ink);
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.linkButton {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--red);
+  font: inherit;
+  font-weight: 750;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.creatorShare {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.creatorShare strong {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.creatorStrip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 22px;
+  margin: 0 0 22px;
+  padding: 14px 18px;
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--ink-soft);
+  font-size: 14px;
+}
+
+.creatorStrip > span {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.creatorStrip > span > span {
+  color: var(--muted);
+  font-weight: 650;
+}
+
+.creatorStrip strong {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.creatorStrip a {
+  margin-left: auto;
+  color: var(--red);
+  font-weight: 750;
+}
+
+.creatorFirst {
+  color: var(--gold-ink);
+  font-weight: 750;
+}

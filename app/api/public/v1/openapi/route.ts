@@ -248,6 +248,36 @@ export async function GET(request: Request) {
           },
         },
       },
+      "/portfolio/{address}": {
+        get: {
+          tags: ["Markets"],
+          summary: "Every Fortune launch a wallet holds, valued at live prices",
+          description:
+            "Balances are read for the whole factory catalog at one block. Positions are valued at the live curve price, or the liquidity-weighted official pool price after graduation; valueUsd is not a sale quote. At most 100 positions are detailed; held counts all of them.",
+          parameters: [{ name: "address", in: "path", required: true, schema: { type: "string" } }],
+          responses: {
+            "200": { description: "Positions sorted by value, with totalValueUsd, held, created and the snapshot block" },
+            "400": { description: "Not an address" },
+          },
+        },
+      },
+      "/creators/{address}": {
+        get: {
+          tags: ["Launches"],
+          summary: "A creator's launch history: phase counts and priced launches",
+          description:
+            "phases counts every launch the address created (on the curve, ready to graduate, graduated, rescued). items is one page of priced launches, newest first, with creatorShare: the share of supply the creator wallet holds now.",
+          parameters: [
+            { name: "address", in: "path", required: true, schema: { type: "string" } },
+            { name: "cursor", in: "query", schema: { type: "string" } },
+            { name: "limit", in: "query", schema: { type: "integer", minimum: 1, maximum: 25 } },
+          ],
+          responses: {
+            "200": { description: "Creator record with page.nextCursor pinned to the first page's block" },
+            "400": { description: "Not an address, or an invalid cursor" },
+          },
+        },
+      },
       "/launches/preview": {
         post: {
           tags: ["Launches"],

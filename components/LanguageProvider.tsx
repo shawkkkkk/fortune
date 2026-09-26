@@ -270,7 +270,7 @@ const ZH: Record<string, string> = {
 
   "FORTUNE PUBLIC API · ALPHA": "FORTUNE 公共 API · 测试版",
   "Real data or no data.": "只展示真实数据，否则不展示。",
-  "Readiness and protocol configuration come from the deployed BSC Testnet stack. Indexed market endpoints deliberately return no synthetic activity until the event indexer is live.": "就绪状态和协议配置来自已部署的 BSC 测试网。市场索引接口在事件索引器上线前不会返回任何模拟活动数据。",
+  "Readiness and protocol configuration come from the deployed BSC Testnet stack. Market endpoints read BNB Chain directly and state the block and log coverage behind every number.": "就绪状态和协议配置来自已部署的 BSC 测试网。市场接口直接读取 BNB Chain，并注明每个数字所依据的区块和日志覆盖范围。",
   "NON-CUSTODIAL": "非托管",
   "Wallets authorize writes.": "写入操作由钱包授权。",
   "The dedicated testnet UI signs transactions in the user's wallet. Private keys never touch Fortune servers.": "专用测试网界面会在用户钱包中签署交易。私钥绝不会进入 Fortune 服务器。",
@@ -284,7 +284,7 @@ const ZH: Record<string, string> = {
   "Check the live deployment.": "检查实时部署。",
   "INDEXER BOUNDARY": "索引器边界",
   "No fake market feed.": "不提供虚假市场数据。",
-  "Token discovery, charts, volume, revenue, portfolio aggregation and social activity remain unavailable until they are reproducible from public onchain events. This is intentional.": "代币发现、图表、交易量、收入、资产组合聚合和社交活动会保持关闭，直到它们能从公开链上事件中可靠复现。这是有意的设计。",
+  "Prices, charts, volume, supply and holdings are read from the factory, the curves, the official pools and a bounded event log, each at a stated block. When the log window cannot cover a range, the response says so instead of filling the gap. Revenue history and social activity wait for a durable indexer.": "价格、图表、交易量、供应量和持仓均读取自工厂、曲线、官方池和有界事件日志，并各自注明区块。当日志窗口无法覆盖某个时间范围时，响应会如实说明，而不会填补空缺。收入历史和社交活动需等待持久化索引器。",
   "Markets": "市场",
   "Launch": "发行",
   "Dark mode": "深色模式",
@@ -894,7 +894,66 @@ const ZH: Record<string, string> = {
   "Share…": "分享…",
   "Share this launch": "分享此发行",
   "Share your launch": "分享你的发行",
+  "HOLDINGS": "持仓",
+  "Your Fortune tokens": "你的 Fortune 代币",
+  "Fortune tokens held": "持有的 Fortune 代币",
+  "Total value": "总价值",
+  "Positions": "持仓数",
+  "Launched": "已发行",
+  "Reading balances from BNB Chain…": "正在从 BNB Chain 读取余额…",
+  "Balances are unavailable right now.": "暂时无法读取余额。",
+  "No Fortune tokens in this wallet yet.": "这个钱包还没有 Fortune 代币。",
+  "This address holds no Fortune tokens.": "该地址未持有 Fortune 代币。",
+  "Balances cover every launch recorded by the Fortune factory.": "余额覆盖 Fortune 工厂记录的每一次发行。",
+  "Explore launches →": "探索发行 →",
+  "Balance": "余额",
+  "Trade →": "交易 →",
+  "Your Fortune bag.": "你的 Fortune 持仓。",
+  "Wallet holdings.": "钱包持仓。",
+  "See every Fortune token in a wallet.": "查看钱包里的每一个 Fortune 代币。",
+  "Balances are read straight from BNB Chain for every Fortune launch, then valued at live curve or pool prices. Nothing is stored, and any address can be looked up.": "余额直接从 BNB Chain 读取，覆盖每一次 Fortune 发行，并按实时曲线或池价格估值。不存储任何数据，任何地址都可以查询。",
+  "Launches by this address →": "该地址的发行 →",
+  "Show my wallet": "显示我的钱包",
+  "BscScan ↗": "BscScan ↗",
+  "Connect a wallet": "连接钱包",
+  "Fortune only reads your address. Connecting never asks for a signature or spends anything.": "Fortune 只读取你的地址。连接不会请求签名，也不会花费任何资产。",
+  "No browser wallet found. Paste an address instead.": "未找到浏览器钱包。请改为粘贴地址。",
+  "The wallet did not connect.": "钱包未连接。",
+  "Or look up any address": "或查询任意地址",
+  "Wallet address": "钱包地址",
+  "Enter a 0x address with 40 hex characters.": "请输入以 0x 开头、包含 40 个十六进制字符的地址。",
+  "View holdings": "查看持仓",
+  "Look up another address": "查询其他地址",
+  "View": "查看",
+  "Fortune tokens this address holds and the launches it created, read from BNB Chain. An address is public onchain data, not a verified identity.": "该地址持有的 Fortune 代币及其创建的发行，均读取自 BNB Chain。地址是公开的链上数据，并非经过验证的身份。",
+  "LAUNCHES": "发行",
+  "Launched by this address": "该地址创建的发行",
+  "No launches from this address": "该地址没有发行",
+  "ONCHAIN READ UNAVAILABLE": "链上读取不可用",
+  "This creator's launches could not be verified right now.": "暂时无法验证该创建者的发行。",
+  "Launches": "发行",
+  "Graduated": "已毕业",
+  "On the curve": "曲线中",
+  "Graduation rate": "毕业率",
+  "The Fortune factory has no launches recorded for this address.": "Fortune 工厂没有记录该地址的发行。",
+  "Creator holds": "创建者持有",
+  "Newest launches": "最新发行",
+  "Older launches →": "更早的发行 →",
+  "Counts cover every launch this address created. “Creator holds” is the creator wallet's balance now; tokens moved to other wallets are not attributed to the creator.": "统计涵盖该地址创建的每一次发行。“创建者持有”是创建者钱包当前的余额；转移到其他钱包的代币不计入创建者。",
+  "Rescued": "已救援",
+  "First Fortune launch": "首次 Fortune 发行",
+  "Creator history →": "创建者历史 →",
+  "Portfolio": "投资组合",
+  "Launches recorded by the Fortune factories, newest first": "Fortune 工厂记录的发行，最新的在前",
+  "Prices, market caps and trade activity; ?tokens= for a watchlist": "价格、市值和交易活动；使用 ?tokens= 查询关注列表",
+  "One market: chart, pair reserves, supply split and recent trades": "单个市场：图表、配对储备、供应量分布和最近交易",
+  "Every Fortune token a wallet holds, valued at live prices": "钱包持有的每一个 Fortune 代币，按实时价格估值",
+  "A creator's launches, graduation record and current holdings": "创建者的发行、毕业记录和当前持仓",
+  "BNB Chain stocks, RWA, pre-IPO and crypto pair assets with eligibility": "BNB Chain 上的股票、RWA、IPO 前和加密配对资产及其资格",
 };
+
+const UNTRANSLATED_TAGS = new Set(["SCRIPT", "STYLE", "NOSCRIPT", "TEMPLATE", "TEXTAREA"]);
+const UNTRANSLATED_SELECTOR = '[translate="no"], script, style, noscript, template, textarea';
 
 function translateText(input: string) {
   const leading = input.match(/^\s*/)?.[0] || "";
@@ -951,13 +1010,16 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
 
     const translateNode = (node: Node) => {
       // User-supplied values (token names, URIs) opt out with translate="no".
-      if (node instanceof Element && node.getAttribute("translate") === "no") {
+      // Script, style and template text is code, not copy: Next.js streams the
+      // server-component payload in inline scripts, and rewriting one before it
+      // runs would change the data React renders.
+      if (node instanceof Element && (node.getAttribute("translate") === "no" || UNTRANSLATED_TAGS.has(node.tagName))) {
         return;
       }
 
       if (node.nodeType === Node.TEXT_NODE) {
         const text = node as Text;
-        if (text.parentElement?.closest('[translate="no"]')) return;
+        if (text.parentElement?.closest(UNTRANSLATED_SELECTOR)) return;
         const current = text.nodeValue || "";
 
         if (!originals.current.has(text)) {

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { PairAssetsPanel, type PairAssetView } from "@/components/PairAssets";
 import PriceChart, { type ChartPoint } from "@/components/PriceChart";
@@ -216,7 +217,7 @@ export default function TokenMarketPanel({ token }: { token: string }) {
                     <td translate="no">{formatAmount(trade.tokenAmount)}</td>
                     <td>{formatPrice(trade.priceUsd)}</td>
                     <td>{sourceLabel(trade.source)}</td>
-                    <td translate="no"><a href={`${FORTUNE_NETWORK.explorerUrl}/address/${trade.trader}`} target="_blank" rel="noreferrer">{shortAddress(trade.trader)}</a></td>
+                    <td translate="no"><Link href={`/profile/${trade.trader}`}>{shortAddress(trade.trader)}</Link></td>
                     <td><a href={`${FORTUNE_NETWORK.explorerUrl}/tx/${trade.transactionHash}`} target="_blank" rel="noreferrer" aria-label="View transaction on BscScan">↗</a></td>
                   </tr>
                 ))}

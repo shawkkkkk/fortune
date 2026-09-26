@@ -12,9 +12,12 @@ import { buildCanonicalChart, type CanonicalChartPoint } from "@/lib/canonical-c
 import { FORTUNE_NETWORK } from "@/lib/fortune-network";
 import { readFortuneAssetUniverse, type FortuneRegistryAsset } from "@/lib/onchain-assets";
 import {
+  readCreatorFortuneLaunches,
+  readFortuneHoldings,
   readFortuneLaunchByToken,
   readFortuneLaunchesByTokens,
   readRecentFortuneLaunches,
+  type CreatorPhases,
   type OnchainFortuneLaunch,
 } from "@/lib/onchain-launches";
 import {
@@ -496,6 +499,106 @@ export async function readMarketsForTokens(tokens: Address[]): Promise<MarketBoa
     hasMore: false,
     ledger,
   };
+}
+
+export type PricedLaunch = Omit<MarketSummary, "activity24h" | "activityTrending">;
+
+export type PortfolioPosition = PricedLaunch & {
+  /** Token balance as a decimal string (launch tokens use 18 decimals). */
+  balance: string;
+  /** Fraction of the launch's total supply this address holds. */
+  share: number | null;
+  valueUsd: number | null;
+};
+
+export type Portfolio = {
+  configured: boolean;
+  chainId: number;
+  owner: Address;
+  blockNumber: string | null;
+  /** Launches whose balances were read (the whole factory catalog). */
+  launchesScanned: number;
+  /** Launches this address holds; positions lists at most HOLDINGS_LIMIT of them. */
+  held: number;
+  /** Launches this address created. */
+  created: number;
+  totalValueUsd: number | null;
+  unpricedPositions: number;
+  positions: PortfolioPosition[];
+};
+
+const ratio = (part: string, whole: string) => {
+  const total = Number(whole);
+  return total > 0 ? Number(part) / total : null;
+};
+
+/**
+ * Values holdings at their price, largest value first; unpriced positions follow,
+ * largest balance first. The total covers priced positions only and is null when
+ * none of them could be priced.
+ */
+export function valuePositions<T extends { priceUsd: number | null; totalSupply: string; balance: string }>(rows: T[]) {
+  const positions = rows.map((row) => {
+    const value = row.priceUsd === null ? null : row.priceUsd * Number(row.balance);
+    return { ...row, share: ratio(row.balance, row.totalSupply), valueUsd: value !== null && Number.isFinite(value) ? value : null };
+  });
+  positions.sort((a, b) => (b.valueUsd ?? -1) - (a.valueUsd ?? -1) || Number(b.balance) - Number(a.balance));
+  const priced = positions.filter((position) => position.valueUsd !== null);
+  return {
+    positions,
+    totalValueUsd: priced.length || !positions.length ? priced.reduce((sum, position) => sum + position.valueUsd!, 0) : null,
+    unpricedPositions: positions.length - priced.length,
+  };
+}
+
+/** Every Fortune launch an address holds, valued at live curve or official-pool prices. */
+export async function readPortfolio(owner: Address): Promise<Portfolio> {
+  const holdings = await readFortuneHoldings(owner);
+  if (!holdings.configured || holdings.blockNumber === null) {
+    return { configured: holdings.configured, chainId: FORTUNE_NETWORK.chainId, owner, blockNumber: null, launchesScanned: 0, held: 0, created: 0, totalValueUsd: null, unpricedPositions: 0, positions: [] };
+  }
+  const launches = holdings.positions.map(({ launch }) => launch);
+  const context = launches.length ? await buildContext(launches, holdings.blockNumber) : null;
+  const valued = valuePositions(context ? holdings.positions.map(({ launch, balance }) => ({ ...summarize(context, launch), balance })) : []);
+  return {
+    configured: true,
+    chainId: FORTUNE_NETWORK.chainId,
+    owner,
+    blockNumber: holdings.blockNumber.toString(),
+    launchesScanned: holdings.total,
+    held: holdings.held,
+    created: holdings.created,
+    ...valued,
+  };
+}
+
+export type CreatorLaunch = PricedLaunch & {
+  /** Fraction of supply the creator's wallet holds now. */
+  creatorShare: number | null;
+};
+
+export type CreatorRecord = {
+  configured: boolean;
+  chainId: number;
+  creator: Address;
+  blockNumber: string | null;
+  launches: number;
+  phases: CreatorPhases;
+  items: CreatorLaunch[];
+  hasMore: boolean;
+};
+
+/** A creator's launch history: phase counts for every launch, and one priced page of them. */
+export async function readCreatorRecord(creator: Address, offset = 0, limit = 25, atBlock?: bigint): Promise<CreatorRecord> {
+  const result = await readCreatorFortuneLaunches(creator, offset, limit, atBlock);
+  const base = { chainId: FORTUNE_NETWORK.chainId, creator, launches: result.creatorTotal, phases: result.phases, hasMore: result.hasMore };
+  if (!result.configured || result.blockNumber === null) return { ...base, configured: false, blockNumber: null, items: [] };
+  const context = result.launches.length ? await buildContext(result.launches, result.blockNumber) : null;
+  const items = context ? result.launches.map((launch, index) => ({
+    ...summarize(context, launch),
+    creatorShare: ratio(result.creatorBalances[index], launch.totalSupply),
+  })) : [];
+  return { ...base, configured: true, blockNumber: result.blockNumber.toString(), items };
 }
 
 export const CHART_RANGES = { "24h": DAY, "7d": 7 * DAY, "30d": 30 * DAY } as const;

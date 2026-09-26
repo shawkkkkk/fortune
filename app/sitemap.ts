@@ -9,6 +9,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "/search",
     "/markets",
     "/assets",
+    "/portfolio",
     "/launch",
     "/testnet",
     "/burns",

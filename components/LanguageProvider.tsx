@@ -944,6 +944,7 @@ const ZH: Record<string, string> = {
   "First Fortune launch": "首次 Fortune 发行",
   "Creator history →": "创建者历史 →",
   "Portfolio": "投资组合",
+  "Skip to content": "跳到主要内容",
   "Launches recorded by the Fortune factories, newest first": "Fortune 工厂记录的发行，最新的在前",
   "Prices, market caps and trade activity; ?tokens= for a watchlist": "价格、市值和交易活动；使用 ?tokens= 查询关注列表",
   "One market: chart, pair reserves, supply split and recent trades": "单个市场：图表、配对储备、供应量分布和最近交易",

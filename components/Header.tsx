@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLanguage } from "@/components/LanguageProvider";
 import FortuneLogo from "@/components/FortuneLogo";
 import { FortuneCoin } from "@/components/Ornaments";
@@ -99,6 +99,7 @@ export default function Header() {
   const [chainId, setChainId] = useState("");
   const [connecting, setConnecting] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const menuToggleRef = useRef<HTMLButtonElement>(null);
   // The home hero is dark, so the floating header switches to white-on-glass
   // while the hero sits underneath it.
   const [overHero, setOverHero] = useState(() => pathname === "/");
@@ -157,7 +158,9 @@ export default function Header() {
     if (!menuOpen) return;
 
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setMenuOpen(false);
+      if (event.key !== "Escape") return;
+      setMenuOpen(false);
+      menuToggleRef.current?.focus();
     };
 
     window.addEventListener("keydown", closeOnEscape);
@@ -284,6 +287,7 @@ export default function Header() {
                     : "Connect wallet"}
             </button>
             <button
+              ref={menuToggleRef}
               type="button"
               className="menuToggle liquid-glass"
               aria-expanded={menuOpen}

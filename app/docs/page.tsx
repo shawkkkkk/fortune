@@ -171,7 +171,7 @@ export default function DocsPage() {
               <li><strong>If the pair token breaks.</strong> Losses hit Launch Shield reserve and unclaimed fees first. If the reserve itself falls short, or graduation stays impossible for seven days, holders redeem a pro-rata share of everything the curve holds.</li>
             </ul>
             <p className="reviewWarning">
-              Unaudited beta, separate from the audited Standard launch. The site never
+              Unaudited beta, separate from the frozen Standard candidate. The site never
               enables it on BNB Smart Chain mainnet until it passes its own audit.
             </p>
             <div className="heroActions">

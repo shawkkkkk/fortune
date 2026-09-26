@@ -274,7 +274,7 @@ export default function CustomPairLaunchPage() {
         <strong>{CUSTOM_PAIRS.enabled ? "UNAUDITED BETA · " + FORTUNE_NETWORK.chainName.toUpperCase() : "NOT DEPLOYED ON THIS NETWORK YET"}</strong>
         <span>
           {CUSTOM_PAIRS.enabled
-            ? "Custom-pair contracts are separate from the audited Standard launch and have not been audited. Fortune does not review pair tokens; the check below measures them but is not an audit."
+            ? "Custom-pair contracts are separate from the frozen Standard candidate and have not been audited. Fortune does not review pair tokens; the check below measures them but is not an audit."
             : FORTUNE_NETWORK.isMainnet
               ? "Custom pairs stay off BNB Smart Chain mainnet until their own audit passes. You can still check any token below."
               : "The custom-pairs beta factory has not been deployed on this network yet. You can already check any token below."}
@@ -406,7 +406,7 @@ export default function CustomPairLaunchPage() {
               <div><dt>Graduation</dt><dd>Pancake V2 · LP burned</dd></div>
               <div><dt>If the pair breaks</dt><dd>Pro-rata rescue</dd></div>
             </dl>
-            <p className="launchPreviewNote">Want a reviewed, audited pair instead? <Link href="/launch">Standard launch →</Link></p>
+            <p className="launchPreviewNote">Want a registry-approved pair instead? <Link href="/launch">Standard launch →</Link></p>
           </div>
           <p className="fieldHint"><Link href="/docs#custom-pairs">How custom pairs work →</Link></p>
         </aside>

@@ -391,7 +391,7 @@ export default function CustomPairMarket({ initial }: { initial: CustomPairLaunc
               <div><span>Fees</span><strong translate="no">{formatTaxBps(launch.protocolFeeBps)} protocol · {formatTaxBps(launch.creatorFeeBps)} creator</strong></div>
               <div><span>Launch Shield reserve</span><strong translate="no">{formatAmount(units(launch.shieldReserve, pair.decimals))} {pair.symbol}</strong></div>
             </div>
-            <p className="fieldHint">Custom-pair contracts are an unaudited beta, separate from Fortune&apos;s audited Standard launch.</p>
+            <p className="fieldHint">Custom-pair contracts are an unaudited beta, separate from Fortune&apos;s frozen Standard candidate.</p>
           </section>
         </div>
       </div>

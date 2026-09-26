@@ -2,7 +2,7 @@
 
 Permissionless Fortune launches paired with **any BEP-20**, including tokens that take a tax on transfer and tokenized stocks that are not in Fortune's Asset Registry. This is the BNB Chain answer to "custom pairs with any transfer-tax token": pick any token, launch against it.
 
-This is a separate Foundry workspace. The audited Standard candidate in `contracts/` and the mainnet fingerprint are unchanged. These contracts are **unaudited**, the deploy script refuses any chain except BSC Testnet (97), and a mainnet release needs its own audit and release gate.
+This is a separate Foundry workspace. The frozen Standard candidate in `contracts/` and the mainnet fingerprint are unchanged. These contracts are **unaudited**, the deploy script refuses any chain except BSC Testnet (97), and a mainnet release needs its own audit and release gate.
 
 ## How it works
 

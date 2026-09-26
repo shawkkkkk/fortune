@@ -119,11 +119,11 @@ test("EIP-1167 minimal proxies are recognised", () => {
   assert.equal(minimalProxyTarget("0x6080604052"), null);
 });
 
-test("custom pairs stay disabled without a factory and can never be enabled on chain 56", () => {
+test("custom pairs stay disabled without a factory and can only be enabled on chain 97", () => {
   assert.equal(CUSTOM_PAIRS.factory, null);
   assert.equal(CUSTOM_PAIRS.enabled, false);
   const source = readFileSync(new URL("../../lib/custom-pairs.ts", import.meta.url), "utf8");
-  assert.match(source, /enabled: isAddress\(configuredFactory\) && FORTUNE_NETWORK\.chainId !== 56/);
+  assert.match(source, /enabled: isAddress\(configuredFactory\) && FORTUNE_NETWORK\.chainId === 97/);
 });
 
 test("the pair inspector fails closed when transfer simulation is unavailable", () => {

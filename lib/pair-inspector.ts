@@ -448,7 +448,10 @@ export async function inspectPairToken(input: { address: string; chainId?: numbe
         6_000
       ));
     if (!holder) {
-      findings.push({ code: "NO_HOLDER_FOUND", level: "info" });
+      // The launch form must fail closed when transfer behavior cannot be
+      // measured. Basic ERC-20 reads alone do not prove that buys, sells, or
+      // graduation transfers will work.
+      findings.push({ code: "NO_HOLDER_FOUND", level: "block" });
     } else {
       simulation.holder = holder.address;
       simulation.holderKind = holder.kind;
@@ -489,7 +492,7 @@ export async function inspectPairToken(input: { address: string; chainId?: numbe
         if (maxTaxBps !== null && maxTaxBps > 2_500) findings.push({ code: "TAX_OVER_25", level: "warn", value: maxTaxBps });
         if (holder.kind === "pool") findings.push({ code: "SIMULATED_FROM_POOL", level: "info" });
       } catch {
-        findings.push({ code: "SIMULATION_UNAVAILABLE", level: "info" });
+        findings.push({ code: "SIMULATION_UNAVAILABLE", level: "block" });
       }
     }
   }

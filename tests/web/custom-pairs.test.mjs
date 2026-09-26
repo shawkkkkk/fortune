@@ -126,6 +126,12 @@ test("custom pairs stay disabled without a factory and can never be enabled on c
   assert.match(source, /enabled: isAddress\(configuredFactory\) && FORTUNE_NETWORK\.chainId !== 56/);
 });
 
+test("the pair inspector fails closed when transfer simulation is unavailable", () => {
+  const source = readFileSync(new URL("../../lib/pair-inspector.ts", import.meta.url), "utf8");
+  assert.match(source, /code: "NO_HOLDER_FOUND", level: "block"/);
+  assert.match(source, /code: "SIMULATION_UNAVAILABLE", level: "block"/);
+});
+
 test("website constants mirror the Solidity sources", () => {
   const curve = readFileSync(new URL("../../contracts-custom-pairs/src/FortuneCustomPairCurve.sol", import.meta.url), "utf8");
   const factory = readFileSync(new URL("../../contracts-custom-pairs/src/FortuneCustomPairFactory.sol", import.meta.url), "utf8");

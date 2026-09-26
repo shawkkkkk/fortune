@@ -4,7 +4,7 @@ Status: unaudited beta. Contracts live in `contracts-custom-pairs/`, outside the
 
 ## Why
 
-LESGO shipped custom pairs on Solana: launch against any token, including Token-2022 tokens with a transfer tax, not only the assets the platform enabled. Fortune's Standard launch pairs only with registry-approved, oracle-priced assets, which is the right default for audited, USD-denominated curves. Custom pairs are the permissionless path on BNB Chain: any BEP-20, including tokenized stocks outside the registry and tokens that tax transfers.
+LESGO shipped custom pairs on Solana: launch against any token, including Token-2022 tokens with a transfer tax, not only the assets the platform enabled. Fortune's Standard launch pairs only with registry-approved, oracle-priced assets, which is the reviewed default for USD-denominated curves. Custom pairs are the permissionless path on BNB Chain: any BEP-20, including tokenized stocks outside the registry and tokens that tax transfers.
 
 ## Design
 

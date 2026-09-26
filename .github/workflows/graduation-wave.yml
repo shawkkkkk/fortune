@@ -17,10 +17,14 @@ on:
         required: true
         default: "10"
         type: string
+  push:
+    branches: [main]
+    paths:
+      - ".github/graduation-wave-request"
 
 jobs:
   graduation-wave:
-    if: ${{ inputs.confirm == 'RUN_GRADUATION_STORM' }}
+    if: ${{ github.event_name == 'push' || inputs.confirm == 'RUN_GRADUATION_STORM' }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
     permissions:
@@ -52,8 +56,8 @@ jobs:
       - name: Validate inputs, chain and testnet balance
         env:
           PRIVATE_KEY: ${{ secrets.FORTUNE_TESTNET_PRIVATE_KEY }}
-          LAUNCH_COUNT: ${{ inputs.launch_count }}
-          SUBMISSION_CONCURRENCY: ${{ inputs.submission_concurrency }}
+          LAUNCH_COUNT: ${{ github.event_name == 'push' && '10' || inputs.launch_count }}
+          SUBMISSION_CONCURRENCY: ${{ github.event_name == 'push' && '10' || inputs.submission_concurrency }}
         run: |
           test -n "$BSC_TESTNET_RPC_URL" || (echo "Missing BSC_TESTNET_RPC_URL secret" && exit 1)
           test -n "$PRIVATE_KEY" || (echo "Missing FORTUNE_TESTNET_PRIVATE_KEY secret" && exit 1)
@@ -95,7 +99,7 @@ jobs:
         working-directory: contracts
         env:
           PRIVATE_KEY: ${{ secrets.FORTUNE_TESTNET_PRIVATE_KEY }}
-          STORM_LAUNCH_COUNT: ${{ inputs.launch_count }}
+          STORM_LAUNCH_COUNT: ${{ github.event_name == 'push' && '10' || inputs.launch_count }}
         run: |
           forge script script/GraduationStormSetup.s.sol:GraduationStormSetup \
             --rpc-url "$BSC_TESTNET_RPC_URL" \
@@ -114,7 +118,7 @@ jobs:
           awk '/^  StormCurve 0x/{print $2}' /tmp/graduation-storm-setup.log > /tmp/storm-curves.txt
           awk '/^  StormToken 0x/{print $2}' /tmp/graduation-storm-setup.log > /tmp/storm-tokens.txt
 
-          EXPECTED="${{ inputs.launch_count }}"
+          EXPECTED="${{ github.event_name == 'push' && '10' || inputs.launch_count }}"
           test "$(wc -l < /tmp/storm-curves.txt | tr -d ' ')" = "$EXPECTED"
           test "$(wc -l < /tmp/storm-tokens.txt | tr -d ' ')" = "$EXPECTED"
 
@@ -179,7 +183,7 @@ jobs:
           FUNDER_ADDRESS: ${{ env.STORM_FUNDER }}
           DEPLOYER_PRIVATE_KEY: ${{ secrets.FORTUNE_TESTNET_PRIVATE_KEY }}
           CURVES_FILE: "/tmp/storm-curves.txt"
-          SUBMISSION_CONCURRENCY: ${{ inputs.submission_concurrency }}
+          SUBMISSION_CONCURRENCY: ${{ github.event_name == 'push' && '10' || inputs.submission_concurrency }}
           REPORT_PATH: ${{ env.GRADUATION_REPORT_PATH }}
         run: |
           node scripts/launch-storm.mjs > /tmp/web-storm.log 2>&1 &
@@ -217,7 +221,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: fortune-graduation-wave-${{ inputs.launch_count }}
+          name: fortune-graduation-wave-${{ github.event_name == 'push' && '10' || inputs.launch_count }}
           path: |
             /tmp/graduation-storm-setup.log
             /tmp/storm-curves.txt

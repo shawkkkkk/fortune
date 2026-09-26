@@ -1,5 +1,5 @@
 const base = (process.env.FORTUNE_BASE_URL || "http://127.0.0.1:3000").replace(/\/$/, "");
-const site = (process.env.NEXT_PUBLIC_SITE_URL || "https://fortune-rho-snowy.vercel.app").replace(/\/$/, "");
+const site = (process.env.NEXT_PUBLIC_SITE_URL || "https://fortunepad.fun").replace(/\/$/, "");
 
 const checks = [
   {

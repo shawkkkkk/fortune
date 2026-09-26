@@ -17,8 +17,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
-      FORTUNE_BASE_URL: ${{ vars.FORTUNE_PUBLIC_SITE_URL || 'https://fortune-rho-snowy.vercel.app' }}
-      NEXT_PUBLIC_SITE_URL: ${{ vars.FORTUNE_PUBLIC_SITE_URL || 'https://fortune-rho-snowy.vercel.app' }}
+      FORTUNE_BASE_URL: ${{ vars.FORTUNE_PUBLIC_SITE_URL || 'https://fortunepad.fun' }}
+      NEXT_PUBLIC_SITE_URL: ${{ vars.FORTUNE_PUBLIC_SITE_URL || 'https://fortunepad.fun' }}
       FORTUNE_REQUIRE_READY: 'true'
       FORTUNE_REQUIRE_ONCHAIN: 'true'
     steps:

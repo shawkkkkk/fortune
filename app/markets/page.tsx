@@ -185,7 +185,7 @@ export default function MarketsPage() {
         </div>
 
         <div className="heroActions">
-          <button className="secondaryCta" onClick={() => void refresh()} disabled={loading}>
+          <button className="secondaryCta refreshButton" onClick={() => void refresh()} disabled={loading}>
             {loading ? "Refreshing…" : "Refresh"}
           </button>
           <Link href="/launch" className="primaryCta">
@@ -250,7 +250,10 @@ export default function MarketsPage() {
           </div>
         </section>
       ) : (
-        <div className="launchGrid" aria-busy={watchOnly && watchMarkets === null}>
+        <div className="launchGrid" aria-busy={(watchOnly && watchMarkets === null) || (!watchOnly && loading && markets.length === 0)}>
+          {!watchOnly && loading && markets.length === 0
+            ? [0, 1, 2].map((index) => <div key={index} className="skeletonLine launchCardSkeleton" aria-hidden="true" />)
+            : null}
           {(watchOnly ? watchMarkets || [] : markets).map((market, index) => {
             const activity = sort === "trending" && !watchOnly ? market.activityTrending : market.activity24h;
             return (

@@ -25,7 +25,6 @@ export default function PortfolioPage() {
   const zh = language === "zh";
   const [wallet, setWallet] = useState<string | null>(null);
   const [viewing, setViewing] = useState<string | null>(null);
-  const [ready, setReady] = useState(false);
   const [draft, setDraft] = useState("");
   const [draftError, setDraftError] = useState("");
   const [connectError, setConnectError] = useState("");
@@ -33,13 +32,13 @@ export default function PortfolioPage() {
   useEffect(() => {
     setViewing(readQueryAddress());
     const ethereum = window.ethereum;
-    if (!ethereum) { setReady(true); return; }
+    if (!ethereum) return;
     const apply = (accounts: unknown) => {
       const first = Array.isArray(accounts) && typeof accounts[0] === "string" && isAddress(accounts[0]) ? getAddress(accounts[0]) : null;
       setWallet(first);
     };
     // eth_accounts never prompts: it only reports a wallet that already connected to Fortune.
-    ethereum.request({ method: "eth_accounts" }).then(apply, () => undefined).finally(() => setReady(true));
+    ethereum.request({ method: "eth_accounts" }).then(apply, () => undefined);
     ethereum.on?.("accountsChanged", apply);
     return () => ethereum.removeListener?.("accountsChanged", apply);
   }, []);
@@ -87,6 +86,8 @@ export default function PortfolioPage() {
         ) : null}
       </section>
 
+      {/* Holds its height while a connected wallet is detected, so the footer never jumps. */}
+      <div className="portfolioBody">
       {address ? (
         <div className="portfolioViewing">
           <span translate="no">{self ? (zh ? "已连接钱包 " : "Connected wallet ") : (zh ? "正在查看 " : "Viewing ")}<code>{shortAddress(address)}</code></span>
@@ -99,7 +100,7 @@ export default function PortfolioPage() {
 
       {address ? <HoldingsPanel address={address} self={self} /> : null}
 
-      {ready && !address ? (
+      {!address ? (
         <section className="panel portfolioConnect">
           <div>
             <h2>Connect a wallet</h2>
@@ -129,6 +130,7 @@ export default function PortfolioPage() {
           {draftError ? <p className="fieldError" id="portfolio-lookup-error" role="alert">{draftError}</p> : null}
         </form>
       ) : null}
+      </div>
     </main>
   );
 }

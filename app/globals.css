@@ -351,9 +351,12 @@ section[id] {
   pointer-events: none;
 }
 
+/* Starts partly visible: text and images painted at opacity 0 do not count as
+   painted until the animation ends, which pushed Largest Contentful Paint
+   back by the whole fade. */
 @keyframes hero-fade-up {
   from {
-    opacity: 0;
+    opacity: 0.35;
     transform: translateY(24px);
   }
   to {
@@ -363,8 +366,7 @@ section[id] {
 }
 
 .hero-fade-up {
-  opacity: 0;
-  animation: hero-fade-up 0.9s var(--ease-out-soft) forwards;
+  animation: hero-fade-up 0.9s var(--ease-out-soft) both;
 }
 
 @keyframes reveal-up {
@@ -6187,6 +6189,16 @@ html.entryGateOpen {
   }
 }
 
+.portfolioBody {
+  min-height: 560px;
+}
+
+@media (max-width: 760px) {
+  .portfolioBody {
+    min-height: 760px;
+  }
+}
+
 .portfolioViewing {
   display: flex;
   flex-wrap: wrap;
@@ -6334,4 +6346,57 @@ html.entryGateOpen {
 .creatorFirst {
   color: var(--gold-ink);
   font-weight: 750;
+}
+
+/* The strip streams in after the page shell; both states share one height so
+   the chart below never moves. */
+.creatorStrip {
+  min-height: 52px;
+}
+
+.creatorStripLoading {
+  background: linear-gradient(90deg, var(--surface-2) 0%, var(--surface-sunk) 50%, var(--surface-2) 100%);
+  background-size: 200% 100%;
+  animation: pickShimmer 1.4s ease-in-out infinite;
+}
+
+@media (max-width: 760px) {
+  .creatorStrip {
+    min-height: 78px;
+  }
+}
+
+.skeletonLine {
+  border-radius: 12px;
+  background: linear-gradient(90deg, var(--surface-sunk) 0%, var(--surface-2) 50%, var(--surface-sunk) 100%);
+  background-size: 200% 100%;
+  animation: pickShimmer 1.4s ease-in-out infinite;
+}
+
+.chartSkeletonPrice {
+  width: min(220px, 60%);
+  height: 38px;
+  margin: 10px 0 18px;
+}
+
+.chartSkeletonArea {
+  height: 300px;
+}
+
+.statsSkeleton {
+  height: 118px;
+  border-radius: var(--radius-lg);
+}
+
+.refreshButton {
+  min-width: 9.5em;
+}
+
+.loadingPage {
+  min-height: 100vh;
+}
+
+.launchCardSkeleton {
+  min-height: 300px;
+  border-radius: var(--radius-lg);
 }

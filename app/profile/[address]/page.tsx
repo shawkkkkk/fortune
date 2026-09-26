@@ -8,7 +8,7 @@ import WatchButton from "@/components/WatchButton";
 import { decodeCatalogCursor, encodeCatalogCursor } from "@/lib/catalog-cursor";
 import { FORTUNE_NETWORK } from "@/lib/fortune-network";
 import { formatPrice, formatShare, formatUsd, shortAddress } from "@/lib/market-format";
-import { readCreatorRecord, type CreatorLaunch, type CreatorRecord } from "@/lib/market-insights";
+import { readCreatorRecord, readPortfolio, type CreatorLaunch, type CreatorRecord, type Portfolio } from "@/lib/market-insights";
 
 export const dynamic = "force-dynamic";
 
@@ -38,12 +38,14 @@ export default async function ProfilePage({ params, searchParams }: { params: Pr
   try { position = decodeCatalogCursor((await searchParams).cursor || null); } catch { notFound(); }
   const { offset, blockNumber } = position;
 
-  let record: CreatorRecord | null = null;
-  let unavailable = false;
-  try {
-    record = await readCreatorRecord(address, offset, PAGE_SIZE, blockNumber);
-    unavailable = !record.configured;
-  } catch { unavailable = true; }
+  // Both reads run together; holdings render on the server so the launches below never move.
+  const [recordResult, portfolioResult] = await Promise.allSettled([
+    readCreatorRecord(address, offset, PAGE_SIZE, blockNumber),
+    readPortfolio(address),
+  ]);
+  const record: CreatorRecord | null = recordResult.status === "fulfilled" ? recordResult.value : null;
+  const unavailable = !record?.configured;
+  const portfolio: Portfolio | null = portfolioResult.status === "fulfilled" && portfolioResult.value.configured ? portfolioResult.value : null;
 
   const launched = record?.launches ?? 0;
   const graduated = record?.phases.graduated ?? 0;
@@ -62,7 +64,7 @@ export default async function ProfilePage({ params, searchParams }: { params: Pr
         </div>
       </section>
 
-      <HoldingsPanel address={address} />
+      <HoldingsPanel key={address} address={address} initial={portfolio} />
 
       <section className="panel profileLaunches">
         <span className="eyebrow">LAUNCHES</span>

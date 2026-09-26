@@ -2,7 +2,7 @@ import { FortuneCoin } from "@/components/Ornaments";
 
 export default function Loading() {
   return (
-    <main className="page">
+    <main className="page loadingPage">
       <section className="panel emptyPanel statePanel" aria-busy="true">
         <FortuneCoin className="loadingCoin" />
         <span className="eyebrow">FORTUNE</span>

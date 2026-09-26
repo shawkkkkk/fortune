@@ -22,7 +22,7 @@ type Position = {
   valueUsd: number | null;
 };
 
-type Portfolio = {
+export type HoldingsData = {
   blockNumber: string | null;
   launchesScanned: number;
   held: number;
@@ -39,15 +39,20 @@ function statusText(position: Position, zh: boolean) {
   return zh ? `曲线 ${position.graduationProgress.toFixed(1)}%` : `Curve ${position.graduationProgress.toFixed(1)}%`;
 }
 
-/** Every Fortune launch an address holds, read onchain through the public portfolio API. */
-export default function HoldingsPanel({ address, self = false }: { address: string; self?: boolean }) {
+/**
+ * Every Fortune launch an address holds, read onchain. Server pages pass the
+ * portfolio they already read as `initial`; otherwise it comes from the public
+ * portfolio API.
+ */
+export default function HoldingsPanel({ address, self = false, initial = null }: { address: string; self?: boolean; initial?: HoldingsData | null }) {
   const { language } = useLanguage();
   const zh = language === "zh";
-  const [data, setData] = useState<Portfolio | null>(null);
+  const [data, setData] = useState<HoldingsData | null>(initial);
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!initial);
 
   useEffect(() => {
+    if (initial) return;
     const controller = new AbortController();
     setLoading(true);
     setError("");
@@ -62,7 +67,7 @@ export default function HoldingsPanel({ address, self = false }: { address: stri
       })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, [address]);
+  }, [address, initial]);
 
   const positions = data?.positions || [];
   return (

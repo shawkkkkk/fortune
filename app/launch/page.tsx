@@ -689,7 +689,7 @@ export default function LaunchPage() {
           <h1>Make your own luck.</h1>
           <p>Name it, choose a reviewed pair, then inspect the exact launch before your wallet signs.</p>
         </div>
-        <img className="launchHeadingArt" src="/fortune-cat-cutout.webp" alt="Fortune lucky cat holding a fortune cookie" width="170" height="170" />
+        <img className="launchHeadingArt" src="/fortune-cat-cutout-400.webp" alt="Fortune lucky cat holding a fortune cookie" width="170" height="170" />
       </section>
 
       <div className="registryNotice">
@@ -894,7 +894,7 @@ export default function LaunchPage() {
             </dl>
             <p className="launchPreviewNote">Fortune repeats the onchain preflight before your wallet signs.</p>
           </div>
-          <img className="launchAsideArt" src="/fortune-cat-rewards.webp" alt="" width="1254" height="1254" loading="lazy" />
+          <img className="launchAsideArt" src="/fortune-cat-rewards-400.webp" alt="" width="400" height="400" loading="lazy" />
         </aside>
       </div>
     </main>

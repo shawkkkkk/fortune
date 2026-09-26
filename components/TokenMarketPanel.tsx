@@ -87,8 +87,15 @@ export default function TokenMarketPanel({ token }: { token: string }) {
       <div className="marketInsights">
         <section className="panel marketChartPanel" aria-busy={loading}>
           <span className="eyebrow">PRICE CHART</span>
+          {loading ? (
+            <>
+              <div className="skeletonLine chartSkeletonPrice" aria-hidden="true" />
+              <div className="skeletonLine chartSkeletonArea" aria-hidden="true" />
+            </>
+          ) : null}
           <p className="chartCoverage">{loading ? "Reading trades and pool state from BNB Chain…" : error || "Market data unavailable."}</p>
         </section>
+        {loading ? <div className="skeletonLine statsSkeleton" aria-hidden="true" /> : null}
       </div>
     );
   }

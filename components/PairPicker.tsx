@@ -13,7 +13,7 @@ import type { UniverseAsset } from "@/lib/pair-universe";
 type Universe = {
   chainId: number;
   snapshot: { generatedAt: string; verifiedAtBlock: number; chainId: number };
-  coverage: { registry: boolean; marketData: boolean; preIpoReferences: boolean };
+  coverage: { registry: boolean; marketData: boolean; marketDataStale?: boolean; priced?: { count: number; total: number }; preIpoReferences: boolean };
   featured: string[];
   items: UniverseAsset[];
 };
@@ -371,7 +371,7 @@ export default function PairPicker({
           {zh
             ? `价格来自 CoinGecko、DexScreener 和 Lighter，可能延迟。合约身份已于 BNB Smart Chain 区块 ${universe.snapshot.verifiedAtBlock.toLocaleString()} 链上核验。`
             : `Prices from CoinGecko, DexScreener and Lighter; they can be delayed. Contract identity checked onchain at BNB Smart Chain block ${universe.snapshot.verifiedAtBlock.toLocaleString()}.`}
-          {!universe.coverage.marketData ? (zh ? " 部分行情暂不可用。" : " Some market data is unavailable right now.") : ""}
+          {!universe.coverage.marketData ? (zh ? " 部分行情暂不可用。" : " Some market data is unavailable right now.") : universe.coverage.marketDataStale ? (zh ? " 部分价格来自较早的读取（最多 6 小时前）。" : " Some prices come from an earlier read, up to 6 hours old.") : ""}
         </p>
       ) : null}
     </div>

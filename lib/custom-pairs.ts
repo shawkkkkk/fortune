@@ -17,7 +17,7 @@ export const CUSTOM_PAIRS = {
   factory: isAddress(configuredFactory) ? (getAddress(configuredFactory) as Address) : null,
   /** Faucet tokens deployed with the beta (tSTONK with a 5% transfer tax, tSHARE without). */
   testTokens: configuredTestTokens as Address[],
-  enabled: isAddress(configuredFactory) && FORTUNE_NETWORK.chainId !== 56,
+  enabled: isAddress(configuredFactory) && FORTUNE_NETWORK.chainId === 97,
 } as const;
 
 /** Mirrors FortuneCustomPairCurve / FortuneCustomPairFactory constants. */

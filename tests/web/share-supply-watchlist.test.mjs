@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { supplySlices } from "../../lib/market-insights.ts";
 import { formatShare } from "../../lib/market-format.ts";
+import { trustedShareArtworkSource } from "../../lib/share-artwork.ts";
 import { parseWatchlist, toggleInList, WATCHLIST_LIMIT } from "../../lib/watchlist.ts";
 
 const E18 = 10n ** 18n;
@@ -48,4 +49,13 @@ test("the watchlist keeps distinct lowercase addresses, newest first, capped", (
   assert.equal(next.length, WATCHLIST_LIMIT);
   assert.equal(next[0], b.toLowerCase());
   assert.ok(!next.includes(full[WATCHLIST_LIMIT - 1]), "the oldest entry drops");
+});
+
+test("share-card artwork only uses the fixed IPFS gateway", () => {
+  assert.equal(trustedShareArtworkSource("https://images.example.com/token.png"), null);
+  assert.equal(trustedShareArtworkSource("ipfs://not-a-cid/token.png"), null);
+  assert.equal(
+    trustedShareArtworkSource("ipfs://QmYwAPJzv5CZsnAzt8auVZRnGi2C9A8a4xM6qS2d5f9WJ8/token.png"),
+    "https://ipfs.io/ipfs/QmYwAPJzv5CZsnAzt8auVZRnGi2C9A8a4xM6qS2d5f9WJ8/token.png",
+  );
 });

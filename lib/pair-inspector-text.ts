@@ -25,12 +25,12 @@ export const FINDING_TEXT: Record<string, { title: string; detail: string }> = {
   REBASING: { title: "Rebasing balances", detail: "Balances can grow or shrink on their own. Growth becomes pool liquidity; shrinkage hits fees first." },
   MINTABLE: { title: "Mintable", detail: "New supply can be minted by an authorised account." },
   HAS_OWNER: { title: "Has an owner", detail: "An owner address is set. Check what it can do on BscScan." },
-  NO_HOLDER_FOUND: { title: "Transfers not simulated", detail: "No balance could be found to simulate with. Connect a wallet that holds this token and check again." },
+  NO_HOLDER_FOUND: { title: "Transfers not simulated", detail: "No balance could be found to simulate with. Connect a wallet that holds this token and check again. Launch stays blocked until the simulation succeeds." },
   SIMULATED_FROM_POOL: {
     title: "Simulated from a DEX pool",
     detail: "The only balance found was in a DEX pool, where some tokens apply their own trading tax.",
   },
-  SIMULATION_UNAVAILABLE: { title: "Simulation unavailable", detail: "The network did not answer the transfer simulation. Try again in a minute." },
+  SIMULATION_UNAVAILABLE: { title: "Simulation unavailable", detail: "The network did not answer the transfer simulation. Launch stays blocked; try again in a minute." },
 };
 
 export const CONTROL_LABELS: Record<string, string> = {

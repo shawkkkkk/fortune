@@ -359,22 +359,15 @@ export async function POST(request: Request) {
       prepare: {
         factoryConfigured: Boolean(factory),
         factoryAddress: factory,
-        ready:
-          errors.length === 0 &&
-          Boolean(factory),
-        reason:
-          !factory
-            ? "Fortune testnet factory is not configured on this deployment."
-            : errors.length
-              ? "Resolve preview errors before preparing a transaction."
-              : null,
+        ready: false,
+        reason: "This endpoint is a research configuration preview, not active-registry approval or transaction preflight. Use the Standard launch form, live registry checks and factory simulation.",
       },
     },
     {
       meta: {
         expiresInSeconds: 60,
         note:
-          "previewId is an API configuration fingerprint, not the onchain Launch Manifest hash. The final manifest is produced by FortuneFactory.",
+          "Research-only preview. valid describes static input shape, never release readiness, approved reserves or permission to launch. previewId is not the onchain Launch Manifest hash.",
       },
     }
   );

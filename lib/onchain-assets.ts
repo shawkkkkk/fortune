@@ -7,6 +7,7 @@ import {
 import { bsc, bscTestnet } from "viem/chains";
 import { FORTUNE_READ_NETWORK_CONFIGURED } from "@/lib/read-network";
 import { configuredRpcUrls } from "@/lib/bsc-rpc";
+import { pairEligibility } from "@/lib/pair-policy";
 import {
   FORTUNE_NETWORK,
 } from "@/lib/fortune-network";
@@ -143,6 +144,10 @@ export async function readFortuneAssetUniverse() {
   }
 
   const rpc = client();
+  if (await rpc.getChainId() !== FORTUNE_NETWORK.chainId) throw new Error("Asset registry RPC returned the wrong chain.");
+  const head = await rpc.getBlock();
+  if (head.number == null || !head.hash) throw new Error("Asset registry snapshot unavailable.");
+  const blockNumber = head.number;
   const registry =
     FORTUNE_NETWORK.contracts.registry as Address;
 
@@ -151,10 +156,12 @@ export async function readFortuneAssetUniverse() {
       address: registry,
       abi: registryAbi,
       functionName: "assetCount",
+      blockNumber,
     })
   );
 
-  const addressResults = await rpc.multicall({ contracts:
+  if (!Number.isSafeInteger(count) || count < 0 || count > 1024) throw new Error("Asset registry exceeds the supported read bound.");
+  const addressResults = await rpc.multicall({ blockNumber, contracts:
     Array.from({ length: count }, (_, index) => ({
       address: registry, abi: registryAbi,
       functionName: "allAssets" as const, args: [BigInt(index)] as const,
@@ -164,7 +171,7 @@ export async function readFortuneAssetUniverse() {
     throw new Error("Could not read the complete onchain asset registry.");
   }
   const addresses = addressResults.map((item) => item.result as Address);
-  const details = addresses.length ? await rpc.multicall({ contracts:
+  const details = addresses.length ? await rpc.multicall({ blockNumber, contracts:
     addresses.flatMap((address) => [
       { address: registry, abi: registryAbi, functionName: "assetConfig" as const, args: [address] as const },
       { address: registry, abi: registryAbi, functionName: "assetHealth" as const, args: [address] as const },
@@ -210,17 +217,16 @@ export async function readFortuneAssetUniverse() {
         healthReason: reasonText(health[1]),
         priceUsd1e18: health[2].toString(),
         updatedAt: Number(health[3]),
-        launchable:
-          active &&
-          healthy &&
-          quoteEnabled &&
-          graduationEnabled,
+        launchable: pairEligibility({ address, active, healthy, quoteEnabled, graduationEnabled }, FORTUNE_NETWORK.chainId).eligible,
       } satisfies FortuneRegistryAsset;
     });
 
+  if ((await rpc.getBlock({ blockNumber })).hash !== head.hash) throw new Error("Asset registry snapshot changed during the read.");
   return {
     configured: true,
     chainId: FORTUNE_NETWORK.chainId,
+    blockNumber: blockNumber.toString(),
+    blockHash: head.hash,
     assets,
   };
 }

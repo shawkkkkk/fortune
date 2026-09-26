@@ -41,6 +41,7 @@ jobs:
       TIMEOUT_MS: "8000"
       INCLUDE_RPC_CHECKS: "false"
       STAGES: "500x5000"
+      PREFLIGHT_REPORT_PATH: "/tmp/fortune-graduation-preflight.json"
       REPORT_PATH: "/tmp/fortune-launch-storm-report.json"
       GRADUATION_REPORT_PATH: "/tmp/fortune-graduation-wave-report.json"
 
@@ -77,6 +78,26 @@ jobs:
           WALLET=$(cast wallet address --private-key "$PRIVATE_KEY")
           BALANCE_WEI=$(cast balance "$WALLET" --rpc-url "$BSC_TESTNET_RPC_URL")
           SAFETY_WEI=$(python3 -c "print((int('$LAUNCH_COUNT') * 20_000_000 + 50_000_000) * 1_000_000_000)")
+          SUFFICIENT=false
+          if [ "$BALANCE_WEI" -ge "$SAFETY_WEI" ]; then SUFFICIENT=true; fi
+
+          node -e '
+            const fs = require("node:fs");
+            const [path, wallet, chainId, launchCount, concurrency, balanceWei, requiredWei, sufficient] = process.argv.slice(1);
+            fs.writeFileSync(path, JSON.stringify({
+              observedAt: new Date().toISOString(),
+              runId: process.env.GITHUB_RUN_ID,
+              commit: process.env.GITHUB_SHA,
+              network: "bsc-testnet",
+              chainId: Number(chainId),
+              wallet,
+              launchCount: Number(launchCount),
+              submissionConcurrency: Number(concurrency),
+              balanceWei,
+              requiredWei,
+              sufficient: sufficient === "true"
+            }, null, 2) + "\n");
+          ' "$PREFLIGHT_REPORT_PATH" "$WALLET" "$CHAIN_ID" "$LAUNCH_COUNT" "$SUBMISSION_CONCURRENCY" "$BALANCE_WEI" "$SAFETY_WEI" "$SUFFICIENT"
 
           echo "Testnet deployer: $WALLET"
           echo "Balance: $(cast balance "$WALLET" --ether --rpc-url "$BSC_TESTNET_RPC_URL") tBNB"
@@ -212,6 +233,8 @@ jobs:
       - name: Show graduation-wave summary
         if: always()
         run: |
+          echo "=== Preflight ==="
+          cat "$PREFLIGHT_REPORT_PATH" 2>/dev/null || true
           echo "=== Graduation wave ==="
           cat "$GRADUATION_REPORT_PATH" 2>/dev/null || true
           echo "=== Web load ==="
@@ -223,6 +246,7 @@ jobs:
         with:
           name: fortune-graduation-wave-${{ github.event_name == 'push' && '10' || inputs.launch_count }}
           path: |
+            /tmp/fortune-graduation-preflight.json
             /tmp/graduation-storm-setup.log
             /tmp/storm-curves.txt
             /tmp/storm-tokens.txt

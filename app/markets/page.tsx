@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import WatchButton from "@/components/WatchButton";
+import { useWatchlist } from "@/lib/watchlist";
 import { useLanguage } from "@/components/LanguageProvider";
 import { PairChips } from "@/components/PairAssets";
 import { FORTUNE_NETWORK } from "@/lib/fortune-network";
@@ -74,8 +76,29 @@ export default function MarketsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [pages, setPages] = useState(1);
+  const watchlist = useWatchlist(FORTUNE_NETWORK.chainId);
+  const [watchOnly, setWatchOnly] = useState(false);
+  const [watchMarkets, setWatchMarkets] = useState<Market[] | null>(null);
+  const [watchError, setWatchError] = useState("");
+  const watchKey = watchlist.list.join(",");
 
   useEffect(() => setSort(readSort()), []);
+
+  // The watchlist view reads only the starred launches (at most 50, one request).
+  useEffect(() => {
+    if (!watchOnly) return;
+    if (!watchKey) { setWatchMarkets([]); return; }
+    let cancelled = false;
+    setWatchError("");
+    fetch(`/api/public/v1/markets?tokens=${watchKey}`, { cache: "no-store" })
+      .then(async (response) => {
+        const body = (await response.json()) as BoardResponse;
+        if (!response.ok || !body.data) throw new Error(body.error?.message || "Could not load your watchlist.");
+        if (!cancelled) setWatchMarkets(body.data.items);
+      })
+      .catch((nextError) => { if (!cancelled) setWatchError(nextError instanceof Error ? nextError.message : "Could not load your watchlist."); });
+    return () => { cancelled = true; };
+  }, [watchOnly, watchKey]);
 
   const refresh = useCallback(async () => {
     try {
@@ -109,6 +132,7 @@ export default function MarketsPage() {
   function choose(next: Sort) {
     setSort(next);
     setPages(1);
+    setWatchOnly(false);
     const url = new URL(window.location.href);
     if (next === "newest") url.searchParams.delete("sort");
     else url.searchParams.set("sort", next);
@@ -161,7 +185,7 @@ export default function MarketsPage() {
         </div>
 
         <div className="heroActions">
-          <button className="secondaryCta" onClick={() => void refresh()} disabled={loading}>
+          <button className="secondaryCta refreshButton" onClick={() => void refresh()} disabled={loading}>
             {loading ? "Refreshing…" : "Refresh"}
           </button>
           <Link href="/launch" className="primaryCta">
@@ -185,22 +209,40 @@ export default function MarketsPage() {
 
       <div className="sortTabs" role="group" aria-label="Sort launches">
         {SORTS.map(([key, text]) => (
-          <button key={key} type="button" aria-pressed={sort === key} onClick={() => choose(key)}>
+          <button key={key} type="button" aria-pressed={sort === key && !watchOnly} onClick={() => choose(key)}>
             {text}
           </button>
         ))}
       </div>
-      {staticCaption ? <p className="sortCaption">{staticCaption}</p> : null}
-      {dynamicCaption ? <p className="sortCaption" translate="no">{dynamicCaption}</p> : null}
+      {watchlist.available ? (
+        <div className="exploreFilters">
+          <button type="button" className="watchFilter" aria-pressed={watchOnly} onClick={() => setWatchOnly((value) => !value)}>
+            <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d="M10 1.8l2.47 5.01 5.53.8-4 3.9.94 5.5L10 14.4l-4.94 2.6.94-5.5-4-3.9 5.53-.8L10 1.8z" fill={watchOnly ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" /></svg>
+            <span>Watchlist</span>
+            <b translate="no">{watchlist.list.length}</b>
+          </button>
+        </div>
+      ) : null}
+      {watchOnly ? <p className="sortCaption">Launches you starred. Saved only in this browser.</p> : <>
+        {staticCaption ? <p className="sortCaption">{staticCaption}</p> : null}
+        {dynamicCaption ? <p className="sortCaption" translate="no">{dynamicCaption}</p> : null}
+      </>}
 
-      {error ? (
+      {error || (watchOnly && watchError) ? (
         <section className="registryNotice statusError">
           <strong>MARKET READ FAILED</strong>
-          <span>{error}</span>
+          <span>{watchOnly ? watchError : error}</span>
         </section>
       ) : null}
 
-      {!loading && markets.length === 0 && !error ? (
+      {watchOnly && watchMarkets !== null && watchMarkets.length === 0 && !watchError ? (
+        <section className="panel">
+          <div className="emptyPanel">
+            <strong>Your watchlist is empty.</strong>
+            <span>Tap the star on any launch to follow it here. The list stays in this browser.</span>
+          </div>
+        </section>
+      ) : !watchOnly && !loading && markets.length === 0 && !error ? (
         <section className="panel">
           <div className="emptyPanel">
             <strong>No launches on this deployment yet.</strong>
@@ -208,20 +250,24 @@ export default function MarketsPage() {
           </div>
         </section>
       ) : (
-        <div className="launchGrid">
-          {markets.map((market, index) => {
-            const activity = sort === "trending" ? market.activityTrending : market.activity24h;
+        <div className="launchGrid" aria-busy={(watchOnly && watchMarkets === null) || (!watchOnly && loading && markets.length === 0)}>
+          {!watchOnly && loading && markets.length === 0
+            ? [0, 1, 2].map((index) => <div key={index} className="skeletonLine launchCardSkeleton" aria-hidden="true" />)
+            : null}
+          {(watchOnly ? watchMarkets || [] : markets).map((market, index) => {
+            const activity = sort === "trending" && !watchOnly ? market.activityTrending : market.activity24h;
             return (
+              <div className="launchCardWrap" key={market.curve}>
+              <WatchButton token={market.token} symbol={market.symbol} className="cardWatch" />
               <Link
                 href={"/market/" + market.curve + (market.mode === "tax" ? "?mode=tax" : "")}
                 className="launchCard"
-                key={market.curve}
               >
                 <div className="launchCardTop">
                   <div className="tokenAvatar">{market.symbol.slice(0, 2)}</div>
                   <div>
                     <div className="tokenTitle">
-                      {sort !== "newest" && board?.sortAvailable ? <span className="rankBadge">#{index + 1}</span> : null}
+                      {sort !== "newest" && board?.sortAvailable && !watchOnly ? <span className="rankBadge">#{index + 1}</span> : null}
                       <strong translate="no">{market.name}</strong>
                       <span translate="no">{market.symbol}</span>
                     </div>
@@ -246,8 +292,8 @@ export default function MarketsPage() {
                     <strong>{formatUsd(market.marketCapUsd)}</strong>
                   </div>
                   <div>
-                    <span>{sort === "trending" ? "Trades · 6h" : "Volume · 24h"}</span>
-                    <strong>{activity ? (sort === "trending" ? String(activity.trades) : formatUsd(activity.volumeUsd)) : "—"}</strong>
+                    <span>{sort === "trending" && !watchOnly ? "Trades · 6h" : "Volume · 24h"}</span>
+                    <strong>{activity ? (sort === "trending" && !watchOnly ? String(activity.trades) : formatUsd(activity.volumeUsd)) : "—"}</strong>
                   </div>
                 </div>
 
@@ -268,12 +314,13 @@ export default function MarketsPage() {
                   </>
                 )}
               </Link>
+              </div>
             );
           })}
         </div>
       )}
 
-      {board?.hasMore ? (
+      {board?.hasMore && !watchOnly ? (
         <div className="heroActions loadMore">
           <button className="secondaryCta" disabled={loading} onClick={() => setPages((count) => count + 1)}>
             {loading ? "Loading…" : "Show more launches"}

@@ -166,14 +166,13 @@ export default function AssetsPage() {
         </Link>
       </section>
 
-      {counts ? (
-        <dl className="universeStats" translate="no">
-          <div><dt>{zh ? "代币化股票与 ETF" : "Tokenized stocks & ETFs"}</dt><dd>{counts.stocks.toLocaleString()}</dd><dd className="universeNote">{zh ? `${counts.issuers} 家发行方` : `${counts.issuers} issuers on BNB Chain`}</dd></div>
-          <div><dt>{zh ? "黄金与大宗商品" : "Gold & commodities"}</dt><dd>{counts.rwa}</dd><dd className="universeNote">{zh ? "BNB Chain 上" : "on BNB Chain"}</dd></div>
-          <div><dt>{zh ? "IPO 前" : "Pre-IPO"}</dt><dd>{counts.preipo}</dd><dd className="universeNote">{zh ? "代币与参考市场" : "tokens and reference markets"}</dd></div>
-          <div><dt>{zh ? "可发行配对" : "Launchable now"}</dt><dd>{counts.launchable}</dd><dd className="universeNote">{zh ? "已通过链上注册表" : "passed the onchain registry"}</dd></div>
-        </dl>
-      ) : null}
+      {/* Always rendered, with dashes until the universe loads, so nothing below it moves. */}
+      <dl className="universeStats" translate="no" aria-busy={!counts}>
+        <div><dt>{zh ? "代币化股票与 ETF" : "Tokenized stocks & ETFs"}</dt><dd>{counts ? counts.stocks.toLocaleString() : "—"}</dd><dd className="universeNote">{counts ? (zh ? `${counts.issuers} 家发行方` : `${counts.issuers} issuers on BNB Chain`) : (zh ? "发行方" : "issuers on BNB Chain")}</dd></div>
+        <div><dt>{zh ? "黄金与大宗商品" : "Gold & commodities"}</dt><dd>{counts ? counts.rwa : "—"}</dd><dd className="universeNote">{zh ? "BNB Chain 上" : "on BNB Chain"}</dd></div>
+        <div><dt>{zh ? "IPO 前" : "Pre-IPO"}</dt><dd>{counts ? counts.preipo : "—"}</dd><dd className="universeNote">{zh ? "代币与参考市场" : "tokens and reference markets"}</dd></div>
+        <div><dt>{zh ? "可发行配对" : "Launchable now"}</dt><dd>{counts ? counts.launchable : "—"}</dd><dd className="universeNote">{zh ? "已通过链上注册表" : "passed the onchain registry"}</dd></div>
+      </dl>
 
       <section className="registryNotice">
         <strong>UNIVERSE-FIRST, NOT FAKE SUPPORT</strong>

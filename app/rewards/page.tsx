@@ -13,7 +13,7 @@ export default function RewardsPage() {
             disabled, and the older tax-token vault remains testnet research.
           </p>
         </div>
-        <img className="mascotSectionArt" src="/fortune-cat-rewards.webp" width="215" height="215" alt="Fortune cat offering pair-asset coins" />
+        <img className="mascotSectionArt" src="/fortune-cat-rewards-400.webp" width="215" height="215" alt="Fortune cat offering pair-asset coins" />
         <Link href="/docs#rewards" className="secondaryCta">Reward design →</Link>
       </section>
 

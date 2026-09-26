@@ -95,7 +95,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <ThemeProvider>
           <LanguageProvider>
+            <a className="skipLink" href="#content">Skip to content</a>
             <Header />
+            <div id="content" className="skipTarget" tabIndex={-1} />
             {children}
             <Footer />
             <ScrollRevealRoot />

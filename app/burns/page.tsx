@@ -14,7 +14,7 @@ export default function BurnsPage() {
             disabled until that separate stack passes its own review gates.
           </p>
         </div>
-        <img className="mascotSectionArt" src="/fortune-cat-burns.webp" width="215" height="215" alt="Fortune cat showing a token burn" />
+        <img className="mascotSectionArt" src="/fortune-cat-burns-400.webp" width="215" height="215" alt="Fortune cat showing a token burn" />
         <Link href="/docs#burns" className="secondaryCta">How burns work →</Link>
       </section>
 

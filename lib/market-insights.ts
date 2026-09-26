@@ -12,8 +12,12 @@ import { buildCanonicalChart, type CanonicalChartPoint } from "@/lib/canonical-c
 import { FORTUNE_NETWORK } from "@/lib/fortune-network";
 import { readFortuneAssetUniverse, type FortuneRegistryAsset } from "@/lib/onchain-assets";
 import {
+  readCreatorFortuneLaunches,
+  readFortuneHoldings,
   readFortuneLaunchByToken,
+  readFortuneLaunchesByTokens,
   readRecentFortuneLaunches,
+  type CreatorPhases,
   type OnchainFortuneLaunch,
 } from "@/lib/onchain-launches";
 import {
@@ -91,6 +95,53 @@ const curveStateAbi = [
   { type: "function", name: "graduationWeights", stateMutability: "view", inputs: [], outputs: [{ type: "uint16[]" }] },
   { type: "function", name: "reserve", stateMutability: "view", inputs: [{ type: "address" }], outputs: [{ type: "uint256" }] },
 ] as const;
+
+const balanceAbi = [
+  { type: "function", name: "balanceOf", stateMutability: "view", inputs: [{ type: "address" }], outputs: [{ type: "uint256" }] },
+  { type: "function", name: "totalSupply", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
+] as const;
+
+const BURN_ADDRESSES: Address[] = ["0x000000000000000000000000000000000000dEaD", "0x0000000000000000000000000000000000000000"];
+
+export type SupplySlice = { key: "curve" | "pools" | "creator" | "vaults" | "burned" | "holders"; amount: number; share: number };
+export type SupplyBreakdown = { total: number; slices: SupplySlice[] };
+
+/** Where a launch's supply sits: known Fortune addresses first, everything else as "holders". */
+export function supplySlices(total: bigint, known: Record<Exclude<SupplySlice["key"], "holders">, bigint>): SupplyBreakdown | null {
+  if (total <= 0n) return null;
+  const accounted = Object.values(known).reduce((sum, value) => sum + value, 0n);
+  const holders = total > accounted ? total - accounted : 0n;
+  const entries: Array<[SupplySlice["key"], bigint]> = [
+    ["curve", known.curve], ["pools", known.pools], ["creator", known.creator], ["vaults", known.vaults], ["burned", known.burned], ["holders", holders],
+  ];
+  return {
+    total: toNumber(total),
+    slices: entries.map(([key, amount]) => ({ key, amount: toNumber(amount), share: Number((amount * 1_000_000n) / total) / 1_000_000 })),
+  };
+}
+
+async function readSupply(rpc: PublicClient, launch: OnchainFortuneLaunch, pools: OfficialPool[], blockNumber: bigint) {
+  const token = launch.token as Address;
+  const holders: Array<[Exclude<SupplySlice["key"], "holders">, Address]> = [
+    ["curve", launch.curve as Address],
+    ["creator", launch.creator as Address],
+    ...launch.vaults.map((vault) => ["vaults", vault] as [Exclude<SupplySlice["key"], "holders">, Address]),
+    ...pools.map((pool) => ["pools", pool.address] as [Exclude<SupplySlice["key"], "holders">, Address]),
+    ...BURN_ADDRESSES.map((address) => ["burned", address] as [Exclude<SupplySlice["key"], "holders">, Address]),
+  ];
+  // Distinct addresses only, so a creator that is also a vault is never counted twice.
+  const seen = new Set<string>();
+  const unique = holders.filter(([, address]) => !seen.has(address.toLowerCase()) && seen.add(address.toLowerCase()));
+  // Both reads are pinned to the same block, so the slices always add up to that block's supply.
+  const [total, balances] = await Promise.all([
+    rpc.readContract({ address: token, abi: balanceAbi, functionName: "totalSupply", blockNumber }),
+    rpc.multicall({ blockNumber, contracts: unique.map(([, address]) => ({ address: token, abi: balanceAbi, functionName: "balanceOf" as const, args: [address] as const })) }),
+  ]);
+  if (balances.some((row) => row.status !== "success")) return null;
+  const known = { curve: 0n, pools: 0n, creator: 0n, vaults: 0n, burned: 0n };
+  unique.forEach(([key], index) => { known[key] += balances[index].result as bigint; });
+  return supplySlices(total, known);
+}
 
 let stateClientCache: PublicClient | null = null;
 
@@ -360,20 +411,8 @@ export type MarketBoard = {
 };
 
 /** Explore board: enriched launches with live prices, pairs and bounded ledger activity. */
-export async function readMarketBoard(sort: MarketSort, offset: number, limit: number): Promise<MarketBoard> {
-  const first = await readRecentFortuneLaunches(25, sort === "newest" ? offset : 0);
-  if (!first.configured || first.blockNumber === null) {
-    return { configured: false, chainId: FORTUNE_NETWORK.chainId, blockNumber: null, total: 0, rankedAmong: 0, sort, sortAvailable: false, items: [], hasMore: false,
-      ledger: { available: false, coverage: null, covers24h: false, coversTrending: false, trendingWindowSeconds: TRENDING_WINDOW } };
-  }
-  const blockNumber = first.blockNumber;
-  const launches = [...first.launches];
-  if (sort !== "newest") {
-    for (let next = 25; next < Math.min(first.total, RANK_LIMIT); next += 25) {
-      launches.push(...(await readRecentFortuneLaunches(25, next, blockNumber)).launches);
-    }
-  }
-
+/** Prices every launch at one block and attaches ledger activity for the 24h and trending windows. */
+async function summarizeWithActivity(launches: OnchainFortuneLaunch[], blockNumber: bigint) {
   const context = await buildContext(launches, blockNumber);
   const provider = ledgerProvider();
   let scan: LedgerScan | null = null;
@@ -395,9 +434,28 @@ export async function readMarketBoard(sort: MarketSort, offset: number, limit: n
       activityTrending: coversTrending ? activityFor(trades, head - TRENDING_WINDOW) : null,
     };
   });
+  return { items, ledger: { available: Boolean(decoded), coverage, covers24h, coversTrending, trendingWindowSeconds: TRENDING_WINDOW } };
+}
 
+const emptyBoard = (sort: MarketSort): MarketBoard => ({
+  configured: false, chainId: FORTUNE_NETWORK.chainId, blockNumber: null, total: 0, rankedAmong: 0, sort, sortAvailable: false, items: [], hasMore: false,
+  ledger: { available: false, coverage: null, covers24h: false, coversTrending: false, trendingWindowSeconds: TRENDING_WINDOW },
+});
+
+export async function readMarketBoard(sort: MarketSort, offset: number, limit: number): Promise<MarketBoard> {
+  const first = await readRecentFortuneLaunches(25, sort === "newest" ? offset : 0);
+  if (!first.configured || first.blockNumber === null) return emptyBoard(sort);
+  const blockNumber = first.blockNumber;
+  const launches = [...first.launches];
+  if (sort !== "newest") {
+    for (let next = 25; next < Math.min(first.total, RANK_LIMIT); next += 25) {
+      launches.push(...(await readRecentFortuneLaunches(25, next, blockNumber)).launches);
+    }
+  }
+
+  const { items, ledger } = await summarizeWithActivity(launches, blockNumber);
   const sortAvailable = sort === "newest" || sort === "marketCap" || (sort === "volume24h"
-    ? covers24h && items.every(item => item.activity24h?.volumeUsd != null) : coversTrending);
+    ? ledger.covers24h && items.every(item => item.activity24h?.volumeUsd != null) : ledger.coversTrending);
   if (sortAvailable) rankMarkets(items, sort);
 
   const page = sort === "newest" ? items.slice(0, limit) : items.slice(offset, offset + limit);
@@ -411,8 +469,136 @@ export async function readMarketBoard(sort: MarketSort, offset: number, limit: n
     sortAvailable,
     items: page,
     hasMore: sort === "newest" ? offset + page.length < first.total : offset + page.length < items.length,
-    ledger: { available: Boolean(decoded), coverage, covers24h, coversTrending, trendingWindowSeconds: TRENDING_WINDOW },
+    ledger,
   };
+}
+
+/** Live price summary for one launch without the trade ledger (share cards, page metadata). */
+export async function readTokenSummary(token: Address) {
+  const lookup = await readFortuneLaunchByToken(token);
+  if (!lookup.configured || !lookup.launch || lookup.blockNumber === null) return null;
+  const context = await buildContext([lookup.launch], lookup.blockNumber);
+  return { summary: summarize(context, lookup.launch), blockNumber: lookup.blockNumber, blockHash: lookup.blockHash };
+}
+
+/** Specific launches (a watchlist), newest first. Tokens that are not Fortune launches are skipped. */
+export async function readMarketsForTokens(tokens: Address[]): Promise<MarketBoard> {
+  const lookup = await readFortuneLaunchesByTokens(tokens);
+  if (!lookup.configured || lookup.blockNumber === null) return emptyBoard("newest");
+  const { items, ledger } = await summarizeWithActivity(lookup.launches, lookup.blockNumber);
+  items.sort((a, b) => b.createdAt - a.createdAt);
+  return {
+    configured: true,
+    chainId: FORTUNE_NETWORK.chainId,
+    blockNumber: lookup.blockNumber.toString(),
+    total: items.length,
+    rankedAmong: items.length,
+    sort: "newest",
+    sortAvailable: true,
+    items,
+    hasMore: false,
+    ledger,
+  };
+}
+
+export type PricedLaunch = Omit<MarketSummary, "activity24h" | "activityTrending">;
+
+export type PortfolioPosition = PricedLaunch & {
+  /** Token balance as a decimal string (launch tokens use 18 decimals). */
+  balance: string;
+  /** Fraction of the launch's total supply this address holds. */
+  share: number | null;
+  valueUsd: number | null;
+};
+
+export type Portfolio = {
+  configured: boolean;
+  chainId: number;
+  owner: Address;
+  blockNumber: string | null;
+  /** Launches whose balances were read (the whole factory catalog). */
+  launchesScanned: number;
+  /** Launches this address holds; positions lists at most HOLDINGS_LIMIT of them. */
+  held: number;
+  /** Launches this address created. */
+  created: number;
+  totalValueUsd: number | null;
+  unpricedPositions: number;
+  positions: PortfolioPosition[];
+};
+
+const ratio = (part: string, whole: string) => {
+  const total = Number(whole);
+  return total > 0 ? Number(part) / total : null;
+};
+
+/**
+ * Values holdings at their price, largest value first; unpriced positions follow,
+ * largest balance first. The total covers priced positions only and is null when
+ * none of them could be priced.
+ */
+export function valuePositions<T extends { priceUsd: number | null; totalSupply: string; balance: string }>(rows: T[]) {
+  const positions = rows.map((row) => {
+    const value = row.priceUsd === null ? null : row.priceUsd * Number(row.balance);
+    return { ...row, share: ratio(row.balance, row.totalSupply), valueUsd: value !== null && Number.isFinite(value) ? value : null };
+  });
+  positions.sort((a, b) => (b.valueUsd ?? -1) - (a.valueUsd ?? -1) || Number(b.balance) - Number(a.balance));
+  const priced = positions.filter((position) => position.valueUsd !== null);
+  return {
+    positions,
+    totalValueUsd: priced.length || !positions.length ? priced.reduce((sum, position) => sum + position.valueUsd!, 0) : null,
+    unpricedPositions: positions.length - priced.length,
+  };
+}
+
+/** Every Fortune launch an address holds, valued at live curve or official-pool prices. */
+export async function readPortfolio(owner: Address): Promise<Portfolio> {
+  const holdings = await readFortuneHoldings(owner);
+  if (!holdings.configured || holdings.blockNumber === null) {
+    return { configured: holdings.configured, chainId: FORTUNE_NETWORK.chainId, owner, blockNumber: null, launchesScanned: 0, held: 0, created: 0, totalValueUsd: null, unpricedPositions: 0, positions: [] };
+  }
+  const launches = holdings.positions.map(({ launch }) => launch);
+  const context = launches.length ? await buildContext(launches, holdings.blockNumber) : null;
+  const valued = valuePositions(context ? holdings.positions.map(({ launch, balance }) => ({ ...summarize(context, launch), balance })) : []);
+  return {
+    configured: true,
+    chainId: FORTUNE_NETWORK.chainId,
+    owner,
+    blockNumber: holdings.blockNumber.toString(),
+    launchesScanned: holdings.total,
+    held: holdings.held,
+    created: holdings.created,
+    ...valued,
+  };
+}
+
+export type CreatorLaunch = PricedLaunch & {
+  /** Fraction of supply the creator's wallet holds now. */
+  creatorShare: number | null;
+};
+
+export type CreatorRecord = {
+  configured: boolean;
+  chainId: number;
+  creator: Address;
+  blockNumber: string | null;
+  launches: number;
+  phases: CreatorPhases;
+  items: CreatorLaunch[];
+  hasMore: boolean;
+};
+
+/** A creator's launch history: phase counts for every launch, and one priced page of them. */
+export async function readCreatorRecord(creator: Address, offset = 0, limit = 25, atBlock?: bigint): Promise<CreatorRecord> {
+  const result = await readCreatorFortuneLaunches(creator, offset, limit, atBlock);
+  const base = { chainId: FORTUNE_NETWORK.chainId, creator, launches: result.creatorTotal, phases: result.phases, hasMore: result.hasMore };
+  if (!result.configured || result.blockNumber === null) return { ...base, configured: false, blockNumber: null, items: [] };
+  const context = result.launches.length ? await buildContext(result.launches, result.blockNumber) : null;
+  const items = context ? result.launches.map((launch, index) => ({
+    ...summarize(context, launch),
+    creatorShare: ratio(result.creatorBalances[index], launch.totalSupply),
+  })) : [];
+  return { ...base, configured: true, blockNumber: result.blockNumber.toString(), items };
 }
 
 export const CHART_RANGES = { "24h": DAY, "7d": 7 * DAY, "30d": 30 * DAY } as const;
@@ -433,13 +619,14 @@ export type TokenMarket = {
     ledger: { available: boolean; coverage: LedgerCoverage | null; coversRange: boolean };
   } | null;
   trades: LedgerTrade[];
+  supply: SupplyBreakdown | null;
 };
 
 /** One token: live summary, pair weights and reserves, canonical chart and recent trades. */
 export async function readTokenMarket(token: Address, range: ChartRange): Promise<TokenMarket> {
   const lookup = await readFortuneLaunchByToken(token);
   if (!lookup.configured || !lookup.launch || lookup.blockNumber === null) {
-    return { configured: lookup.configured, chainId: FORTUNE_NETWORK.chainId, blockNumber: lookup.blockNumber?.toString() ?? null, summary: null, chart: null, trades: [] };
+    return { configured: lookup.configured, chainId: FORTUNE_NETWORK.chainId, blockNumber: lookup.blockNumber?.toString() ?? null, summary: null, chart: null, trades: [], supply: null };
   }
   const launch = lookup.launch;
   const blockNumber = lookup.blockNumber;
@@ -469,7 +656,10 @@ export async function readTokenMarket(token: Address, range: ChartRange): Promis
 
   const provider = ledgerProvider();
   const pools = context.pools.get(launch.token.toLowerCase()) || [];
-  const scan = provider ? await readLedger(provider, [launch.curve as Address, ...pools.map((pool) => pool.address)], CHART_RANGES[range]).catch(() => null) : null;
+  const [scan, supply] = await Promise.all([
+    provider ? readLedger(provider, [launch.curve as Address, ...pools.map((pool) => pool.address)], CHART_RANGES[range]).catch(() => null) : Promise.resolve(null),
+    readSupply(rpc, launch, pools, blockNumber).catch(() => null),
+  ]);
   const decoded = scan ? await decodeTrades(context, scan).catch(() => null) : null;
   const trades = decoded?.trades.get(launch.token.toLowerCase()) || [];
   const coverage = scan?.coverage || null;
@@ -505,5 +695,6 @@ export async function readTokenMarket(token: Address, range: ChartRange): Promis
       ledger: { available: Boolean(decoded), coverage, coversRange: Boolean(decoded) && covers(coverage, CHART_RANGES[range]) },
     },
     trades: [...trades].reverse().slice(0, 50),
+    supply,
   };
 }

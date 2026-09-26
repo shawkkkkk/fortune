@@ -6,10 +6,14 @@ const endpoints = [
   ["GET", "/api/public/v1/readiness", "Full protocol + Pancake infrastructure readiness"],
   ["GET", "/api/public/v1/protocol", "Published public-alpha protocol configuration"],
   ["GET", "/api/public/v1/stats", "Measured release-validation results"],
+  ["GET", "/api/public/v1/launches", "Launches recorded by the Fortune factories, newest first"],
+  ["GET", "/api/public/v1/markets", "Prices, market caps and trade activity; ?tokens= for a watchlist"],
+  ["GET", "/api/public/v1/markets/{token}", "One market: chart, pair reserves, supply split and recent trades"],
+  ["GET", "/api/public/v1/portfolio/{address}", "Every Fortune token a wallet holds, valued at live prices"],
+  ["GET", "/api/public/v1/creators/{address}", "A creator's launches, graduation record and current holdings"],
+  ["GET", "/api/public/v1/universe", "BNB Chain stocks, RWA, pre-IPO and crypto pair assets with eligibility"],
   ["POST", "/api/public/v1/launches/preview", "Validate a launch configuration"],
   ["GET", "/api/public/v1/transactions/{hash}", "Resolve transaction status before retrying"],
-  ["GET", "/api/public/v1/tokens", "Empty until the public onchain indexer is enabled"],
-  ["GET", "/api/public/v1/launches", "Empty until the public onchain indexer is enabled"],
 ] as const;
 
 const quickstart =
@@ -26,8 +30,8 @@ export default function DevelopersPage() {
           <h1>Real data or no data.</h1>
           <p>
             Readiness and protocol configuration come from the deployed BSC
-            Testnet stack. Indexed market endpoints deliberately return no
-            synthetic activity until the event indexer is live.
+            Testnet stack. Market endpoints read BNB Chain directly and state
+            the block and log coverage behind every number.
           </p>
         </div>
         <Link href="/testnet" className="primaryCta">
@@ -84,9 +88,11 @@ export default function DevelopersPage() {
           <span className="eyebrow">INDEXER BOUNDARY</span>
           <h2>No fake market feed.</h2>
           <p className="dataDisclaimer">
-            Token discovery, charts, volume, revenue, portfolio aggregation and
-            social activity remain unavailable until they are reproducible from
-            public onchain events. This is intentional.
+            Prices, charts, volume, supply and holdings are read from the
+            factory, the curves, the official pools and a bounded event log,
+            each at a stated block. When the log window cannot cover a range,
+            the response says so instead of filling the gap. Revenue history
+            and social activity wait for a durable indexer.
           </p>
         </div>
       </section>

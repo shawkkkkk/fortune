@@ -224,6 +224,7 @@ export async function GET(request: Request) {
             "Graduated tokens are priced from the official Pancake pools that hold Fortune's locked liquidity. Activity comes from a bounded eth_getLogs ledger and is null unless its coverage spans the whole window; ledger.coverage states the exact block range. Sorts other than newest rank the 100 most recent launches.",
           parameters: [
             { name: "sort", in: "query", schema: { type: "string", enum: ["newest", "volume24h", "trending", "marketCap"] } },
+            { name: "tokens", in: "query", description: "Up to 50 comma-separated token addresses (a watchlist). Overrides sort and paging; tokens that are not Fortune launches are skipped.", schema: { type: "string" } },
             { name: "offset", in: "query", schema: { type: "integer", minimum: 0 } },
             { name: "limit", in: "query", schema: { type: "integer", minimum: 1, maximum: 25 } },
           ],
@@ -242,8 +243,38 @@ export async function GET(request: Request) {
             { name: "range", in: "query", schema: { type: "string", enum: ["24h", "7d", "30d"] } },
           ],
           responses: {
-            "200": { description: "Market detail; chart.ledger.coversRange is false when the log provider could not serve the whole range" },
+            "200": { description: "Market detail; chart.ledger.coversRange is false when the log provider could not serve the whole range. supply splits totalSupply into curve, pools, creator, vaults, burned and holders, read at the same block." },
             "404": { description: "Not recorded by the configured Fortune factories" },
+          },
+        },
+      },
+      "/portfolio/{address}": {
+        get: {
+          tags: ["Markets"],
+          summary: "Every Fortune launch a wallet holds, valued at live prices",
+          description:
+            "Balances are read for the whole factory catalog at one block. Positions are valued at the live curve price, or the liquidity-weighted official pool price after graduation; valueUsd is not a sale quote. At most 100 positions are detailed; held counts all of them.",
+          parameters: [{ name: "address", in: "path", required: true, schema: { type: "string" } }],
+          responses: {
+            "200": { description: "Positions sorted by value, with totalValueUsd, held, created and the snapshot block" },
+            "400": { description: "Not an address" },
+          },
+        },
+      },
+      "/creators/{address}": {
+        get: {
+          tags: ["Launches"],
+          summary: "A creator's launch history: phase counts and priced launches",
+          description:
+            "phases counts every launch the address created (on the curve, ready to graduate, graduated, rescued). items is one page of priced launches, newest first, with creatorShare: the share of supply the creator wallet holds now.",
+          parameters: [
+            { name: "address", in: "path", required: true, schema: { type: "string" } },
+            { name: "cursor", in: "query", schema: { type: "string" } },
+            { name: "limit", in: "query", schema: { type: "integer", minimum: 1, maximum: 25 } },
+          ],
+          responses: {
+            "200": { description: "Creator record with page.nextCursor pinned to the first page's block" },
+            "400": { description: "Not an address, or an invalid cursor" },
           },
         },
       },

@@ -1,8 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { PairAssetsPanel, type PairAssetView } from "@/components/PairAssets";
 import PriceChart, { type ChartPoint } from "@/components/PriceChart";
+import SupplyBreakdown, { type SupplyView } from "@/components/SupplyBreakdown";
 import { useLanguage } from "@/components/LanguageProvider";
 import { useTheme } from "@/components/ThemeProvider";
 import { FORTUNE_NETWORK } from "@/lib/fortune-network";
@@ -36,6 +38,7 @@ type MarketResponse = {
     };
     chart: { range: Range; points: ChartPoint[]; ledger: { available: boolean; coverage: Coverage | null; coversRange: boolean } } | null;
     trades: Trade[];
+    supply?: SupplyView | null;
   };
   error?: { message?: string };
 };
@@ -84,8 +87,15 @@ export default function TokenMarketPanel({ token }: { token: string }) {
       <div className="marketInsights">
         <section className="panel marketChartPanel" aria-busy={loading}>
           <span className="eyebrow">PRICE CHART</span>
+          {loading ? (
+            <>
+              <div className="skeletonLine chartSkeletonPrice" aria-hidden="true" />
+              <div className="skeletonLine chartSkeletonArea" aria-hidden="true" />
+            </>
+          ) : null}
           <p className="chartCoverage">{loading ? "Reading trades and pool state from BNB Chain…" : error || "Market data unavailable."}</p>
         </section>
+        {loading ? <div className="skeletonLine statsSkeleton" aria-hidden="true" /> : null}
       </div>
     );
   }
@@ -190,6 +200,7 @@ export default function TokenMarketPanel({ token }: { token: string }) {
         </div>
       </div>
 
+      {data.supply ? <SupplyBreakdown supply={data.supply} zh={zh} /> : null}
       <PairAssetsPanel pairs={summary.pairs} graduated={summary.phase === 2} zh={zh} />
 
       <p className="chartCoverage" translate="no">{zh
@@ -213,7 +224,7 @@ export default function TokenMarketPanel({ token }: { token: string }) {
                     <td translate="no">{formatAmount(trade.tokenAmount)}</td>
                     <td>{formatPrice(trade.priceUsd)}</td>
                     <td>{sourceLabel(trade.source)}</td>
-                    <td translate="no"><a href={`${FORTUNE_NETWORK.explorerUrl}/address/${trade.trader}`} target="_blank" rel="noreferrer">{shortAddress(trade.trader)}</a></td>
+                    <td translate="no"><Link href={`/profile/${trade.trader}`}>{shortAddress(trade.trader)}</Link></td>
                     <td><a href={`${FORTUNE_NETWORK.explorerUrl}/tx/${trade.transactionHash}`} target="_blank" rel="noreferrer" aria-label="View transaction on BscScan">↗</a></td>
                   </tr>
                 ))}

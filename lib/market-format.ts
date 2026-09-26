@@ -33,6 +33,15 @@ export function formatAmount(value: number | null | undefined) {
   return new Intl.NumberFormat("en-US", { notation: value >= 100_000 ? "compact" : "standard", maximumFractionDigits: value >= 1 ? 2 : 6 }).format(value);
 }
 
+/** A 0–1 share as a compact percentage: "50%", "12.5%", "0.25%", "<0.1%". */
+export function formatShare(share: number) {
+  if (share === 0) return "0%";
+  if (share < 0.001) return "<0.1%";
+  const value = share * 100;
+  const text = value >= 10 ? value.toFixed(1) : value.toFixed(2);
+  return (text.includes(".") ? text.replace(/\.?0+$/, "") : text) + "%";
+}
+
 export function formatAge(timestamp: number | null | undefined, zh = false, now = Date.now() / 1000) {
   if (!timestamp) return "—";
   const seconds = Math.max(0, Math.round(now - timestamp));

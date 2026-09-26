@@ -169,3 +169,18 @@ export function formatEtTime(ms: number, now = Date.now()) {
     ...(sameDay ? {} : { weekday: "short" }),
   }).format(new Date(ms)) + " ET";
 }
+
+/** One line for the US session, for tokenized stocks: state plus the next change in ET. */
+export function sessionLine(status: UsMarketStatus, zh: boolean, now: number) {
+  const when = status.nextChange ? formatEtTime(status.nextChange, now) : null;
+  if (zh) {
+    if (status.session === "regular") return "美股交易中" + (when ? ` · ${when} 收盘` : "");
+    if (status.session === "pre") return "盘前交易" + (when ? ` · ${when} 开盘` : "");
+    if (status.session === "after") return "盘后交易" + (when ? ` · ${when} 结束` : "");
+    return "美股休市" + (when ? ` · ${when} 盘前开始` : "");
+  }
+  if (status.session === "regular") return "US market open" + (when ? ` · closes ${when}` : "");
+  if (status.session === "pre") return "Pre-market" + (when ? ` · opens ${when}` : "");
+  if (status.session === "after") return "After hours" + (when ? ` · ends ${when}` : "");
+  return (status.holiday ? `US market closed for ${status.holiday}` : "US market closed") + (when ? ` · pre-market ${when}` : "");
+}

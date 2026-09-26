@@ -142,11 +142,13 @@ export default function HomePage() {
           <span className="cinemaPodium" aria-hidden="true" />
           <img
             className="cinemaCat hero-fade-up"
-            style={{ animationDelay: "0.7s" }}
-            src="/fortune-cat-cutout.webp"
+            style={{ animationDelay: "0.3s" }}
+            src="/fortune-cat-cutout-800.webp"
+            srcSet="/fortune-cat-cutout-400.webp 400w, /fortune-cat-cutout-800.webp 800w"
+            sizes="(max-width: 760px) 300px, 400px"
             alt="Fortune's white lucky cat in a red and gold outfit holding a fortune cookie"
-            width="1254"
-            height="1254"
+            width="800"
+            height="800"
             fetchPriority="high"
           />
         </div>
@@ -295,12 +297,12 @@ export default function HomePage() {
           </div>
           <div className="proofGrid">
             <Link href="/burns" className="proofCard proofCardArt reveal" style={stagger(0, 0.1)}>
-              <img src="/fortune-cat-burns.webp" alt="" width="1254" height="1254" loading="lazy" />
+              <img src="/fortune-cat-burns-400.webp" srcSet="/fortune-cat-burns-400.webp 400w, /fortune-cat-burns-800.webp 800w" sizes="(max-width: 760px) 180px, 250px" alt="" width="400" height="400" loading="lazy" />
               <strong>Burns</strong>
               <span>Burn routes backed by public transaction evidence.</span>
             </Link>
             <Link href="/rewards" className="proofCard proofCardArt reveal" style={stagger(1, 0.1)}>
-              <img src="/fortune-cat-rewards.webp" alt="" width="1254" height="1254" loading="lazy" />
+              <img src="/fortune-cat-rewards-400.webp" srcSet="/fortune-cat-rewards-400.webp 400w, /fortune-cat-rewards-800.webp 800w" sizes="(max-width: 760px) 180px, 250px" alt="" width="400" height="400" loading="lazy" />
               <strong>Rewards</strong>
               <span>Pair-asset holder claims with a public ledger.</span>
             </Link>
@@ -372,10 +374,12 @@ export default function HomePage() {
         <img
           className="quoteCat reveal"
           style={{ animationDelay: "0.35s" }}
-          src="/fortune-cat-rewards.webp"
+          src="/fortune-cat-rewards-800.webp"
+          srcSet="/fortune-cat-rewards-400.webp 400w, /fortune-cat-rewards-800.webp 800w"
+          sizes="(max-width: 760px) 190px, 330px"
           alt=""
-          width="1254"
-          height="1254"
+          width="800"
+          height="800"
           loading="lazy"
         />
         <ParallaxLayer className="quoteClouds" mode="lift" strength={80}>

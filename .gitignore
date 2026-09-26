@@ -12,3 +12,6 @@ contracts/lib
 contracts-v2/cache
 contracts-v2/out
 tsconfig.tsbuildinfo
+
+# Local e2e screenshots (tests/e2e/creator-flow.mjs)
+.tmp/

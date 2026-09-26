@@ -21,6 +21,7 @@ import {
   FORTUNE_NETWORK_CONFIGURED,
 } from "@/lib/fortune-network";
 import FortuneLogo from "@/components/FortuneLogo";
+import TokenMarketPanel from "@/components/TokenMarketPanel";
 
 const curveAbi = [
   {
@@ -862,6 +863,8 @@ export default function MarketPage() {
           <span style={{ width: progress + "%" }} />
         </div>
       </section>
+
+      <TokenMarketPanel token={market.token} />
 
       {market.graduated ? (
         <section className="registryNotice" style={{ marginTop: 14 }}>

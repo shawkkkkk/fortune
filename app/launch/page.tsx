@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   createPublicClient,
   createWalletClient,
@@ -21,8 +21,10 @@ import {
 
 import { assertWalletIdentity, parseLaunchAmount, restorePendingLaunch, type PendingLaunch } from "@/lib/launch-safety";
 import TokenImageInput from "@/components/TokenImageInput";
-import PairAddressCheck from "@/components/PairAddressCheck";
-import { assets as discoveryAssets } from "@/data/assets";
+import PairPicker from "@/components/PairPicker";
+import { useLanguage } from "@/components/LanguageProvider";
+import { curveEconomics, firstBuyPreview as previewFirstBuy } from "@/lib/launch-preview";
+import { formatAmount, formatUsd } from "@/lib/market-format";
 import { byteLength, importMetadataUri, validateCreatorMetadata, type CreatorMetadata } from "@/lib/creator-metadata";
 import { launchDraftKey, makeLaunchDraft, restoreLaunchDraft, type LaunchDraft } from "@/lib/launch-draft";
 
@@ -36,6 +38,7 @@ type LaunchAsset = {
   category: string;
   healthy: boolean;
   launchable: boolean;
+  priceUsd1e18?: string;
 };
 
 type LaunchReceipt = {
@@ -276,8 +279,9 @@ function short(value: string) {
 export default function LaunchPage() {
   const mode: LaunchMode = "standard";
   const [account, setAccount] = useState<Address | null>(null);
+  const { language } = useLanguage();
+  const zh = language === "zh";
   const [assets, setAssets] = useState<LaunchAsset[]>([]);
-  const [assetSearch, setAssetSearch] = useState("");
   const [selectedAsset, setSelectedAsset] = useState<Address | null>(null);
   const [assetError, setAssetError] = useState("");
   const [name, setName] = useState("");
@@ -303,7 +307,6 @@ export default function LaunchPage() {
   const [metadataMessage, setMetadataMessage] = useState("");
   const [savedDraft, setSavedDraft] = useState<LaunchDraft | null>(null);
   const [draftMessage, setDraftMessage] = useState("");
-  const [assetCategory, setAssetCategory] = useState("Approved");
   const [message, setMessage] = useState("");
   const [receipt, setReceipt] = useState<LaunchReceipt | null>(null);
   const [reviewed, setReviewed] = useState(false);
@@ -433,28 +436,6 @@ export default function LaunchPage() {
     finally { signing.current = false; setBusy(false); }
   }
 
-  const visibleAssets = useMemo(() => {
-    const needle = assetSearch.trim().toLowerCase();
-    if (!needle) return assets;
-
-    return assets.filter((asset) =>
-      [
-        asset.symbol,
-        asset.name,
-        asset.category,
-        asset.address,
-      ]
-        .join(" ")
-        .toLowerCase()
-        .includes(needle)
-    );
-  }, [assets, assetSearch]);
-
-  const discoveryRows = useMemo(() => discoveryAssets.filter((asset) => asset.chain === "BSC" && asset.address &&
-    (assetCategory === "All BNB" || asset.category === assetCategory) &&
-    [asset.name, asset.symbol, asset.address].join(" ").toLowerCase().includes(assetSearch.toLowerCase().trim()) &&
-    !(FORTUNE_NETWORK.chainId === 56 && assets.some((active) => active.address.toLowerCase() === asset.address!.toLowerCase()))), [assets, assetSearch, assetCategory]);
-
   const selected = assets.find(
     (asset) => asset.address.toLowerCase() === selectedAsset?.toLowerCase()
   ) || null;
@@ -479,8 +460,14 @@ export default function LaunchPage() {
         if (cancelled) return;
 
         setAssets(next);
+        // /launch?pair=0x… preselects a pair, but only one this registry read marks launchable.
+        let requested = "";
+        try { requested = (new URLSearchParams(window.location.search).get("pair") || "").toLowerCase(); } catch { /* No query string. */ }
         setSelectedAsset((current) => {
           if (current) return current;
+
+          const wanted = next.find((item) => item.launchable && item.address.toLowerCase() === requested);
+          if (wanted) return wanted.address;
 
           const primary = next.find(
             (item) =>
@@ -685,6 +672,10 @@ export default function LaunchPage() {
     }
   }
 
+  const curveInputs = { supply: Number(totalSupply), base: Number(basePrice), slope: Number(slope), graduationUsd: Number(graduationTarget) };
+  const economics = curveEconomics(curveInputs);
+  const quotePriceUsd = selected?.priceUsd1e18 ? Number(selected.priceUsd1e18) / 1e18 : 0;
+  const buyPreview = previewFirstBuy({ ...curveInputs, amount: Number(creatorPurchase), quotePriceUsd });
   const cleanNamePreview = name.trim();
   const cleanSymbolPreview = symbol.trim();
   const firstBuyPreview = Number(creatorPurchase) > 0 ? creatorPurchase.trim() + " " + (selected?.symbol || "") : "";
@@ -758,31 +749,35 @@ export default function LaunchPage() {
           </section>
 
           <section className="formCard">
-            <div className="formSectionTitle"><span>03</span><div><h2>Pair asset</h2><p>Only live registry-approved assets are selectable.</p></div></div>
+            <div className="formSectionTitle"><span>03</span><div><h2>Pair asset</h2><p>Browse every stock, fund, gold and pre-IPO token on BNB Chain. Only registry-approved assets can hold launch reserves.</p></div></div>
             <div className="poolScope"><strong>One pair · one graduation pool</strong><p className="fieldHint">Two-to-five-pool launches require a separate reviewed release. This form does not enable multi-pair research or change the frozen Standard candidate.</p></div>
-            <div className="creatorTabs" aria-label="Pair categories">
-              {["Approved", "All BNB", "Majors", "Stablecoins", "DeFi", "RWAs", "xStocks", "Any token"].map((category) => <button type="button" key={category} className={assetCategory === category ? "active" : ""} aria-pressed={assetCategory === category} onClick={() => setAssetCategory(category)}>{category}</button>)}
-            </div>
-            {assetCategory === "Any token" ? <PairAddressCheck onSelect={(address) => { const match = assets.find((asset) => asset.launchable && asset.address.toLowerCase() === address.toLowerCase()); if (!match) return false; setSelectedAsset(match.address); setReviewed(false); return true; }} /> : <>
-            <div className="assetPickerToolbar">
-              <input aria-label="Search approved pair assets" value={assetSearch} onChange={(event) => setAssetSearch(event.target.value)} placeholder="Search approved BNB assets" />
-              <Link href="/assets" className="secondaryCta">Pair policy →</Link>
-            </div>
             {assetError ? <div className="registryNotice statusError"><strong>ASSET READ FAILED</strong><span>{assetError}</span></div> : null}
-            {visibleAssets.length === 0 && !assetError ? <div className="emptyPanel"><strong>No approved pair found.</strong><p>Asset discovery alone does not mean an asset is safe to pair.</p></div> : null}
-            <div className="launchAssetGrid">
-              {visibleAssets.filter((asset) => assetCategory === "Approved" || assetCategory === "All BNB" || asset.category === assetCategory).map((asset) => <button type="button" key={asset.address} className={selectedAsset?.toLowerCase() === asset.address.toLowerCase() ? "assetOption assetSelected" : "assetOption"} aria-pressed={selectedAsset?.toLowerCase() === asset.address.toLowerCase()} onClick={() => { setSelectedAsset(asset.address); setReviewed(false); }}>
-                <span className="assetIconLarge">{asset.symbol.slice(0, 2)}</span><span><strong>{asset.symbol}</strong><small>{asset.name}</small></span><em>{asset.category}</em>
-              </button>)}
-              {assetCategory !== "Approved" ? discoveryRows.map((asset) => <div className="assetOption discoveryPair" key={asset.id}><span className="assetIconLarge" translate="no">{asset.symbol.slice(0, 2)}</span><span><strong translate="no">{asset.symbol}</strong><small>{asset.name}</small><small>Discovery only · not selectable</small></span><em>{asset.category}</em></div>) : null}
-            </div>
-            {assetCategory !== "Approved" ? <p className="fieldHint">Catalog entries are not registry approval. Mainnet Standard is WBNB-only; testnet uses its own valueless assets. Tokenized stocks require a verified compatible BSC deployment and separate eligibility review. <Link href="/assets">Explore pair research →</Link></p> : null}
-            </>}
+            <PairPicker
+              mode="select"
+              selectable={assets.filter((asset) => asset.launchable).map((asset) => asset.address)}
+              selected={selectedAsset}
+              onSelect={(address) => { setSelectedAsset(address as Address); setReviewed(false); }}
+            />
           </section>
 
           <section className="formCard">
             <div className="formSectionTitle"><span>04</span><div><h2>Optional first buy</h2><p>Zero means launch without a creator purchase.</p></div></div>
             <div className="fieldGrid"><label>Amount in {selected?.symbol || "pair asset"}<input value={creatorPurchase} inputMode="decimal" onChange={(event) => { setCreatorPurchase(event.target.value); setReviewed(false); }} placeholder="0" /></label></div>
+            {buyPreview && selected ? (
+              <div className="firstBuyPreview" aria-live="polite" translate="no">
+                <strong>{zh ? "首购预览" : "First-buy preview"}</strong>
+                <dl>
+                  <div><dt>{zh ? "支付" : "You pay"}</dt><dd>{formatAmount(buyPreview.spent)} {selected.symbol}</dd></div>
+                  <div><dt>{zh ? "发行护盾 99%" : "Launch Shield 99%"}</dt><dd>−{formatAmount(buyPreview.shield)} {selected.symbol}<small>{zh ? "用于加固流动性" : "to liquidity reinforcement"}</small></dd></div>
+                  <div><dt>{zh ? "手续费 1%" : "Fees 1%"}</dt><dd>−{formatAmount(buyPreview.fee)} {selected.symbol}</dd></div>
+                  <div><dt>{zh ? "进入曲线" : "Reaches the curve"}</dt><dd>{formatAmount(buyPreview.netQuote)} {selected.symbol} · {formatUsd(buyPreview.netUsd)}</dd></div>
+                  <div className="firstBuyTotal"><dt>{zh ? "预计获得" : "You receive"}</dt><dd>≈ {formatAmount(buyPreview.tokens)} {symbol.trim() || (zh ? "代币" : "tokens")}<small>{(buyPreview.supplyShare * 100).toPrecision(2)}% {zh ? "的总供应量" : "of supply"}</small></dd></div>
+                </dl>
+                {buyPreview.reachesGraduation ? <p className="fieldHint">{zh ? `这笔购买本身就会达到毕业目标：曲线只成交到目标，退还 ${formatAmount(buyPreview.refund)} ${selected.symbol}。` : `This buy alone reaches the graduation target: the curve fills only to the target and refunds ${formatAmount(buyPreview.refund)} ${selected.symbol}.`}</p> : null}
+                {buyPreview.exceedsWalletCap ? <p className="reviewWarning">{zh ? `超过前 15 秒每个钱包 2% 的上限，发行交易会被回滚。首购最多约 ${formatAmount(buyPreview.maxAmountUnderCap)} ${selected.symbol}。` : `Over the 2% early-wallet cap for the first 15 seconds: the launch transaction would revert. Keep the first buy under about ${formatAmount(buyPreview.maxAmountUnderCap)} ${selected.symbol}.`}</p> : null}
+                <p className="fieldHint">{zh ? `护盾在 5 秒内衰减为零。以开盘价计算，同样金额届时约可买到 ${formatAmount(buyPreview.afterShieldTokens)} ${symbol.trim() || "枚代币"}，但其他买家可能先成交。` : `The shield decays to zero within 5 seconds. At the opening price the same amount would then buy about ${formatAmount(buyPreview.afterShieldTokens)} ${symbol.trim() || "tokens"}, though other buyers may get in first.`}</p>
+              </div>
+            ) : null}
             <p className="reviewWarning">The Launch Shield charges up to 99% on buys in the first five seconds, including a creator first buy. Fortune simulates the atomic transaction and sets a minimum token output before submitting it.</p>
           </section>
 
@@ -796,6 +791,13 @@ export default function LaunchPage() {
               <label>Graduation target · USD<input value={graduationTarget} inputMode="decimal" onChange={(event) => { setGraduationTarget(event.target.value); setReviewed(false); }} /></label>
               <label>Community treasury · optional<input value={treasury} onChange={(event) => { setTreasury(event.target.value); setReviewed(false); }} placeholder="Defaults to creator wallet" /></label>
             </div>
+            {economics ? (
+              <dl className="curvePreview" translate="no">
+                <div><dt>{zh ? "开盘市值" : "Opening market cap"}</dt><dd>{formatUsd(economics.openingMarketCap)}</dd></div>
+                <div><dt>{zh ? "毕业市值" : "Market cap at graduation"}</dt><dd>{formatUsd(economics.graduationMarketCap)}</dd></div>
+                <div><dt>{zh ? "毕业前售出" : "Sold on the curve"}</dt><dd>{(economics.soldShare * 100).toPrecision(2)}% {zh ? "的供应量" : "of supply"}</dd></div>
+              </dl>
+            ) : null}
           </details>
 
           <section className="formCard">

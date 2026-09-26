@@ -28,6 +28,7 @@ const links = [
   ["/", "Home"],
   ["/explore", "Explore"],
   ["/launch", "Launch"],
+  ["/assets", "Stocks"],
   ["/burns", "Burns"],
   ["/rewards", "Rewards"],
   ["/stats", "Stats"],

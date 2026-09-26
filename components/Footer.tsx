@@ -38,6 +38,7 @@ export default function Footer() {
             <Link href="/launch">
               {zh ? "发行" : "Launch"}
             </Link>
+            <Link href="/assets">{zh ? "股票与配对资产" : "Stocks & pairs"}</Link>
             {FORTUNE_NETWORK.isTestnet ? <Link href="/testnet">{zh ? "测试网实验室" : "Testnet lab"}</Link> : null}
           </div>
           <div>

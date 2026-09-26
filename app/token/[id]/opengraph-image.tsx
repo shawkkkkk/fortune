@@ -5,6 +5,7 @@ import { isAddress, type Address } from "viem";
 import { FORTUNE_NETWORK } from "@/lib/fortune-network";
 import { formatPrice, formatUsd } from "@/lib/market-format";
 import { readTokenSummary } from "@/lib/market-insights";
+import { trustedShareArtworkSource } from "@/lib/share-artwork";
 import { readTokenMetadata } from "@/lib/token-metadata";
 
 export const size = { width: 1200, height: 630 };
@@ -16,18 +17,15 @@ const IMAGE_BYTES_LIMIT = 1_500_000;
 
 /**
  * Token artwork as a data URI, only for small PNG/JPEG files that answer quickly.
- * `url` is creator metadata already checked by publicMetadataUrl (public web host,
- * no IP literal, credentials or custom port). Only HTTPS is fetched, and redirects
- * are refused except from the IPFS gateway, so a public host cannot bounce the
- * request inward.
+ * Creator-controlled HTTPS hosts are intentionally not fetched here: hostname
+ * validation alone cannot prevent DNS rebinding into a private network. Valid
+ * IPFS URIs use Fortune's fixed gateway, with a timeout and response-size bound.
  */
 async function artwork(url: string | null) {
-  if (!url) return null;
-  const ipfs = url.startsWith("ipfs://");
-  const source = ipfs ? `https://ipfs.io/ipfs/${url.slice(7)}` : url;
-  if (!/^https:\/\//i.test(source)) return null;
+  const source = trustedShareArtworkSource(url);
+  if (!source) return null;
   try {
-    const response = await fetch(source, { signal: AbortSignal.timeout(3_000), redirect: ipfs ? "follow" : "error" });
+    const response = await fetch(source, { signal: AbortSignal.timeout(3_000), redirect: "error" });
     const type = (response.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
     if (!response.ok || (type !== "image/png" && type !== "image/jpeg")) return null;
     const bytes = Buffer.from(await response.arrayBuffer());

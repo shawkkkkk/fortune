@@ -16,6 +16,7 @@ const sections = [
   ["rewards", "Holder rewards"],
   ["pairs", "Pair assets on BNB"],
   ["any-bep20", "Any reviewed BEP-20"],
+  ["custom-pairs", "Custom pairs (beta)"],
   ["launch", "Launching a token"],
   ["trust", "What you have to trust"],
   ["api", "API and addresses"],
@@ -147,8 +148,35 @@ export default function DocsPage() {
               fees, rebases, blacklists, unusual decimals or thin liquidity. Fortune
               therefore treats custom pairing as a compatibility pipeline: token
               behavior, pricing source, liquidity/graduation venue and policy checks
-              must pass before the asset becomes launchable.
+              must pass before the asset becomes launchable. The permissionless
+              alternative is the <a href="#custom-pairs">custom-pairs beta</a>.
             </p>
+          </section>
+
+          <section className="panel" id="custom-pairs">
+            <span className="eyebrow">CUSTOM PAIRS · BETA</span>
+            <h2>Pair with any token, including ones that tax transfers.</h2>
+            <p>
+              Custom pairs are the permissionless path: paste any BEP-20, such as a
+              tokenized stock that is not in the registry or a token with a transfer
+              tax, and launch against it. There is no registry and no oracle. Each
+              launch gets its own curve priced in the pair token, so a badly behaved
+              pair can only affect launches that chose it.
+            </p>
+            <ul className="docsPoints">
+              <li><strong>Transfer taxes are measured, not trusted.</strong> The curve counts only what actually arrives, checks sell slippage against what reaches the seller, and seeds the pool from what the pool received.</li>
+              <li><strong>Check a token before you launch.</strong> Fortune simulates a buy, a sell and a graduation transfer and reports the tax on each, plus pause, blacklist, fee-change, limit and rebasing functions found in the bytecode.</li>
+              <li><strong>Same Launch Shield.</strong> 99% decaying to zero within five seconds and a 2% wallet cap for fifteen seconds. Shield tax becomes pool liquidity and is never paid to the creator.</li>
+              <li><strong>Graduation to PancakeSwap V2.</strong> The pool is created in the launch transaction and locked until graduation, then opened at the final curve price with the LP tokens burned.</li>
+              <li><strong>If the pair token breaks.</strong> Losses hit Launch Shield reserve and unclaimed fees first. If the reserve itself falls short, or graduation stays impossible for seven days, holders redeem a pro-rata share of everything the curve holds.</li>
+            </ul>
+            <p className="reviewWarning">
+              Unaudited beta, separate from the frozen Standard candidate. The site never
+              enables it on BNB Smart Chain mainnet until it passes its own audit.
+            </p>
+            <div className="heroActions">
+              <Link href="/launch/custom" className="secondaryCta">Check a token or launch →</Link>
+            </div>
           </section>
 
           <section className="panel" id="launch">

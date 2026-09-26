@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import CustomPairBoard from "@/components/CustomPairBoard";
 import WatchButton from "@/components/WatchButton";
 import { useWatchlist } from "@/lib/watchlist";
 import { useLanguage } from "@/components/LanguageProvider";
@@ -327,6 +328,8 @@ export default function MarketsPage() {
           </button>
         </div>
       ) : null}
+
+      {watchOnly ? null : <CustomPairBoard />}
     </main>
   );
 }

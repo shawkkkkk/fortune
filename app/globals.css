@@ -6611,3 +6611,120 @@ html.entryGateOpen {
 .assetCompareControls span + span::before {
   content: " · ";
 }
+
+/* ---------------------------------------------------------------- Custom pairs (beta) */
+
+.launchModeRow .launchModeLink {
+  position: relative;
+  min-height: 96px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 6px;
+  padding: 18px 48px 18px 18px;
+  border: 1px dashed var(--gold-line);
+  border-radius: var(--radius);
+  background: var(--gold-tint);
+  color: var(--ink);
+  text-decoration: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.launchModeRow .launchModeLink:hover { border-color: var(--red); box-shadow: 0 0 0 3px rgba(216, 20, 29, 0.08); }
+.launchModeRow .launchModeLink strong { font-family: var(--font-display); font-size: 18px; font-weight: 650; font-variation-settings: "SOFT" 100; }
+.launchModeRow .launchModeLink span { color: var(--muted); font-size: 13.5px; line-height: 1.45; }
+.launchModeRow .launchModeLink::after { content: "→"; position: absolute; top: 18px; right: 18px; color: var(--red); font-weight: 700; }
+
+.pairInspector {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 18px;
+  border: 1px solid var(--line-strong);
+  border-radius: 16px;
+  background: var(--surface);
+  min-width: 0;
+}
+.pairInspector-clear { border-color: var(--jade-line); }
+.pairInspector-caution { border-color: var(--gold-line); }
+.pairInspector-unsupported { border-color: rgba(216, 20, 29, 0.5); background: var(--red-tint); }
+.pairInspectorLoading { min-height: 180px; align-content: center; }
+.inspectorHead { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.inspectorHead h3 { margin: 4px 0 2px; font-size: 20px; overflow-wrap: anywhere; }
+.inspectorHead p { margin: 0; }
+.inspectorVerdict { padding: 6px 12px; border-radius: 999px; font-size: 13px; font-weight: 700; white-space: nowrap; }
+.inspectorVerdict-clear { background: var(--jade-tint); color: var(--jade); }
+.inspectorVerdict-caution { background: var(--gold-tint); color: var(--gold-ink); }
+.inspectorVerdict-unsupported { background: rgba(216, 20, 29, 0.12); color: var(--red); }
+.inspectorTaxes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 0; }
+.inspectorTaxes > div { display: grid; gap: 2px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-sunk); min-width: 0; }
+.inspectorTaxes dt { color: var(--muted); font-size: 12.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+.inspectorTaxes dd { display: grid; gap: 2px; margin: 0; }
+.inspectorTaxes dd b { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.inspectorTaxes small { color: var(--muted); font-size: 12px; }
+.inspectorTaxes .tax-good { color: var(--jade); }
+.inspectorTaxes .tax-warn { color: var(--gold-ink); }
+.inspectorTaxes .tax-bad { color: var(--red); }
+.inspectorTaxes .tax-muted { color: var(--muted); }
+.inspectorFindings { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.inspectorFindings li { display: grid; gap: 2px; padding: 10px 12px 10px 14px; border-left: 3px solid var(--line-strong); border-radius: 8px; background: var(--surface-sunk); font-size: 14px; line-height: 1.45; }
+.inspectorFindings li span { color: var(--muted); }
+.inspectorFindings .inspectorFinding-block { border-left-color: var(--red); }
+.inspectorFindings .inspectorFinding-warn { border-left-color: var(--gold); }
+.inspectorFindings .inspectorFinding-info { border-left-color: var(--line-strong); }
+
+.customPairQuick { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
+.customPairQuick .secondaryCta { padding: 8px 14px; font-size: 13.5px; }
+.customFeeChoice { margin: 16px 0 8px; padding: 0; border: 0; min-width: 0; }
+.customFeeChoice legend { margin-bottom: 10px; font-weight: 650; }
+.customFeeChoice .launchModeRow { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.customFeeChoice .launchModeRow button { min-height: 72px; padding: 14px 36px 14px 14px; }
+.customFeeChoice .launchModeRow button::after { top: 14px; right: 12px; width: 16px; height: 16px; }
+.customChecklist { display: grid; gap: 6px; margin: 0 0 16px; padding: 0; list-style: none; }
+.customChecklist li { position: relative; padding-left: 26px; color: var(--muted); }
+.customChecklist li::before { content: ""; position: absolute; left: 0; top: 4px; width: 14px; height: 14px; border: 2px solid var(--line-strong); border-radius: 50%; }
+.customChecklist li.done { color: var(--ink); }
+.customChecklist li.done::before { border-color: var(--jade); background: radial-gradient(circle, var(--jade) 0 45%, transparent 50%); }
+
+.customMarketMetrics { margin-top: 8px; }
+.customProgress { margin: 18px 0 22px; }
+.customDescription { max-width: 72ch; color: var(--muted); line-height: 1.6; overflow-wrap: anywhere; }
+.customLinks { margin: 0 0 12px; }
+.customMarketLayout { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr); gap: 20px; align-items: start; }
+.customMarketSide { display: grid; gap: 16px; min-width: 0; }
+.customMarketSide .pairInspector { margin-top: 0; }
+.customTradePanel { display: grid; gap: 14px; min-width: 0; }
+.customTradePanel label { display: grid; gap: 6px; font-weight: 600; }
+.customTradePanel .linkButton { justify-self: end; margin-top: -6px; }
+.tradeTabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 4px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-sunk); }
+.tradeTabs button { padding: 10px; border: 0; border-radius: 9px; background: transparent; color: var(--muted); font-weight: 700; }
+.tradeTabs button.active { background: var(--surface); color: var(--ink); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08); }
+.tradeTabs button:first-child.active { color: var(--jade); }
+.tradeTabs button:last-child.active { color: var(--red); }
+.tradeQuote { display: grid; gap: 6px; margin: 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-sunk); font-size: 14px; }
+.tradeQuote > div { display: flex; justify-content: space-between; gap: 12px; }
+.tradeQuote dt { color: var(--muted); }
+.tradeQuote dd { margin: 0; font-variant-numeric: tabular-nums; text-align: right; overflow-wrap: anywhere; }
+.tradeQuote .firstBuyTotal { padding-top: 6px; border-top: 1px dashed var(--line); font-weight: 700; }
+.slippageRow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.slippageRow button { padding: 6px 12px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--surface); color: var(--ink); font-size: 13px; font-weight: 600; }
+.slippageRow button.active { border-color: var(--red); color: var(--red); background: var(--red-tint); }
+.customPhaseAction { display: grid; gap: 10px; padding: 14px; border: 1px solid var(--gold-line); border-radius: 12px; background: var(--gold-tint); }
+.customPhaseAction p { margin: 0; line-height: 1.5; }
+.customFacts .statRows a { overflow-wrap: anywhere; }
+.statusPill.customPhase-CurveActive, .statusPill.customPhase-GraduationReady, .statusPill.customPhase-Graduated, .statusPill.customPhase-Rescued { margin-left: 10px; vertical-align: middle; }
+.customPairBoard { display: grid; gap: 16px; margin-top: 40px; }
+.customPairTeaser { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-top: 40px; }
+.customPairTeaser h2 { margin: 6px 0; }
+.docsPoints { display: grid; gap: 10px; margin: 14px 0; padding-left: 20px; line-height: 1.6; }
+
+@media (max-width: 900px) {
+  .customMarketLayout { grid-template-columns: minmax(0, 1fr); }
+  .customFeeChoice .launchModeRow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 560px) {
+  .inspectorTaxes { grid-template-columns: minmax(0, 1fr); }
+  .inspectorTaxes > div { grid-template-columns: auto 1fr; align-items: center; column-gap: 12px; }
+  .inspectorTaxes dd { justify-items: end; text-align: right; }
+  .inspectorTaxes dd b { font-size: 20px; }
+}

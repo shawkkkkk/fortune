@@ -248,6 +248,45 @@ export async function GET(request: Request) {
           },
         },
       },
+      "/pairs/inspect": {
+        get: {
+          tags: ["Assets"],
+          summary: "Measure any BEP-20 as a custom pair",
+          description:
+            "Reads metadata and bytecode (proxy slots; pause, blacklist, fee-change, limit, mint and rebasing selectors), then simulates the transfers a custom-pair curve makes with eth_call state overrides: wallet to curve, curve to wallet and curve to pool. Each leg reports the measured tax in basis points. Nothing is signed or broadcast. A simulation at one block, not an audit.",
+          parameters: [
+            { name: "address", in: "query", required: true, schema: { type: "string" } },
+            { name: "chain", in: "query", schema: { type: "integer", enum: [56, 97] } },
+            { name: "holder", in: "query", schema: { type: "string" }, description: "Optional wallet to simulate from when no fresh-wallet balance can be synthesized" },
+          ],
+          responses: {
+            "200": { description: "verdict (clear, caution, unsupported), findings, per-leg taxes and the block the simulation used" },
+            "400": { description: "Not an address or unsupported chain" },
+            "503": { description: "The network could not be read" },
+          },
+        },
+      },
+      "/custom-pairs": {
+        get: {
+          tags: ["Launches"],
+          summary: "Custom-pair beta launches (any BEP-20 pair), newest first",
+          description:
+            "Unaudited beta, never enabled on BNB Smart Chain mainnet. Returns configured=false where the custom-pair factory is not deployed. Prices are in pair-token base units per whole launch token, scaled by 1e18.",
+          parameters: [
+            { name: "offset", in: "query", schema: { type: "integer", minimum: 0 } },
+            { name: "limit", in: "query", schema: { type: "integer", minimum: 1, maximum: 48 } },
+          ],
+          responses: { "200": { description: "Factory, protocol fee, pause state and one page of launches" }, "503": { description: "The network could not be read" } },
+        },
+      },
+      "/custom-pairs/{curve}": {
+        get: {
+          tags: ["Launches"],
+          summary: "One custom-pair launch: curve state, fees, graduation or rescue",
+          parameters: [{ name: "curve", in: "path", required: true, schema: { type: "string" } }],
+          responses: { "200": { description: "Launch detail read at one block" }, "404": { description: "No custom-pair launch uses this curve" } },
+        },
+      },
       "/portfolio/{address}": {
         get: {
           tags: ["Markets"],

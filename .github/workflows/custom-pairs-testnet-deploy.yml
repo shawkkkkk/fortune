@@ -1,0 +1,138 @@
+name: Custom Pairs Beta Testnet Deploy + Drill
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type DEPLOY_CUSTOM_PAIRS_BETA to deploy the UNAUDITED custom-pairs beta to BSC Testnet and run a real lifecycle drill"
+        required: true
+        type: string
+      pancake_v2_factory:
+        description: "PancakeSwap V2 factory on BSC testnet (verify before every run)"
+        required: true
+        default: "0xB7926C0430Afb07AA7DEfDE6DA862aE0Bde767bc"
+        type: string
+
+jobs:
+  deploy-and-drill:
+    if: ${{ inputs.confirm == 'DEPLOY_CUSTOM_PAIRS_BETA' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: contracts-custom-pairs
+    env:
+      PRIVATE_KEY: ${{ secrets.FORTUNE_TESTNET_PRIVATE_KEY }}
+      BSC_TESTNET_RPC_URL: ${{ secrets.BSC_TESTNET_RPC_URL }}
+      PANCAKE_V2_FACTORY: ${{ inputs.pancake_v2_factory }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09
+        with:
+          version: v1.8.3
+
+      - name: Require BSC testnet secrets
+        run: |
+          test -n "$PRIVATE_KEY" || (echo "Missing FORTUNE_TESTNET_PRIVATE_KEY secret" && exit 1)
+          test -n "$BSC_TESTNET_RPC_URL" || (echo "Missing BSC_TESTNET_RPC_URL secret" && exit 1)
+
+      - name: Install pinned Solidity libraries
+        working-directory: contracts
+        run: |
+          forge install OpenZeppelin/openzeppelin-contracts@69c8def5f222ff96f2b5beff05dfba996368aa79 --no-commit
+          forge install foundry-rs/forge-std@8bbcf6e3f8f62f419e5429a0bd89331c85c37824 --no-commit
+
+      - name: Verify testnet chain, Pancake V2 factory and gas budget
+        run: |
+          set -euo pipefail
+          CHAIN_ID=$(cast chain-id --rpc-url "$BSC_TESTNET_RPC_URL")
+          test "$CHAIN_ID" = "97" || (echo "Expected BSC Testnet chain 97, got $CHAIN_ID" && exit 1)
+          CODE=$(cast code "$PANCAKE_V2_FACTORY" --rpc-url "$BSC_TESTNET_RPC_URL")
+          test "$CODE" != "0x" || (echo "Pancake V2 factory has no bytecode: $PANCAKE_V2_FACTORY" && exit 1)
+          WALLET=$(cast wallet address --private-key "$PRIVATE_KEY")
+          BALANCE=$(cast balance "$WALLET" --rpc-url "$BSC_TESTNET_RPC_URL")
+          echo "Testnet deployer: $WALLET"
+          echo "tBNB balance (wei): $BALANCE"
+          if [ "$BALANCE" -lt 50000000000000000 ]; then
+            echo "Need at least 0.05 tBNB for the beta deployment and lifecycle drill."
+            exit 1
+          fi
+
+      - name: Unit, fuzz and invariant suites
+        run: forge test --no-match-contract Fork --fuzz-runs 1000 -vv
+
+      - name: Deploy custom-pairs beta and faucet test tokens
+        run: |
+          set -euo pipefail
+          forge script script/DeployCustomPairsTestnet.s.sol \
+            --rpc-url "$BSC_TESTNET_RPC_URL" --broadcast --slow --legacy --with-gas-price 1000000000 \
+            2>&1 | tee /tmp/custom-pairs-deploy.log
+          for NAME in CUSTOM_PAIR_FACTORY CUSTOM_PAIR_CURVE_DEPLOYER TESTNET_TAX_TOKEN TESTNET_PLAIN_TOKEN; do
+            VALUE=$(sed -nE "s/.*${NAME}=(0x[0-9a-fA-F]{40}).*/\1/p" /tmp/custom-pairs-deploy.log | tail -1)
+            test -n "$VALUE" || (echo "Missing $NAME in deploy output" && exit 1)
+            echo "$NAME=$VALUE" >> "$GITHUB_ENV"
+          done
+
+      - name: Drill phase 1 - launch paired with the 5% transfer-tax token
+        run: |
+          set -euo pipefail
+          forge script script/CustomPairsTestnetDrill.s.sol --sig "launch()" \
+            --rpc-url "$BSC_TESTNET_RPC_URL" --broadcast --slow --legacy --with-gas-price 1000000000 \
+            2>&1 | tee /tmp/custom-pairs-drill-launch.log
+          CURVE=$(sed -nE 's/.*CUSTOM_PAIR_DRILL_CURVE=(0x[0-9a-fA-F]{40}).*/\1/p' /tmp/custom-pairs-drill-launch.log | tail -1)
+          test -n "$CURVE" || (echo "Missing drill curve" && exit 1)
+          echo "CUSTOM_PAIR_DRILL_CURVE=$CURVE" >> "$GITHUB_ENV"
+
+      - name: Wait out the Launch Shield
+        run: sleep 30
+
+      - name: Drill phase 2 - trade, fill, graduate to Pancake V2
+        run: |
+          set -euo pipefail
+          forge script script/CustomPairsTestnetDrill.s.sol --sig "complete()" \
+            --rpc-url "$BSC_TESTNET_RPC_URL" --broadcast --slow --legacy --with-gas-price 1000000000 \
+            2>&1 | tee /tmp/custom-pairs-drill-complete.log
+          grep -q "CUSTOM_PAIR_ONCHAIN_EXECUTION_COMPLETE_AND_SUCCESSFUL" /tmp/custom-pairs-drill-complete.log
+
+      - name: Verify graduation onchain
+        run: |
+          set -euo pipefail
+          PHASE=$(cast call "$CUSTOM_PAIR_DRILL_CURVE" "phase()(uint8)" --rpc-url "$BSC_TESTNET_RPC_URL")
+          test "$PHASE" = "2" || (echo "Drill curve not graduated (phase $PHASE)" && exit 1)
+          POOL=$(cast call "$CUSTOM_PAIR_DRILL_CURVE" "pool()(address)" --rpc-url "$BSC_TESTNET_RPC_URL")
+          LP=$(cast call "$POOL" "balanceOf(address)(uint256)" 0x000000000000000000000000000000000000dEaD --rpc-url "$BSC_TESTNET_RPC_URL")
+          echo "Pool $POOL burned LP: $LP"
+          test "$LP" != "0" || (echo "LP not burned" && exit 1)
+          echo "CUSTOM_PAIR_DRILL_POOL=$POOL" >> "$GITHUB_ENV"
+
+      - name: Summary
+        run: |
+          {
+            echo "## Custom pairs beta deployed to BSC Testnet (UNAUDITED)"
+            echo ""
+            echo "| Contract | Address |"
+            echo "| --- | --- |"
+            echo "| Custom-pair factory | \`$CUSTOM_PAIR_FACTORY\` |"
+            echo "| Curve deployer | \`$CUSTOM_PAIR_CURVE_DEPLOYER\` |"
+            echo "| tSTONK (5% transfer tax, faucet) | \`$TESTNET_TAX_TOKEN\` |"
+            echo "| tSHARE (no tax, faucet) | \`$TESTNET_PLAIN_TOKEN\` |"
+            echo "| Drill curve (graduated) | \`$CUSTOM_PAIR_DRILL_CURVE\` |"
+            echo "| Drill Pancake V2 pool | \`$CUSTOM_PAIR_DRILL_POOL\` |"
+            echo ""
+            echo "To enable the website beta, set these Vercel environment variables and redeploy:"
+            echo ""
+            echo "- \`NEXT_PUBLIC_FORTUNE_CUSTOM_PAIR_FACTORY_ADDRESS=$CUSTOM_PAIR_FACTORY\`"
+            echo "- \`NEXT_PUBLIC_FORTUNE_CUSTOM_PAIR_TEST_TOKENS=$TESTNET_TAX_TOKEN,$TESTNET_PLAIN_TOKEN\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload deployment and drill logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: custom-pairs-testnet-deploy
+          path: /tmp/custom-pairs-*.log
+          if-no-files-found: ignore
+          retention-days: 30

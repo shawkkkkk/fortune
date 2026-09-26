@@ -746,11 +746,13 @@ export default function LaunchPage() {
               <button type="button" className="selectedMode" aria-pressed="true"><strong>Standard</strong><span>Fixed supply · Pancake V3 · permanently locked LP position</span></button>
               <button type="button" disabled aria-disabled="true" title="Separate testnet research and audit required"><strong>Burn + Rewards</strong><span>Pair-asset holder claims via Infinity hook · v2 in research</span></button>
               <button type="button" disabled aria-disabled="true"><strong>Dev Launch</strong><span>Custom creator-fee model · not implemented or approved</span></button>
+              <Link className="launchModeLink" href="/launch/custom"><strong>Custom pair · beta</strong><span>Any BEP-20, including transfer-tax tokens · unaudited</span></Link>
             </div>
           </section>
 
           <section className="formCard">
             <div className="formSectionTitle"><span>03</span><div><h2>Pair asset</h2><p>Browse every stock, fund, gold and pre-IPO token on BNB Chain. Only registry-approved assets can hold launch reserves.</p></div></div>
+            <p className="fieldHint">Want a token that is not approved here, such as any tokenized stock or a transfer-tax token? <Link href="/launch/custom">Try custom pairs (beta) →</Link></p>
             <div className="poolScope"><strong>One pair · one graduation pool</strong><p className="fieldHint">Two-to-five-pool launches require a separate reviewed release. This form does not enable multi-pair research or change the frozen Standard candidate.</p></div>
             {assetError ? <div className="registryNotice statusError"><strong>ASSET READ FAILED</strong><span>{assetError}</span></div> : null}
             <PairPicker

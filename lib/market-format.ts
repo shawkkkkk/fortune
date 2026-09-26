@@ -17,6 +17,12 @@ export function formatPrice(value: number | null | undefined) {
   return "$0." + "0".repeat(zeros) + significant;
 }
 
+/** A price in another token's units (no currency sign), keeping tiny values readable. */
+export function formatUnitPrice(value: number | null | undefined) {
+  const text = formatPrice(value);
+  return text === "—" ? text : text.replace(/^\$/, "");
+}
+
 /** Totals such as market cap, volume and liquidity. */
 export function formatUsd(value: number | null | undefined) {
   if (value === null || value === undefined || !Number.isFinite(value)) return "—";

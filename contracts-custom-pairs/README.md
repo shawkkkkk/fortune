@@ -47,7 +47,8 @@ forge test --no-match-contract Fork --fuzz-runs 1000 -vv
 BSC_FORK_RPC_URL=https://bsc-dataseed.bnbchain.org forge test --match-contract Fork -vv
 ```
 
-- Unit tests with hostile pair tokens: 5–10% transfer tax, tax charged on top, share-based rebasing (up and down), pause and blacklist, USDT-style missing return values, reentrancy on every transfer, max-wallet limits, and 0, 6, 8, 18 and 24 decimals.
+- Unit tests with hostile pair tokens: 5–10% transfer tax, tax charged on top, share-based rebasing (up and down), pause and blacklist, USDT-style missing return values, reentrancy on every transfer, max-wallet limits, a transfer hook that tries to mint the graduation LP for itself, and 0, 6, 8, 18 and 24 decimals.
+- `FortunePairTokenProbe`: the read-only probe the website runs through `eth_call` state overrides to measure a token's tax on each leg before launch. Never deployed.
 - Fuzz: a round trip never profits, pool price continuity at graduation for any tax and target, and solvency across random trade sequences.
 - Invariants (random buys, sells, donations, time jumps, fee claims and graduation): the pair balance covers everything owed, circulating supply equals what holders hold, the curve never sells more than its formula allows, and every holder can still exit.
 - BSC mainnet fork: real PancakeSwap V2 with a 5% tax token, the bStocks Apple token (AAPLB) and WBNB, including swaps through the real router after graduation.

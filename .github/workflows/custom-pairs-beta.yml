@@ -5,10 +5,14 @@ on:
     branches: [main]
     paths:
       - "contracts-custom-pairs/**"
+      - "lib/custom-pairs-artifacts.ts"
+      - "scripts/export-custom-pair-artifacts.mjs"
       - ".github/workflows/custom-pairs-beta.yml"
   pull_request:
     paths:
       - "contracts-custom-pairs/**"
+      - "lib/custom-pairs-artifacts.ts"
+      - "scripts/export-custom-pair-artifacts.mjs"
       - ".github/workflows/custom-pairs-beta.yml"
   workflow_dispatch:
 
@@ -30,6 +34,8 @@ jobs:
       - name: Contract sizes stay under EIP-170
         working-directory: contracts-custom-pairs
         run: forge build --sizes
+      - name: Website ABIs and inspector probe match the contracts
+        run: node scripts/export-custom-pair-artifacts.mjs --check
       - name: Unit, 1,000-run fuzz and invariant suites
         working-directory: contracts-custom-pairs
         run: forge test --no-match-contract Fork --fuzz-runs 1000 -vv

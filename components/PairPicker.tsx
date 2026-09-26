@@ -7,7 +7,8 @@ import { useLanguage } from "@/components/LanguageProvider";
 import PairAddressCheck from "@/components/PairAddressCheck";
 import { FORTUNE_NETWORK } from "@/lib/fortune-network";
 import { assetCoinStyle, formatPrice, formatUsd, shortAddress } from "@/lib/market-format";
-import { formatEtTime, usMarketStatus, type UsMarketStatus } from "@/lib/market-hours";
+import { sessionLine, usMarketStatus } from "@/lib/market-hours";
+import { REASON_TEXT, tracksUsSession } from "@/lib/pair-reasons";
 import type { UniverseAsset } from "@/lib/pair-universe";
 
 type Universe = {
@@ -35,21 +36,6 @@ const TABS: Array<{ key: Tab; label: string }> = [
   { key: "any", label: "Any token" },
 ];
 
-export const REASON_TEXT: Record<string, string> = {
-  MAINNET_ONLY: "Lives on BNB Smart Chain mainnet. This testnet alpha pairs only with its own valueless test assets.",
-  NOT_IN_ACTIVE_REGISTRY: "Not approved in Fortune's onchain Asset Registry.",
-  RWA_OUT_OF_SCOPE_V1: "Tokenized stocks, funds, commodities and pre-IPO tokens are outside the mainnet v1 asset policy.",
-  REBASING_NEEDS_WRAPPER: "Balances follow a share multiplier. Fortune needs a non-rebasing wrapper before pairing.",
-  STANDARD_MAINNET_WBNB_ONLY: "Standard launches on mainnet v1 pair with WBNB only.",
-  EXTERNAL_PERP_REFERENCE: "An external perpetual market, not a BEP-20 token. Shown as a price reference.",
-  NOT_ON_BNB_CHAIN: "Not deployed on BNB Chain. Shown as a price reference.",
-  ASSET_INACTIVE: "The registry has this asset switched off.",
-  ORACLE_UNHEALTHY: "Its price oracle is stale or unhealthy right now.",
-  QUOTE_DISABLED: "Not enabled as a payment asset.",
-  GRADUATION_DISABLED: "Not enabled for graduation pools.",
-  UNSUPPORTED_CHAIN: "Unsupported network.",
-};
-
 function Coin({ asset }: { asset: UniverseAsset }) {
   const [failed, setFailed] = useState(false);
   if (asset.image && !failed) {
@@ -73,22 +59,9 @@ function changeText(value: number | null) {
 }
 
 function isStockLike(asset: UniverseAsset) {
-  return asset.chainId === 56 && (asset.kind === "stock" || asset.kind === "etf" || (asset.kind === "commodity" && asset.provider !== "Tether" && asset.provider !== "Matrixdock"));
+  return asset.chainId === 56 && tracksUsSession(asset);
 }
 
-function sessionLine(status: UsMarketStatus, zh: boolean, now: number) {
-  const when = status.nextChange ? formatEtTime(status.nextChange, now) : null;
-  if (zh) {
-    if (status.session === "regular") return "美股交易中" + (when ? ` · ${when} 收盘` : "");
-    if (status.session === "pre") return "盘前交易" + (when ? ` · ${when} 开盘` : "");
-    if (status.session === "after") return "盘后交易" + (when ? ` · ${when} 结束` : "");
-    return "美股休市" + (when ? ` · ${when} 盘前开始` : "");
-  }
-  if (status.session === "regular") return "US market open" + (when ? ` · closes ${when}` : "");
-  if (status.session === "pre") return "Pre-market" + (when ? ` · opens ${when}` : "");
-  if (status.session === "after") return "After hours" + (when ? ` · ends ${when}` : "");
-  return (status.holiday ? `US market closed for ${status.holiday}` : "US market closed") + (when ? ` · pre-market ${when}` : "");
-}
 
 export type PairUniverseSummary = Pick<Universe, "chainId" | "snapshot" | "coverage" | "items">;
 
@@ -356,6 +329,9 @@ export default function PairPicker({
             ) : null}
             {isStockLike(inspectedAsset) ? <div><dt>Underlying market</dt><dd translate="no">{sessionLine(market, zh, now)}</dd></div> : null}
           </dl>
+          {mode === "browse" && !inspectedAsset.id.includes(":") ? (
+            <Link className="pickPageLink" href={`/assets/${inspectedAsset.id}`}>Full asset page →</Link>
+          ) : null}
           {inspectedAsset.leveraged ? <p className="reviewWarning">Leveraged or inverse fund: its value resets daily and can fall much faster than the index it tracks.</p> : null}
           {inspectedAsset.notice ? (
             <p className="reviewWarning">{inspectedAsset.notice} {inspectedAsset.noticeSource ? <a href={inspectedAsset.noticeSource} target="_blank" rel="noreferrer">Source ↗</a> : null}</p>

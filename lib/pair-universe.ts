@@ -204,13 +204,26 @@ export async function fetchCoinGeckoMarkets(ids: string[], deadline = Date.now()
     const path = `/coins/markets?vs_currency=usd&category=${category}&order=market_cap_desc&per_page=250&page=${page}&sparkline=false&price_change_percentage=24h`;
     if (take(await remembered(`category:${category}:${page}`, () => coingeckoJson(path, 300, deadline)))) answered++;
   }
-  const missing = ids.filter((id) => !rows.has(id)).slice(0, 200);
-  for (let start = 0; start < missing.length; start += 100) {
-    const batch = missing.slice(start, start + 100);
+  const missing = ids.filter((id) => !rows.has(id));
+  const byId = await fetchCoinGeckoIds(missing, deadline);
+  for (const [id, row] of byId.rows) rows.set(id, row);
+  return { rows, complete: answered === requests.length, stale: stale || byId.stale };
+}
+
+/** CoinGecko rows for specific ids only (at most 200), in batches of 100. */
+export async function fetchCoinGeckoIds(ids: string[], deadline = Date.now() + 8_000) {
+  const rows = new Map<string, MarketRow>();
+  let stale = false;
+  const wanted = [...new Set(ids)].slice(0, 200);
+  for (let start = 0; start < wanted.length; start += 100) {
+    const batch = wanted.slice(start, start + 100);
     const path = `/coins/markets?vs_currency=usd&ids=${batch.join(",")}&per_page=100&sparkline=false&price_change_percentage=24h`;
-    take(await remembered(`ids:${batch.join(",")}`, () => coingeckoJson(path, 300, deadline)));
+    const result = await remembered(`ids:${batch.join(",")}`, () => coingeckoJson(path, 300, deadline));
+    if (!result || !Array.isArray(result.value)) continue;
+    if (!result.fresh) stale = true;
+    for (const coin of result.value) if (typeof coin?.id === "string") rows.set(coin.id, cgRow(coin));
   }
-  return { rows, complete: answered === requests.length, stale };
+  return { rows, stale };
 }
 
 /** DexScreener pool prices for BSC tokens, keyed by lowercase address. Six requests run at a time. */
@@ -520,5 +533,59 @@ export async function readPairUniverse(now = Date.now()) {
     },
     featured,
     items,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Asset pages: one page per verified snapshot asset.
+
+/** A snapshot asset by page id, without any network read (page metadata, 404s). */
+export function snapshotAsset(id: string) {
+  return (snapshot.assets as unknown as SnapshotAsset[]).find((asset) => asset.id === id) ?? null;
+}
+
+/** Every asset with its own page: the verified BNB Chain snapshot. */
+export function universePageIds() {
+  return (snapshot.assets as unknown as SnapshotAsset[]).map((asset) => asset.id);
+}
+
+/**
+ * The same underlying from other issuers (NVDA as bStocks NVDAB, Ondo NVDAon
+ * and xStocks NVDAx), BNB Chain contracts only. Leveraged products are only
+ * compared with other leveraged products.
+ */
+export function issuerSiblings<T extends { id: string; underlying: string | null; leveraged?: boolean; address: string | null }>(items: T[], asset: T) {
+  const key = asset.underlying?.trim().toUpperCase();
+  if (!key) return [];
+  return items.filter((item) => item.id !== asset.id && item.address && item.underlying?.trim().toUpperCase() === key && Boolean(item.leveraged) === Boolean(asset.leveraged));
+}
+
+/**
+ * One asset with live market data, Fortune eligibility and its issuer siblings.
+ * Only this asset and its siblings are priced (at most a handful of ids), so an
+ * asset page never waits on the whole universe.
+ */
+export async function readUniverseAsset(id: string, now = Date.now()) {
+  const base = snapshotAsset(id);
+  if (!base) return null;
+  const assets = snapshot.assets as unknown as SnapshotAsset[];
+  const group = [base, ...issuerSiblings(assets, base)];
+  const coingeckoIds = group.filter((asset) => asset.source.startsWith("coingecko:")).map((asset) => asset.id);
+  const [coingecko, registry] = await Promise.allSettled([fetchCoinGeckoIds(coingeckoIds, now + 5_000), readFortuneAssetUniverse()]);
+  const cgRows = coingecko.status === "fulfilled" ? coingecko.value.rows : new Map<string, MarketRow>();
+  const dexAddresses = group.filter((asset) => !asset.source.startsWith("coingecko:") || !cgRows.get(asset.id)?.priceUsd).map((asset) => asset.address);
+  const dexscreener = dexAddresses.length ? await fetchDexScreener(dexAddresses).catch(() => new Map<string, MarketRow>()) : new Map<string, MarketRow>();
+  const registryRead: RegistryRead = registry.status === "fulfilled"
+    ? { configured: registry.value.configured, chainId: registry.value.chainId, assets: registry.value.assets }
+    : { configured: false, chainId: FORTUNE_NETWORK.chainId, assets: [] };
+  const { items } = buildUniverse({ assets: group, coingecko: cgRows, dexscreener, registry: registryRead, lighter: [], preIpo: [], now });
+  const asset = items.find((item) => item.id === id);
+  if (!asset) return null;
+  return {
+    chainId: registryRead.chainId,
+    registryChecked: registry.status === "fulfilled",
+    snapshot: { generatedAt: snapshot.generatedAt, verifiedAtBlock: snapshot.verifiedAtBlock, chainId: snapshot.chainId },
+    asset,
+    siblings: group.slice(1).flatMap((sibling) => items.filter((item) => item.id === sibling.id)),
   };
 }

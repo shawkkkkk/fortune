@@ -6429,3 +6429,185 @@ html.entryGateOpen {
   min-height: 300px;
   border-radius: var(--radius-lg);
 }
+
+/* --------------------------------------------------------------------------
+   Asset pages (/assets/[id])
+   -------------------------------------------------------------------------- */
+
+.assetCrumbs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.assetCrumbs a {
+  color: var(--red);
+}
+
+.assetTitle {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  min-width: 0;
+}
+
+.assetTitle > div {
+  min-width: 0;
+}
+
+.assetLogo {
+  width: 64px;
+  height: 64px;
+  flex: none;
+  border-radius: 50%;
+  box-shadow: 0 0 0 3px var(--gold-line);
+  background: var(--surface);
+  object-fit: cover;
+}
+
+.assetMonogram {
+  width: 64px;
+  height: 64px;
+  font-size: 18px;
+}
+
+.assetHeading h1 {
+  overflow-wrap: anywhere;
+}
+
+.assetMarket .metric small.chartChangeUp,
+.assetMarket .metric small.chartChangeDown {
+  font-weight: 750;
+}
+
+.assetMarket .metric small.chartChangeUp {
+  color: var(--jade);
+}
+
+.assetMarket .metric small.chartChangeDown {
+  color: var(--red-ink);
+}
+
+.assetSession {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  margin: 0 0 18px;
+}
+
+.assetSession .fieldHint {
+  flex: 1 1 320px;
+  margin: 0;
+}
+
+.assetEligibility h2,
+.assetContract h2,
+.assetSiblings h2 {
+  margin: 4px 0 12px;
+}
+
+.assetEligibility-launchable {
+  box-shadow: inset 0 3px 0 var(--jade), var(--shadow-sm);
+}
+
+.assetNotice {
+  margin: 12px 0 0;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  background: var(--gold-tint);
+  color: var(--gold-ink);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.assetNotice a {
+  color: var(--red);
+  font-weight: 750;
+}
+
+.assetContract .statRows a {
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.assetControls {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0 12px;
+  padding: 0;
+  list-style: none;
+}
+
+.assetControls li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 14.5px;
+  line-height: 1.5;
+}
+
+.assetControls b {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  flex: none;
+  border-radius: 50%;
+  font-size: 12px;
+}
+
+.assetControls .controlOn b {
+  background: var(--amber-tint);
+  color: var(--amber);
+}
+
+.assetControls .controlOff b {
+  background: var(--jade-tint);
+  color: var(--jade);
+}
+
+.assetCompare td,
+.assetCompare th {
+  white-space: nowrap;
+}
+
+.assetCompareCurrent td {
+  background: var(--gold-tint);
+}
+
+.assetCompare a {
+  color: var(--red);
+  font-weight: 750;
+}
+
+.assetPage > .dataDisclaimer {
+  margin-top: 22px;
+}
+
+@media (max-width: 760px) {
+  .assetTitle {
+    align-items: flex-start;
+  }
+
+  .assetLogo,
+  .assetMonogram {
+    width: 52px;
+    height: 52px;
+  }
+}
+
+.pickPageLink {
+  display: inline-block;
+  margin-top: 12px;
+  color: var(--red);
+  font-weight: 750;
+}
+
+.assetCompareControls span + span::before {
+  content: " · ";
+}

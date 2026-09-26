@@ -177,3 +177,36 @@ test("only CoinGecko image hosts reach the browser", async () => {
   assert.equal(safeImage("javascript:alert(1)"), null);
   assert.equal(safeImage(null), null);
 });
+
+test("a failed CoinGecko read falls back to its last good answer for six hours", async () => {
+  const { remembered } = await import("../../lib/pair-universe.ts");
+  const memory = new Map();
+  const t0 = Date.parse("2026-09-26T00:00:00Z");
+  const fail = async () => { throw new Error("CoinGecko returned 429"); };
+  assert.deepEqual(await remembered("bstocks", async () => [1], t0, memory), { value: [1], fresh: true });
+  assert.deepEqual(await remembered("bstocks", fail, t0 + 3_600_000, memory), { value: [1], fresh: false });
+  assert.equal(await remembered("bstocks", fail, t0 + 7 * 3_600_000, memory), null, "too old to serve");
+  assert.equal(await remembered("ondo", fail, t0, memory), null, "nothing remembered yet");
+});
+
+test("CoinGecko rate limits are retried briefly, then reported", async () => {
+  const { coingeckoJson } = await import("../../lib/pair-universe.ts");
+  const original = globalThis.fetch;
+  try {
+    let calls = 0;
+    const waits = [];
+    globalThis.fetch = async () => (++calls < 3
+      ? new Response("{}", { status: 429, headers: { "retry-after": "1" } })
+      : new Response('[{"id":"nvidia-bstocks"}]', { status: 200 }));
+    assert.deepEqual(await coingeckoJson("/coins/markets", 300, Date.now() + 60_000, async (ms) => { waits.push(ms); }), [{ id: "nvidia-bstocks" }]);
+    assert.deepEqual(waits, [1_000, 1_000]);
+
+    globalThis.fetch = async () => new Response("{}", { status: 429 });
+    await assert.rejects(coingeckoJson("/coins/markets", 300, Date.now() + 60_000, async () => {}), /429/);
+    globalThis.fetch = async () => new Response("down", { status: 500 });
+    await assert.rejects(coingeckoJson("/coins/markets", 300, Date.now() + 60_000, async () => {}), /500/);
+    await assert.rejects(coingeckoJson("/coins/markets", 300, Date.now() - 1, async () => {}), /time budget/);
+  } finally {
+    globalThis.fetch = original;
+  }
+});

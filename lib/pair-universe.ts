@@ -142,6 +142,41 @@ async function getJson(url: string, init: RequestInit & { next?: { revalidate: n
   return response.json();
 }
 
+// CoinGecko's keyless tier rate-limits shared serverless egress. Requests go one
+// at a time, a 429 is retried briefly, and each answer is remembered so a failed
+// read falls back to the last good one instead of dropping a whole issuer.
+const LAST_GOOD_MS = 6 * 3_600_000;
+const lastGood = new Map<string, { at: number; value: unknown }>();
+
+export async function remembered<T>(key: string, load: () => Promise<T>, now = Date.now(), memory: Map<string, { at: number; value: unknown }> = lastGood) {
+  try {
+    const value = await load();
+    memory.set(key, { at: now, value });
+    return { value, fresh: true };
+  } catch {
+    const kept = memory.get(key);
+    return kept && now - kept.at <= LAST_GOOD_MS ? { value: kept.value as T, fresh: false } : null;
+  }
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+export async function coingeckoJson(path: string, revalidate: number, deadline: number, wait: (ms: number) => Promise<unknown> = sleep) {
+  for (let attempt = 0; ; attempt++) {
+    if (Date.now() >= deadline) throw new Error("CoinGecko time budget spent");
+    const response = await fetch(COINGECKO + path, {
+      headers: cgHeaders(),
+      next: { revalidate },
+      signal: AbortSignal.timeout(Math.max(1_000, Math.min(12_000, deadline - Date.now()))),
+    });
+    if (response.ok) return response.json();
+    const retryAfter = Number(response.headers.get("retry-after"));
+    const pause = Math.min(Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1_000 : 1_200 * (attempt + 1), 3_000);
+    if (response.status !== 429 || attempt >= 2 || Date.now() + pause >= deadline) throw new Error(`CoinGecko returned ${response.status}`);
+    await wait(pause);
+  }
+}
+
 function cgRow(coin: Record<string, unknown>): MarketRow {
   return {
     priceUsd: finite(coin.current_price),
@@ -152,38 +187,41 @@ function cgRow(coin: Record<string, unknown>): MarketRow {
   };
 }
 
-/** Live CoinGecko rows keyed by CoinGecko id, plus which categories answered. */
-export async function fetchCoinGeckoMarkets(ids: string[]) {
+/** Live CoinGecko rows keyed by CoinGecko id, and whether every read answered (fresh or remembered). */
+export async function fetchCoinGeckoMarkets(ids: string[], deadline = Date.now() + 8_000) {
   const rows = new Map<string, MarketRow>();
   const requests = MARKET_CATEGORIES.flatMap(([category, pages]) =>
     Array.from({ length: pages }, (_, index) => ({ category, page: index + 1 })));
-  const settled = await Promise.allSettled(requests.map(({ category, page }) =>
-    getJson(`${COINGECKO}/coins/markets?vs_currency=usd&category=${category}&order=market_cap_desc&per_page=250&page=${page}&sparkline=false&price_change_percentage=24h`,
-      { headers: cgHeaders(), next: { revalidate: 300 } })));
-  settled.forEach((result) => {
-    if (result.status !== "fulfilled" || !Array.isArray(result.value)) return;
+  let answered = 0;
+  let stale = false;
+  const take = (result: { value: unknown; fresh: boolean } | null) => {
+    if (!result || !Array.isArray(result.value)) return false;
+    if (!result.fresh) stale = true;
     for (const coin of result.value) if (typeof coin?.id === "string") rows.set(coin.id, cgRow(coin));
-  });
-  const missing = ids.filter((id) => !rows.has(id));
-  for (let start = 0; start < missing.length && start < 200; start += 100) {
-    try {
-      const batch = await getJson(`${COINGECKO}/coins/markets?vs_currency=usd&ids=${missing.slice(start, start + 100).join(",")}&per_page=100&sparkline=false&price_change_percentage=24h`,
-        { headers: cgHeaders(), next: { revalidate: 300 } });
-      if (Array.isArray(batch)) for (const coin of batch) if (typeof coin?.id === "string") rows.set(coin.id, cgRow(coin));
-    } catch { /* Leave these assets without live data. */ }
+    return true;
+  };
+  for (const { category, page } of requests) {
+    const path = `/coins/markets?vs_currency=usd&category=${category}&order=market_cap_desc&per_page=250&page=${page}&sparkline=false&price_change_percentage=24h`;
+    if (take(await remembered(`category:${category}:${page}`, () => coingeckoJson(path, 300, deadline)))) answered++;
   }
-  const answered = settled.filter((result) => result.status === "fulfilled").length;
-  return { rows, complete: answered === requests.length };
+  const missing = ids.filter((id) => !rows.has(id)).slice(0, 200);
+  for (let start = 0; start < missing.length; start += 100) {
+    const batch = missing.slice(start, start + 100);
+    const path = `/coins/markets?vs_currency=usd&ids=${batch.join(",")}&per_page=100&sparkline=false&price_change_percentage=24h`;
+    take(await remembered(`ids:${batch.join(",")}`, () => coingeckoJson(path, 300, deadline)));
+  }
+  return { rows, complete: answered === requests.length, stale };
 }
 
-/** DexScreener prices for BSC tokens CoinGecko does not track, keyed by lowercase address. */
+/** DexScreener pool prices for BSC tokens, keyed by lowercase address. Six requests run at a time. */
 export async function fetchDexScreener(addresses: string[]) {
   const rows = new Map<string, MarketRow>();
-  for (let start = 0; start < addresses.length; start += 30) {
-    const chunk = addresses.slice(start, start + 30);
+  const chunks: string[][] = [];
+  for (let start = 0; start < addresses.length; start += 30) chunks.push(addresses.slice(start, start + 30));
+  const read = async (chunk: string[]) => {
     try {
       const pairs = await getJson(`https://api.dexscreener.com/tokens/v1/bsc/${chunk.join(",")}`, { next: { revalidate: 300 } });
-      if (!Array.isArray(pairs)) continue;
+      if (!Array.isArray(pairs)) return;
       for (const address of chunk) {
         const own = pairs
           .filter((pair) => String(pair?.baseToken?.address || "").toLowerCase() === address.toLowerCase())
@@ -198,7 +236,8 @@ export async function fetchDexScreener(addresses: string[]) {
         });
       }
     } catch { /* Leave these assets without live data. */ }
-  }
+  };
+  for (let start = 0; start < chunks.length; start += 6) await Promise.all(chunks.slice(start, start + 6).map(read));
   return rows;
 }
 
@@ -222,9 +261,10 @@ export async function fetchLighterPreIpo(): Promise<LighterMarket[]> {
 }
 
 /** Pre-IPO tokens CoinGecko tracks on any chain (discovery references). */
-export async function fetchPreIpoListings(): Promise<PreIpoListing[]> {
-  const coins = await getJson(`${COINGECKO}/coins/markets?vs_currency=usd&category=${PRE_IPO_CATEGORY}&per_page=100&sparkline=false&price_change_percentage=24h`,
-    { headers: cgHeaders(), next: { revalidate: 900 } });
+export async function fetchPreIpoListings(deadline = Date.now() + 4_000): Promise<PreIpoListing[]> {
+  const result = await remembered("category:" + PRE_IPO_CATEGORY, () => coingeckoJson(`/coins/markets?vs_currency=usd&category=${PRE_IPO_CATEGORY}&per_page=100&sparkline=false&price_change_percentage=24h`, 900, deadline));
+  if (!result) throw new Error("Pre-IPO listings unavailable");
+  const coins = result.value;
   if (!Array.isArray(coins)) return [];
   return coins
     .filter((coin) => typeof coin?.id === "string" && typeof coin?.name === "string")
@@ -316,8 +356,11 @@ export function buildUniverse(input: UniverseInputs) {
   for (const asset of input.assets) {
     const key = asset.address.toLowerCase();
     if (listed.has(key)) continue;
-    const live = input.coingecko.get(asset.id) ?? input.dexscreener.get(key) ?? null;
-    const source = input.coingecko.has(asset.id) ? "coingecko" : input.dexscreener.has(key) ? "dexscreener" : null;
+    // CoinGecko first; DexScreener's onchain pool price when CoinGecko has no price for it.
+    const fromCoinGecko = input.coingecko.get(asset.id);
+    const fromDex = input.dexscreener.get(key);
+    const live = fromCoinGecko?.priceUsd != null ? fromCoinGecko : fromDex ?? fromCoinGecko ?? null;
+    const source = !live ? null : live === fromCoinGecko ? "coingecko" : "dexscreener";
     const group = asset.group as UniverseGroup;
     const controls = asset.controls;
     items.push({
@@ -333,7 +376,7 @@ export function buildUniverse(input: UniverseInputs) {
       address: asset.address,
       decimals: asset.decimals,
       controls,
-      image: live?.image ?? safeImage(asset.image),
+      image: fromCoinGecko?.image ?? safeImage(asset.image),
       venue: null,
       market: {
         priceUsd: live?.priceUsd ?? null,
@@ -435,15 +478,19 @@ export function buildUniverse(input: UniverseInputs) {
 export async function readPairUniverse(now = Date.now()) {
   const assets = snapshot.assets as unknown as SnapshotAsset[];
   const coingeckoIds = assets.filter((asset) => asset.source.startsWith("coingecko:")).map((asset) => asset.id);
-  const dexAddresses = assets.filter((asset) => !asset.source.startsWith("coingecko:")).map((asset) => asset.address);
 
-  const [coingecko, dexscreener, registry, lighter, preIpo] = await Promise.allSettled([
-    fetchCoinGeckoMarkets(coingeckoIds),
-    fetchDexScreener(dexAddresses),
-    readFortuneAssetUniverse(),
-    fetchLighterPreIpo(),
-    fetchPreIpoListings(),
-  ]);
+  // One CoinGecko stream (markets, then pre-IPO) so the keyless tier sees no burst.
+  const coingeckoReads = (async () => {
+    const markets = await fetchCoinGeckoMarkets(coingeckoIds);
+    const preIpo = await fetchPreIpoListings().then((value) => ({ ok: true as const, value }), () => ({ ok: false as const, value: [] as PreIpoListing[] }));
+    return { markets, preIpo };
+  })();
+  const [coingecko, registry, lighter] = await Promise.allSettled([coingeckoReads, readFortuneAssetUniverse(), fetchLighterPreIpo()]);
+
+  const cgRows = coingecko.status === "fulfilled" ? coingecko.value.markets.rows : new Map<string, MarketRow>();
+  // DexScreener's onchain pool prices cover curated tokens and anything CoinGecko could not answer.
+  const dexAddresses = assets.filter((asset) => !asset.source.startsWith("coingecko:") || !cgRows.get(asset.id)?.priceUsd).map((asset) => asset.address);
+  const dexscreener = await fetchDexScreener(dexAddresses).catch(() => new Map<string, MarketRow>());
 
   const registryRead: RegistryRead = registry.status === "fulfilled"
     ? { configured: registry.value.configured, chainId: registry.value.chainId, assets: registry.value.assets }
@@ -451,21 +498,25 @@ export async function readPairUniverse(now = Date.now()) {
 
   const { items, featured } = buildUniverse({
     assets,
-    coingecko: coingecko.status === "fulfilled" ? coingecko.value.rows : new Map(),
-    dexscreener: dexscreener.status === "fulfilled" ? dexscreener.value : new Map(),
+    coingecko: cgRows,
+    dexscreener,
     registry: registryRead,
     lighter: lighter.status === "fulfilled" ? lighter.value : [],
-    preIpo: preIpo.status === "fulfilled" ? preIpo.value : [],
+    preIpo: coingecko.status === "fulfilled" ? coingecko.value.preIpo.value : [],
     now,
   });
 
+  const onBnb = items.filter((item) => item.address);
+  const priced = onBnb.filter((item) => item.market.priceUsd !== null).length;
   return {
     chainId: registryRead.chainId,
     snapshot: { generatedAt: snapshot.generatedAt, verifiedAtBlock: snapshot.verifiedAtBlock, chainId: snapshot.chainId },
     coverage: {
       registry: registry.status === "fulfilled" && registryRead.configured,
-      marketData: coingecko.status === "fulfilled" && coingecko.value.complete,
-      preIpoReferences: lighter.status === "fulfilled" && preIpo.status === "fulfilled",
+      marketData: priced >= onBnb.length * 0.95,
+      marketDataStale: coingecko.status === "fulfilled" && coingecko.value.markets.stale,
+      priced: { count: priced, total: onBnb.length },
+      preIpoReferences: lighter.status === "fulfilled" && lighter.value.length > 0 && coingecko.status === "fulfilled" && coingecko.value.preIpo.ok,
     },
     featured,
     items,

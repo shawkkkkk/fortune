@@ -129,6 +129,8 @@ export type OnchainFortuneLaunch = {
   graduationProgress: number;
   totalSupply: string;
   quoteAssets: Address[];
+  /** Fortune purpose vaults recorded at creation: holder rewards, buyback, liquidity. */
+  vaults: Address[];
 };
 
 function client() {
@@ -208,6 +210,15 @@ export async function readFortuneLaunchByToken(token: string) {
   return { ...catalog, entries: undefined, launch: launches[0] || null };
 }
 
+/** Several launches by token address (at most 50), in catalog order, read at one block. */
+export async function readFortuneLaunchesByTokens(tokens: string[]) {
+  const wanted = new Set(tokens.slice(0, 50).map((token) => token.toLowerCase()));
+  const catalog = await readFortuneLaunchCatalog();
+  const entries = catalog.entries.filter(({ info }) => wanted.has(info[1].toLowerCase()));
+  const launches = entries.length && catalog.blockNumber !== null ? await readLaunchDetails(entries, catalog.blockNumber, catalog.blockHash!) : [];
+  return { ...catalog, entries: undefined, launches };
+}
+
 export async function readCreatorFortuneLaunches(creator: string, offset = 0, limit = 25, atBlock?: bigint) {
   const catalog = await readFortuneLaunchCatalog(atBlock);
   const matching = catalog.entries.filter(({ info }) => info[0].toLowerCase() === creator.toLowerCase());
@@ -264,6 +275,7 @@ async function readLaunchDetails(valid: Awaited<ReturnType<typeof readFactoryCat
       graduationProgress: target === 0n ? 0 : Math.min(100, Number((reserve * 10_000n) / target) / 100),
       totalSupply: formatUnits(supply, 18),
       quoteAssets: values.map((value) => value.result as Address),
+      vaults: [info[4], info[5], info[6]],
     } satisfies OnchainFortuneLaunch];
   });
 

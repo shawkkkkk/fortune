@@ -22,6 +22,7 @@ import {
 import { assertWalletIdentity, parseLaunchAmount, restorePendingLaunch, type PendingLaunch } from "@/lib/launch-safety";
 import TokenImageInput from "@/components/TokenImageInput";
 import PairPicker from "@/components/PairPicker";
+import ShareBar from "@/components/ShareBar";
 import { useLanguage } from "@/components/LanguageProvider";
 import { curveEconomics, firstBuyPreview as previewFirstBuy } from "@/lib/launch-preview";
 import { formatAmount, formatUsd } from "@/lib/market-format";
@@ -869,6 +870,7 @@ export default function LaunchPage() {
                 </Link>
               </div>
             ) : null}
+            {receipt ? <ShareBar path={`/token/${receipt.token}`} text={`I just launched ${name.trim() || "a token"} ($${symbol.trim()}) on Fortune.`} label="Share your launch" /> : null}
           </section>
         </div>
 

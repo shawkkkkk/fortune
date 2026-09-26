@@ -224,6 +224,7 @@ export async function GET(request: Request) {
             "Graduated tokens are priced from the official Pancake pools that hold Fortune's locked liquidity. Activity comes from a bounded eth_getLogs ledger and is null unless its coverage spans the whole window; ledger.coverage states the exact block range. Sorts other than newest rank the 100 most recent launches.",
           parameters: [
             { name: "sort", in: "query", schema: { type: "string", enum: ["newest", "volume24h", "trending", "marketCap"] } },
+            { name: "tokens", in: "query", description: "Up to 50 comma-separated token addresses (a watchlist). Overrides sort and paging; tokens that are not Fortune launches are skipped.", schema: { type: "string" } },
             { name: "offset", in: "query", schema: { type: "integer", minimum: 0 } },
             { name: "limit", in: "query", schema: { type: "integer", minimum: 1, maximum: 25 } },
           ],
@@ -242,7 +243,7 @@ export async function GET(request: Request) {
             { name: "range", in: "query", schema: { type: "string", enum: ["24h", "7d", "30d"] } },
           ],
           responses: {
-            "200": { description: "Market detail; chart.ledger.coversRange is false when the log provider could not serve the whole range" },
+            "200": { description: "Market detail; chart.ledger.coversRange is false when the log provider could not serve the whole range. supply splits totalSupply into curve, pools, creator, vaults, burned and holders, read at the same block." },
             "404": { description: "Not recorded by the configured Fortune factories" },
           },
         },

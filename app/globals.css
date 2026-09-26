@@ -5820,3 +5820,180 @@ html.entryGateOpen {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* --------------------------------------------------------------------------
+   Supply breakdown (token and market pages)
+   -------------------------------------------------------------------------- */
+
+.supplyBar {
+  display: flex;
+  height: 14px;
+  margin: 14px 0 16px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--surface-sunk);
+}
+
+.supplyBar .supplySlice + .supplySlice {
+  border-left: 2px solid var(--surface);
+}
+
+.supplySlice-curve { background: var(--gold); }
+.supplySlice-pools { background: var(--jade); }
+.supplySlice-creator { background: var(--red); }
+.supplySlice-vaults { background: var(--amber); }
+.supplySlice-burned { background: var(--ink-soft); }
+.supplySlice-holders { background: var(--line-strong); }
+
+.supplyLegend {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px 22px;
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+}
+
+.supplyLegend li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px 10px;
+}
+
+.supplyLegend i {
+  width: 12px;
+  height: 12px;
+  border-radius: 4px;
+}
+
+.supplyLegend strong {
+  font-variant-numeric: tabular-nums;
+}
+
+.supplyLegend small {
+  grid-column: 2 / -1;
+  color: var(--muted);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --------------------------------------------------------------------------
+   Watchlist (Explore cards, token pages)
+   -------------------------------------------------------------------------- */
+
+.launchCardWrap {
+  position: relative;
+  display: grid;
+}
+
+.launchCardWrap .launchCard {
+  height: 100%;
+}
+
+.launchCardWrap .launchCardTop {
+  padding-right: 34px;
+}
+
+.watchButton {
+  display: inline-grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  flex: none;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--muted);
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+}
+
+.watchButton:hover {
+  border-color: var(--gold-line);
+  background: var(--gold-tint);
+  color: var(--gold-ink);
+}
+
+.watchButton.watching {
+  border-color: var(--gold);
+  background: var(--gold-tint);
+  color: var(--gold);
+}
+
+.watchButton:active {
+  transform: scale(0.94);
+}
+
+.cardWatch {
+  position: absolute;
+  z-index: 2;
+  top: 14px;
+  right: 14px;
+  width: 32px;
+  height: 32px;
+}
+
+.exploreFilters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 16px 0 0;
+}
+
+.watchFilter {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 6px 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink-soft);
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.watchFilter b {
+  min-width: 22px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--surface-sunk);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.watchFilter[aria-pressed="true"] {
+  border-color: var(--gold);
+  background: var(--gold-tint);
+  color: var(--gold-ink);
+}
+
+.watchFilter[aria-pressed="true"] svg {
+  color: var(--gold);
+}
+
+.tokenHeadingActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.shareBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0 0 22px;
+}
+
+.shareBar .secondaryCta {
+  min-height: 40px;
+  padding: 8px 16px;
+  font-size: 14px;
+}
+
+.launchStatus .shareBar {
+  margin: 14px 0 0;
+}

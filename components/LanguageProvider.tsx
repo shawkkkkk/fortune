@@ -880,6 +880,20 @@ const ZH: Record<string, string> = {
   "CATALOG READ FAILED": "目录读取失败",
   "Stocks & pairs": "股票与配对资产",
   "Browse every stock, fund, gold and pre-IPO token on BNB Chain. Only registry-approved assets can hold launch reserves.": "浏览 BNB Chain 上的所有股票、基金、黄金和 IPO 前代币。只有注册表批准的资产才能作为发行储备。",
+  "SUPPLY": "供应量",
+  "Where the supply sits": "供应量分布",
+  "Balances of the curve, the creator, Fortune's vaults, the official pools and burn addresses, read onchain at the same block. Everyone else covers every other wallet and contract.": "曲线、创建者、Fortune 金库、官方池和销毁地址的余额，均在同一区块链上读取。其他所有地址涵盖其余全部钱包和合约。",
+  "Watchlist": "关注列表",
+  "Launches you starred. Saved only in this browser.": "你标星的发行。仅保存在此浏览器中。",
+  "Your watchlist is empty.": "你的关注列表是空的。",
+  "Tap the star on any launch to follow it here. The list stays in this browser.": "点击任意发行上的星标即可在此关注。列表保存在此浏览器中。",
+  "Post on X ↗": "分享到 X ↗",
+  "Telegram ↗": "Telegram ↗",
+  "Copy link": "复制链接",
+  "Link copied": "链接已复制",
+  "Share…": "分享…",
+  "Share this launch": "分享此发行",
+  "Share your launch": "分享你的发行",
 };
 
 function translateText(input: string) {

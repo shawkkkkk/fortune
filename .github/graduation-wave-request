@@ -1,0 +1,13 @@
+# One-shot graduation wave request
+
+Requested after the public-alpha reliability work to exercise the next capacity step.
+
+- Network: BSC Testnet (chain 97)
+- Launches: 10
+- Concurrent graduation submissions: 10
+- Web storm: 500 concurrent / 5,000 requests
+- Success floor: 99.5%
+- p95 gate: 2,500 ms
+- Mainnet: not involved
+
+This file exists only to trigger the dedicated Fortune Concurrent Graduation Wave workflow on main.

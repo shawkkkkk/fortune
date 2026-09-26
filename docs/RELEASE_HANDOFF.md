@@ -1,4 +1,4 @@
-# Fortune release handoff — 2026-09-25
+# Fortune release handoff — 2026-09-26
 
 ## Public state and identity
 
@@ -7,6 +7,8 @@
 - Intended domain: `fortunepad.fun`. A fresh public check at 22:08–22:11 UTC on September 25 returned HTTPS 200 from Vercel for the apex and HTTPS 308 from www to the apex, replacing the earlier Squarespace observation. Authenticated project inspection still returns 403, so project attachment/ownership and full DNS verification are not yet confirmed. Keep domain cutover PR #12 draft pending those checks.
 - Claude's frontend redesign PR #14 and canonical metadata correction PR #13 are merged.
 - Release preparation PR #15 is merged at `a7c3e2344af3389769f4b0a5fcf12659f2cefcec`. GitHub Actions run `36182869836` passed; Vercel production deployment `dpl_ApGRY9nLpHjuVK3UW6n47wyNn3AX` reached READY. Browser checks confirmed `@fortunepad` in the footer and social metadata.
+- Creator-flow PR #22, market/pair-universe PR #20 and pair-market-data recovery PR #23 are merged. File uploads remain disabled until their server-only provider credentials and drills are complete, and registry policy still decides which displayed assets are launchable.
+- Frontend/data PR #26 and its production security follow-up PR #27 are merged. Main `ce6f65f49cce0489bab4ba5565aaa8f320ecb5fa` has READY Vercel production deployment `dpl_3pm7m6yfTd51RyhAHyPDMEXreuhn`. The release now includes share cards, supply breakdowns, local watchlists, wallet portfolios, creator histories and verified pair-asset pages. Server-rendered share cards fetch creator artwork only from validated IPFS URIs through Fortune's fixed gateway; arbitrary external HTTPS artwork falls back to the token monogram.
 - Mainnet contract deployment and activation remain blocked. There is no published official mainnet token CA in this release.
 
 ## Release scope
@@ -30,8 +32,8 @@ The Brew/LESGO comparison is recorded in `BREW_REVIEW.md`. The owner's GO revenu
 
 ## Data boundary
 
-Creator-flow follow-up ([draft PR #22](https://github.com/shawkkkkk/fortune/pull/22),
-not a production claim): see `CREATOR_FLOW.md`. It adds visible project fields, local drafts, bounded JSON
+Creator-flow follow-up ([merged PR #22](https://github.com/shawkkkkk/fortune/pull/22),
+not a mainnet capability claim): see `CREATOR_FLOW.md`. It adds visible project fields, local drafts, bounded JSON
 import, credential-gated IPFS uploads, metadata provenance and registry-backed
 address inspection. Storage/pinning credentials and real-provider upload checks
 remain owner/operator prerequisites. Multi-pool, Dev Launch and unrestricted
@@ -52,6 +54,10 @@ The output includes the chain, block/hash, every included factory record and a S
 
 ## Observed verification
 
+- [Pair-market-data PR #23 CI run 36204534985](https://github.com/shawkkkkk/fortune/actions/runs/36204534985) passed its web build/runtime/browser checks and contract suite with 1,000 fuzz runs. PR #23 is now merged into main `dec346088c573ae88fc9db705804338f77738f99`; Vercel production deployment `dpl_Dw77tGFrkdLixdAPp3LVeZtMyonN` reached READY.
+- [Frontend/data PR #26 CI run 36223903240](https://github.com/shawkkkkk/fortune/actions/runs/36223903240) passed its production build, runtime/browser checks and contract suite with 1,000 fuzz runs. PR #26 merged as main `0254b457f5bd78617bc46f0454deb4bcbc71fc69`; its production deployment reached READY.
+- [Share-card security PR #27 CI run 36245450216](https://github.com/shawkkkkk/fortune/actions/runs/36245450216) passed the production build, runtime smoke gate, desktop/mobile browser checks and contract suite with 1,000 fuzz runs. PR #27 then merged as main `ce6f65f49cce0489bab4ba5565aaa8f320ecb5fa`; Vercel production deployment `dpl_3pm7m6yfTd51RyhAHyPDMEXreuhn` reached READY.
+- [Ten-launch graduation-wave run 36204084110](https://github.com/shawkkkkk/fortune/actions/runs/36204084110) failed closed during its chain/balance preflight on September 26. The configured testnet deployer had `0.0110827725 tBNB`, below the workflow's conservative `0.25 tBNB` safety budget. No setup, launch, graduation or load-test step ran and no evidence artifact was produced; this run does not satisfy a rehearsal gate.
 - Creator-flow PR #22: [CI run 36195640178](https://github.com/shawkkkkk/fortune/actions/runs/36195640178) passed on September 25: 22 web tests, production build/runtime smoke and 53 contract tests with 1,000 fuzz runs. The normal contract suite does not independently establish a live fork pass. Follow-up [web job 108273239958](https://github.com/shawkkkkk/fortune/actions/runs/36196438248/job/108273239958) also passed desktop/mobile browser checks at 22:24 UTC, with four screenshots retained in the `creator-flow-browser` artifact. Those UI checks use localhost fixtures, not production chain or provider evidence.
 - Production Next.js build passed. Ten new web regression tests passed.
 - Foundry v1.8.3: 53 tests passed at 1,000 fuzz runs. The separately executed live BSC-mainnet fork lifecycle passed. Isolated rewards v2: four tests passed at 1,000 fuzz runs.
@@ -109,5 +115,6 @@ The economic simulation gate already contains evidence; this work does not chang
 2. Verify the existing apex/www attachment in that project's Domains settings and compare Squarespace DNS with the exact A/CNAME and any ownership TXT values Vercel requires. Public HTTPS and the www-to-apex redirect now pass; do not replace working records unnecessarily. Preserve unrelated DNS/email records. Keep PR #12 draft until authenticated attachment/ownership and DNS checks also pass.
 3. Provide the completed external reviews, public Safe address and signer availability. Configure dedicated RPC/deployer secrets through the protected services, not chat. Funding and governance signatures require the actual wallet owners.
 4. Provision durable indexer storage/worker and image hosting credentials if those product paths are to be included. Image URLs/IPFS URIs work today; upload hosting is not configured.
+5. Fund the public BSC-testnet rehearsal deployer with enough faucet tBNB to meet the `0.25 tBNB` ten-launch safety budget, then rerun failed job `36204084110`. Its last observed balance was `0.0110827725 tBNB`; do not substitute mainnet BNB or a mainnet key.
 
 Hourly cloud continuation checks are configured to inspect GitHub, finish safe work when accessible, and surface changed blockers. They do not guarantee continuous execution or automatically authorize mainnet activation. Avoid concurrent edits to another active release-preparation branch.

@@ -20,7 +20,7 @@ type Universe = {
 };
 
 type Tab = "featured" | "crypto" | "stocks" | "penny" | "rwa" | "preipo" | "new" | "any";
-type Issuer = "all" | "bStocks" | "Ondo" | "xStocks";
+type Issuer = "all" | "Anchored" | "bStocks" | "Ondo" | "xStocks";
 type Kind = "all" | "stock" | "etf";
 
 const PAGE = 36;
@@ -216,7 +216,7 @@ export default function PairPicker({
           {tab === "stocks" && !query.trim() ? (
             <div className="pickFilters">
               <div role="group" aria-label="Stock issuer">
-                {(["all", "bStocks", "Ondo", "xStocks"] as const).map((value) => (
+                {(["all", "Anchored", "bStocks", "Ondo", "xStocks"] as const).map((value) => (
                   <button key={value} type="button" aria-pressed={issuer === value} className={issuer === value ? "active" : ""} onClick={() => { setIssuer(value); setShown(PAGE); }}>{value === "all" ? "All issuers" : value}</button>
                 ))}
               </div>

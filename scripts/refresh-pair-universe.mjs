@@ -30,11 +30,19 @@ const RPC = typeof args.rpc === "string" ? args.rpc : process.env.BSC_RPC_URL ||
 const today = new Date().toISOString().slice(0, 10);
 
 // Stock issuers whose BNB Smart Chain tokens CoinGecko groups by category.
+// Pages are an upper bound; reading stops at the first short page.
+// Anchored deploys each aStock at the same address on every chain (Ethereum,
+// Base, Monad, Arbitrum, BNB Smart Chain), next to its StockRouter, Stock and
+// Cashier contracts at the addresses its docs publish for other chains.
 const STOCK_CATEGORIES = [
-  { category: "bstocks-ecosystem", provider: "bStocks", pages: 1 },
-  { category: "ondo-tokenized-assets", provider: "Ondo", pages: 2 },
-  { category: "xstocks-ecosystem", provider: "xStocks", pages: 1 },
+  { category: "anchored-ecosystem", provider: "Anchored", pages: 4 },
+  { category: "bstocks-ecosystem", provider: "bStocks", pages: 4 },
+  { category: "ondo-tokenized-assets", provider: "Ondo", pages: 8 },
+  { category: "xstocks-ecosystem", provider: "xStocks", pages: 8 },
 ];
+
+// xStocks publishes every deployment itself; an xStocks candidate must be one of them.
+const XSTOCKS_ASSETS = "https://api.xstocks.fi/api/v2/public/assets";
 
 // Tokenized gold on BNB Smart Chain.
 const RWA_CATEGORIES = [{ category: "tokenized-gold", pages: 1 }];
@@ -93,6 +101,25 @@ async function coingecko(path, attempt = 0) {
   return response.json();
 }
 
+/** Lowercase BNB Smart Chain addresses of every xStocks deployment, from the issuer's own API. */
+async function xStocksDeployments() {
+  const addresses = new Set();
+  for (let page = 0; page < 40; page++) {
+    const response = await fetch(`${XSTOCKS_ASSETS}?page=${page}`, { headers: { accept: "application/json" } });
+    if (!response.ok) throw new Error(`xStocks assets returned ${response.status}`);
+    const body = await response.json();
+    for (const asset of body.nodes || []) {
+      for (const deployment of asset.deployments || []) {
+        if (deployment.network === "BinanceSmartChain" && /^0x[0-9a-fA-F]{40}$/.test(deployment.address)) addresses.add(deployment.address.toLowerCase());
+      }
+    }
+    if (!body.page?.hasNextPage) break;
+    await sleep(400);
+  }
+  if (!addresses.size) throw new Error("xStocks listed no BNB Smart Chain deployments.");
+  return addresses;
+}
+
 async function category(id, pages) {
   const rows = [];
   for (let page = 1; page <= pages; page++) {
@@ -105,12 +132,13 @@ async function category(id, pages) {
 
 function stripIssuer(name) {
   return name
-    .replace(/\s*\((?:bStocks|Ondo)[^)]*\)\s*$/i, "")
-    .replace(/\s+xStock$/i, "")
+    .replace(/\s*\((?:bStocks|Ondo|Anchored)[^)]*\)\s*$/i, "")
+    .replace(/\s+[xa]Stock$/i, "")
     .trim();
 }
 
 function underlyingTicker(symbol, provider) {
+  if (provider === "Anchored") return symbol.replace(/^a/, "");
   if (provider === "bStocks") return symbol.replace(/B$/, "");
   if (provider === "Ondo") return symbol.replace(/on$/, "");
   if (provider === "xStocks") return symbol.replace(/x$/, "");
@@ -194,6 +222,9 @@ async function main() {
     .map((coin) => [coin.id, coin.platforms?.["binance-smart-chain"] || null])
     .filter(([, address]) => address && /^0x[0-9a-fA-F]{40}$/.test(address)));
 
+  console.log("Reading xStocks deployments…");
+  const xStocks = await xStocksDeployments();
+
   const candidates = new Map();
   const add = (candidate) => {
     const key = candidate.address.toLowerCase();
@@ -228,6 +259,11 @@ async function main() {
   for (const coin of crypto.slice(0, CRYPTO_LIMIT)) {
     add({ id: coin.id, address: getAddress(bscAddress.get(coin.id)), provider: null, cgSymbol: coin.symbol, cgName: coin.name, image: coin.image || null, source: "coingecko:" + coin.id, family: "crypto" });
   }
+  // A listed token stays listed while its contract checks out, so a quiet trading day never removes its page.
+  for (const asset of previous?.assets || []) {
+    if (asset.group !== "crypto" || candidates.has(asset.address.toLowerCase())) continue;
+    add({ id: asset.id, address: getAddress(asset.address), provider: null, cgSymbol: asset.symbol, cgName: asset.name, image: asset.image, source: asset.source, family: "crypto" });
+  }
   for (const curated of CURATED) add({ ...curated, address: getAddress(curated.address), family: "curated" });
 
   console.log(`Inspecting ${candidates.size} contracts on BNB Smart Chain via ${new URL(RPC).host}…`);
@@ -243,6 +279,7 @@ async function main() {
     if (!row.code || row.code === "0x") { rejected.push([candidate.id, "no contract code"]); continue; }
     if (typeof row.symbol !== "string" || row.decimals === null) { rejected.push([candidate.id, "not a readable ERC-20"]); continue; }
     if (candidate.family !== "curated" && !symbolsAgree(row.symbol, expected)) { rejected.push([candidate.id, `onchain symbol ${row.symbol} ≠ ${expected}`]); continue; }
+    if (candidate.provider === "xStocks" && !xStocks.has(candidate.address.toLowerCase())) { rejected.push([candidate.id, "not an xStocks deployment"]); continue; }
     if (row.decimals > 36) { rejected.push([candidate.id, "unsupported decimals"]); continue; }
 
     let group = "crypto";

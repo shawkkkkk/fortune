@@ -1,18 +1,18 @@
 import snapshot from "@/data/pair-universe.json";
 
 // Is a token the tokenized stock it looks like? The verified set is every
-// issuer security token in data/pair-universe.json: bStocks, Ondo Global
-// Markets and xStocks stocks, ETFs and ETF-backed commodities on BNB Smart
-// Chain, checked onchain.
+// issuer security token in data/pair-universe.json: Anchored, bStocks, Ondo
+// Global Markets and xStocks stocks, ETFs and ETF-backed commodities on BNB
+// Smart Chain, checked onchain.
 // - Copying one of those tokens' symbols, or a listed company's name together
 //   with its ticker, is an imitation.
 // - Calling itself a tokenized stock, or pairing a company's name with an
-//   issuer-style symbol (AMCON, BABAB), without being one of those contracts is
-//   unverified. Issuers have deployed more tokens than Fortune has reviewed
-//   (hundreds more xStocks on BNB Smart Chain alone), so it may be genuine,
-//   but Fortune does not pair with it: in September 2026 a memecoin paired with
-//   a counterfeit "tokenized Farmmi" moved the real Nasdaq stock 350% while one
-//   wallet controlled the fake token's supply.
+//   issuer-style symbol (AMCON, BABAB, AAAPL), without being one of those
+//   contracts is unverified. Issuers have deployed more tokens than Fortune
+//   has reviewed (hundreds more xStocks on BNB Smart Chain alone), so it may
+//   be genuine, but Fortune does not pair with it: in September 2026 a
+//   memecoin paired with a counterfeit "tokenized Farmmi" moved the real
+//   Nasdaq stock 350% while one wallet controlled the fake token's supply.
 
 export type StockToken = { symbol: string; name: string; underlying: string | null; provider: string | null; address: string };
 
@@ -113,9 +113,11 @@ export function checkStockIdentity(input: { address: string; chainId: number; na
   const company = name ? companyKey(name) : "";
   const byCompany = company.length >= 4 ? BY_COMPANY.get(company) ?? null : null;
   const byTicker = BY_TICKER.get(normalizedSymbol) ?? null;
-  // Issuers name tokens after the ticker plus Ondo's "on", xStocks' "x" or bStocks' "B" (bStocks keeps the plain company name).
-  const issuerBase = normalizedSymbol.replace(/(?:on|x|b)$/, "");
-  const byIssuerSymbol = issuerBase !== normalizedSymbol ? BY_TICKER.get(issuerBase) ?? null : null;
+  // Issuers name tokens after the ticker plus Ondo's "on", xStocks' "x" or bStocks' "B" (bStocks keeps the plain company name),
+  // or Anchored's "a" in front.
+  const issuerBases = [normalizedSymbol.replace(/(?:on|x|b)$/, ""), normalizedSymbol.replace(/^a/, "")].filter((base) => base !== normalizedSymbol);
+  const byIssuerSymbol = issuerBases.map((base) => BY_TICKER.get(base)).find((token) => token && token.underlying === byCompany?.underlying) ?? null;
+  const issuerBase = byIssuerSymbol ? symbolKey(byIssuerSymbol.underlying || "") : "";
 
   const bySymbol = BY_SYMBOL.get(symbolForm(symbol));
   if (bySymbol) return { status: "imitation", reason: "TOKEN_SYMBOL", official: bySymbol };

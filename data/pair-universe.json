@@ -1,7 +1,7 @@
 {
- "generatedAt": "2026-09-25T23:18:51.480Z",
+ "generatedAt": "2026-09-27T20:07:16.610Z",
  "chainId": 56,
- "verifiedAtBlock": 124035616,
+ "verifiedAtBlock": 124393980,
  "sources": {
   "addresses": "CoinGecko platform map (BNB Smart Chain) and named primary sources, each confirmed by onchain symbol, name and decimals",
   "controls": "Onchain probes: EIP-1967 implementation/beacon slots (upgradeable), paused() (issuer pause switch), multiplier() (rebasing share multiplier)"
@@ -28,6 +28,26 @@
    "firstSeen": null
   },
   {
+   "id": "aioz-network",
+   "symbol": "AIOZ",
+   "name": "AIOZ Network",
+   "contractName": "AIOZ Network",
+   "group": "crypto",
+   "kind": "token",
+   "provider": null,
+   "underlying": null,
+   "address": "0x33d08D8C7a168333a85285a68C0042b39fC3741D",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": false,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/14631/small/aioz-logo-200.png?1696514309",
+   "source": "coingecko:aioz-network",
+   "firstSeen": null
+  },
+  {
    "id": "akedo",
    "symbol": "AKE",
    "name": "Akedo",
@@ -45,6 +65,26 @@
    },
    "image": "https://coin-images.coingecko.com/coins/images/68410/small/akedo.png?1755678461",
    "source": "coingecko:akedo",
+   "firstSeen": null
+  },
+  {
+   "id": "apecoin",
+   "symbol": "APE",
+   "name": "ApeCoin",
+   "contractName": "ApeCoin",
+   "group": "crypto",
+   "kind": "token",
+   "provider": null,
+   "underlying": null,
+   "address": "0x8f86a15EC17cb3369d8b3E666dAdBC11daA82b79",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": false,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/24383/small/APECOIN.png?1756551529",
+   "source": "coingecko:apecoin",
    "firstSeen": null
   },
   {
@@ -85,6 +125,26 @@
    },
    "image": "https://coin-images.coingecko.com/coins/images/1481/small/cosmos_hub.png?1696502525",
    "source": "coingecko:cosmos",
+   "firstSeen": null
+  },
+  {
+   "id": "agora-dollar",
+   "symbol": "AUSD",
+   "name": "AUSD",
+   "contractName": "AUSD",
+   "group": "crypto",
+   "kind": "token",
+   "provider": null,
+   "underlying": null,
+   "address": "0x00000000eFE302BEAA2b3e6e1b18d08D69a9012a",
+   "decimals": 6,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/39284/small/AUSD_1024px.png?1764684132",
+   "source": "coingecko:agora-dollar",
    "firstSeen": null
   },
   {
@@ -848,6 +908,26 @@
    "firstSeen": null
   },
   {
+   "id": "ultima",
+   "symbol": "ULTIMA",
+   "name": "Ultima",
+   "contractName": "Ultima",
+   "group": "crypto",
+   "kind": "token",
+   "provider": null,
+   "underlying": null,
+   "address": "0x5668a83B46016B494A30Dd14066A451E5417A8B8",
+   "decimals": 6,
+   "controls": {
+    "upgradeable": false,
+    "pausable": true,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/31844/small/ULTIMA-200x200.png?1763090865",
+   "source": "coingecko:ultima",
+   "firstSeen": null
+  },
+  {
    "id": "uniswap",
    "symbol": "UNI",
    "name": "Uniswap",
@@ -1108,6 +1188,26 @@
    "firstSeen": null
   },
   {
+   "id": "chain-2",
+   "symbol": "XCN",
+   "name": "Onyxcoin",
+   "contractName": "Chain",
+   "group": "crypto",
+   "kind": "token",
+   "provider": null,
+   "underlying": null,
+   "address": "0x7324c7C0d95CEBC73eEa7E85CbAac0dBdf88a05b",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/24210/small/onyxlogo.jpg?1696523397",
+   "source": "coingecko:chain-2",
+   "firstSeen": null
+  },
+  {
    "id": "binance-peg-xrp",
    "symbol": "XRP",
    "name": "Binance-Peg XRP",
@@ -1205,6 +1305,46 @@
    },
    "image": null,
    "source": "coinmarketcap:paimon-polymarket-spv-token",
+   "firstSeen": null
+  },
+  {
+   "id": "spdr-gold-shares-astock",
+   "symbol": "aGLD",
+   "name": "SPDR Gold Shares",
+   "contractName": "SPDR Gold Shares aStock",
+   "group": "rwa",
+   "kind": "commodity",
+   "provider": "Anchored",
+   "underlying": "GLD",
+   "address": "0x3e4A2f26Fc4F92d92D7CD1e49ddaDe32869D00A4",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175692/small/GLD.png?1787292288",
+   "source": "coingecko:spdr-gold-shares-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "ishares-silver-trust-astock",
+   "symbol": "aSLV",
+   "name": "iShares Silver Trust",
+   "contractName": "iShares Silver Trust aStock",
+   "group": "rwa",
+   "kind": "commodity",
+   "provider": "Anchored",
+   "underlying": "SLV",
+   "address": "0xa6d6d48D778539103d379A66697ACC22dD7B1d3C",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175721/small/SLV.png?1787292387",
+   "source": "coingecko:ishares-silver-trust-astock",
    "firstSeen": null
   },
   {
@@ -1385,6 +1525,2195 @@
    },
    "image": "https://coin-images.coingecko.com/coins/images/66699/small/Ticker_GLD__Company_Name_Gold__size_200x200_2x.png?1750267259",
    "source": "coingecko:gold-xstock",
+   "firstSeen": null
+  },
+  {
+   "id": "apple-astock",
+   "symbol": "aAAPL",
+   "name": "Apple",
+   "contractName": "Apple aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "AAPL",
+   "address": "0x17683e492d0C8910F7c0157D04af31Cb7A23Ad71",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175665/small/AAPL.png?1787292199",
+   "source": "coingecko:apple-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "c3-ai-inc-astock",
+   "symbol": "aAI",
+   "name": "C3.ai Inc",
+   "contractName": "C3.ai Inc aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "AI",
+   "address": "0x59A036FC042b5b15Cb36a4E1fe1bcCfCf18F8d63",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102178344/small/aai.png?1789377917",
+   "source": "coingecko:c3-ai-inc-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "global-x-ai-technology-astock",
+   "symbol": "aAIQ",
+   "name": "Global X AI & Technology",
+   "contractName": "Global X AI & Technology aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "AIQ",
+   "address": "0x1D236E2EF49bf8b425a5d81332230FDfdAa20aee",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175666/small/AIQ.png?1787292203",
+   "source": "coingecko:global-x-ai-technology-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "spdr-bridgewater-all-weather-astock",
+   "symbol": "aALLW",
+   "name": "SPDR Bridgewater All Weather",
+   "contractName": "SPDR Bridgewater All Weather aStock",
+   "group": "stocks",
+   "kind": "etf",
+   "provider": "Anchored",
+   "underlying": "ALLW",
+   "address": "0x057a4712d82D83909b149f6e4390E5298FfDeb3C",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175667/small/ALLW.png?1787292206",
+   "source": "coingecko:spdr-bridgewater-all-weather-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "advanced-micro-devices-astock",
+   "symbol": "aAMD",
+   "name": "Advanced Micro Devices",
+   "contractName": "Advanced Micro Devices aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "AMD",
+   "address": "0xbdf82C0DAFCf73834d10639c0F0Bf14b84808C43",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175668/small/AMD.png?1787292209",
+   "source": "coingecko:advanced-micro-devices-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "amazon-astock",
+   "symbol": "aAMZN",
+   "name": "Amazon",
+   "contractName": "Amazon aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "AMZN",
+   "address": "0x06f272082339A90e81e1DCB8AB892fD1a8c5E4C0",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175669/small/AMZN.png?1787292213",
+   "source": "coingecko:amazon-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "arista-networks-astock",
+   "symbol": "aANET",
+   "name": "Arista Networks",
+   "contractName": "Arista Networks aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "ANET",
+   "address": "0xB8e03AD48dDdC2E415715F6DbeFb51839E756C25",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175670/small/ANET.png?1787292216",
+   "source": "coingecko:arista-networks-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "ark-autonomous-technology-astock",
+   "symbol": "aARKQ",
+   "name": "ARK Autonomous Technology",
+   "contractName": "ARK Autonomous Technology aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "ARKQ",
+   "address": "0x4ebaF539FB82F35d09f24c709B4c7B9A56777c03",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175671/small/ARKQ.png?1787292219",
+   "source": "coingecko:ark-autonomous-technology-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "arm-holdings-astock",
+   "symbol": "aARM",
+   "name": "Arm Holdings",
+   "contractName": "Arm Holdings aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "ARM",
+   "address": "0x37bb22aF99a6C2B23Cfc2EA0cCB7151752a0fd5a",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175672/small/ARM.png?1787292222",
+   "source": "coingecko:arm-holdings-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "asml-astock",
+   "symbol": "aASML",
+   "name": "ASML",
+   "contractName": "ASML aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "ASML",
+   "address": "0xFAE6ba6D36a6388c5a944a9366E55B6597E4f8af",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175673/small/ASML.png?1787292226",
+   "source": "coingecko:asml-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "broadcom-astock",
+   "symbol": "aAVGO",
+   "name": "Broadcom",
+   "contractName": "Broadcom aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "AVGO",
+   "address": "0x4dfbCd033662BC41de8996886E751613C2B8e8e5",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175674/small/AVGO.png?1787292229",
+   "source": "coingecko:broadcom-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "better-home-finance-holding-co-astock",
+   "symbol": "aBETR",
+   "name": "Better Home & Finance Holding Co",
+   "contractName": "Better Home & Finance Holding Co aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "BETR",
+   "address": "0xD70B950Fd70e96933Ebd991005fE6F37aeF1354f",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102178358/small/better.png?1789384654",
+   "source": "coingecko:better-home-finance-holding-co-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "spdr-bloomberg-1-3-month-t-bill-etf-anchored-tokenized-etf",
+   "symbol": "aBIL",
+   "name": "SPDR Bloomberg 1-3 Month T-Bill ETF",
+   "contractName": "SPDR Bloomberg 1-3M T-Bill aStock",
+   "group": "stocks",
+   "kind": "etf",
+   "provider": "Anchored",
+   "underlying": "BIL",
+   "address": "0x4FC5B9f8933597D3ecf84d0611687E1Dc8DD576f",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175631/small/coingecko-aBIL.png?1787145231",
+   "source": "coingecko:spdr-bloomberg-1-3-month-t-bill-etf-anchored-tokenized-etf",
+   "firstSeen": null
+  },
+  {
+   "id": "us-brent-oil-fund-astock",
+   "symbol": "aBNO",
+   "name": "US Brent Oil Fund",
+   "contractName": "US Brent Oil Fund aStock",
+   "group": "stocks",
+   "kind": "etf",
+   "provider": "Anchored",
+   "underlying": "BNO",
+   "address": "0xc924B71A10C356c15e3d7CB76ac8EFe8F5522347",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175675/small/BNO.png?1787292232",
+   "source": "coingecko:us-brent-oil-fund-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "robostrategy-inc-astock",
+   "symbol": "aBOT",
+   "name": "RoboStrategy Inc",
+   "contractName": "RoboStrategy Inc aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "BOT",
+   "address": "0x5F3b897dEeA4ea0Cb6AEFe50bd2AE556CF6F4b63",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102178361/small/abot.png?1789385140",
+   "source": "coingecko:robostrategy-inc-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "global-x-robotics-ai-astock",
+   "symbol": "aBOTZ",
+   "name": "Global X Robotics & AI",
+   "contractName": "Global X Robotics & AI aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "BOTZ",
+   "address": "0xfd8ae3a6e660EFDfcE2Ae9bdCdCB81c9a959a846",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175676/small/BOTZ.png?1787292235",
+   "source": "coingecko:global-x-robotics-ai-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "webull-corp-astock",
+   "symbol": "aBULL",
+   "name": "Webull Corp",
+   "contractName": "Webull Corp aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "BULL",
+   "address": "0xff7fb9f9044523dfCAB1F65f204Ac79e6327a1CC",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102178332/small/abull.png?1789373412",
+   "source": "coingecko:webull-corp-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "cameco-astock",
+   "symbol": "aCCJ",
+   "name": "Cameco",
+   "contractName": "Cameco aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "CCJ",
+   "address": "0xDaBa319970C3502e152088E45e5a803e78Cf51D8",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175677/small/CCJ.png?1787292239",
+   "source": "coingecko:cameco-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "chaince-digital-holdings-inc-astock",
+   "symbol": "aCD",
+   "name": "Chaince Digital Holdings Inc",
+   "contractName": "Chaince Digital Holdings Inc aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "CD",
+   "address": "0xA69b48373F8a34A6A53DBE188DB3A664a4e6a7fc",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102178351/small/chaince.png?1789381428",
+   "source": "coingecko:chaince-digital-holdings-inc-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "ciena-astock",
+   "symbol": "aCIEN",
+   "name": "Ciena",
+   "contractName": "Ciena aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "CIEN",
+   "address": "0xd90007E68aa0557E3e9FBf17140d00611DC793EC",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175678/small/CIEN.png?1787292242",
+   "source": "coingecko:ciena-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "coinbase-global-astock",
+   "symbol": "aCOIN",
+   "name": "Coinbase Global",
+   "contractName": "Coinbase Global aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "COIN",
+   "address": "0xD8c1DAe1c55B2fA349F78Ce34553E075AAD6b8A2",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175679/small/COIN.png?1787292245",
+   "source": "coingecko:coinbase-global-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "graniteshares-2x-short-coin-daily-etf-astock",
+   "symbol": "aCONI",
+   "name": "GraniteShares 2x Short COIN Daily ETF",
+   "contractName": "GraniteShares 2x Short COIN Daily ETF aStock",
+   "group": "stocks",
+   "kind": "etf",
+   "provider": "Anchored",
+   "underlying": "CONI",
+   "leveraged": true,
+   "address": "0x2C82E424f8B36352bAe1bCd585c82938B8B78EC8",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175680/small/CONI.png?1787292248",
+   "source": "coingecko:graniteshares-2x-short-coin-daily-etf-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "circle-astock",
+   "symbol": "aCRCL",
+   "name": "Circle",
+   "contractName": "Circle aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "CRCL",
+   "address": "0x72e4F625B68f8d7A08dFb5A88065D6bB90052098",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175681/small/CRCL.png?1787292252",
+   "source": "coingecko:circle-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "salesforce-astock",
+   "symbol": "aCRM",
+   "name": "Salesforce",
+   "contractName": "Salesforce aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "CRM",
+   "address": "0x8339D77b003589cF90F17729595AFE05AD951ac5",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175682/small/CRM.png?1787292255",
+   "source": "coingecko:salesforce-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "cisco-astock",
+   "symbol": "aCSCO",
+   "name": "Cisco",
+   "contractName": "Cisco aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "CSCO",
+   "address": "0x991c1f370Adbab08E1F7978B01Cb1DC022b902BB",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175683/small/CSCO.png?1787292258",
+   "source": "coingecko:cisco-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "dell-technologies-astock",
+   "symbol": "aDELL",
+   "name": "Dell Technologies",
+   "contractName": "Dell Technologies aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "DELL",
+   "address": "0x87Db2cEAC8b2321443d0BfEf67340096867C91BA",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175684/small/DELL.png?1787292262",
+   "source": "coingecko:dell-technologies-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "roundhill-memory-etf-astock",
+   "symbol": "aDRAM",
+   "name": "Roundhill Memory ETF",
+   "contractName": "Roundhill Memory ETF aStock",
+   "group": "stocks",
+   "kind": "etf",
+   "provider": "Anchored",
+   "underlying": "DRAM",
+   "address": "0xF90BF694935638374B238dE65222139010592c8f",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102178336/small/adran.png?1789375096",
+   "source": "coingecko:roundhill-memory-etf-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "ebay-astock",
+   "symbol": "aEBAY",
+   "name": "eBay",
+   "contractName": "eBay aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "EBAY",
+   "address": "0x33f74aC6aa7a73Aca8aB09C52D9158061F634ff3",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175685/small/EBAY.png?1787292265",
+   "source": "coingecko:ebay-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "eaton-astock",
+   "symbol": "aETN",
+   "name": "Eaton",
+   "contractName": "Eaton aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "ETN",
+   "address": "0x678ed8ccc3f3D8FF2873D6BeaB5748E4321C1670",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175686/small/ETN.png?1787292268",
+   "source": "coingecko:eaton-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "ishares-msci-south-korea-astock",
+   "symbol": "aEWY",
+   "name": "iShares MSCI South Korea",
+   "contractName": "iShares MSCI South Korea aStock",
+   "group": "stocks",
+   "kind": "etf",
+   "provider": "Anchored",
+   "underlying": "EWY",
+   "address": "0xA01a050440b8D77Fc868Ff33d290A2DAb5b79366",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175687/small/EWY.png?1787292271",
+   "source": "coingecko:ishares-msci-south-korea-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "franklin-ftse-south-korea-astock",
+   "symbol": "aFLKR",
+   "name": "Franklin FTSE South Korea",
+   "contractName": "Franklin FTSE South Korea aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "FLKR",
+   "address": "0x4F9b7d336b1972dD4C93CA250121AacAa6B083AA",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175688/small/FLKR.png?1787292275",
+   "source": "coingecko:franklin-ftse-south-korea-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "fluence-energy-inc-astock",
+   "symbol": "aFLNC",
+   "name": "Fluence Energy Inc",
+   "contractName": "Fluence Energy Inc aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "FLNC",
+   "address": "0xFA63f789664F761e38E39F83A3617DBc1c8e0226",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102178359/small/fluence.png?1789384812",
+   "source": "coingecko:fluence-energy-inc-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "1-800-flowers-com-inc-astock",
+   "symbol": "aFLWS",
+   "name": "1-800-Flowers.Com Inc",
+   "contractName": "1-800-Flowers.Com Inc aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "FLWS",
+   "address": "0x3a013978CbD3ed7b270C92009E6A6D1bE8E6ac25",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102178345/small/FLWS.png?1789379159",
+   "source": "coingecko:1-800-flowers-com-inc-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "formfactor-astock",
+   "symbol": "aFORM",
+   "name": "FormFactor",
+   "contractName": "FormFactor aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "FORM",
+   "address": "0xbe10e0C583e46ff8D9A5a6aB578A89b7e49ad005",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175689/small/FORM.png?1787292278",
+   "source": "coingecko:formfactor-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "vaneck-gold-miners-etf-astock",
+   "symbol": "aGDX",
+   "name": "VanEck Gold Miners ETF",
+   "contractName": "VanEck Gold Miners ETF aStock",
+   "group": "stocks",
+   "kind": "etf",
+   "provider": "Anchored",
+   "underlying": "GDX",
+   "address": "0x7b17054C9621930F3CDd38177217c2b73956856a",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175690/small/GDX.png?1787292281",
+   "source": "coingecko:vaneck-gold-miners-etf-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "ge-vernova-astock",
+   "symbol": "aGEV",
+   "name": "GE Vernova",
+   "contractName": "GE Vernova aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "GEV",
+   "address": "0xdBd41398c970a1649C7Eec1D72c9D50E0Aa3B095",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175691/small/GEV.png?1787292285",
+   "source": "coingecko:ge-vernova-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "gamestop-astock",
+   "symbol": "aGME",
+   "name": "GameStop",
+   "contractName": "GameStop aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "GME",
+   "address": "0x8E18aC2b7EbDd781e7a15C333f3b80EEd8De4A27",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175693/small/GME.png?1787292291",
+   "source": "coingecko:gamestop-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "alphabet-astock",
+   "symbol": "aGOOGL",
+   "name": "Alphabet",
+   "contractName": "Alphabet aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "GOOGL",
+   "address": "0xBDe676CDF5564Ef64CCD8555Aa9B56867D8D1aD5",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175694/small/GOOGL.png?1787292295",
+   "source": "coingecko:alphabet-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "groupon-inc-astock",
+   "symbol": "aGRPN",
+   "name": "Groupon Inc",
+   "contractName": "Groupon Inc aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "GRPN",
+   "address": "0x8eee4aAb4acBe84182c0f2CdbC906e39c6B076E8",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102178339/small/agrpn.png?1789376674",
+   "source": "coingecko:groupon-inc-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "robinhood-astock",
+   "symbol": "aHOOD",
+   "name": "Robinhood",
+   "contractName": "Robinhood aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "HOOD",
+   "address": "0x5a4860adDCc094FcE026384caeEcb1e634DD9af4",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175695/small/HOOD.png?1787292298",
+   "source": "coingecko:robinhood-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "hertz-global-holdings-inc-astock",
+   "symbol": "aHTZ",
+   "name": "Hertz Global Holdings Inc",
+   "contractName": "Hertz Global Holdings Inc aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "HTZ",
+   "address": "0x9B76297343f272481f23Dd0BBd4f20a9a227b392",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102178338/small/ahtz.png?1789376091",
+   "source": "coingecko:hertz-global-holdings-inc-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "immunitybio-inc-astock",
+   "symbol": "aIBRX",
+   "name": "Immunitybio Inc",
+   "contractName": "Immunitybio Inc aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "IBRX",
+   "address": "0xE8Bc8f7CE09d0B3b9F2CC017BBBf0EF0535ca573",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102178357/small/immunity.png?1789384401",
+   "source": "coingecko:immunitybio-inc-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "indie-semiconductor-inc-astock",
+   "symbol": "aINDI",
+   "name": "indie Semiconductor Inc",
+   "contractName": "indie Semiconductor Inc aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "INDI",
+   "address": "0x7Fe49b79e7acF9Fbd840c8F11035c618425c36ca",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102178356/small/indi.png?1789384212",
+   "source": "coingecko:indie-semiconductor-inc-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "intel-astock",
+   "symbol": "aINTC",
+   "name": "Intel",
+   "contractName": "Intel aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "INTC",
+   "address": "0x126250964E05B9E34d025e9D3b309349cf92402A",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175696/small/INTC.png?1787292301",
+   "source": "coingecko:intel-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "ionq-astock",
+   "symbol": "aIONQ",
+   "name": "IONQ",
+   "contractName": "IONQ aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "IONQ",
+   "address": "0xC8c3bbd0aF3f10293d75dd468C51F3f81Fc22FEe",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175697/small/IONQ.png?1787292305",
+   "source": "coingecko:ionq-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "lucid-group-inc-astock",
+   "symbol": "aLCID",
+   "name": "Lucid Group Inc",
+   "contractName": "Lucid Group Inc aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "LCID",
+   "address": "0x490c6311948aE3E3A6a96D3842e333302034D4d3",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102178353/small/lucid.png?1789383587",
+   "source": "coingecko:lucid-group-inc-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "roundhill-meme-stock-etf-astock",
+   "symbol": "aMEME",
+   "name": "Roundhill Meme Stock ETF",
+   "contractName": "Roundhill Meme Stock ETF aStock",
+   "group": "stocks",
+   "kind": "etf",
+   "provider": "Anchored",
+   "underlying": "MEME",
+   "address": "0x6F75b1B886bd1b1295325c9619F9F6B9Fb760588",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102178331/small/ameme.png?1789373158",
+   "source": "coingecko:roundhill-meme-stock-etf-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "meta-astock",
+   "symbol": "aMETA",
+   "name": "Meta",
+   "contractName": "Meta aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "META",
+   "address": "0xa1847139cbd660ABC2f7b889d7CBCF18C56407fb",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175698/small/META.png?1787292309",
+   "source": "coingecko:meta-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "ramaco-resources-inc-astock",
+   "symbol": "aMETC",
+   "name": "Ramaco Resources Inc",
+   "contractName": "Ramaco Resources Inc aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "METC",
+   "address": "0x297Df276F30a22c1F94EAB7daf1e280E54bC439a",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102178350/small/ramaco.png?1789380536",
+   "source": "coingecko:ramaco-resources-inc-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "moderna-inc-astock",
+   "symbol": "aMRNA",
+   "name": "Moderna Inc",
+   "contractName": "Moderna Inc aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "MRNA",
+   "address": "0xDa230A7EC7aFf66E62ff3e225C3D9C42093C23ae",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175699/small/MRNA.png?1787292312",
+   "source": "coingecko:moderna-inc-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "defiance-daily-target-2x-long-mrna-etf-astock",
+   "symbol": "aMRNX",
+   "name": "Defiance Daily Target 2X Long MRNA ETF",
+   "contractName": "Defiance Daily Target 2X Long MRNA ETF aStock",
+   "group": "stocks",
+   "kind": "etf",
+   "provider": "Anchored",
+   "underlying": "MRNX",
+   "leveraged": true,
+   "address": "0x69825E4Cf138fe7441a75Af72dA1AE8F9e720434",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175700/small/MRNX.png?1787292316",
+   "source": "coingecko:defiance-daily-target-2x-long-mrna-etf-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "marvell-technology-astock",
+   "symbol": "aMRVL",
+   "name": "Marvell Technology",
+   "contractName": "Marvell Technology aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "MRVL",
+   "address": "0x870e3495f5D7F0872Ad7c0fbDD163016AE9122b5",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175701/small/MRVL.png?1787292319",
+   "source": "coingecko:marvell-technology-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "microsoft-astock",
+   "symbol": "aMSFT",
+   "name": "Microsoft",
+   "contractName": "Microsoft aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "MSFT",
+   "address": "0x73E9EB2C7a4B4E8c68232b31Ea0F1246963D0375",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175702/small/MSFT.png?1787292323",
+   "source": "coingecko:microsoft-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "strategy-astock",
+   "symbol": "aMSTR",
+   "name": "Strategy",
+   "contractName": "Strategy aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "MSTR",
+   "address": "0x294F40996134D067B56dcbACBf6a36396BBBeA7a",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175703/small/MSTR.png?1787292326",
+   "source": "coingecko:strategy-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "micron-technology-astock",
+   "symbol": "aMU",
+   "name": "Micron Technology",
+   "contractName": "Micron Technology aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "MU",
+   "address": "0xc54ce75193a68602bC01FfD2B112DA3948EB14a7",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175704/small/MU.png?1787292329",
+   "source": "coingecko:micron-technology-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "nebius-group-astock",
+   "symbol": "aNBIS",
+   "name": "Nebius Group",
+   "contractName": "Nebius Group aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "NBIS",
+   "address": "0x822594e4bC4C8237E77e5620744d3f383e77d4fe",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175705/small/NBIS.png?1787292333",
+   "source": "coingecko:nebius-group-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "newegg-commerce-inc-astock",
+   "symbol": "aNEGG",
+   "name": "Newegg Commerce Inc",
+   "contractName": "Newegg Commerce Inc aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "NEGG",
+   "address": "0x6031e48580FD0d8eD23d6A9AD89b69758adCF7b2",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102178346/small/anegg.png?1789379329",
+   "source": "coingecko:newegg-commerce-inc-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "servicenow-astock",
+   "symbol": "aNOW",
+   "name": "ServiceNow",
+   "contractName": "ServiceNow aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "NOW",
+   "address": "0x6B97A52C6877FaF6F3836377B37e4A0A27EdDE01",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175706/small/NOW.png?1787292336",
+   "source": "coingecko:servicenow-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "graniteshares-2x-short-nvda-daily-etf-astock",
+   "symbol": "aNVD",
+   "name": "GraniteShares 2x Short NVDA Daily ETF",
+   "contractName": "GraniteShares 2x Short NVDA Daily ETF aStock",
+   "group": "stocks",
+   "kind": "etf",
+   "provider": "Anchored",
+   "underlying": "NVD",
+   "leveraged": true,
+   "address": "0x9b4D9b20EaC87C4DA9912cdbDC111d991eEF0681",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175707/small/NVD.png?1787292339",
+   "source": "coingecko:graniteshares-2x-short-nvda-daily-etf-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "ondas-inc-astock",
+   "symbol": "aONDS",
+   "name": "Ondas Inc",
+   "contractName": "Ondas Inc aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "ONDS",
+   "address": "0x049cBB2180DcceD2B69FcaD0a98f6D046cCE1C6e",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102178340/small/aondas.png?1789376839",
+   "source": "coingecko:ondas-inc-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "oruka-therapeutics-inc-astock",
+   "symbol": "aORKA",
+   "name": "Oruka Therapeutics Inc",
+   "contractName": "Oruka Therapeutics Inc aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "ORKA",
+   "address": "0x344FCa3683cd01aa5833E67179F826080bda98fc",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175709/small/ORKA.png?1787292346",
+   "source": "coingecko:oruka-therapeutics-inc-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "palo-alto-networks-inc-astock",
+   "symbol": "aPANW",
+   "name": "Palo Alto Networks Inc",
+   "contractName": "Palo Alto Networks Inc aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "PANW",
+   "address": "0xB66340a2BC5F95b127534Ba5F24827802B9Bc7EE",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175710/small/PANW.png?1787292349",
+   "source": "coingecko:palo-alto-networks-inc-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "purecycle-technologies-inc-astock",
+   "symbol": "aPCT",
+   "name": "Purecycle Technologies Inc",
+   "contractName": "Purecycle Technologies Inc aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "PCT",
+   "address": "0x13077A525AE6Ca771e04fc91871b2f8F55ECFE3a",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102178348/small/purecycle.png?1789379807",
+   "source": "coingecko:purecycle-technologies-inc-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "palantir-astock",
+   "symbol": "aPLTR",
+   "name": "Palantir",
+   "contractName": "Palantir aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "PLTR",
+   "address": "0xB95956daacE89226185FB696C2Cc3F0d9BBFD4e3",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175711/small/PLTR.png?1787292353",
+   "source": "coingecko:palantir-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "propetro-holding-corp-astock",
+   "symbol": "aPUMP",
+   "name": "Propetro Holding Corp",
+   "contractName": "Propetro Holding Corp aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "PUMP",
+   "address": "0xAB7d864BC08f4322DE2F94FABaF14D71a687d7C5",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102178330/small/propetro.png?1789372860",
+   "source": "coingecko:propetro-holding-corp-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "d-wave-quantum-astock",
+   "symbol": "aQBTS",
+   "name": "D-Wave Quantum",
+   "contractName": "D-Wave Quantum aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "QBTS",
+   "address": "0xdfA678fA8d208eD3125e84a184fb39f2a22817A4",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175712/small/QBTS.png?1787292356",
+   "source": "coingecko:d-wave-quantum-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "invesco-qqq-astock",
+   "symbol": "aQQQ",
+   "name": "Invesco QQQ",
+   "contractName": "Invesco QQQ aStock",
+   "group": "stocks",
+   "kind": "etf",
+   "provider": "Anchored",
+   "underlying": "QQQ",
+   "address": "0x1446501E886c7f830DB9b494A1890cBCCC072f57",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175713/small/QQQ.png?1787292360",
+   "source": "coingecko:invesco-qqq-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "defiance-quantum-astock",
+   "symbol": "aQTUM",
+   "name": "Defiance Quantum",
+   "contractName": "Defiance Quantum aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "QTUM",
+   "address": "0x472A83495B50Ce62b124CAbfef7A7C0DB067C1e7",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175714/small/QTUM.png?1787292364",
+   "source": "coingecko:defiance-quantum-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "quantum-computing-inc-astock",
+   "symbol": "aQUBT",
+   "name": "Quantum Computing Inc",
+   "contractName": "Quantum Computing Inc aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "QUBT",
+   "address": "0x11917C87B177e134116d1A538aCc9F832B76D0F2",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102178354/small/qci.png?1789383764",
+   "source": "coingecko:quantum-computing-inc-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "reddit-astock",
+   "symbol": "aRDDT",
+   "name": "Reddit",
+   "contractName": "Reddit aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "RDDT",
+   "address": "0x167ef0d9AE3D001146865eC8Aa4A7a78b048B615",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175715/small/RDDT.png?1787292367",
+   "source": "coingecko:reddit-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "rigetti-computing-astock",
+   "symbol": "aRGTI",
+   "name": "Rigetti Computing",
+   "contractName": "Rigetti Computing aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "RGTI",
+   "address": "0xC3b236FB3cd15e3D996f3B49C0eE034Bc18ACCF9",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175716/small/RGTI.png?1787292370",
+   "source": "coingecko:rigetti-computing-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "rocket-lab-astock",
+   "symbol": "aRKLB",
+   "name": "Rocket Lab",
+   "contractName": "Rocket Lab aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "RKLB",
+   "address": "0x8bCe7712CA1eFc613CE73F9471aD2388DAc09413",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175717/small/RKLB.png?1787292374",
+   "source": "coingecko:rocket-lab-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "recursion-pharmaceuticals-inc-astock",
+   "symbol": "aRXRX",
+   "name": "Recursion Pharmaceuticals Inc",
+   "contractName": "Recursion Pharmaceuticals Inc aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "RXRX",
+   "address": "0xA886aAAc8752548CbD9fFD7940b99B9B46EAb219",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102178349/small/arxrx.png?1789380038",
+   "source": "coingecko:recursion-pharmaceuticals-inc-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "rackspace-technology-inc-astock",
+   "symbol": "aRXT",
+   "name": "Rackspace Technology Inc",
+   "contractName": "Rackspace Technology Inc aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "RXT",
+   "address": "0xB2eaa18aaAb01d049EDf2b845c9Ea0480F72c18A",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102178355/small/rackspace.png?1789384008",
+   "source": "coingecko:rackspace-technology-inc-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "proshares-ultrashort-s-p500-astock",
+   "symbol": "aSDS",
+   "name": "ProShares UltraShort S&P500",
+   "contractName": "ProShares UltraShort S&P500 aStock",
+   "group": "stocks",
+   "kind": "etf",
+   "provider": "Anchored",
+   "underlying": "SDS",
+   "address": "0x9B5803E173b3118d70A17C3be0BABdd912A4000E",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175719/small/SDS.png?1787292380",
+   "source": "coingecko:proshares-ultrashort-s-p500-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "serve-robotics-inc-astock",
+   "symbol": "aSERV",
+   "name": "Serve Robotics Inc",
+   "contractName": "Serve Robotics Inc aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "SERV",
+   "address": "0x1076356059c5Fe9faD3a053c4C84a32EfD116274",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102178352/small/serve.png?1789383427",
+   "source": "coingecko:serve-robotics-inc-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "graniteshares-2x-short-sk-hynix-daily-etf-astock",
+   "symbol": "aSKDD",
+   "name": "GraniteShares 2x Short SK Hynix Daily ETF",
+   "contractName": "GraniteShares 2x Short SK Hynix Daily ETF aStock",
+   "group": "stocks",
+   "kind": "etf",
+   "provider": "Anchored",
+   "underlying": "SKDD",
+   "leveraged": true,
+   "address": "0x215CCE3E783fC7FAfBed758D55ef5B654fD69A34",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175720/small/SKDD.png?1787292384",
+   "source": "coingecko:graniteshares-2x-short-sk-hynix-daily-etf-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "sk-hynix-anchored-tokenized-stock",
+   "symbol": "aSKHY",
+   "name": "SK Hynix",
+   "contractName": "SK hynix aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "SKHY",
+   "address": "0x6E8568ba7B43138d9210959a9523155e274550C9",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175661/small/coingecko-aSKHY.png?1787279624",
+   "source": "coingecko:sk-hynix-anchored-tokenized-stock",
+   "firstSeen": null
+  },
+  {
+   "id": "super-micro-computer-astock",
+   "symbol": "aSMCI",
+   "name": "Super Micro Computer",
+   "contractName": "Super Micro Computer aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "SMCI",
+   "address": "0xfd38813A547b30155914383919cebE83a98435fA",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175722/small/SMCI.png?1787292390",
+   "source": "coingecko:super-micro-computer-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "vaneck-semiconductor-astock",
+   "symbol": "aSMH",
+   "name": "VanEck Semiconductor",
+   "contractName": "VanEck Semiconductor aStock",
+   "group": "stocks",
+   "kind": "etf",
+   "provider": "Anchored",
+   "underlying": "SMH",
+   "address": "0x74110FB3858D91418227007851362672514925Ef",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175723/small/SMH.png?1787292393",
+   "source": "coingecko:vaneck-semiconductor-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "sandisk-astock",
+   "symbol": "aSNDK",
+   "name": "SanDisk",
+   "contractName": "SanDisk aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "SNDK",
+   "address": "0x57e2613fa6193c11913299CBdC1C8cb4916c15e8",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175724/small/SNDK.png?1787292397",
+   "source": "coingecko:sandisk-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "soundhound-ai-inc-astock",
+   "symbol": "aSOUN",
+   "name": "SoundHound AI Inc",
+   "contractName": "SoundHound AI Inc aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "SOUN",
+   "address": "0x3197Fb576B8daa0a5A9C1C5923e91A4D41d25D71",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102178342/small/asound.png?1789377540",
+   "source": "coingecko:soundhound-ai-inc-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "direxion-daily-semiconductor-bull-3x-astock",
+   "symbol": "aSOXL",
+   "name": "Direxion Daily Semiconductor Bull 3x",
+   "contractName": "Direxion Daily Semiconductor Bull 3x aStock",
+   "group": "stocks",
+   "kind": "etf",
+   "provider": "Anchored",
+   "underlying": "SOXL",
+   "leveraged": true,
+   "address": "0x6910aCdC21a86dAd4FdE233764FdaC4F4cE187E8",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175725/small/SOXL.png?1787292400",
+   "source": "coingecko:direxion-daily-semiconductor-bull-3x-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "tradr-2x-short-spacex-daily-etf-astock",
+   "symbol": "aSPCG",
+   "name": "Tradr 2X Short SpaceX Daily ETF",
+   "contractName": "Tradr 2X Short SpaceX Daily ETF aStock",
+   "group": "stocks",
+   "kind": "etf",
+   "provider": "Anchored",
+   "underlying": "SPCG",
+   "leveraged": true,
+   "address": "0xA67F4594e3c8441a58D1df95F1AB7D3d65367Afd",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175726/small/SPCG.png?1787292403",
+   "source": "coingecko:tradr-2x-short-spacex-daily-etf-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "spacex-anchored-tokenized-stock",
+   "symbol": "aSPCX",
+   "name": "SpaceX",
+   "contractName": "SpaceX aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "SPCX",
+   "address": "0x12473790e09D415ABAc7441401F7AbeC64Fa959C",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175662/small/coingecko-aSPCX.png?1787279738",
+   "source": "coingecko:spacex-anchored-tokenized-stock",
+   "firstSeen": null
+  },
+  {
+   "id": "spdr-s-p-500-astock",
+   "symbol": "aSPY",
+   "name": "SPDR S&P 500",
+   "contractName": "SPDR S&P 500 aStock",
+   "group": "stocks",
+   "kind": "etf",
+   "provider": "Anchored",
+   "underlying": "SPY",
+   "address": "0x4716Cfb68C73BfF797Eea4f94ffAD8d198aEfC4B",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175727/small/SPY.png?1787292406",
+   "source": "coingecko:spdr-s-p-500-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "proshares-ultrapro-short-qqq-astock",
+   "symbol": "aSQQQ",
+   "name": "ProShares UltraPro Short QQQ",
+   "contractName": "ProShares UltraPro Short QQQ aStock",
+   "group": "stocks",
+   "kind": "etf",
+   "provider": "Anchored",
+   "underlying": "SQQQ",
+   "leveraged": true,
+   "address": "0x3D054231Ed348b1C52684E2477f935FE06DAfd85",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175728/small/SQQQ.png?1787292410",
+   "source": "coingecko:proshares-ultrapro-short-qqq-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "seagate-technology-astock",
+   "symbol": "aSTX",
+   "name": "Seagate Technology",
+   "contractName": "Seagate Technology aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "STX",
+   "address": "0xC060d393df9ca0E96fb5434FF3223c085c4B2e2A",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175729/small/STX.png?1787292413",
+   "source": "coingecko:seagate-technology-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "proshares-ultrashort-20-year-treasury-astock",
+   "symbol": "aTBT",
+   "name": "ProShares UltraShort 20+ Year Treasury",
+   "contractName": "ProShares UltraShort 20+ Year Treasury aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "TBT",
+   "address": "0xC614D4aD49ec4F4854D70cb4fd788DDb5c3Fe41e",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175730/small/TBT.png?1787292416",
+   "source": "coingecko:proshares-ultrashort-20-year-treasury-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "ishares-20-year-treasury-bond-astock",
+   "symbol": "aTLT",
+   "name": "iShares 20+ Year Treasury Bond",
+   "contractName": "iShares 20+ Year Treasury Bond aStock",
+   "group": "stocks",
+   "kind": "etf",
+   "provider": "Anchored",
+   "underlying": "TLT",
+   "address": "0x5DA938Ad48C46BD22CA362A91517ce2c16367d09",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175731/small/TLT.png?1787292420",
+   "source": "coingecko:ishares-20-year-treasury-bond-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "proshares-ultrapro-qqq-astock",
+   "symbol": "aTQQQ",
+   "name": "ProShares UltraPro QQQ",
+   "contractName": "ProShares UltraPro QQQ aStock",
+   "group": "stocks",
+   "kind": "etf",
+   "provider": "Anchored",
+   "underlying": "TQQQ",
+   "leveraged": true,
+   "address": "0xB57B6C37526CECDDDbf92DA1783b7F4b4B53d45F",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175732/small/TQQQ.png?1787292423",
+   "source": "coingecko:proshares-ultrapro-qqq-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "tesla-astock",
+   "symbol": "aTSLA",
+   "name": "Tesla",
+   "contractName": "Tesla aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "TSLA",
+   "address": "0x10FAD4A60Adb421F8F5Ca6f9f2eAf2DbC110E146",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175733/small/TSLA.png?1787292426",
+   "source": "coingecko:tesla-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "tradr-2x-short-tsla-daily-etf-astock",
+   "symbol": "aTSLZ",
+   "name": "Tradr 2X Short TSLA Daily ETF",
+   "contractName": "T-Rex 2x Inverse Tesla Daily Target ETF aStock",
+   "group": "stocks",
+   "kind": "etf",
+   "provider": "Anchored",
+   "underlying": "TSLZ",
+   "leveraged": true,
+   "address": "0x3f670133caa4d10Cf726028A68602114c1A3F15c",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175734/small/TSLZ.png?1787292430",
+   "source": "coingecko:tradr-2x-short-tsla-daily-etf-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "global-x-uranium-astock",
+   "symbol": "aURA",
+   "name": "Global X Uranium",
+   "contractName": "Global X Uranium aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "URA",
+   "address": "0x7e952B8C28D855804c7FE8d64ecac30ace16C4dA",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175735/small/URA.png?1787292433",
+   "source": "coingecko:global-x-uranium-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "us-oil-fund-astock",
+   "symbol": "aUSO",
+   "name": "US Oil Fund",
+   "contractName": "US Oil Fund aStock",
+   "group": "stocks",
+   "kind": "etf",
+   "provider": "Anchored",
+   "underlying": "USO",
+   "address": "0x7388ED3371407471D48637b4Ad8445b8D4Fc3f8f",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175736/small/USO.png?1787292436",
+   "source": "coingecko:us-oil-fund-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "vertiv-astock",
+   "symbol": "aVRT",
+   "name": "Vertiv",
+   "contractName": "Vertiv aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "VRT",
+   "address": "0x0b45e5aFEa928030988704ef60995d8925b91CD6",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175737/small/VRT.png?1787292439",
+   "source": "coingecko:vertiv-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "vistra-astock",
+   "symbol": "aVST",
+   "name": "Vistra",
+   "contractName": "Vistra aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "VST",
+   "address": "0x49ccCd75B2b0Fb9ccD8c1d2a5D313e050C52fA89",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175738/small/VST.png?1787292443",
+   "source": "coingecko:vistra-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "western-digital-astock",
+   "symbol": "aWDC",
+   "name": "Western Digital",
+   "contractName": "Western Digital aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "WDC",
+   "address": "0x49E30F2D4a1b9a1766F0675ADaF04f70681Fbb63",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175739/small/WDC.png?1787292446",
+   "source": "coingecko:western-digital-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "waterdrop-inc-astock",
+   "symbol": "aWDH",
+   "name": "Waterdrop Inc",
+   "contractName": "Waterdrop Inc aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "WDH",
+   "address": "0x6458D4844ccaaD06dbf566D1df93D8815f89D9b0",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102178731/small/aWDH-logo.png?1790168204",
+   "source": "coingecko:waterdrop-inc-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "wendy-s-astock",
+   "symbol": "aWEN",
+   "name": "Wendy's",
+   "contractName": "Wendy's aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "WEN",
+   "address": "0x4644Fd1eab16A21969B4c16Be8A2D5c986033F2a",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175740/small/WEN.png?1787292449",
+   "source": "coingecko:wendy-s-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "genedx-holdings-corp-astock",
+   "symbol": "aWGS",
+   "name": "GeneDx Holdings Corp",
+   "contractName": "GeneDx Holdings Corp aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "WGS",
+   "address": "0xd13163B837A3736C0aC4da9239b108Fe0E04DBaE",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102178343/small/sema4.png?1789377734",
+   "source": "coingecko:genedx-holdings-corp-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "walmart-astock",
+   "symbol": "aWMT",
+   "name": "Walmart",
+   "contractName": "Walmart aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "WMT",
+   "address": "0xbDcd7e902861094164D4b4048Ac62D3897a32721",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175741/small/WMT.png?1787292453",
+   "source": "coingecko:walmart-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "petco-health-and-wellness-company-inc-astock",
+   "symbol": "aWOOF",
+   "name": "Petco Health and Wellness Company Inc",
+   "contractName": "Petco Health and Wellness Company Inc aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "WOOF",
+   "address": "0x2f5d2EacE3890E5E53dd4e5462Ba252C3746FEeF",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102178333/small/awoof.png?1789373638",
+   "source": "coingecko:petco-health-and-wellness-company-inc-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "world-acceptance-corp-astock",
+   "symbol": "aWRLD",
+   "name": "World Acceptance Corp",
+   "contractName": "World Acceptance Corp aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "WRLD",
+   "address": "0x72584A4d919B7969cE030fb58F7f56E2137af9B0",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102178337/small/awrld.png?1789375799",
+   "source": "coingecko:world-acceptance-corp-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "waton-financial-limited-astock",
+   "symbol": "aWTF",
+   "name": "Waton Financial Limited",
+   "contractName": "Waton Financial Limited aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "WTF",
+   "address": "0xE1E495fa46EEd2B6dA96fCEdc051DE23166fA892",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102178329/small/awtf.png?1789372492",
+   "source": "coingecko:waton-financial-limited-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "whitefiber-inc-astock",
+   "symbol": "aWYFI",
+   "name": "WhiteFiber Inc",
+   "contractName": "WhiteFiber Inc aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "WYFI",
+   "address": "0xA359B67304F183D3308577d856eED0D98DfB715D",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102178347/small/whitefiber.png?1789379562",
+   "source": "coingecko:whitefiber-inc-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "technology-select-sector-spdr-astock",
+   "symbol": "aXLK",
+   "name": "Technology Select Sector SPDR",
+   "contractName": "Technology Select Sector SPDR aStock",
+   "group": "stocks",
+   "kind": "etf",
+   "provider": "Anchored",
+   "underlying": "XLK",
+   "address": "0xf63AD58f1D4D1276eA0De2490689942303d2D446",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102175742/small/XLK.png?1787292456",
+   "source": "coingecko:technology-select-sector-spdr-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "xponential-fitness-inc-astock",
+   "symbol": "aXPOF",
+   "name": "Xponential Fitness Inc",
+   "contractName": "Xponential Fitness Inc aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "XPOF",
+   "address": "0x5D04786d76a9eA0C91C6a2f25fD4922846527C4C",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102178341/small/axpof.png?1789377385",
+   "source": "coingecko:xponential-fitness-inc-astock",
+   "firstSeen": null
+  },
+  {
+   "id": "xerox-holdings-corp-astock",
+   "symbol": "aXRX",
+   "name": "Xerox Holdings Corp",
+   "contractName": "Xerox Holdings Corp aStock",
+   "group": "stocks",
+   "kind": "stock",
+   "provider": "Anchored",
+   "underlying": "XRX",
+   "address": "0x5C55e3Da9d7bBFAd6C5FdB4B6b4dac85c9d6e5C7",
+   "decimals": 18,
+   "controls": {
+    "upgradeable": true,
+    "pausable": false,
+    "rebasing": false
+   },
+   "image": "https://coin-images.coingecko.com/coins/images/102178360/small/xerox.png?1789384981",
+   "source": "coingecko:xerox-holdings-corp-astock",
    "firstSeen": null
   },
   {

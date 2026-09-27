@@ -39,6 +39,24 @@ test("counterfeits: a stock token's ticker, stock-token wording, or a company's 
   assert.equal(copy.official.symbol, "GPROB");
 });
 
+test("punctuation and invisible format characters cannot bypass counterfeit checks", () => {
+  for (const [name, symbol, reason] of [
+    ["Totally GoPro", "GPRO-B", "TOKEN_SYMBOL"],
+    ["Farmmi x-stock", "FAMI", "STOCK_NAMING"],
+    ["Farmmi stock-token", "FAMI", "STOCK_NAMING"],
+    ["Tokenized\u200bstock Farmmi", "FAMI", "STOCK_NAMING"],
+    ["Ｆａｒｍｍｉ ＸＳｔｏｃｋ", "FAMI", "STOCK_NAMING"],
+  ]) {
+    const fake = checkStockIdentity({ address: ELSEWHERE, chainId: 56, name, symbol });
+    assert.equal(fake.status, "imitation", `${name} ${symbol}`);
+    assert.equal(fake.reason, reason, `${name} ${symbol}`);
+  }
+
+  const disguisedTicker = checkStockIdentity({ address: ELSEWHERE, chainId: 56, name: "AMC Entertainment", symbol: "A.M.C" });
+  assert.equal(disguisedTicker.status, "imitation");
+  assert.equal(disguisedTicker.reason, "NAME_AND_TICKER");
+});
+
 test("a shared name or ticker alone is a warning, and short tickers or unrelated tokens pass", () => {
   const meme = checkStockIdentity({ address: ELSEWHERE, chainId: 56, name: "A Meme Coin", symbol: "AMC" });
   assert.equal(meme.status, "overlap");

@@ -74,6 +74,7 @@ export const PANCAKE_V3_QUOTER_ABI = [
 
 export const PANCAKE_V3_POOL_ABI = [
   { type: "function", name: "token0", stateMutability: "view", inputs: [], outputs: [{ type: "address" }] },
+  { type: "function", name: "token1", stateMutability: "view", inputs: [], outputs: [{ type: "address" }] },
   { type: "function", name: "fee", stateMutability: "view", inputs: [], outputs: [{ type: "uint24" }] },
   { type: "function", name: "slot0", stateMutability: "view", inputs: [], outputs: [
     { name: "sqrtPriceX96", type: "uint160" }, { name: "tick", type: "int24" }, { name: "observationIndex", type: "uint16" }, { name: "observationCardinality", type: "uint16" },

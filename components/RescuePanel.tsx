@@ -92,7 +92,8 @@ export default function RescuePanel({ curve, token, symbol, quotes, rescued, gra
       setBusy("open");
       const simulation = await publicClient.simulateContract({ account: owner, address: curve, abi: CURVE_TRADE_ABI, functionName: "activateRescue" });
       const hash = await walletClient.writeContract(simulation.request);
-      await publicClient.waitForTransactionReceipt({ hash });
+      const receipt = await publicClient.waitForTransactionReceipt({ hash });
+      if (receipt.status !== "success") throw new Error(zh ? "开启救援的交易失败。" : "The rescue activation transaction reverted.");
       setStatus(zh ? "救援已开启，持有人现在可以赎回。" : "Rescue is open. Holders can now redeem.");
       onDone();
     } catch (error) {
@@ -113,7 +114,8 @@ export default function RescuePanel({ curve, token, symbol, quotes, rescued, gra
         setBusy("approve");
         setStatus(zh ? `批准 ${amountText(amount, TOKEN_DECIMALS)} ${symbol}（仅本次金额）。` : `Approve ${amountText(amount, TOKEN_DECIMALS)} ${symbol} (this redemption only).`);
         const approveHash = await walletClient.writeContract({ address: token, abi: ERC20_TRADE_ABI, functionName: "approve", args: [curve, amount] });
-        await publicClient.waitForTransactionReceipt({ hash: approveHash });
+        const approveReceipt = await publicClient.waitForTransactionReceipt({ hash: approveHash });
+        if (approveReceipt.status !== "success") throw new Error(zh ? "批准交易失败。" : "The approval transaction reverted.");
       }
       // The share per token cannot fall as others redeem, so the preview is the floor.
       const minOut = payouts.map((payout) => (payout * 999n) / 1000n);
@@ -133,7 +135,8 @@ export default function RescuePanel({ curve, token, symbol, quotes, rescued, gra
         setBusy("unwrap");
         try {
           const unwrapHash = await walletClient.writeContract({ address: quotes[wrappedIndex].address, abi: WRAPPED_NATIVE_ABI, functionName: "withdraw", args: [paid[wrappedIndex]] });
-          await publicClient.waitForTransactionReceipt({ hash: unwrapHash });
+          const unwrapReceipt = await publicClient.waitForTransactionReceipt({ hash: unwrapHash });
+          if (unwrapReceipt.status !== "success") throw new Error(zh ? "解包交易失败。" : "The unwrap transaction reverted.");
           unwrapped = true;
         } catch {
           // The redemption stands; the share stays wrapped.

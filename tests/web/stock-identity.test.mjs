@@ -7,6 +7,7 @@ import { PENNY_MAX_USD, isPennyStock } from "../../lib/pair-reasons.ts";
 const AMC_ONDO = "0x1d7B5e06fdbe4FD33f5C64C081E32B5d539751D0";
 const GOPRO_BSTOCK = "0x1ECfda023C46cA216b5c620eF357A6D0C03951E6";
 const SILVER_ONDO = "0x8b872732b07be325a8803CDB480D9d20B6f8d11B";
+const APPLE_ANCHORED = "0x17683E492d0C8910F7C0157D04Af31cB7A23aD71";
 const ELSEWHERE = "0x000000000000000000000000000000000000beef";
 
 test("the verified set is every tokenized stock and ETF in the pair universe", () => {
@@ -87,8 +88,7 @@ test("issuer tokens Fortune has not reviewed are unverified, never imitations", 
     ["Vertiv Holdings Co xStock", "VRTx"],
     ["C3.ai (Ondo Tokenized Stock)", "AIon"],
     ["SK Hynix (Anchored Tokenized Stock)", "ASKHY"],
-    ["SpaceX aStock", "aSPCX"],
-    ["Apple aStock", "aAAPL"],
+    ["Kratos Defense & Security Solutions xStock", "KTOSx"],
     ["Alibaba", "BABAB"],
   ]) {
     const unlisted = checkStockIdentity({ address: ELSEWHERE, chainId: 56, name, symbol });
@@ -99,6 +99,19 @@ test("issuer tokens Fortune has not reviewed are unverified, never imitations", 
   const styled = checkStockIdentity({ address: ELSEWHERE, chainId: 56, name: "AMC Entertainment", symbol: "AMCON" });
   assert.equal(styled.status, "unverified");
   assert.equal(styled.official.address, AMC_ONDO);
+});
+
+test("Anchored aStocks are verified issuer tokens; copies of them are not", () => {
+  const apple = checkStockIdentity({ address: APPLE_ANCHORED, chainId: 56, name: "Apple aStock", symbol: "aAAPL" });
+  assert.equal(apple.status, "verified");
+  assert.equal(apple.official.provider, "Anchored");
+  const copy = checkStockIdentity({ address: ELSEWHERE, chainId: 56, name: "SpaceX aStock", symbol: "aSPCX" });
+  assert.equal(copy.status, "imitation");
+  assert.equal(copy.reason, "TOKEN_SYMBOL");
+  // Anchored puts its "a" in front of the ticker; a company's name with that style is unverified.
+  const styled = checkStockIdentity({ address: ELSEWHERE, chainId: 56, name: "Apple", symbol: "AAAPL" });
+  assert.equal(styled.status, "unverified");
+  assert.equal(styled.official.underlying, "AAPL");
 });
 
 test("crypto tokens that share an issuer symbol's letters are not imitations", () => {

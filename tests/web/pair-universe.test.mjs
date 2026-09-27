@@ -160,7 +160,7 @@ test("the committed snapshot is well formed and keeps policy-critical facts", ()
     addresses.add(asset.address.toLowerCase());
     assert.ok(["crypto", "stocks", "rwa", "preipo"].includes(asset.group), asset.id);
     assert.ok(Number.isInteger(asset.decimals) && asset.decimals >= 0 && asset.decimals <= 36, asset.id);
-    if (asset.group === "stocks") assert.ok(["bStocks", "Ondo", "xStocks"].includes(asset.provider), asset.id);
+    if (asset.group === "stocks") assert.ok(["Anchored", "bStocks", "Ondo", "xStocks"].includes(asset.provider), asset.id);
     // xStocks apply a share multiplier; Fortune must keep flagging it until a wrapper is used.
     if (asset.provider === "xStocks") assert.equal(asset.controls.rebasing, true, asset.id);
   }

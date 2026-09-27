@@ -77,6 +77,7 @@ type RegistryRead = { configured: boolean; chainId: number; assets: FortuneRegis
 
 const COINGECKO = "https://api.coingecko.com/api/v3";
 const MARKET_CATEGORIES: Array<[string, number]> = [
+  ["anchored-ecosystem", 1],
   ["bstocks-ecosystem", 1],
   ["ondo-tokenized-assets", 2],
   ["xstocks-ecosystem", 1],

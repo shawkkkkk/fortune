@@ -42,7 +42,7 @@ pool launch tokens = delivered * S * a0 / (a0 + R)^2            capped at invent
 - Stock identity: a verified issuer stock token is labelled as such. A token that imitates one (a verified stock token's exact symbol, or a company's name with its ticker) or presents itself as one without being a verified issuer contract (stock-token wording, or a company's name with an issuer-style symbol) is unsupported. See [STOCK_PAIRING.md](STOCK_PAIRING.md#counterfeit-stock-tokens).
 - Verdicts: `unsupported` for no code, unreadable metadata, reverting transfers, 100% tax, tax charged on top, or an imitated or unverified stock token; `caution` for any measured tax or control; `clear` otherwise.
 
-Checked on BSC mainnet on 2026-09-26: bStocks, Ondo and xStocks stock tokens measure no transfer tax from a fresh wallet (all upgradeable and mintable; xStocks also rebasing); USDT and WBNB are clear; BabyDoge measures 0% today but is flagged because fees can be changed; SafeMoon v1 is unsupported (99.99% tax).
+Checked on BSC mainnet on 2026-09-26: bStocks, Ondo and xStocks stock tokens measure no transfer tax from a fresh wallet (all upgradeable and mintable; xStocks also rebasing), and on 2026-09-27 Anchored's Apple, SpaceX and Hertz aStocks did too (upgradeable and mintable); USDT and WBNB are clear; BabyDoge measures 0% today but is flagged because fees can be changed; SafeMoon v1 is unsupported (99.99% tax).
 
 ## Website
 

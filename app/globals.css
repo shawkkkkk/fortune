@@ -7080,3 +7080,17 @@ html.entryGateOpen {
 }
 .inspectorOfficial { display: block; margin-top: 4px; font-size: 13.5px; }
 .inspectorOfficial a { font-weight: 700; }
+
+/* Creator check on token and market pages. */
+.creatorCheckWho {
+  margin: 4px 0 12px;
+  font-weight: 700;
+}
+
+.creatorCheck .metricsGrid {
+  margin-bottom: 10px;
+}
+
+.metric[data-notable] strong {
+  color: var(--red-ink);
+}

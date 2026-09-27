@@ -24,6 +24,7 @@ const pancakeV2Swap = parseAbiItem("event Swap(address indexed sender, uint256 a
 const graduationAnchor = parseAbiItem("event GraduationAnchor(uint256 priceUsd1e18, uint256 reserveUsd1e18, uint256 tokensSold)");
 
 const LEDGER_EVENTS = [bought, sold, pancakeV3Swap, uniswapV3Swap, pancakeV2Swap, graduationAnchor] as const;
+const transfer = parseAbiItem("event Transfer(address indexed from, address indexed to, uint256 value)");
 
 // Public defaults serve logs for a short recent window only (PublicNode keeps
 // roughly 90,000 blocks). Operators can point Fortune at full-history providers.
@@ -91,6 +92,7 @@ export function resetLedgerState() {
   nextProviderId = 0;
   scanCache.clear();
   scanPending.clear();
+  flowCache.clear();
 }
 
 export function ledgerProvider(): Provider | null {
@@ -284,3 +286,119 @@ export async function readLedger(provider: Provider, addresses: Address[], windo
   scanPending.set(key, task);
   try { return await task; } finally { scanPending.delete(key); }
 }
+
+export type WalletFlow = {
+  /** Tokens that left the wallet: curve sells, pool sells and plain transfers alike. */
+  sent: bigint;
+  received: bigint;
+  transfersOut: number;
+  coverage: LedgerCoverage;
+};
+
+const flowCache = new Map<string, { flow: WalletFlow; expires: number }>();
+
+/**
+ * Every transfer of `token` into and out of `wallet` since `sinceTimestamp`, newest
+ * chunk first at a pinned head. Like readLedger, it stops at the first chunk the
+ * provider cannot serve and reports exactly which blocks it covered; `complete`
+ * means the scan reached back to `sinceTimestamp`.
+ */
+export async function readWalletFlow(provider: Provider, token: Address, wallet: Address, sinceTimestamp: number): Promise<WalletFlow> {
+  if (!Number.isSafeInteger(sinceTimestamp) || sinceTimestamp <= 0) throw new Error("Invalid flow start.");
+  if (await provider.client.getChainId() !== FORTUNE_NETWORK.chainId) throw new Error("Wrong ledger chain.");
+  const rpc = provider.client;
+  const key = token.toLowerCase() + ":" + wallet.toLowerCase() + ":" + sinceTimestamp;
+  const cached = flowCache.get(key);
+  if (cached && cached.expires > Date.now()) return cached.flow;
+
+  const head = await pinLedgerHead(rpc);
+  const blockTime = await averageBlockTime(rpc, head);
+  // A minute of slack so the creation block itself is always inside the scan.
+  const fromTimestamp = sinceTimestamp - 60;
+  const blocksBack = BigInt(Math.ceil(Math.max(0, head.timestamp - fromTimestamp) / blockTime * 1.03) + 5);
+  const wanted = head.number > blocksBack ? head.number - blocksBack : 0n;
+  const retained = retention.get(rpc);
+  const known = retained && retained.expires > Date.now() ? retained.depth : null;
+  const startBlock = known !== null && head.number - wanted > known ? head.number - known : wanted;
+
+  const self = wallet.toLowerCase();
+  const seen = new Set<string>();
+  let sent = 0n;
+  let received = 0n;
+  let transfersOut = 0;
+  let covered = head.number + 1n;
+  let complete = false;
+  let span = provider.chunk;
+  let halvings = 0;
+  const read = (from: bigint, to: bigint) => Promise.all([
+    rpc.getLogs({ address: token, event: transfer, args: { from: wallet }, fromBlock: from, toBlock: to, strict: true }),
+    rpc.getLogs({ address: token, event: transfer, args: { to: wallet }, fromBlock: from, toBlock: to, strict: true }),
+  ]).then((sides) => sides.flat());
+
+  for (let to = head.number; to >= startBlock; to -= span) {
+    const from = to - span + 1n > startBlock ? to - span + 1n : startBlock;
+    let rows;
+    try {
+      try {
+        rows = await read(from, to);
+      } catch (error) {
+        if (prunedError(error)) throw new PrunedRange();
+        rows = await read(from, to);
+      }
+    } catch (error) {
+      if (error instanceof PrunedRange && halvings < 5 && span > 1_000n) {
+        span /= 2n;
+        halvings += 1;
+        to += span;
+        continue;
+      }
+      if (error instanceof PrunedRange) retention.set(rpc, { depth: head.number - covered + 1n, expires: Date.now() + 30 * 60_000 });
+      else console.warn("[trade-ledger] wallet flow stopping at block " + to + ": " + describe(error));
+      break;
+    }
+    for (const row of rows) {
+      if (row.blockNumber === null || row.logIndex === null || row.removed) throw new Error("Incomplete or removed transfer log.");
+      if (row.blockNumber < from || row.blockNumber > to || row.address.toLowerCase() !== token.toLowerCase()) throw new Error("Transfer log outside requested scope.");
+      const identity = row.blockHash + ":" + row.logIndex;
+      if (seen.has(identity)) continue;
+      seen.add(identity);
+      const out = String(row.args.from).toLowerCase() === self;
+      const into = String(row.args.to).toLowerCase() === self;
+      if (out === into) continue;
+      if (out) {
+        sent += row.args.value as bigint;
+        transfersOut += 1;
+      } else {
+        received += row.args.value as bigint;
+      }
+    }
+    covered = from;
+    if (from === startBlock) { complete = startBlock === wanted; break; }
+  }
+
+  const fromBlock = covered > head.number ? head.number : covered;
+  const boundary = await rpc.getBlock({ blockNumber: fromBlock });
+  if (boundary.number !== fromBlock) throw new Error("Flow boundary block unavailable.");
+  // Reject the whole read if the head was reorganized while it ran.
+  const check = await rpc.getBlock({ blockNumber: head.number });
+  if (check.hash !== head.hash) throw new Error("Chain head changed during the flow read.");
+
+  const flow: WalletFlow = {
+    sent,
+    received,
+    transfersOut,
+    coverage: {
+      requestedFrom: fromTimestamp,
+      fromBlock: fromBlock.toString(),
+      toBlock: head.number.toString(),
+      fromTimestamp: Number(boundary.timestamp),
+      toTimestamp: head.timestamp,
+      complete: complete && Number(boundary.timestamp) <= fromTimestamp,
+      source: provider.source,
+    },
+  };
+  if (flowCache.size >= 64 && !flowCache.has(key)) flowCache.delete(flowCache.keys().next().value!);
+  flowCache.set(key, { flow, expires: Date.now() + 20_000 });
+  return flow;
+}
+

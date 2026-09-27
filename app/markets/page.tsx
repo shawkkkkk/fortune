@@ -53,6 +53,7 @@ const SORTS = [
   ["volume24h", "24H Volume"],
   ["trending", "Trending"],
   ["marketCap", "Highest Market Cap"],
+  ["graduating", "Graduating soon"],
 ] as const;
 type Sort = (typeof SORTS)[number][0];
 
@@ -148,6 +149,8 @@ export default function MarketsPage() {
   // Static captions go through the DOM dictionary; sentences with numbers are built per language.
   const staticCaption = !board ? "" : sort === "newest"
     ? "Newest launches first, straight from the Fortune factories."
+    : sort === "graduating" && !bounded
+      ? "Launches still on their curve, closest to the graduation target first. Graduated and rescued launches follow."
     : sort === "marketCap" && !bounded
       ? "Price × total supply. Graduated tokens are priced from their official locked Pancake pools."
       : board.sortAvailable && !bounded
@@ -155,7 +158,9 @@ export default function MarketsPage() {
           ? "Fortune curve trades plus official Pancake pool swaps over the last 24 hours."
           : "Most trades in the last 6 hours, then 6-hour volume.")
         : "";
-  const dynamicCaption = !board || staticCaption ? "" : sort === "marketCap"
+  const dynamicCaption = !board || staticCaption ? "" : sort === "graduating"
+    ? (zh ? "仍在曲线上的发行按距离毕业目标由近到远排列，已毕业和已救援的发行排在后面。" : "Launches still on their curve, closest to the graduation target first. Graduated and rescued launches follow.") + bounded
+    : sort === "marketCap"
     ? (zh ? "价格 × 总供应量。已毕业代币按其官方锁定的 Pancake 池定价。" : "Price × total supply. Graduated tokens are priced from their official locked Pancake pools.") + bounded
     : board.sortAvailable
       ? (sort === "volume24h"

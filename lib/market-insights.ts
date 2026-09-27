@@ -31,11 +31,12 @@ import {
 import {
   ledgerProvider,
   readLedger,
+  readWalletFlow,
   type LedgerCoverage,
   type LedgerScan,
 } from "@/lib/trade-ledger";
 
-export const MARKET_SORTS = ["newest", "volume24h", "trending", "marketCap"] as const;
+export const MARKET_SORTS = ["newest", "volume24h", "trending", "marketCap", "graduating"] as const;
 export type MarketSort = (typeof MARKET_SORTS)[number];
 
 // Ranking reads every field of each candidate, so non-newest sorts rank the most
@@ -362,17 +363,20 @@ export function covers(coverage: LedgerCoverage | null, seconds: number) {
   return coverage.toTimestamp - coverage.fromTimestamp >= seconds;
 }
 
-type Rankable = Pick<MarketSummary, "createdAt" | "marketCapUsd" | "activity24h" | "activityTrending">;
+type Rankable = Pick<MarketSummary, "createdAt" | "marketCapUsd" | "activity24h" | "activityTrending" | "phase" | "graduationProgress">;
 
 /**
  * Orders launches in place. Unknown values sort last; ties fall back to newest.
- * Trending compares trade count first and 6-hour volume second.
+ * Trending compares trade count first and 6-hour volume second. Graduating
+ * ranks launches still trading on their curve by progress to the target;
+ * ready, graduated and rescued launches follow, newest first.
  */
 export function rankMarkets<T extends Rankable>(items: T[], sort: MarketSort) {
   if (sort === "newest") return items.sort((a, b) => b.createdAt - a.createdAt);
   const key = (item: T): [number, number] | null => {
     if (sort === "marketCap") return item.marketCapUsd === null ? null : [item.marketCapUsd, 0];
     if (sort === "volume24h") return item.activity24h?.volumeUsd != null ? [item.activity24h.volumeUsd, 0] : null;
+    if (sort === "graduating") return item.phase === 0 ? [item.graduationProgress, 0] : null;
     return item.activityTrending ? [item.activityTrending.trades, item.activityTrending.volumeUsd ?? -1] : null;
   };
   return items.sort((a, b) => {
@@ -454,7 +458,7 @@ export async function readMarketBoard(sort: MarketSort, offset: number, limit: n
   }
 
   const { items, ledger } = await summarizeWithActivity(launches, blockNumber);
-  const sortAvailable = sort === "newest" || sort === "marketCap" || (sort === "volume24h"
+  const sortAvailable = sort === "newest" || sort === "marketCap" || sort === "graduating" || (sort === "volume24h"
     ? ledger.covers24h && items.every(item => item.activity24h?.volumeUsd != null) : ledger.coversTrending);
   if (sortAvailable) rankMarkets(items, sort);
 
@@ -620,13 +624,33 @@ export type TokenMarket = {
   } | null;
   trades: LedgerTrade[];
   supply: SupplyBreakdown | null;
+  creator: CreatorCheck | null;
+};
+
+/**
+ * What a trader should know about the creator before buying: their record across
+ * every Fortune launch, how much of this token they hold now, and how many tokens
+ * have left their wallet (sells anywhere and plain transfers) since launch.
+ */
+export type CreatorCheck = {
+  address: Address;
+  launches: number | null;
+  phases: CreatorPhases | null;
+  holdsShare: number | null;
+  flow: {
+    sent: number;
+    received: number;
+    sentShare: number | null;
+    transfersOut: number;
+    coverage: LedgerCoverage;
+  } | null;
 };
 
 /** One token: live summary, pair weights and reserves, canonical chart and recent trades. */
 export async function readTokenMarket(token: Address, range: ChartRange): Promise<TokenMarket> {
   const lookup = await readFortuneLaunchByToken(token);
   if (!lookup.configured || !lookup.launch || lookup.blockNumber === null) {
-    return { configured: lookup.configured, chainId: FORTUNE_NETWORK.chainId, blockNumber: lookup.blockNumber?.toString() ?? null, summary: null, chart: null, trades: [], supply: null };
+    return { configured: lookup.configured, chainId: FORTUNE_NETWORK.chainId, blockNumber: lookup.blockNumber?.toString() ?? null, summary: null, chart: null, trades: [], supply: null, creator: null };
   }
   const launch = lookup.launch;
   const blockNumber = lookup.blockNumber;
@@ -656,10 +680,26 @@ export async function readTokenMarket(token: Address, range: ChartRange): Promis
 
   const provider = ledgerProvider();
   const pools = context.pools.get(launch.token.toLowerCase()) || [];
-  const [scan, supply] = await Promise.all([
+  const [scan, supply, creatorLaunches, creatorFlow] = await Promise.all([
     provider ? readLedger(provider, [launch.curve as Address, ...pools.map((pool) => pool.address)], CHART_RANGES[range]).catch(() => null) : Promise.resolve(null),
     readSupply(rpc, launch, pools, blockNumber).catch(() => null),
+    readCreatorFortuneLaunches(launch.creator, 0, 0, blockNumber).catch(() => null),
+    provider ? readWalletFlow(provider, launch.token as Address, launch.creator as Address, launch.createdAt).catch(() => null) : Promise.resolve(null),
   ]);
+  const supplyTotal = Number(launch.totalSupply);
+  const creator: CreatorCheck = {
+    address: launch.creator as Address,
+    launches: creatorLaunches?.configured ? creatorLaunches.creatorTotal : null,
+    phases: creatorLaunches?.configured ? creatorLaunches.phases : null,
+    holdsShare: supply?.slices.find((slice) => slice.key === "creator")?.share ?? null,
+    flow: creatorFlow ? {
+      sent: toNumber(creatorFlow.sent),
+      received: toNumber(creatorFlow.received),
+      sentShare: supplyTotal > 0 ? toNumber(creatorFlow.sent) / supplyTotal : null,
+      transfersOut: creatorFlow.transfersOut,
+      coverage: creatorFlow.coverage,
+    } : null,
+  };
   const decoded = scan ? await decodeTrades(context, scan).catch(() => null) : null;
   const trades = decoded?.trades.get(launch.token.toLowerCase()) || [];
   const coverage = scan?.coverage || null;
@@ -696,5 +736,6 @@ export async function readTokenMarket(token: Address, range: ChartRange): Promis
     },
     trades: [...trades].reverse().slice(0, 50),
     supply,
+    creator,
   };
 }

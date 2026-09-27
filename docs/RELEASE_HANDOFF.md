@@ -12,6 +12,7 @@
 - Custom-pairs PR #28 is merged at `df907757b7155ee55f2e5f928a7d746461788268`; Vercel production deployment `dpl_8duqQg7V4nhRobGBFKU5ghGuPvcr` reached READY. The public site now includes the read-only pair-token inspector and an isolated custom-pair beta surface. Launches remain disabled until a BSC Testnet factory is explicitly configured, and code hard-disables this engine on every chain except 97. Review follow-ups #29–#31 removed false audit claims, made unavailable transfer simulations block launches and narrowed the chain allowlist to exactly BSC Testnet.
 - Social-fee routing PR #33 and security follow-up PR #34 are merged. Current main `bf429b1988906983a96a251357f6710a2070bb32` has a successful [Vercel deployment](https://vercel.com/hoque-industries/fortune/Cyrh7vV1wn8Ppkbx8guXkMVE7osB). The custom-pairs beta can describe immutable creator-fee splits across wallet and supported social recipients, but the contracts remain unaudited, BSC-Testnet-only and unconfigured in the public release. PR #34 made ownership verification reject redirects and unsuccessful responses and enforce byte limits while streaming. This work does not add social routing to the frozen Standard candidate.
 - Penny-stock discovery and counterfeit stock-token checks PR #36 and normalization follow-up PR #37 are merged. Current main `8702dcb41c6945a9e69d21ae02dee5258699ce02` has a successful [Vercel deployment](https://vercel.com/hoque-industries/fortune/HguGD6WEzznZr46S67gwWuV5ArmT). The pair picker can show verified BSC tokenized-company assets trading below $5, but they remain discovery-only and outside v1 launch eligibility. The custom-pair inspector blocks unverified tokens that impersonate tracked stock tokens, including punctuation, zero-width and full-width variants. This is a compatibility guard, not legal approval or a guarantee that an issuer token is safe.
+- Stock-identity correction PR #39 and Anchored catalog PR #40 are merged. Current main `2eb5e653f139908168f6e930e903554137a291d5` has a successful [Vercel production deployment](https://vercel.com/hoque-industries/fortune/4N9PDq8oq5GCJSZTn2BEqi2tWY9r). The reviewed snapshot now contains 780 BNB Chain assets: 704 stocks and ETFs, 11 RWAs, 1 pre-IPO token and 64 crypto assets. PR #39 stopped case-insensitive ticker collisions from blocking unrelated crypto tokens and separates unverified stock-token claims from confirmed imitations. PR #40 added Anchored aStocks and checks every xStocks entry against the issuer's deployment list. Both remain discovery and compatibility work: tokenized securities and every non-WBNB quote remain outside Standard mainnet v1.
 - Mainnet contract deployment and activation remain blocked. There is no published official mainnet token CA in this release.
 
 ## Release scope
@@ -49,11 +50,13 @@ no configured custom-pair factory or attestor, so this is source and test eviden
 The server verifier uses fixed platform endpoints, rejects redirects and non-success bodies, and stops reading
 responses above its byte limits. Platform compatibility and regional policy still require live review before beta use.
 
-Stock-token identity checks ([merged PR #36](https://github.com/shawkkkkk/fortune/pull/36),
+Stock-token identity checks ([merged PRs #36–#40](https://github.com/shawkkkkk/fortune/pull/40),
 not a mainnet capability claim): see `STOCK_PAIRING.md`. Verified status requires an exact tracked issuer contract
-on BNB Smart Chain mainnet. Lookalike names, symbols and stock-token wording block the isolated custom-pair path;
-name/ticker overlap without a stronger match is only a warning. Unicode and punctuation normalization closes trivial
-text evasions, but the registry, transfer simulation and asset policy remain independent gates. Mainnet v1 is still WBNB-only.
+on BNB Smart Chain mainnet; xStocks candidates must also appear in the issuer's deployment list. Lookalike names,
+symbols and stock-token wording block the isolated custom-pair path, while unreviewed issuer-looking contracts are
+reported as unverified rather than counterfeit. Name/ticker overlap without a stronger match is only a warning.
+Unicode and punctuation normalization closes trivial text evasions, but the registry, transfer simulation and asset
+policy remain independent gates. Anchored and other tokenized securities are discovery-only; mainnet v1 is still WBNB-only.
 
 The RPC catalog is an interim read path with an explicit 10,000-entry maximum across configured factories. It fails rather than truncates beyond that bound. It is not a durable event indexer or a high-volume production SLA. Name/ticker search still covers recent entries; exact token addresses and creator pages use the complete bounded catalog.
 

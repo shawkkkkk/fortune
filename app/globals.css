@@ -6728,3 +6728,92 @@ html.entryGateOpen {
   .inspectorTaxes dd { justify-items: end; text-align: right; }
   .inspectorTaxes dd b { font-size: 20px; }
 }
+
+/* Social fee routing: fee split editor, recipients panel and claims page */
+.feeSplit { display: grid; gap: 12px; margin: 16px 0 8px; padding: 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface-sunk); }
+.feeSplitHead { display: grid; gap: 4px; }
+.feeSplitHead span { color: var(--muted); font-size: 14px; }
+.feeSplitRows { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.feeSplitRow { display: grid; grid-template-columns: minmax(150px, 0.8fr) minmax(0, 1.4fr) 104px 40px; gap: 8px; align-items: center; }
+.feeSplitRow > div { display: flex; align-items: center; margin: 0; min-width: 0; }
+.feeSplitRowError select, .feeSplitRowError input { border-color: var(--red); }
+.feeSplitSelf { padding: 0 4px; color: var(--muted); font-size: 14px; }
+.feeSplitResolved { grid-column: 1 / -1; margin: -2px 0 2px; padding-left: 4px; color: var(--jade); font-size: 13px; font-weight: 650; }
+.feeSplitResolved.feeSplitLookupError { color: var(--red-ink); }
+.feeSplitValue { position: relative; }
+.feeSplitPrefix { position: absolute; left: 14px; color: var(--faint); font-weight: 700; pointer-events: none; }
+.feeSplitPrefix + input { padding-left: 30px; }
+.feeSplitPercent { position: relative; }
+.feeSplitPercent input { padding-right: 30px; text-align: right; font-variant-numeric: tabular-nums; }
+.feeSplitPercent span { position: absolute; right: 12px; color: var(--muted); font-weight: 700; pointer-events: none; }
+.feeSplitRemove { width: 40px; height: 40px; border: 1px solid var(--line-strong); border-radius: 50%; background: var(--surface); color: var(--muted); font-size: 20px; line-height: 1; }
+.feeSplitRemove:not(:disabled):hover { border-color: var(--red); color: var(--red); }
+.feeSplitRemove:disabled { opacity: 0.4; cursor: not-allowed; }
+.feeSplitActions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.feeSplitActions .secondaryCta { padding: 8px 14px; font-size: 14px; }
+.feeSplitTotal { margin-left: auto; color: var(--red-ink); font-weight: 800; font-variant-numeric: tabular-nums; }
+.feeSplitTotalOk { color: var(--jade); }
+
+.feeRecipients { display: grid; gap: 12px; }
+.feeRecipients h2 { margin: 0; font-size: 20px; }
+.recipientList { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
+.recipientList li { display: grid; gap: 6px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.recipientList li:first-child { padding-top: 4px; }
+.recipientMain, .recipientMeta, .identityHead { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; min-width: 0; }
+.recipientName { display: inline-flex; align-items: center; gap: 8px; min-width: 0; overflow-wrap: anywhere; }
+.recipientName a, .recipientMain > a { font-weight: 700; }
+.recipientPlatform { padding: 2px 8px; border: 1px solid var(--line-strong); border-radius: 999px; color: var(--ink-soft); font-size: 12px; font-weight: 750; }
+.recipientShare { font-variant-numeric: tabular-nums; }
+.recipientBadge { display: inline-flex; align-items: center; padding: 3px 9px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--surface); color: var(--muted); font-size: 12px; font-weight: 700; }
+.recipientVerified, .recipientWallet { border-color: var(--jade-line); background: var(--jade-tint); color: var(--jade); }
+.recipientPending { border-color: var(--amber-line); background: var(--amber-tint); color: var(--amber); }
+.recipientClaim { font-size: 13.5px; font-weight: 700; }
+
+.claimsLayout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; align-items: start; gap: 24px; }
+.claimsMain { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.claimsConnect { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.claimsConnect p { margin: 0; }
+.identityList { display: grid; gap: 12px; }
+.identityCard { display: grid; gap: 10px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.identityBalances { display: grid; gap: 6px; margin: 0; }
+.identityBalances > div { display: flex; justify-content: space-between; gap: 12px; }
+.identityBalances dt { color: var(--muted); }
+.identityBalances dd { display: grid; justify-items: end; margin: 0; font-weight: 750; font-variant-numeric: tabular-nums; text-align: right; }
+.identityBalances small { color: var(--muted); font-size: 12.5px; font-weight: 500; }
+.identityLaunches summary { cursor: pointer; color: var(--ink-soft); font-size: 14px; font-weight: 650; }
+.identityLaunches ul { display: grid; gap: 4px; margin: 8px 0 0; padding: 0; list-style: none; font-size: 14px; }
+.identityLaunches li { display: flex; justify-content: space-between; gap: 12px; }
+.identityLaunches li span { color: var(--muted); }
+.identityActions { display: flex; flex-wrap: wrap; gap: 10px; }
+.identityActions:empty { display: none; }
+.claimsLookup { display: grid; grid-template-columns: minmax(150px, 0.7fr) minmax(0, 1.3fr) auto; gap: 10px; align-items: end; }
+.claimsLookup label { display: grid; gap: 6px; margin: 0; font-weight: 600; }
+.claimsLookup .secondaryCta { min-height: 48px; }
+.claimsFound { display: grid; gap: 12px; margin-top: 16px; padding: 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface-sunk); }
+.claimsFound .fieldHint { margin: 0; }
+.claimsSteps { display: grid; gap: 14px; margin: 0; padding-left: 22px; }
+.claimsSteps li { display: grid; gap: 8px; }
+.claimsSteps li.reviewWarning { list-style: none; margin-left: -22px; }
+.claimsSteps label { display: grid; gap: 6px; font-weight: 600; }
+.claimsSteps .secondaryCta, .claimsSteps .primaryCta { justify-self: start; }
+.claimsCode { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.claimsCode code { flex: 1 1 280px; padding: 10px 12px; border: 1px dashed var(--gold-line); border-radius: 10px; background: var(--surface); color: var(--ink); font-size: 13.5px; overflow-wrap: anywhere; }
+.claimsCode .secondaryCta { padding: 8px 14px; font-size: 14px; }
+.claimsHow { display: grid; gap: 10px; margin: 12px 0 16px; padding-left: 20px; font-size: 14.5px; line-height: 1.5; }
+.claimsHow strong { display: block; }
+
+@media (max-width: 900px) {
+  .claimsLayout { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 640px) {
+  .feeSplitRow { grid-template-columns: minmax(0, 1fr) 96px 40px; }
+  .feeSplitRow .feeSplitKind { grid-column: 1 / -1; }
+  .feeSplitRow .feeSplitSelf { grid-column: 1; }
+  .claimsLookup { grid-template-columns: minmax(0, 1fr); }
+  .claimsLookup .secondaryCta { justify-self: start; }
+}
+/* The claims page keeps its explainer on small screens, below the forms. */
+.claimsLayout > .launchAside { display: grid; }
+@media (max-width: 900px) {
+  .claimsLayout > .launchAside { position: static; }
+}

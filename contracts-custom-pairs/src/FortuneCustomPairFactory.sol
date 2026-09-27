@@ -7,14 +7,16 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {FortuneCustomPairCurve} from "./FortuneCustomPairCurve.sol";
 import {FortuneCustomPairCurveDeployer} from "./FortuneCustomPairCurveDeployer.sol";
+import {IFortuneSocialFeeVault} from "./interfaces/IFortuneSocialFeeVault.sol";
 
 /// @notice Permissionless Fortune launches paired with any BEP-20, including
 ///         transfer-tax tokens and tokenized stocks. UNAUDITED BETA.
 /// @dev There is no pair-token registry or oracle. Each launch gets its own
 ///      curve, launch token and PancakeSwap V2 pool, so a badly behaved pair
 ///      token can only affect launches that chose it. The owner can pause new
-///      launches and set the protocol fee for future launches; it has no
-///      control over curves that already exist.
+///      launches, set the protocol fee for future launches and choose the
+///      social fee vault future launches use; it has no control over curves
+///      that already exist.
 contract FortuneCustomPairFactory is Ownable2Step {
     using SafeERC20 for IERC20;
 
@@ -39,6 +41,9 @@ contract FortuneCustomPairFactory is Ownable2Step {
         string website;
         string xProfile;
         string telegram;
+        /// Empty: creator fees go to the creator. Otherwise they go to the
+        /// social fee vault, split between these wallets and social accounts.
+        IFortuneSocialFeeVault.FeeShare[] feeShares;
     }
 
     struct Launch {
@@ -64,6 +69,7 @@ contract FortuneCustomPairFactory is Ownable2Step {
     uint16 public protocolFeeBps;
     address public protocolFeeRecipient;
     bool public launchesPaused;
+    address public socialFeeVault;
 
     Launch[] private _launches;
     mapping(address => uint256) public curveIndexPlusOne;
@@ -86,6 +92,7 @@ contract FortuneCustomPairFactory is Ownable2Step {
     );
     event ProtocolFeeSet(uint16 feeBps, address indexed recipient);
     event LaunchPauseSet(bool paused);
+    event SocialFeeVaultSet(address indexed vault);
 
     error LaunchPreflightFailed(bytes32 reasonCode);
 
@@ -104,6 +111,15 @@ contract FortuneCustomPairFactory is Ownable2Step {
     function setLaunchesPaused(bool paused) external onlyOwner {
         launchesPaused = paused;
         emit LaunchPauseSet(paused);
+    }
+
+    /// @notice Vault used by launches created afterwards that split their
+    ///         creator fee. Zero disables split launches. Existing curves keep
+    ///         the vault they were created with.
+    function setSocialFeeVault(address vault) external onlyOwner {
+        require(vault == address(0) || vault.code.length > 0, "BAD_VAULT");
+        socialFeeVault = vault;
+        emit SocialFeeVaultSet(vault);
     }
 
     /// @notice Applies to launches created afterwards. Existing curves keep
@@ -141,6 +157,13 @@ contract FortuneCustomPairFactory is Ownable2Step {
             return (false, "TARGET_RANGE");
         }
         if (p.creatorFeeBps > MAX_CREATOR_FEE_BPS) return (false, "CREATOR_FEE_TOO_HIGH");
+        if (p.feeShares.length > 0) {
+            address vault = socialFeeVault;
+            if (vault == address(0)) return (false, "SOCIAL_FEES_DISABLED");
+            if (p.creatorFeeBps == 0) return (false, "SHARES_NEED_CREATOR_FEE");
+            (bool sharesOk, bytes32 sharesReason) = IFortuneSocialFeeVault(vault).checkShares(p.feeShares);
+            if (!sharesOk) return (false, sharesReason);
+        }
         (bool ok, bytes32 reason,) = checkPairToken(p.pairToken);
         if (!ok) return (false, reason);
         return (true, "OK");
@@ -187,6 +210,8 @@ contract FortuneCustomPairFactory is Ownable2Step {
         (bool ready, bytes32 reason) = preflight(p);
         if (!ready) revert LaunchPreflightFailed(reason);
         (,, uint8 decimals) = checkPairToken(p.pairToken);
+        bool split = p.feeShares.length > 0;
+        address vault = socialFeeVault;
 
         FortuneCustomPairCurve curve = curveDeployer.deploy(
             FortuneCustomPairCurve.Config({
@@ -200,7 +225,8 @@ contract FortuneCustomPairFactory is Ownable2Step {
                 pancakeFactory: pancakeFactory,
                 graduationTarget: p.graduationTarget,
                 protocolFeeBps: protocolFeeBps,
-                creatorFeeBps: p.creatorFeeBps
+                creatorFeeBps: p.creatorFeeBps,
+                feeRecipient: split ? vault : msg.sender
             })
         );
         curveAddress = address(curve);
@@ -229,6 +255,7 @@ contract FortuneCustomPairFactory is Ownable2Step {
             xProfile: p.xProfile,
             telegram: p.telegram
         });
+        if (split) IFortuneSocialFeeVault(vault).registerCurve(curveAddress, p.pairToken, p.feeShares);
 
         emit LaunchCreated(
             launchId,

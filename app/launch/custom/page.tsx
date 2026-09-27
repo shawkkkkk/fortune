@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { decodeEventLog, formatUnits, hexToString, isAddress, parseAbi, parseUnits, type Address, type Hex } from "viem";
+import FeeSplitEditor, { feeSplitInputs, feeSplitRow, type FeeSplitRow } from "@/components/FeeSplitEditor";
 import PairInspector from "@/components/PairInspector";
 import TokenImageInput from "@/components/TokenImageInput";
 import { useLanguage } from "@/components/LanguageProvider";
@@ -14,6 +15,7 @@ import { assertWalletIdentity } from "@/lib/launch-safety";
 import { formatAmount, formatShare } from "@/lib/market-format";
 import type { PairInspection } from "@/lib/pair-inspector";
 import { formatTaxBps } from "@/lib/pair-inspector-text";
+import { buildFeeShares } from "@/lib/social-fees";
 import { connectWallet, connectedAccount, injectedProvider, walletClients, walletErrorMessage } from "@/lib/wallet";
 
 const ERC20 = parseAbi([
@@ -35,7 +37,19 @@ const PREFLIGHT_TEXT: Record<string, string> = {
   PAIR_IS_CURVE: "That address is a Fortune curve, not a token.",
   PAIR_DECIMALS: "The pair token's decimals could not be read or are above 36.",
   PAIR_NOT_ERC20: "The pair token does not answer basic BEP-20 reads.",
+  SOCIAL_FEES_DISABLED: "Fee splits are not enabled on this deployment yet.",
+  SHARES_NEED_CREATOR_FEE: "Choose a creator fee above 0% to split it.",
+  SHARE_COUNT: "Use 1 to 10 fee recipients.",
+  SHARE_TOO_SMALL: "Each fee recipient needs at least 1%.",
+  SHARES_NOT_100: "The fee split must add up to 100%.",
+  DUPLICATE_SHARE: "A fee recipient is listed twice.",
+  BAD_ACCOUNT: "A social handle is not valid.",
+  BAD_WALLET_SHARE: "A fee recipient wallet is not valid.",
+  BAD_SOCIAL_SHARE: "A social fee recipient is not valid.",
 };
+
+// Only used to check the split before a wallet is connected.
+const PREVIEW_WALLET = "0x000000000000000000000000000000000000f0F0" as Address;
 
 const CREATOR_FEES = [0, 25, 50, 100] as const;
 
@@ -71,6 +85,8 @@ export default function CustomPairLaunchPage() {
   const [supply, setSupply] = useState("1000000000");
   const [target, setTarget] = useState("1000");
   const [creatorFeeBps, setCreatorFeeBps] = useState<number>(50);
+  const [feeRows, setFeeRows] = useState<FeeSplitRow[]>(() => [feeSplitRow("self", "100")]);
+  const [socialFees, setSocialFees] = useState(false);
   const [firstBuy, setFirstBuy] = useState("");
   const [protocolFeeBps, setProtocolFeeBps] = useState<number | null>(null);
   const [paused, setPaused] = useState(false);
@@ -92,6 +108,10 @@ export default function CustomPairLaunchPage() {
         if (typeof body?.data?.protocolFeeBps === "number") setProtocolFeeBps(body.data.protocolFeeBps);
         setPaused(body?.data?.launchesPaused === true);
       })
+      .catch(() => undefined);
+    fetch("/api/public/v1/social/status")
+      .then((response) => response.json())
+      .then((body) => setSocialFees(body?.data?.enabled === true))
       .catch(() => undefined);
   }, []);
 
@@ -158,8 +178,13 @@ export default function CustomPairLaunchPage() {
     return "";
   })();
 
+  const splitting = socialFees && creatorFeeBps > 0;
+  const feeSplit = splitting ? buildFeeShares(feeSplitInputs(feeRows, account ?? PREVIEW_WALLET), account) : ({ ok: true, shares: [] } as const);
+  const feeError = feeSplit.ok ? "" : feeSplit.reason;
+  const feeRecipientCount = feeSplit.ok ? feeSplit.shares.length : 0;
+
   const pairBlocked = !inspection || inspection.verdict === "unsupported";
-  const ready = CUSTOM_PAIRS.enabled && !paused && Boolean(pairAddress) && !pairBlocked && !identityError && !economicsError;
+  const ready = CUSTOM_PAIRS.enabled && !paused && Boolean(pairAddress) && !pairBlocked && !identityError && !economicsError && !feeError;
 
   async function launch() {
     if (!ready || !pairAddress || !economics || !CUSTOM_PAIRS.factory) return;
@@ -171,6 +196,8 @@ export default function CustomPairLaunchPage() {
       setAccount(wallet);
       const { publicClient, walletClient } = walletClients(wallet);
       const factory = CUSTOM_PAIRS.factory;
+      const split = splitting ? buildFeeShares(feeSplitInputs(feeRows, wallet), wallet) : ({ ok: true, shares: [] } as const);
+      if (!split.ok) throw new Error(split.reason);
       const params = {
         name: name.trim(),
         symbol: symbol.trim(),
@@ -183,6 +210,7 @@ export default function CustomPairLaunchPage() {
         website: website.trim(),
         xProfile: xProfile.trim(),
         telegram: telegram.trim(),
+        feeShares: split.shares,
       };
 
       setMessage("Running the factory preflight…");
@@ -338,6 +366,9 @@ export default function CustomPairLaunchPage() {
                   ))}
                 </div>
               </fieldset>
+              {splitting ? (
+                <FeeSplitEditor rows={feeRows} onChange={setFeeRows} error={feeError} errorRow={feeSplit.ok ? undefined : feeSplit.row} disabled={busy} />
+              ) : null}
               <p className="fieldHint" translate="no">{zh
                 ? `另加 ${protocolFeeBps === null ? "—" : formatTaxBps(protocolFeeBps)} 的协议费。手续费累积在曲线中、由接收方领取，因此被封禁的接收方永远无法阻止交易。`
                 : `Plus the protocol fee of ${protocolFeeBps === null ? "—" : formatTaxBps(protocolFeeBps)}. Fees accrue in the curve and are claimed, so a blocked recipient can never stop trading.`}</p>
@@ -380,11 +411,19 @@ export default function CustomPairLaunchPage() {
                 <li className={pairAddress && !pairBlocked ? "done" : undefined}>{pairAddress ? (pairBlocked ? (inspection ? "This pair token is not supported." : "Checking the pair token…") : "Pair token checked") : "Choose a pair token"}</li>
                 <li className={!identityError ? "done" : undefined}>{identityError || "Identity complete"}</li>
                 <li className={!economicsError ? "done" : undefined}>{economicsError || "Curve and first buy set"}</li>
+                <li className={!feeError ? "done" : undefined} translate="no">
+                  {feeError || (feeRecipientCount
+                    ? (zh ? `创作者手续费分给 ${feeRecipientCount} 个接收方` : `Creator fee split between ${feeRecipientCount} recipients`)
+                    : (zh ? "创作者手续费归你的钱包" : "Creator fee goes to your wallet"))}
+                </li>
               </ul>
               <button className="launchButton" disabled={!ready || busy} onClick={() => void launch()}>
                 {busy ? "Working…" : !CUSTOM_PAIRS.enabled ? "Custom pairs are not live on this network" : paused ? "Launches paused" : FORTUNE_NETWORK.isMainnet ? "Launch custom pair on BNB Chain →" : "Launch custom pair on BSC Testnet →"}
               </button>
               {message ? <p className="launchDescription" role="status">{message}</p> : null}
+              {launched && feeRecipientCount ? (
+                <p className="fieldHint">Named accounts see their share on your market page and claim it after verifying. <Link href="/claims">Claims →</Link></p>
+              ) : null}
               {launched ? (
                 <div className="heroActions">
                   <Link className="primaryCta" href={`/custom/${launched.curve}`}>Open your market →</Link>
@@ -405,6 +444,7 @@ export default function CustomPairLaunchPage() {
               <div><dt>Launch Shield</dt><dd>99% → 0 in 5s · 2% cap for 15s</dd></div>
               <div><dt>Graduation</dt><dd>Pancake V2 · LP burned</dd></div>
               <div><dt>If the pair breaks</dt><dd>Pro-rata rescue</dd></div>
+              <div><dt>Creator fee</dt><dd>Your wallet, or split with wallets and social accounts</dd></div>
             </dl>
             <p className="launchPreviewNote">Want a registry-approved pair instead? <Link href="/launch">Standard launch →</Link></p>
           </div>

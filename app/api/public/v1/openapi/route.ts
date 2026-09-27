@@ -287,6 +287,84 @@ export async function GET(request: Request) {
           responses: { "200": { description: "Launch detail read at one block" }, "404": { description: "No custom-pair launch uses this curve" } },
         },
       },
+      "/social/status": {
+        get: {
+          tags: ["Launches"],
+          summary: "Social fee routing: vault, verifier and supported platforms",
+          description:
+            "Custom-pair beta only. Launches can split their creator fee between wallets and social accounts; accounts claim after verifying. Returns the vault the custom-pair factory uses, the attestor address the vault trusts, the address this server signs with (never the key) and ready=true when they match and bindings are not paused.",
+          responses: { "200": { description: "Status, vault rules (delays, share limits) and platforms with their proof method" }, "503": { description: "The network could not be read" } },
+        },
+      },
+      "/social/identity": {
+        get: {
+          tags: ["Launches"],
+          summary: "A social account's or wallet's fee balances, binding and launches",
+          description:
+            "Pass platform and account (a handle or profile link) for one account, or wallet for every account bound to it or waiting to be. Includes owed and claimable amounts per pair token, and each launch naming the account with its share of fees not yet collected.",
+          parameters: [
+            { name: "platform", in: "query", schema: { type: "string", enum: ["x", "github", "tiktok", "telegram", "youtube", "farcaster", "bluesky", "weibo", "bilibili", "wechat"] } },
+            { name: "account", in: "query", schema: { type: "string" } },
+            { name: "wallet", in: "query", schema: { type: "string" } },
+          ],
+          responses: {
+            "200": { description: "Identity with binding state (wallet, pendingWallet, pendingAt, nonce), balances and curves" },
+            "400": { description: "Unknown platform, invalid handle or wallet" },
+            "503": { description: "Social fees are not enabled here, or the network could not be read" },
+          },
+        },
+      },
+      "/social/resolve": {
+        get: {
+          tags: ["Launches"],
+          summary: "Turn a Weibo, Bilibili or WeChat link into the account id the vault stores",
+          description:
+            "Weibo and Bilibili accounts are stored by numeric UID and WeChat Official Accounts by their gh_ id. Accepts a UID, a profile or space link, a Weibo custom domain or any WeChat article link, and returns the account id with the display name when the platform shares it. Other platforms return the canonical handle. Rate limited.",
+          parameters: [
+            { name: "platform", in: "query", required: true, schema: { type: "string" } },
+            { name: "input", in: "query", required: true, schema: { type: "string" } },
+          ],
+          responses: {
+            "200": { description: "platform, account and name (null when unknown)" },
+            "400": { description: "Unknown platform or unreadable input" },
+            "429": { description: "Too many lookups" },
+            "503": { description: "The platform did not answer" },
+          },
+        },
+      },
+      "/social/attest": {
+        post: {
+          tags: ["Launches"],
+          summary: "Verify a public ownership proof and sign a wallet binding",
+          description:
+            "Body: { platform, account, wallet, proofUrl }. The proof must be a public post by the account containing the challenge code for this wallet (fortune- followed by 24 hex characters, derived from the chain, vault, account, wallet and the account's nonce). Farcaster needs no post: the wallet must be a verified address of the account. Returns an EIP-712 Binding signature that only `wallet` can submit to FortuneSocialFeeVault.bind within 30 minutes; the binding then takes effect after 1 hour (3 days to change an existing wallet). Rate limited.",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["platform", "account", "wallet"],
+                  properties: {
+                    platform: { type: "string" },
+                    account: { type: "string" },
+                    wallet: { type: "string" },
+                    proofUrl: { type: "string" },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": { description: "identityId, stableId, nonce, deadline, signature and the evidence that was checked" },
+            "400": { description: "Invalid platform, handle, wallet or missing proof link" },
+            "409": { description: "Already bound or pending for this wallet, or the handle now belongs to a different account" },
+            "422": { description: "The proof failed: wrong author, code missing, post not found or wallet not verified (details.reason, details.code)" },
+            "429": { description: "Too many attempts" },
+            "503": { description: "Verification not configured, paused, or the platform did not answer" },
+          },
+        },
+      },
       "/portfolio/{address}": {
         get: {
           tags: ["Markets"],

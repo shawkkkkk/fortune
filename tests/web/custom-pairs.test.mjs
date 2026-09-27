@@ -160,6 +160,6 @@ test("generated artifacts expose the calls the website makes", () => {
     assert.ok(curve.has(name), name);
   }
   const params = CUSTOM_PAIR_FACTORY_ABI.find((item) => item.name === "createLaunchAndBuy").inputs[0].components.map((field) => field.name);
-  assert.deepEqual(params, ["name", "symbol", "supply", "pairToken", "graduationTarget", "creatorFeeBps", "description", "imageURI", "website", "xProfile", "telegram"]);
+  assert.deepEqual(params, ["name", "symbol", "supply", "pairToken", "graduationTarget", "creatorFeeBps", "description", "imageURI", "website", "xProfile", "telegram", "feeShares"]);
   assert.match(PAIR_TOKEN_PROBE_RUNTIME, /^0x[0-9a-f]{200,}$/);
 });

@@ -13,6 +13,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "/portfolio",
     "/launch",
     "/launch/custom",
+    "/claims",
     "/testnet",
     "/burns",
     "/rewards",

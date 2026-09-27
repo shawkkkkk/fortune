@@ -366,6 +366,7 @@ export default function Header() {
         </span>
         <div className="networkTools">
           <nav className="networkLinks" aria-label="System">
+            <Link href="/claims">Claims</Link>
             <Link href="/status">Status</Link>
             <Link href="/docs">Docs</Link>
             <Link href="/developers">API</Link>

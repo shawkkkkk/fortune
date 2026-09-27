@@ -40,6 +40,9 @@ contract FortuneCustomPairCurve is ReentrancyGuard {
         uint256 graduationTarget;
         uint16 protocolFeeBps;
         uint16 creatorFeeBps;
+        /// Where creator fees go. Zero means the creator. The factory sets its
+        /// social fee vault here when a launch splits its creator fee.
+        address feeRecipient;
     }
 
     struct State {
@@ -190,7 +193,7 @@ contract FortuneCustomPairCurve is ReentrancyGuard {
 
         factory = c.factory;
         creator = c.creator;
-        creatorFeeRecipient = c.creator;
+        creatorFeeRecipient = c.feeRecipient == address(0) ? c.creator : c.feeRecipient;
         pairToken = IERC20(c.pairToken);
         pairDecimals = c.pairDecimals;
         launchSupply = c.supply;

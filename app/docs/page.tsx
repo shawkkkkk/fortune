@@ -17,6 +17,7 @@ const sections = [
   ["pairs", "Pair assets on BNB"],
   ["any-bep20", "Any reviewed BEP-20"],
   ["custom-pairs", "Custom pairs (beta)"],
+  ["social-fees", "Creator fees to social accounts"],
   ["launch", "Launching a token"],
   ["trust", "What you have to trust"],
   ["api", "API and addresses"],
@@ -176,6 +177,33 @@ export default function DocsPage() {
             </p>
             <div className="heroActions">
               <Link href="/launch/custom" className="secondaryCta">Check a token or launch →</Link>
+            </div>
+          </section>
+
+          <section className="panel" id="social-fees">
+            <span className="eyebrow">SOCIAL FEES · BETA</span>
+            <h2>Send creator fees to wallets and social accounts.</h2>
+            <p>
+              A custom-pair launch can split its creator fee between up to ten
+              recipients: wallets, and accounts on X, GitHub, TikTok, Telegram
+              channels, YouTube, Farcaster and Bluesky. The split is fixed at launch.
+              Fees go to Fortune&apos;s fee vault, and each account claims its share
+              on the Claims page after proving it owns the account.
+            </p>
+            <ul className="docsPoints">
+              <li><strong>Proof without passwords.</strong> The account publishes a one-time code that names the wallet it wants paid (a post, a gist, a video caption or title, a channel post). On Farcaster, adding the wallet as a verified address is the proof. Fortune never asks for a seed phrase, a private key or a platform login.</li>
+              <li><strong>The wallet binds itself.</strong> Fortune signs a binding only that wallet can submit. It takes effect after one hour; changing the wallet later takes three days, and the current wallet can cancel the change.</li>
+              <li><strong>Handles cannot be recycled.</strong> Where the platform has a permanent account id (X, GitHub, Farcaster, Bluesky), the first binding pins it, so someone who takes the handle later cannot take the fees.</li>
+              <li><strong>Pull, never push.</strong> Anyone can collect a launch&apos;s creator fees into the vault; only the bound wallet can claim. Transfer taxes are measured on the way in and on the way out.</li>
+              <li><strong>Unclaimed fees wait.</strong> A named account that never verifies simply leaves its share in the vault. Naming an account is not an endorsement by its owner.</li>
+            </ul>
+            <p className="reviewWarning">
+              Unaudited beta on BSC Testnet. Fortune&apos;s verifier is trusted to check
+              proofs honestly; delays and a guardian who can cancel pending bindings
+              limit the damage a compromised verifier could do, but do not remove that trust.
+            </p>
+            <div className="heroActions">
+              <Link href="/claims" className="secondaryCta">Claim creator fees →</Link>
             </div>
           </section>
 

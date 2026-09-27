@@ -3,7 +3,8 @@ import { bsc, bscTestnet } from "viem/chains";
 import { configuredRpcUrls } from "@/lib/bsc-rpc";
 import { FORTUNE_NETWORK } from "@/lib/fortune-network";
 import { CUSTOM_PAIRS, customPhase, type CustomPairPhase } from "@/lib/custom-pairs";
-import { CUSTOM_PAIR_CURVE_ABI, CUSTOM_PAIR_FACTORY_ABI } from "@/lib/custom-pairs-artifacts";
+import { CUSTOM_PAIR_CURVE_ABI, CUSTOM_PAIR_FACTORY_ABI, SOCIAL_FEE_VAULT_ABI } from "@/lib/custom-pairs-artifacts";
+import { toIdentity, type IdentityTuple, type SocialIdentity } from "@/lib/social-fees";
 
 const ERC20 = parseAbi([
   "function name() view returns (string)",
@@ -63,9 +64,34 @@ export type CustomPairLaunchDetail = CustomPairLaunch & {
   graduation: { pairDelivered: string; launchTokens: string; liquidity: string } | null;
   poolReserves: { pair: string; launch: string } | null;
   rescue: { circulating: string; holderClaims: string } | null;
+  /** Set when the creator fee is split between wallets and social accounts through the social fee vault. */
+  feeSplit: { vault: Address; collected: string; recipients: Array<SocialIdentity & { shareBps: number }> } | null;
   blockNumber: string;
   blockTimestamp: number;
 };
+
+/** A split launch's creator-fee recipient is the social fee vault; any other recipient is a plain wallet. */
+async function readFeeSplit(rpc: PublicClient, curve: Address, recipient: Address, blockNumber: bigint): Promise<CustomPairLaunchDetail["feeSplit"]> {
+  const code = await rpc.getCode({ address: recipient, blockNumber }).catch(() => undefined);
+  if (!code || code === "0x") return null;
+  try {
+    const [recipients, collected] = await Promise.all([
+      rpc.readContract({ address: recipient, abi: SOCIAL_FEE_VAULT_ABI, functionName: "curveRecipients", args: [curve], blockNumber }) as Promise<
+        readonly [readonly IdentityTuple[], readonly number[]]
+      >,
+      rpc.readContract({ address: recipient, abi: SOCIAL_FEE_VAULT_ABI, functionName: "collectedByCurve", args: [curve], blockNumber }) as Promise<bigint>,
+    ]);
+    const [identities, shares] = recipients;
+    if (!identities.length) return null;
+    return {
+      vault: recipient,
+      collected: collected.toString(),
+      recipients: identities.map((identity, index) => ({ ...toIdentity(identity), shareBps: Number(shares[index]) })),
+    };
+  } catch {
+    return null;
+  }
+}
 
 let cached: PublicClient | null = null;
 
@@ -237,6 +263,8 @@ export async function readCustomPairLaunch(curveAddress: string): Promise<Custom
     poolReserves = { pair: (pairFirst ? reserves[0] : reserves[1]).toString(), launch: (pairFirst ? reserves[1] : reserves[0]).toString() };
   }
 
+  const feeSplit = await readFeeSplit(rpc, curve, creatorFeeRecipient, blockNumber);
+
   return {
     ...row,
     description: metadata.description || null,
@@ -256,6 +284,7 @@ export async function readCustomPairLaunch(curveAddress: string): Promise<Custom
     graduation: row.phase === "Graduated" ? { pairDelivered: delivered.toString(), launchTokens: launchTokens.toString(), liquidity: liquidity.toString() } : null,
     poolReserves,
     rescue: row.phase === "Rescued" ? { circulating: rescueCirculating.toString(), holderClaims: rescueHolderClaims.toString() } : null,
+    feeSplit,
     blockNumber: blockNumber.toString(),
     blockTimestamp: Number(block.timestamp),
   };

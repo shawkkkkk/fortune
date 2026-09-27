@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { formatUnits, parseAbi, parseUnits, type Address } from "viem";
+import FeeRecipientsPanel from "@/components/FeeRecipientsPanel";
 import PairInspector from "@/components/PairInspector";
 import { useLanguage } from "@/components/LanguageProvider";
 import { FORTUNE_NETWORK } from "@/lib/fortune-network";
 import { CUSTOM_PAIR_RULES, afterTax, pairForTokens, previewCurveBuy, shieldBpsAt } from "@/lib/custom-pairs";
-import { CUSTOM_PAIR_CURVE_ABI } from "@/lib/custom-pairs-artifacts";
+import { CUSTOM_PAIR_CURVE_ABI, SOCIAL_FEE_VAULT_ABI } from "@/lib/custom-pairs-artifacts";
 import type { CustomPairLaunchDetail } from "@/lib/custom-pairs-read";
 import { assertWalletIdentity } from "@/lib/launch-safety";
 import { formatAmount, formatShare, formatUnitPrice, shortAddress } from "@/lib/market-format";
@@ -222,6 +223,20 @@ export default function CustomPairMarket({ initial }: { initial: CustomPairLaunc
     });
   }
 
+  async function collectForRecipients() {
+    const vault = launch.feeSplit?.vault;
+    if (!vault) return;
+    await run("Collecting creator fees…", async (wallet) => {
+      const { publicClient, walletClient } = walletClients(wallet);
+      await publicClient.simulateContract({ account: wallet, address: vault, abi: SOCIAL_FEE_VAULT_ABI, functionName: "collect", args: [launch.curve] });
+      await assertWalletIdentity(injectedProvider(), wallet, FORTUNE_NETWORK.chainId);
+      const hash = await walletClient.writeContract({ address: vault, abi: SOCIAL_FEE_VAULT_ABI, functionName: "collect", args: [launch.curve] });
+      const receipt = await publicClient.waitForTransactionReceipt({ hash });
+      if (receipt.status !== "success") throw new Error("The transaction reverted.");
+      setMessage("Collected. Each recipient's share is waiting in the fee vault.");
+    });
+  }
+
   async function redeem() {
     await run("Preparing your redemption…", async (wallet) => {
       const { publicClient, walletClient } = walletClients(wallet);
@@ -380,6 +395,19 @@ export default function CustomPairMarket({ initial }: { initial: CustomPairLaunc
         <div className="customMarketSide">
           <PairInspector address={pair.address} holder={account} onResult={setInspection} />
 
+          {launch.feeSplit ? (
+            <FeeRecipientsPanel
+              recipients={launch.feeSplit.recipients}
+              collected={launch.feeSplit.collected}
+              uncollected={launch.creatorFeesOwed}
+              pairSymbol={pair.symbol}
+              pairDecimals={pair.decimals}
+              now={now}
+              busy={busy}
+              onCollect={() => void collectForRecipients()}
+            />
+          ) : null}
+
           <section className="panel customFacts">
             <span className="eyebrow">CONTRACTS</span>
             <div className="statRows">
@@ -388,7 +416,8 @@ export default function CustomPairMarket({ initial }: { initial: CustomPairLaunc
               <div><span>Pair token</span><strong><a translate="no" href={`${FORTUNE_NETWORK.explorerUrl}/token/${pair.address}`} target="_blank" rel="noreferrer">{pair.symbol} · {shortAddress(pair.address)}</a></strong></div>
               <div><span>Pancake V2 pool</span><strong><a translate="no" href={`${FORTUNE_NETWORK.explorerUrl}/address/${launch.pool}`} target="_blank" rel="noreferrer">{shortAddress(launch.pool)}</a></strong></div>
               <div><span>Creator</span><strong><Link translate="no" href={`/profile/${launch.creator}`}>{shortAddress(launch.creator)}</Link></strong></div>
-              <div><span>Fees</span><strong translate="no">{formatTaxBps(launch.protocolFeeBps)} protocol · {formatTaxBps(launch.creatorFeeBps)} creator</strong></div>
+              <div><span>Fees</span><strong translate="no">{formatTaxBps(launch.protocolFeeBps)} protocol · {formatTaxBps(launch.creatorFeeBps)} creator{launch.feeSplit ? (zh ? "（分成）" : " (split)") : ""}</strong></div>
+              {launch.feeSplit ? <div><span>Fee vault</span><strong><a translate="no" href={`${FORTUNE_NETWORK.explorerUrl}/address/${launch.feeSplit.vault}`} target="_blank" rel="noreferrer">{shortAddress(launch.feeSplit.vault)}</a></strong></div> : null}
               <div><span>Launch Shield reserve</span><strong translate="no">{formatAmount(units(launch.shieldReserve, pair.decimals))} {pair.symbol}</strong></div>
             </div>
             <p className="fieldHint">Custom-pair contracts are an unaudited beta, separate from Fortune&apos;s frozen Standard candidate.</p>

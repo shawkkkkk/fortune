@@ -43,7 +43,7 @@ The category uses a sub-$5 last-sale price as its UI definition of a penny stock
 
 ## Penny stocks tab
 
-The pair picker (`/launch` and `/assets`) has a **Penny stocks** tab: companies whose tokenized share on BNB Smart Chain trades under $5, most traded first (`isPennyStock` in `lib/pair-reasons.ts`). Leveraged and inverse funds, ETFs and Ondo's managed portfolios are excluded. On 2026-09-27 that was 22 companies, including AMC Entertainment (Ondo), GoPro (bStocks), Hertz, Plug Power, Opendoor, BigBear.ai, NIO and Grab. They show why they are not launchable yet: they live on BNB Smart Chain mainnet, and tokenized securities are outside the mainnet v1 asset policy.
+The pair picker (`/launch` and `/assets`) has a **Penny stocks** tab: companies whose tokenized share on BNB Smart Chain trades under $5, most traded first (`isPennyStock` in `lib/pair-reasons.ts`). Leveraged and inverse funds, ETFs and Ondo's managed portfolios are excluded. The count moves with live prices; after the Anchored catalog refresh on 2026-09-27, the tab exposed 34 companies, including AMC Entertainment (Ondo), GoPro (bStocks), Hertz, Plug Power, Opendoor, BigBear.ai, NIO and Grab. They show why they are not launchable yet: they live on BNB Smart Chain mainnet, and tokenized securities are outside the mainnet v1 asset policy.
 
 ## Counterfeit stock tokens
 

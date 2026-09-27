@@ -13,6 +13,7 @@ const sections = [
   ["how", "How a Fortune launch works"],
   ["burns", "Burn + Rewards"],
   ["graduation", "Locked Pancake liquidity"],
+  ["trading", "Trading and rescue"],
   ["rewards", "Holder rewards"],
   ["pairs", "Pair assets on BNB"],
   ["any-bep20", "Any reviewed BEP-20"],
@@ -112,6 +113,20 @@ export default function DocsPage() {
               mints the LP position and deposits the NFT into the permanent Fortune
               liquidity locker. Failed graduation remains retryable rather than
               partially completing.
+            </p>
+          </section>
+
+          <section className="panel" id="trading">
+            <span className="eyebrow">TRADING</span>
+            <h2>Trade in BNB, from launch to PancakeSwap.</h2>
+            <p>
+              On a WBNB-paired launch the market page takes and pays out BNB: it wraps only what a buy needs and unwraps what a sale returns. Every trade shows its quote, minimum received, price impact and fee first, approves only that trade&apos;s amount, and uses the slippage you choose.
+            </p>
+            <p>
+              In the first five seconds the page shows the Launch Shield tax falling to zero and asks you to confirm before buying into it. A buy that reaches the graduation target is filled only up to the target, and the rest comes back to you.
+            </p>
+            <p>
+              After graduation you trade the launch&apos;s locked Pancake V3 pool on the same page, quoted and routed by PancakeSwap&apos;s own contracts. If graduation cannot complete within seven days of reaching the target, anyone can open rescue and every holder can redeem a pro-rata share of the reserve.
             </p>
           </section>
 

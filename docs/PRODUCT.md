@@ -48,6 +48,19 @@ Show the quote amount, approve if needed, simulate output and enforce a meaningf
 ### 5. Review and launch
 Show fixed token, description, links, pair, fee and liquidity terms before signature. Standard defaults to immutable display metadata. Put supply, price slope and graduation target in Advanced. Save/restore/delete browser-local drafts without persisting wallet authority or review consent; unuploaded files are not included.
 
+## Trading
+
+The market page is where holders trade, from the first block to PancakeSwap:
+
+- **BNB in and out.** On a WBNB-paired launch, buys wrap only the BNB the trade needs and sales unwrap what they return. A buy that reaches the graduation target is filled up to the target and the refund comes back as BNB. Wrapping and unwrapping are separate wallet steps, so a failed unwrap never undoes a trade.
+- **Quote first.** Every trade shows what you receive, the minimum at your slippage, the average price and its distance from spot, the trading fee, any Launch Shield tax and any graduation refund. The minimum is re-quoted right before signing.
+- **Exact approvals.** Approvals cover the amount of the trade being signed, never an unlimited allowance.
+- **Launch Shield in the open.** During the first five seconds the page counts the shield tax down to zero and requires an explicit "buy anyway" before a taxed buy; during the first fifteen seconds it shows how much of the 2% early wallet cap is left and blocks buys over it.
+- **Exact results.** Fills, refunds, sale proceeds and rescue payouts are read from the transaction's own events, not inferred from balance changes, so a creator trading their own launch never sees creator fees reported as a refund.
+- **After graduation.** The launch's permanently locked Pancake V3 pool trades on the same page, quoted by PancakeSwap's QuoterV2 and routed through its SwapRouter, with BNB in and out. A link opens the same pair on PancakeSwap.
+- **Graduation that actually graduates.** The factory catches a failed migration so it stays retryable, which makes wallet gas estimates stop where the migration runs out of gas. The page simulates and sends an explicit per-pool gas limit (`lib/graduation-gas.ts`) and reports success only when `GraduationFinalized` is emitted.
+- **Rescue.** If a launch reaches its target but cannot graduate for seven days, anyone can open rescue from the market page and every holder can redeem a pro-rata share of the reserve, paid out in BNB for WBNB reserves.
+
 ## Current release boundary
 
 The BSC testnet alpha is live. The Standard mainnet candidate is paused pending the independent audit, governance signatures, production infrastructure and legal/asset policy gates in `mainnet-release.json`. The isolated v2 reward token has no Infinity hook, factory, indexer, or deployment and must never inherit Standard approval.

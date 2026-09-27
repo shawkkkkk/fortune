@@ -3120,6 +3120,263 @@ label.fieldGrid {
   font-variant-numeric: tabular-nums;
 }
 
+/* Market page: chart and trades beside a sticky trade panel. */
+.marketTradeLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 400px);
+  gap: 16px;
+  align-items: start;
+  margin-top: 14px;
+}
+
+.marketTradeMain {
+  min-width: 0;
+}
+
+.marketTradeMain > * + * {
+  margin-top: 14px;
+}
+
+.marketTradeSide {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+  position: sticky;
+  top: 96px;
+}
+
+.curveTrade {
+  padding: 18px;
+}
+
+.tradeSides {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 14px;
+  background: var(--surface-sunk);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.tradeSides button {
+  min-height: 42px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink-soft);
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.tradeSides button.active {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 1px 2px rgba(34, 21, 21, 0.08), inset 0 0 0 1px var(--line-strong);
+}
+
+.tradeSides button:first-child.active {
+  color: var(--jade);
+}
+
+.tradeSides button:last-child.active {
+  color: var(--red-ink);
+}
+
+.tradePanel label.tradeNative {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.tradeNative input[type="checkbox"] {
+  flex: none;
+  width: 18px;
+  min-height: 18px;
+  height: 18px;
+  margin: 2px 0 0;
+  padding: 0;
+  accent-color: var(--red);
+}
+
+.tradeQuick {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.tradeQuick > span:last-child {
+  display: flex;
+  gap: 6px;
+}
+
+.tradeQuick button,
+.slippageRow button {
+  min-height: 32px;
+  padding: 4px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink-soft);
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.tradeQuick button:hover:not(:disabled),
+.slippageRow button:hover {
+  border-color: var(--gold-line);
+  background: var(--gold-tint);
+  color: var(--ink);
+}
+
+.tradeQuick button:disabled {
+  opacity: 0.45;
+}
+
+.slippageRow button[aria-pressed="true"] {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--bg);
+}
+
+.tradeQuote {
+  display: grid;
+  gap: 8px;
+  margin: 14px 0 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.tradeQuote > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 14px;
+}
+
+.tradeQuote dt {
+  color: var(--muted);
+}
+
+.tradeQuote dd {
+  margin: 0;
+  color: var(--ink);
+  font-weight: 700;
+  text-align: right;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+
+.slippageRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 14px;
+}
+
+.slippageRow > span {
+  margin-right: 4px;
+}
+
+.slippageRow input {
+  width: 88px;
+  min-height: 32px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 13px;
+}
+
+.shieldNotice {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--amber-tint);
+  box-shadow: inset 0 0 0 1px var(--amber-line);
+  color: var(--amber);
+}
+
+.shieldNotice > strong {
+  font-size: 14px;
+}
+
+.shieldTrack {
+  display: block;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(161, 92, 7, 0.16);
+}
+
+.shieldTrack > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--amber);
+  transition: width 0.25s linear;
+}
+
+.shieldNotice label.tradeNative {
+  margin-top: 0;
+  color: var(--ink-soft);
+}
+
+.tradeSteps {
+  margin: 12px 0 0;
+}
+
+.tradeStatus {
+  margin: 12px 0 0;
+  color: var(--ink-soft);
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.poolTradeHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.poolTradeHead a {
+  color: var(--red-ink);
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.rescuePanel > p {
+  margin: 8px 0 0;
+}
+
+.rescuePanel > .secondaryCta {
+  width: 100%;
+  margin-top: 14px;
+}
+
+@media (max-width: 1080px) {
+  .marketTradeLayout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .marketTradeSide {
+    position: static;
+    order: -1;
+  }
+}
+
 /* --------------------------------------------------------------------------
    Status page
    -------------------------------------------------------------------------- */
@@ -4838,6 +5095,8 @@ html.entryGateOpen {
 
 .marketInsights {
   display: grid;
+  /* minmax(0, …) lets the column shrink below the trades table's width; the table scrolls inside its wrapper. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 14px;
   margin: 14px 0;
 }
@@ -5159,6 +5418,8 @@ html.entryGateOpen {
 }
 
 .tableWrap {
+  /* Positioned so absolutely positioned cell content (screen-reader labels) is clipped by this scroller too. */
+  position: relative;
   margin-top: 10px;
   overflow-x: auto;
 }

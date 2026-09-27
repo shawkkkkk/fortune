@@ -16,6 +16,7 @@ import {
   type Hex,
 } from "viem";
 import { PUBLIC_TESTNET } from "@/lib/public-testnet";
+import { graduationGasLimit } from "@/lib/graduation-gas";
 import FortuneLogo from "@/components/FortuneLogo";
 
 type LaunchMode = "standard" | "tax";
@@ -1340,7 +1341,8 @@ export default function PublicTestnetPage() {
     try {
       const active = await withAccount();
       const { publicClient, walletClient } = clients(active);
-      const deadline = BigInt(Math.floor(Date.now() / 1000) + 1200);
+      // Twenty minutes of chain time; a device clock can be off.
+      const deadline = (await publicClient.getBlock()).timestamp + 1200n;
 
       const plan =
         launch.mode === "tax"
@@ -1385,12 +1387,16 @@ export default function PublicTestnetPage() {
       const abi =
         launch.mode === "tax" ? taxFactoryAbi : standardFactoryAbi;
 
+      // One explicit limit for the simulation and the transaction: a wallet
+      // estimate stops where the caught migration runs out of gas.
+      const gas = graduationGasLimit(1);
       const simulation = await publicClient.simulateContract({
         account: active,
         address,
         abi,
         functionName: "finalizeGraduation",
         args: [launch.curve, plan],
+        gas,
       });
 
       if (!simulation.result) {
@@ -1399,7 +1405,7 @@ export default function PublicTestnetPage() {
         );
       }
 
-      const hash = await walletClient.writeContract(simulation.request);
+      const hash = await walletClient.writeContract({ ...simulation.request, gas });
       await waitTracked(publicClient, hash, "Graduation");
 
       let graduated: boolean;

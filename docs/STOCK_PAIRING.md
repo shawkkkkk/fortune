@@ -46,15 +46,20 @@ The pair picker (`/launch` and `/assets`) has a **Penny stocks** tab: companies 
 
 ## Counterfeit stock tokens
 
-`lib/stock-identity.ts` checks every token the pair inspector sees against the verified stock-token contracts in `data/pair-universe.json`:
+`lib/stock-identity.ts` checks every token the pair inspector sees against the verified issuer contracts in `data/pair-universe.json`: the bStocks, Ondo Global Markets and xStocks stocks and ETFs, plus those issuers' ETF-backed commodity tokens.
 
 | Result | When | Inspector |
 | --- | --- | --- |
-| Verified | The address is an issuer contract on BNB Smart Chain | `VERIFIED_STOCK_TOKEN` (info) |
-| Imitation | Same symbol as a verified stock token (e.g. a second `GPROB`), stock-token wording (`xStock`, `bStock`, `Stock Token`, `(Ondo Tokenized)`, `Tokenized stock`), or a listed company's name together with its ticker | `IMITATES_STOCK_TOKEN` (block), naming the verified contract |
-| Overlap | Only the company name, or a company ticker of three or more letters | `SHARES_STOCK_NAME` (warning) |
+| Verified | The address is one of those issuer contracts on BNB Smart Chain | `VERIFIED_STOCK_TOKEN` (info) |
+| Imitation | The exact symbol of a verified stock token at another address (a second `GPROB`), or a listed company's name together with its ticker (`Disney`, `DIS`) | `IMITATES_STOCK_TOKEN` (block), naming the verified contract |
+| Unverified | Stock-token wording (`xStock`, `bStock`, `aStock`, `Stock Token`, `Tokenized Stock/Share/Equity/ETF`, `(Ondo`, singular or plural, spaced, glued or split by punctuation), or a company's name with an issuer-style symbol (its ticker plus `on`, `x` or `B`, like `AMCON`) | `UNVERIFIED_STOCK_TOKEN` (block), naming the verified contract when there is one |
+| Overlap | Only the company name, a company ticker of three or more letters, or a name that is just the ticker (`OPEN`, `OPEN`) | `SHARES_STOCK_NAME` (warning) |
 
-On any chain but BNB Smart Chain mainnet (including BSC Testnet) nothing can be a verified stock token, so anything posing as one is blocked. Across the 665 tokens in the pair universe the rules flag no crypto asset.
+Names and symbols are compared after Unicode NFKC folding (full-width letters), with invisible format characters (zero-width spaces and joiners) removed and punctuation ignored. Symbols keep their case: issuers write `Ton` (AT&T), `LIon` (Li Auto), `WMTx` (Walmart) and `Vx` (Visa), while `TON`, `LION`, `WMTX` and `VX` are unrelated crypto tokens.
+
+Unverified is not an accusation. Issuers have deployed far more tokens than the snapshot lists: on 2026-09-27 the public BNB Smart Chain token lists (CoinGecko, CoinMarketCap and PancakeSwap, 13,696 tokens) held 713 more xStocks, every one with the same `owner()` and ProxyAdmin as the verified xStocks; 112 aStocks from Anchored, an issuer the snapshot does not cover yet (tokenized SpaceX among them); and three Ondo and one bStocks token behind those issuers' beacons. Matching contracts are evidence, not proof (anyone can deploy a proxy that points at a public beacon or implementation, and roles can be handed over after minting), so these stay unpairable until the snapshot is refreshed and reviewed.
+
+On that list, with each token's name and symbol read onchain, the rules give 602 verified, 1 imitation (a token named `Disney` with the symbol `DIS`), 830 unverified (829 issuer tokens and one that calls itself "FX Stock Token"), 136 overlap warnings (memecoins such as `CAT` or `AMC`) and 12,127 none. On any chain but BNB Smart Chain mainnet (including BSC Testnet) nothing can be verified, so anything posing as a stock token is blocked. Wording checks are a backstop, not proof: a counterfeit can always pick a name without the labels, so only a verified contract is ever presented as a stock token.
 
 Why: in September 2026 a memecoin (JINQIAN) was paired on Robinhood Chain with a token presented as tokenized Farmmi that one wallet had minted in full and kept repricing; the real Nasdaq stock rose as much as 350% and fell back within hours. On Long.xyz, where memecoins may only pair with official Robinhood Stock Tokens, a memecoin paired with tokenized AMC drew a public objection from AMC's chief executive, who called the stock tokens a "pseudo-fake market" and threatened an SEC complaint. Fortune pairs only with real issuer tokens, labels them as price exposure rather than shares, and never lets a lookalike stand in for a stock.
 

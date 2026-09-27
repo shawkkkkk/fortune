@@ -1449,9 +1449,11 @@ const ZH: Record<string, string> = {
   "Verified tokenized stock": "已验证的代币化股票",
   "This is the issuer's tokenized stock contract that Fortune tracks. It gives price exposure to the listed share, not ownership, votes or dividends, and the company has not endorsed launches paired with it.": "这是 Fortune 追踪的发行方代币化股票合约。它提供挂钩上市股票的价格敞口，不代表所有权、投票权或分红权，该公司也未为与其配对的发行背书。",
   "Imitates a tokenized stock": "仿冒代币化股票",
-  "It borrows a stock token's ticker or calls itself a tokenized share, but it is not a verified issuer contract. A memecoin paired with a counterfeit stock token was used to move a real Nasdaq stock in 2026. Fortune does not pair with it.": "它借用股票代币的代码或自称代币化股票，但并非经过验证的发行方合约。2026 年曾有 memecoin 与仿冒股票代币配对，被用来拉动一只真实的纳斯达克股票。Fortune 不与其配对。",
+  "It copies a verified stock token's symbol, or a listed company's name together with its ticker, but it is not that issuer contract. A memecoin paired with a counterfeit stock token was used to move a real Nasdaq stock in 2026. Fortune does not pair with it.": "它照搬已验证股票代币的符号，或同时使用上市公司的名称和股票代码，但并非该发行方合约。2026 年曾有 memecoin 与仿冒股票代币配对，被用来拉动一只真实的纳斯达克股票。Fortune 不与其配对。",
+  "Unverified tokenized stock": "未经验证的代币化股票",
+  "It presents itself as a tokenized stock, but it is not one of the issuer contracts Fortune has verified. It may be an issuer token Fortune has not reviewed yet, or a counterfeit. Fortune does not pair with it.": "它自称代币化股票，但不在 Fortune 已验证的发行方合约之列。它可能是 Fortune 尚未审核的发行方代币，也可能是仿冒品。Fortune 不与其配对。",
   "Shares a listed company's name or ticker": "与上市公司同名或同代码",
-  "It is not that company's stock or its tokenized version.": "它不是该公司的股票，也不是其代币化版本。",
+  "It is not one of the tokenized stocks Fortune has verified.": "它不在 Fortune 已验证的代币化股票之列。",
 };
 
 // Code containers are skipped entirely. A textarea's typed text is never

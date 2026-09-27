@@ -16,6 +16,9 @@ const HOLDER_TEXT: Record<string, string> = {
   pool: "a DEX pool",
 };
 
+/** Findings that name the verified contract for the stock the token resembles. */
+const STOCK_LOOKALIKE_CODES = new Set(["IMITATES_STOCK_TOKEN", "UNVERIFIED_STOCK_TOKEN", "SHARES_STOCK_NAME"]);
+
 function legValue(leg: TransferLeg | null) {
   if (!leg) return { text: "—", tone: "muted" };
   if (leg.reverted) return { text: "Fails", tone: "bad" };
@@ -109,7 +112,7 @@ export default function PairInspector({
               <li key={finding.code} className={"inspectorFinding-" + finding.level}>
                 <b>{text.title}{finding.value !== undefined ? <span translate="no"> · {formatTaxBps(finding.value)}</span> : null}</b>
                 {text.detail ? <span>{text.detail}</span> : null}
-                {(finding.code === "IMITATES_STOCK_TOKEN" || finding.code === "SHARES_STOCK_NAME") && result.stock?.official ? (
+                {STOCK_LOOKALIKE_CODES.has(finding.code) && result.stock?.official ? (
                   <span className="inspectorOfficial">
                     <span translate="no">
                       {zh

@@ -260,7 +260,7 @@ export async function GET(request: Request) {
             { name: "holder", in: "query", schema: { type: "string" }, description: "Optional wallet to simulate from when no fresh-wallet balance can be synthesized" },
           ],
           responses: {
-            "200": { description: "verdict (clear, caution, unsupported), findings, per-leg taxes, stock identity (a verified issuer stock token, an imitation of one, or a shared company name or ticker, with the verified contract) and the block the simulation used" },
+            "200": { description: "verdict (clear, caution, unsupported), findings, per-leg taxes, stock identity (a verified issuer stock token, an imitation of one, an unverified token presenting itself as one, or a shared company name or ticker, with the verified contract) and the block the simulation used" },
             "400": { description: "Not an address or unsupported chain" },
             "503": { description: "The network could not be read" },
           },

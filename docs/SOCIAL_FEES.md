@@ -6,7 +6,7 @@ A custom-pair launch can split its creator fee between up to ten recipients: wal
 
 ## Why only custom pairs
 
-The frozen Standard fee router pushes creator fees to an immutable `creator` address on every trade, so fees cannot be redirected there without changing audited code. The custom-pair curve pulls fees and lets the factory set its fee recipient, so a split launch points it at the vault in the launch transaction. Standard support needs a future Standard version.
+The frozen Standard fee router pushes creator fees to an immutable `creator` address on every trade, so fees cannot be redirected there without changing the frozen candidate. That candidate still requires independent audit and release approval. The custom-pair curve pulls fees and lets the factory set its fee recipient, so a split launch points it at the vault in the launch transaction. Standard support needs a future Standard version.
 
 ## Contracts
 
@@ -26,7 +26,7 @@ The factory gained `LaunchParams.feeShares` and `setSocialFeeVault`; the curve c
 
 ## Platforms and proofs
 
-The verifier (`lib/social-verify.ts`) only calls fixed public endpoints of each platform; a pasted link supplies an id, never a host. No platform credentials are needed.
+The verifier (`lib/social-verify.ts`) only calls configured platform endpoints; a pasted link supplies an id, never a host. Redirects fail closed, unsuccessful HTTP response bodies cannot establish ownership, and responses are bounded while streaming (1,000,000 bytes normally; 6,000,000 for WeChat articles). A platform that requires a redirect needs a reviewed endpoint update before verification can succeed. No platform credentials are needed.
 
 | Id | Platform | Account | Proof | Permanent id pinned |
 | --- | --- | --- | --- | --- |

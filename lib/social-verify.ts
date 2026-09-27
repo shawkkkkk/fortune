@@ -60,34 +60,60 @@ export function proofOrigins(env: Record<string, string | undefined> = process.e
   return { ...ORIGINS, farcaster: hub && /^https:\/\/[a-z0-9.-]+(?::\d+)?$/i.test(hub) ? hub : ORIGINS.farcaster };
 }
 
-const MAX_BODY_CHARS = 1_000_000;
+const MAX_BODY_BYTES = 1_000_000;
 // WeChat article pages run to several megabytes and name the account near the end.
-const WECHAT_BODY_CHARS = 6_000_000;
+const WECHAT_BODY_BYTES = 6_000_000;
 
 /** One retry for a network error or a 5xx: platform edges drop the odd request. */
-async function fetchText(fetcher: FetchLike, url: string, init?: RequestInit, maxChars = MAX_BODY_CHARS) {
+async function fetchText(fetcher: FetchLike, url: string, init?: RequestInit, maxBytes = MAX_BODY_BYTES) {
   try {
-    const first = await fetchOnce(fetcher, url, init, maxChars);
+    const first = await fetchOnce(fetcher, url, init, maxBytes);
     if (first.status < 500) return first;
   } catch {
     // retried below
   }
   await new Promise((resolve) => setTimeout(resolve, 300));
-  return fetchOnce(fetcher, url, init, maxChars);
+  return fetchOnce(fetcher, url, init, maxBytes);
 }
 
-async function fetchOnce(fetcher: FetchLike, url: string, init?: RequestInit, maxChars = MAX_BODY_CHARS) {
+async function fetchOnce(fetcher: FetchLike, url: string, init?: RequestInit, maxBytes = MAX_BODY_BYTES) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 8_000);
   try {
     const response = await fetcher(url, {
       ...init,
-      redirect: "follow",
+      redirect: "error",
       cache: "no-store",
       signal: controller.signal,
       headers: { "User-Agent": "fortunepad-social-verifier/1.0 (+https://fortunepad.fun)", ...(init?.headers || {}) },
     });
-    const body = (await response.text()).slice(0, maxChars);
+    // Error/redirect bodies are never ownership evidence, even if they happen
+    // to contain fields resembling a successful platform response.
+    if (!response.ok) {
+      await response.body?.cancel();
+      return { status: response.status, body: "" };
+    }
+    const reader = response.body?.getReader();
+    if (!reader) return { status: response.status, body: "" };
+    const decoder = new TextDecoder();
+    let bytes = 0;
+    let body = "";
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        bytes += value.byteLength;
+        if (bytes > maxBytes) {
+          controller.abort();
+          await reader.cancel();
+          throw new Error("Social proof response exceeded its byte limit");
+        }
+        body += decoder.decode(value, { stream: true });
+      }
+      body += decoder.decode();
+    } finally {
+      reader.releaseLock();
+    }
     return { status: response.status, body };
   } finally {
     clearTimeout(timer);
@@ -544,7 +570,7 @@ async function verifyWeChat(request: ProofRequest, fetcher: FetchLike, origins: 
   if (!path) return fail("PROOF_URL", "Paste the article link, like https://mp.weixin.qq.com/s/….");
   let page: { status: number; body: string };
   try {
-    page = await fetchText(fetcher, `${origins.wechat}${path}`, { headers: { "User-Agent": BROWSER_UA } }, WECHAT_BODY_CHARS);
+    page = await fetchText(fetcher, `${origins.wechat}${path}`, { headers: { "User-Agent": BROWSER_UA } }, WECHAT_BODY_BYTES);
   } catch {
     return unavailable("WeChat");
   }
@@ -616,7 +642,7 @@ export async function resolveSocialAccount(
       if (/^gh_[0-9a-f]{12}$/i.test(raw)) return { ok: true, account: raw.toLowerCase(), name: null };
       const path = url ? wechatArticleUrl(url) : null;
       if (!path) return fail("PROOF_URL", "Paste a link to any article from the Official Account, or its gh_ ID.") as ResolvedAccount;
-      const page = await fetchText(fetcher, `${origins.wechat}${path}`, { headers: { "User-Agent": BROWSER_UA } }, WECHAT_BODY_CHARS);
+      const page = await fetchText(fetcher, `${origins.wechat}${path}`, { headers: { "User-Agent": BROWSER_UA } }, WECHAT_BODY_BYTES);
       const article = readWeChatArticle(page.body);
       if (!article.account) return fail("PROOF_NOT_FOUND", "That article could not be read. Try another article link.") as ResolvedAccount;
       return { ok: true, account: article.account, name: article.name };

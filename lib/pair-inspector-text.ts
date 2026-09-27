@@ -37,11 +37,15 @@ export const FINDING_TEXT: Record<string, { title: string; detail: string }> = {
   },
   IMITATES_STOCK_TOKEN: {
     title: "Imitates a tokenized stock",
-    detail: "It borrows a stock token's ticker or calls itself a tokenized share, but it is not a verified issuer contract. A memecoin paired with a counterfeit stock token was used to move a real Nasdaq stock in 2026. Fortune does not pair with it.",
+    detail: "It copies a verified stock token's symbol, or a listed company's name together with its ticker, but it is not that issuer contract. A memecoin paired with a counterfeit stock token was used to move a real Nasdaq stock in 2026. Fortune does not pair with it.",
+  },
+  UNVERIFIED_STOCK_TOKEN: {
+    title: "Unverified tokenized stock",
+    detail: "It presents itself as a tokenized stock, but it is not one of the issuer contracts Fortune has verified. It may be an issuer token Fortune has not reviewed yet, or a counterfeit. Fortune does not pair with it.",
   },
   SHARES_STOCK_NAME: {
     title: "Shares a listed company's name or ticker",
-    detail: "It is not that company's stock or its tokenized version.",
+    detail: "It is not one of the tokenized stocks Fortune has verified.",
   },
 };
 

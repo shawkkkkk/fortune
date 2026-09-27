@@ -426,6 +426,7 @@ export async function inspectPairToken(input: { address: string; chainId?: numbe
   const stock = checkStockIdentity({ address, chainId, name, symbol });
   if (stock.status === "verified") findings.push({ code: "VERIFIED_STOCK_TOKEN", level: "info" });
   else if (stock.status === "imitation") findings.push({ code: "IMITATES_STOCK_TOKEN", level: "block" });
+  else if (stock.status === "unverified") findings.push({ code: "UNVERIFIED_STOCK_TOKEN", level: "block" });
   else if (stock.status === "overlap") findings.push({ code: "SHARES_STOCK_NAME", level: "warn" });
 
   if (decimals === null || totalSupply === null) findings.push({ code: "NOT_ERC20", level: "block" });

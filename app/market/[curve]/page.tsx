@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import {
   createPublicClient,
@@ -177,6 +177,8 @@ type QuoteInfo = {
 };
 
 type MarketState = {
+  /** The curve and launch type these values were read for; only that URL may show them. */
+  key: string;
   token: Address;
   name: string;
   symbol: string;
@@ -230,7 +232,11 @@ export default function MarketPage() {
       ? (params.curve as Address)
       : null;
 
-  const [market, setMarket] = useState<MarketState | null>(null);
+  const [loadedMarket, setMarket] = useState<MarketState | null>(null);
+  const marketKey = `${curve?.toLowerCase() ?? ""}:${isTaxMarket ? "tax" : "standard"}`;
+  // Signing controls only ever see a market read for this exact curve and launch type.
+  const market = loadedMarket?.key === marketKey ? loadedMarket : null;
+  const activeMarketKey = useRef(marketKey);
   const [account, setAccount] = useState<Address | null>(null);
   const [busy, setBusy] = useState("");
   const [message, setMessage] = useState("");
@@ -258,6 +264,11 @@ export default function MarketPage() {
       return;
     }
 
+    // A read that finishes after the URL changed belongs to another market.
+    const key = marketKey;
+    const stale = () => activeMarketKey.current !== key;
+    let unregistered = false;
+
     try {
       // Never render signing controls for an arbitrary contract supplied in the
       // URL. A valid market must be registered by the configured factory for
@@ -269,6 +280,7 @@ export default function MarketPage() {
         args: [curve],
       });
       if (curveIndex === 0n) {
+        unregistered = true;
         throw new Error("This address is not a launch from Fortune's configured factory.");
       }
 
@@ -323,7 +335,9 @@ export default function MarketPage() {
         })
       );
 
+      if (stale()) return;
       setMarket((previous) => ({
+        key,
         token,
         name,
         symbol,
@@ -342,25 +356,31 @@ export default function MarketPage() {
         quotes: previous && sameQuotes(previous.quotes, quotes) ? previous.quotes : quotes,
       }));
     } catch (error) {
-      setMarket(null);
+      if (stale()) return;
+      // Registration never changes, so a failed refresh keeps a market already
+      // verified for this exact curve; anything else fails closed.
+      setMarket((previous) =>
+        !unregistered && previous?.key === key ? previous : null
+      );
       setMessage(
         error instanceof Error
           ? error.message
           : "Could not read this Fortune market."
       );
     } finally {
-      setLoading(false);
+      if (!stale()) setLoading(false);
     }
-  }, [curve, isTaxMarket]);
+  }, [curve, isTaxMarket, marketKey]);
 
   useEffect(() => {
     // Route transitions can reuse this client component. Clear the prior
     // market immediately so a failed read can never leave old signing controls
     // attached to a new curve URL.
+    activeMarketKey.current = marketKey;
     setMarket(null);
     setMessage("");
     setLoading(true);
-  }, [curve, isTaxMarket]);
+  }, [curve, isTaxMarket, marketKey]);
 
   useEffect(() => {
     void refresh();

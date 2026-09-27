@@ -11,12 +11,14 @@ import {
   buildFeeShares,
   canonicalAccount,
   challengeCode,
+  challengePost,
+  describeAccount,
   identityIdOf,
   isVaultCanonical,
   stableIdHash,
   walletIdentityOf,
 } from "../../lib/social-fees.ts";
-import { htmlToText, proofOrigins, verifySocialProof, xPostId, xSyndicationToken } from "../../lib/social-verify.ts";
+import { htmlToText, proofOrigins, readWeChatArticle, resolveSocialAccount, verifySocialProof, wechatArticleUrl, xPostId, xSyndicationToken } from "../../lib/social-verify.ts";
 import { SOCIAL_FEE_VAULT_ABI, CUSTOM_PAIR_FACTORY_ABI } from "../../lib/custom-pairs-artifacts.ts";
 
 const VAULT = "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512";
@@ -62,7 +64,7 @@ test("website constants mirror the vault", () => {
   // Platform ids are permanent onchain values.
   assert.deepEqual(
     SOCIAL_PLATFORMS.map((item) => [item.id, item.key]),
-    [[1, "x"], [2, "github"], [3, "tiktok"], [4, "telegram"], [5, "youtube"], [6, "farcaster"], [7, "bluesky"]]
+    [[1, "x"], [2, "github"], [3, "tiktok"], [4, "telegram"], [5, "youtube"], [6, "farcaster"], [7, "bluesky"], [8, "weibo"], [9, "bilibili"], [10, "wechat"]]
   );
   for (const item of SOCIAL_PLATFORMS) assert.ok(item.id > 0 && item.id <= SOCIAL_FEE_RULES.maxPlatform);
 });
@@ -85,6 +87,18 @@ test("pasted handles and profile links become the vault's canonical account", ()
   ok("farcaster", "vitalik.eth", "vitalik.eth");
   ok("bluesky", "https://bsky.app/profile/Alice.bsky.social", "alice.bsky.social");
   ok(1, "alice", "alice");
+  ok("weibo", "https://weibo.com/u/1195230310", "1195230310");
+  ok("weibo", "https://m.weibo.cn/profile/1195230310", "1195230310");
+  ok("weibo", "UID:1195230310", "1195230310");
+  ok("bilibili", "https://space.bilibili.com/2/dynamic", "2");
+  ok("bilibili", "m.bilibili.com/space/2", "2");
+  ok("bilibili", "uid 2", "2");
+  ok("wechat", "gh_E23146F9A9CD", "gh_e23146f9a9cd");
+  // Links only Fortune's server can turn into an id.
+  assert.equal(canonicalAccount("weibo", "https://weibo.com/hejiong").resolvable, true);
+  assert.equal(canonicalAccount("wechat", "https://mp.weixin.qq.com/s/LmWJGCLyddA9sAM7arYpag").resolvable, true);
+  assert.equal(canonicalAccount("weibo", "何炅").ok, false);
+  assert.equal(describeAccount(8, "1195230310"), "UID 1195230310");
 
   const bad = (platformKey, raw) => assert.equal(canonicalAccount(platformKey, raw).ok, false, `${platformKey} ${raw}`);
   bad("x", "");
@@ -121,6 +135,12 @@ test("fee split rules match checkShares, and a lone creator wallet is a plain la
   assert.match(reason([{ kind: "social", platform: 1, account: "alice", percent: "50" }, { kind: "social", platform: 1, account: "ALICE", percent: "50" }]), /already listed/);
   assert.match(reason([{ kind: "social", platform: 1, account: "alice", percent: "50.555" }, { kind: "wallet", wallet: creator, percent: "49.445" }]), /two decimals/);
   assert.match(reason(Array.from({ length: 11 }, (_, i) => ({ kind: "wallet", wallet: `0x${String(i + 1).padStart(40, "0")}`, percent: "9.09" }))), /Up to 10/);
+});
+
+test("Chinese platforms get the bare code, with nothing promotional", () => {
+  const code = "fortune-0123456789abcdef01234567";
+  for (const key of ["weibo", "bilibili", "wechat"]) assert.equal(challengePost(platform(key), code), code);
+  assert.match(challengePost(platform("x"), code), /@fortunepad: fortune-/);
 });
 
 test("challenge codes commit to the wallet and the nonce", () => {
@@ -252,6 +272,54 @@ test("Farcaster: the wallet must be a verified externally owned address of that 
   assert.equal(ok.stableRawId, "3");
   assert.equal((await verifySocialProof(request("farcaster", "dwr", null), { fetcher: hub([contract]).fetcher, env: {} })).code, "WALLET_NOT_VERIFIED");
   assert.equal((await verifySocialProof(request("farcaster", "dwr", null), { fetcher: hub([]).fetcher, env: {} })).code, "WALLET_NOT_VERIFIED");
+});
+
+test("Weibo and Bilibili read the code from the bio of the numeric UID", async () => {
+  const weibo = (description, idstr = "1195230310") =>
+    fakeFetch([
+      [/passport\.weibo\.com\/visitor\/genvisitor2/, [200, 'window.visitor_gray_callback && visitor_gray_callback({"retcode":20000000,"data":{"sub":"_2Ak","subp":"0033"}});']],
+      [/weibo\.com\/ajax\/profile\/info\?uid=1195230310/, [200, { ok: 1, data: { user: { idstr, screen_name: "何炅", description } } }]],
+    ]);
+  const good = await verifySocialProof(request("weibo", "1195230310", null), { fetcher: weibo("主持人 fortune-0123456789abcdef01234567").fetcher, env: {} });
+  assert.equal(good.ok, true, good.message);
+  assert.equal(good.stableRawId, "1195230310");
+  assert.equal(good.evidence.author, "何炅");
+  assert.equal((await verifySocialProof(request("weibo", "1195230310", null), { fetcher: weibo("主持人").fetcher, env: {} })).code, "CODE_MISSING");
+  assert.equal((await verifySocialProof(request("weibo", "1195230310", null), { fetcher: weibo("fortune-0123456789abcdef01234567", "999").fetcher, env: {} })).code, "WRONG_ACCOUNT");
+
+  const bili = fakeFetch([[/api\.bilibili\.com\/x\/web-interface\/card\?mid=2$/, [200, { code: 0, data: { card: { mid: "2", name: "碧诗", sign: "We Are Star Dust fortune-0123456789abcdef01234567" } } }]]]);
+  const outcome = await verifySocialProof(request("bilibili", "2", null), { fetcher: bili.fetcher, env: {} });
+  assert.equal(outcome.ok, true);
+  assert.equal(outcome.stableRawId, "2");
+  const missing = fakeFetch([[/card\?mid=3$/, [200, { code: -404, data: null }]]]);
+  assert.equal((await verifySocialProof(request("bilibili", "3", null), { fetcher: missing.fetcher, env: {} })).code, "PROOF_NOT_FOUND");
+});
+
+test("WeChat Official Accounts: the article's gh_ id must match and the code must be in the article itself", async () => {
+  assert.equal(wechatArticleUrl(new URL("https://mp.weixin.qq.com/s/LmWJGCLyddA9sAM7arYpag")), "/s/LmWJGCLyddA9sAM7arYpag");
+  assert.equal(
+    wechatArticleUrl(new URL("https://mp.weixin.qq.com/s?__biz=MzIyODI1MzYyNA==&mid=2653546018&idx=1&sn=69ff3b17631b8a88b7e96b7a971c5850&chksm=x")),
+    "/s?__biz=MzIyODI1MzYyNA%3D%3D&mid=2653546018&idx=1&sn=69ff3b17631b8a88b7e96b7a971c5850"
+  );
+  assert.equal(wechatArticleUrl(new URL("https://evil.example/s/LmWJGCLyddA9sAM7arYpag")), null);
+  const article = (userName, body, script = "") =>
+    `<html><head><meta property="og:title" content="标题"></head><body><script>var nickname = htmlDecode("玉树芝兰"); var user_name = "${userName}";</script>` +
+    `<div class="rich_media_content" id="js_content"><p>${body}</p></div><script>var other = "${script}";</script></body></html>`;
+  assert.deepEqual(readWeChatArticle(article("gh_e23146f9a9cd", "hello &amp; bye")), { account: "gh_e23146f9a9cd", name: "玉树芝兰", title: "标题", text: "hello & bye" });
+  const route = (html) => fakeFetch([[/mp\.weixin\.qq\.com\/s\/LmWJGCLyddA9sAM7arYpag$/, [200, html]]]).fetcher;
+  const url = "https://mp.weixin.qq.com/s/LmWJGCLyddA9sAM7arYpag";
+  assert.equal((await verifySocialProof(request("wechat", "gh_e23146f9a9cd", url), { fetcher: route(article("gh_e23146f9a9cd", "fortune-0123456789abcdef01234567")), env: {} })).ok, true);
+  assert.equal((await verifySocialProof(request("wechat", "gh_e23146f9a9cd", url), { fetcher: route(article("gh_000000000000", "fortune-0123456789abcdef01234567")), env: {} })).code, "WRONG_ACCOUNT");
+  assert.equal((await verifySocialProof(request("wechat", "gh_e23146f9a9cd", url), { fetcher: route(article("gh_e23146f9a9cd", "no code", "fortune-0123456789abcdef01234567")), env: {} })).code, "CODE_MISSING");
+  assert.equal((await verifySocialProof(request("wechat", "gh_e23146f9a9cd", url), { fetcher: route("<html>环境异常</html>"), env: {} })).code, "PROOF_NOT_FOUND");
+
+  const resolved = await resolveSocialAccount(platform("wechat"), url, { fetcher: route(article("gh_e23146f9a9cd", "x")), env: {} });
+  assert.deepEqual(resolved, { ok: true, account: "gh_e23146f9a9cd", name: "玉树芝兰" });
+  const weiboDomain = fakeFetch([
+    [/genvisitor2/, [200, '{"data":{"sub":"a","subp":"b"}}']],
+    [/profile\/info\?custom=hejiong$/, [200, { ok: 1, data: { user: { idstr: "1195230310", screen_name: "何炅" } } }]],
+  ]);
+  assert.deepEqual(await resolveSocialAccount(platform("weibo"), "https://weibo.com/hejiong", { fetcher: weiboDomain.fetcher, env: {} }), { ok: true, account: "1195230310", name: "何炅" });
 });
 
 test("proof sources can only be redirected to a loopback test server", () => {

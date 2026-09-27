@@ -9,6 +9,7 @@ import {
   identityIdOf,
   stableIdHash,
 } from "@/lib/social-fees";
+import { customPairClient } from "@/lib/custom-pairs-read";
 import { attestorAccount, parseWallet, readIdentity, readSocialStatus } from "@/lib/social-fees-server";
 import { verifySocialProof } from "@/lib/social-verify";
 
@@ -99,7 +100,14 @@ export async function POST(request: Request) {
     );
   }
 
-  const deadline = BigInt(Math.floor(Date.now() / 1000) + 30 * 60);
+  // The vault checks the deadline against chain time, which can run ahead of this server's clock.
+  let now = Math.floor(Date.now() / 1000);
+  try {
+    now = Math.max(now, Number((await customPairClient().getBlock({ blockTag: "latest" })).timestamp));
+  } catch {
+    // Server time is close enough on a healthy chain.
+  }
+  const deadline = BigInt(now + 30 * 60);
   const signature = await signer.signTypedData(
     bindingTypedData({ chainId: FORTUNE_NETWORK.chainId, vault: status.vault, identityId, wallet, stableId, nonce, deadline })
   );

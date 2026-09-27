@@ -15,14 +15,17 @@ export async function GET() {
     return apiOk(
       {
         ...status,
-        platforms: SOCIAL_PLATFORMS.map(({ id, key, label, prefix, proof, proofExample, pinsAccountId }) => ({
+        platforms: SOCIAL_PLATFORMS.map(({ id, key, label, labelZh, region, prefix, proof, proofExample, pinsAccountId, resolvable }) => ({
           id,
           key,
           label,
+          labelZh: labelZh ?? null,
+          region,
           prefix,
           proof,
           proofExample,
           pinsAccountId,
+          resolvable,
         })),
       },
       { cacheSeconds: 15, staleSeconds: 60 }

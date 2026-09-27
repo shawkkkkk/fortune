@@ -1,6 +1,6 @@
 # Custom pairs (beta)
 
-Status: unaudited beta. Contracts live in `contracts-custom-pairs/`, outside the frozen Standard candidate and the mainnet fingerprint. The website enables custom-pair launches only on BSC Testnet, chain 97 (`lib/custom-pairs.ts` hard-codes that). Updated 2026-09-26.
+Status: unaudited beta. Contracts live in `contracts-custom-pairs/`, outside the frozen Standard candidate and the mainnet fingerprint. The website enables custom-pair launches only on BSC Testnet, chain 97 (`lib/custom-pairs.ts` hard-codes that). Updated 2026-09-27.
 
 ## Why
 
@@ -48,6 +48,7 @@ Checked on BSC mainnet on 2026-09-26: bStocks, Ondo and xStocks stock tokens mea
 - `/launch/custom`: pair-token check, identity, curve and creator fee (0 to 1%), optional first buy with a tax-aware preview, preflight, approval and a simulated transaction before signing.
 - `/custom/[curve]`: curve price and market cap in pair units, tax-aware buy/sell quotes, slippage on delivered amounts, graduation, rescue, redemption and creator-fee claims.
 - Explore lists custom-pair launches; the Standard launch page links to the beta.
+- Creator fee splits: a launch can send its creator fee to up to ten wallets and social accounts (X, GitHub, TikTok, Telegram, YouTube, Farcaster, Bluesky, Weibo, Bilibili, WeChat Official Accounts), who claim on `/claims`. See [SOCIAL_FEES.md](SOCIAL_FEES.md).
 - Configuration: `NEXT_PUBLIC_FORTUNE_CUSTOM_PAIR_FACTORY_ADDRESS` and optional `NEXT_PUBLIC_FORTUNE_CUSTOM_PAIR_TEST_TOKENS` (comma-separated). Ignored on every chain except BSC Testnet (97).
 
 ## Deployment

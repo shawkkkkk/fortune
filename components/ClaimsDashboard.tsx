@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { formatUnits, getAddress, isAddress, type Address, type Hex } from "viem";
 import { RecipientName, RecipientState } from "@/components/FeeRecipientsPanel";
+import { PlatformOptions } from "@/components/FeeSplitEditor";
+import { resolveAccount } from "@/components/SocialAccountName";
 import { useLanguage } from "@/components/LanguageProvider";
 import { SOCIAL_FEE_VAULT_ABI } from "@/lib/custom-pairs-artifacts";
 import { FORTUNE_NETWORK } from "@/lib/fortune-network";
@@ -14,7 +16,9 @@ import {
   canonicalAccount,
   challengeCode,
   challengePost,
+  describeAccount,
   formatShareBps,
+  platformLabel,
   socialPlatform,
   type SocialIdentityDetail,
 } from "@/lib/social-fees";
@@ -186,14 +190,24 @@ export default function ClaimsDashboard() {
     setLookupError("");
     setAttestation(null);
     const parsed = canonicalAccount(key, raw);
+    let account = parsed.ok ? parsed.account : "";
     if (!parsed.ok) {
-      setLookup(null);
-      setLookupError(parsed.reason);
-      return;
+      if (!parsed.resolvable) {
+        setLookup(null);
+        setLookupError(parsed.reason);
+        return;
+      }
+      try {
+        account = (await resolveAccount(key, raw)).account;
+      } catch (error) {
+        setLookup(null);
+        setLookupError(error instanceof Error ? error.message : parsed.reason);
+        return;
+      }
     }
     try {
       const data = await api<SocialIdentityDetail & { vault: Address; chainTime?: number }>(
-        `/api/public/v1/social/identity?platform=${parsed.platform.key}&account=${encodeURIComponent(parsed.account)}`
+        `/api/public/v1/social/identity?platform=${key}&account=${encodeURIComponent(account)}`
       );
       syncClock(data.chainTime);
       setLookup(data);
@@ -421,10 +435,10 @@ export default function ClaimsDashboard() {
             >
               <label>Platform
                 <select value={platformKey} onChange={(event) => { setPlatformKey(event.target.value); setLookup(null); setAttestation(null); }}>
-                  {SOCIAL_PLATFORMS.map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}
+                  <PlatformOptions zh={zh} />
                 </select>
               </label>
-              <label><span translate="no">{zh ? `${platform.label} 账户` : `${platform.label} ${platform.placeholder}`}</span>
+              <label><span translate="no">{zh ? `${platformLabel(platform, true)} 账户` : `${platform.label} ${platform.placeholder}`}</span>
                 <input value={handle} onChange={(event) => setHandle(event.target.value)} placeholder={platform.prefix + platform.placeholder} autoComplete="off" spellCheck={false} />
               </label>
               <button type="submit" className="secondaryCta" disabled={!enabled || busy}>Look up</button>
@@ -473,7 +487,11 @@ export default function ClaimsDashboard() {
                       </li>
                     ) : (
                       <li>
-                        <strong translate="no">{zh ? `从 ${lookedUpPlatform.prefix}${lookup.identity.account} 发布这段文字` : `Publish this from ${lookedUpPlatform.prefix}${lookup.identity.account}`}</strong>
+                        <strong translate="no">
+                          {lookedUpPlatform.proofExample === null
+                            ? (zh ? `把这段代码加到 ${platformLabel(lookedUpPlatform, true)} ${describeAccount(lookedUpPlatform.id, lookup.identity.account)} 的简介里` : `Add this code to the bio of ${lookedUpPlatform.label} ${describeAccount(lookedUpPlatform.id, lookup.identity.account)}`)
+                            : (zh ? `从 ${describeAccount(lookedUpPlatform.id, lookup.identity.account)} 发布这段文字` : `Publish this from ${describeAccount(lookedUpPlatform.id, lookup.identity.account)}`)}
+                        </strong>
                         <p className="fieldHint">{lookedUpPlatform.proof}</p>
                         <div className="claimsCode">
                           <code translate="no">{post}</code>
@@ -528,7 +546,7 @@ export default function ClaimsDashboard() {
               <li><strong>You claim.</strong> Fees from every launch that names the account, in each pair token, to your wallet.</li>
             </ol>
             <dl className="launchPreviewFacts">
-              <div><dt>Platforms</dt><dd>{SOCIAL_PLATFORMS.map((item) => item.label).join(", ")}</dd></div>
+              <div><dt>Platforms</dt><dd translate="no">{SOCIAL_PLATFORMS.map((item) => platformLabel(item, zh)).join(zh ? "、" : ", ")}</dd></div>
               <div><dt>Seed phrase</dt><dd>Never needed. Never share it.</dd></div>
             </dl>
           </div>

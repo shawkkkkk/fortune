@@ -6738,6 +6738,8 @@ html.entryGateOpen {
 .feeSplitRow > div { display: flex; align-items: center; margin: 0; min-width: 0; }
 .feeSplitRowError select, .feeSplitRowError input { border-color: var(--red); }
 .feeSplitSelf { padding: 0 4px; color: var(--muted); font-size: 14px; }
+.feeSplitResolved { grid-column: 1 / -1; margin: -2px 0 2px; padding-left: 4px; color: var(--jade); font-size: 13px; font-weight: 650; }
+.feeSplitResolved.feeSplitLookupError { color: var(--red-ink); }
 .feeSplitValue { position: relative; }
 .feeSplitPrefix { position: absolute; left: 14px; color: var(--faint); font-weight: 700; pointer-events: none; }
 .feeSplitPrefix + input { padding-left: 30px; }

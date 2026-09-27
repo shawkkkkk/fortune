@@ -303,7 +303,7 @@ export async function GET(request: Request) {
           description:
             "Pass platform and account (a handle or profile link) for one account, or wallet for every account bound to it or waiting to be. Includes owed and claimable amounts per pair token, and each launch naming the account with its share of fees not yet collected.",
           parameters: [
-            { name: "platform", in: "query", schema: { type: "string", enum: ["x", "github", "tiktok", "telegram", "youtube", "farcaster", "bluesky"] } },
+            { name: "platform", in: "query", schema: { type: "string", enum: ["x", "github", "tiktok", "telegram", "youtube", "farcaster", "bluesky", "weibo", "bilibili", "wechat"] } },
             { name: "account", in: "query", schema: { type: "string" } },
             { name: "wallet", in: "query", schema: { type: "string" } },
           ],
@@ -311,6 +311,24 @@ export async function GET(request: Request) {
             "200": { description: "Identity with binding state (wallet, pendingWallet, pendingAt, nonce), balances and curves" },
             "400": { description: "Unknown platform, invalid handle or wallet" },
             "503": { description: "Social fees are not enabled here, or the network could not be read" },
+          },
+        },
+      },
+      "/social/resolve": {
+        get: {
+          tags: ["Launches"],
+          summary: "Turn a Weibo, Bilibili or WeChat link into the account id the vault stores",
+          description:
+            "Weibo and Bilibili accounts are stored by numeric UID and WeChat Official Accounts by their gh_ id. Accepts a UID, a profile or space link, a Weibo custom domain or any WeChat article link, and returns the account id with the display name when the platform shares it. Other platforms return the canonical handle. Rate limited.",
+          parameters: [
+            { name: "platform", in: "query", required: true, schema: { type: "string" } },
+            { name: "input", in: "query", required: true, schema: { type: "string" } },
+          ],
+          responses: {
+            "200": { description: "platform, account and name (null when unknown)" },
+            "400": { description: "Unknown platform or unreadable input" },
+            "429": { description: "Too many lookups" },
+            "503": { description: "The platform did not answer" },
           },
         },
       },

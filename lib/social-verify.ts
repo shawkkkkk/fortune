@@ -38,6 +38,10 @@ const ORIGINS = {
   youtube: "https://www.youtube.com",
   bluesky: "https://public.api.bsky.app",
   farcaster: "https://hub.pinata.cloud",
+  weiboPassport: "https://passport.weibo.com",
+  weibo: "https://weibo.com",
+  bilibili: "https://api.bilibili.com",
+  wechat: "https://mp.weixin.qq.com",
 } as const;
 
 type OriginKey = keyof typeof ORIGINS;
@@ -56,21 +60,23 @@ export function proofOrigins(env: Record<string, string | undefined> = process.e
   return { ...ORIGINS, farcaster: hub && /^https:\/\/[a-z0-9.-]+(?::\d+)?$/i.test(hub) ? hub : ORIGINS.farcaster };
 }
 
-const MAX_BODY_BYTES = 1_000_000;
+const MAX_BODY_CHARS = 1_000_000;
+// WeChat article pages run to several megabytes and name the account near the end.
+const WECHAT_BODY_CHARS = 6_000_000;
 
 /** One retry for a network error or a 5xx: platform edges drop the odd request. */
-async function fetchText(fetcher: FetchLike, url: string, init?: RequestInit) {
+async function fetchText(fetcher: FetchLike, url: string, init?: RequestInit, maxChars = MAX_BODY_CHARS) {
   try {
-    const first = await fetchOnce(fetcher, url, init);
+    const first = await fetchOnce(fetcher, url, init, maxChars);
     if (first.status < 500) return first;
   } catch {
     // retried below
   }
   await new Promise((resolve) => setTimeout(resolve, 300));
-  return fetchOnce(fetcher, url, init);
+  return fetchOnce(fetcher, url, init, maxChars);
 }
 
-async function fetchOnce(fetcher: FetchLike, url: string, init?: RequestInit) {
+async function fetchOnce(fetcher: FetchLike, url: string, init?: RequestInit, maxChars = MAX_BODY_CHARS) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 8_000);
   try {
@@ -81,7 +87,7 @@ async function fetchOnce(fetcher: FetchLike, url: string, init?: RequestInit) {
       signal: controller.signal,
       headers: { "User-Agent": "fortunepad-social-verifier/1.0 (+https://fortunepad.fun)", ...(init?.headers || {}) },
     });
-    const body = (await response.text()).slice(0, MAX_BODY_BYTES);
+    const body = (await response.text()).slice(0, maxChars);
     return { status: response.status, body };
   } finally {
     clearTimeout(timer);
@@ -420,6 +426,207 @@ async function verifyFarcaster(request: ProofRequest, fetcher: FetchLike, origin
   }
 }
 
+// ------------------------------------------------------------------ Weibo
+
+const BROWSER_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36";
+let weiboVisitor: { cookie: string; expires: number; origin: string } | null = null;
+
+/** Weibo serves public profiles to guests holding its visitor cookies (SUB, SUBP). */
+async function weiboCookie(fetcher: FetchLike, origins: Record<OriginKey, string>) {
+  if (weiboVisitor && weiboVisitor.expires > Date.now() && weiboVisitor.origin === origins.weiboPassport) return weiboVisitor.cookie;
+  const { body } = await fetchText(fetcher, `${origins.weiboPassport}/visitor/genvisitor2`, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded", "User-Agent": BROWSER_UA },
+    body: "cb=visitor_gray_callback&tid=&from=weibo",
+  });
+  const sub = body.match(/"sub":"([^"]+)"/)?.[1];
+  const subp = body.match(/"subp":"([^"]+)"/)?.[1];
+  if (!sub || !subp) throw new Error("no visitor cookie");
+  weiboVisitor = { cookie: `SUB=${sub}; SUBP=${subp}`, expires: Date.now() + 30 * 60_000, origin: origins.weiboPassport };
+  return weiboVisitor.cookie;
+}
+
+type WeiboProfile = { ok?: number; data?: { user?: { idstr?: string; screen_name?: string; description?: string } } };
+
+async function weiboProfile(fetcher: FetchLike, origins: Record<OriginKey, string>, query: string) {
+  const cookie = await weiboCookie(fetcher, origins);
+  const result = await fetchJson<WeiboProfile>(fetcher, `${origins.weibo}/ajax/profile/info?${query}`, {
+    headers: { cookie, referer: "https://weibo.com/", "User-Agent": BROWSER_UA },
+  });
+  if (!result.json) weiboVisitor = null;
+  return result;
+}
+
+async function verifyWeibo(request: ProofRequest, fetcher: FetchLike, origins: Record<OriginKey, string>): Promise<ProofOutcome> {
+  try {
+    const profile = await weiboProfile(fetcher, origins, `uid=${request.account}`);
+    if (!profile.json) return unavailable("Weibo");
+    const user = profile.json.data?.user;
+    if (!user?.idstr) return fail("PROOF_NOT_FOUND", `No Weibo account has UID ${request.account}.`);
+    if (user.idstr !== request.account) return fail("WRONG_ACCOUNT", `Weibo returned UID ${user.idstr}, not ${request.account}.`);
+    const bio = user.description || "";
+    if (!containsCode(bio, request.code)) return fail("CODE_MISSING", "Your Weibo bio does not contain the code yet.");
+    return {
+      ok: true,
+      stableRawId: user.idstr,
+      evidence: { url: `https://weibo.com/u/${user.idstr}`, author: user.screen_name || `UID ${user.idstr}`, excerpt: excerpt(bio) },
+    };
+  } catch {
+    return unavailable("Weibo");
+  }
+}
+
+// ---------------------------------------------------------------- Bilibili
+
+type BilibiliCard = { code?: number; data?: { card?: { mid?: string | number; name?: string; sign?: string } } };
+
+async function bilibiliCard(fetcher: FetchLike, origins: Record<OriginKey, string>, mid: string) {
+  return fetchJson<BilibiliCard>(fetcher, `${origins.bilibili}/x/web-interface/card?mid=${mid}`, {
+    headers: { "User-Agent": BROWSER_UA, referer: "https://www.bilibili.com/" },
+  });
+}
+
+async function verifyBilibili(request: ProofRequest, fetcher: FetchLike, origins: Record<OriginKey, string>): Promise<ProofOutcome> {
+  try {
+    const result = await bilibiliCard(fetcher, origins, request.account);
+    if (!result.json) return unavailable("Bilibili");
+    const card = result.json.data?.card;
+    if (result.json.code !== 0 || !card?.mid) return fail("PROOF_NOT_FOUND", `No Bilibili account has UID ${request.account}.`);
+    if (String(card.mid) !== request.account) return fail("WRONG_ACCOUNT", `Bilibili returned UID ${card.mid}, not ${request.account}.`);
+    const bio = card.sign || "";
+    if (!containsCode(bio, request.code)) return fail("CODE_MISSING", "Your Bilibili bio does not contain the code yet.");
+    return {
+      ok: true,
+      stableRawId: String(card.mid),
+      evidence: { url: `https://space.bilibili.com/${card.mid}`, author: card.name || `UID ${card.mid}`, excerpt: excerpt(bio) },
+    };
+  } catch {
+    return unavailable("Bilibili");
+  }
+}
+
+// ------------------------------------------------- WeChat Official Accounts
+
+/** Canonical article URL: short /s/<id> links or long /s?__biz=…&mid=…&idx=…&sn=… links. */
+export function wechatArticleUrl(url: URL) {
+  if (url.hostname.toLowerCase() !== "mp.weixin.qq.com") return null;
+  const short = url.pathname.match(/^\/s\/([A-Za-z0-9_-]{10,64})\/?$/);
+  if (short) return `/s/${short[1]}`;
+  if (url.pathname === "/s") {
+    const biz = url.searchParams.get("__biz");
+    const mid = url.searchParams.get("mid");
+    const idx = url.searchParams.get("idx");
+    const sn = url.searchParams.get("sn");
+    if (biz && /^[A-Za-z0-9+/=]{8,40}$/.test(biz) && mid && /^\d{1,15}$/.test(mid) && idx && /^\d{1,3}$/.test(idx) && sn && /^[0-9a-f]{32}$/i.test(sn)) {
+      return `/s?__biz=${encodeURIComponent(biz)}&mid=${mid}&idx=${idx}&sn=${sn.toLowerCase()}`;
+    }
+  }
+  return null;
+}
+
+export function readWeChatArticle(html: string) {
+  const account = html.match(/var\s+user_name\s*=\s*"(gh_[0-9a-f]{12})"/i)?.[1]?.toLowerCase() ?? null;
+  const name = html.match(/var\s+nickname\s*=\s*htmlDecode\("([^"]*)"\)/)?.[1] ?? html.match(/var\s+nickname\s*=\s*"([^"]*)"/)?.[1] ?? null;
+  const title = html.match(/<meta\s+property="og:title"\s+content="([^"]*)"/)?.[1] ?? html.match(/var\s+msg_title\s*=\s*'([^']*)'/)?.[1] ?? "";
+  const start = html.indexOf('id="js_content"');
+  let body = "";
+  if (start >= 0) {
+    const open = html.indexOf(">", start);
+    const end = html.indexOf("<script", open);
+    body = html.slice(open + 1, end > open ? end : open + 200_000);
+  }
+  return { account, name: name ? htmlToText(name) : null, title: htmlToText(title), text: htmlToText(body) };
+}
+
+async function verifyWeChat(request: ProofRequest, fetcher: FetchLike, origins: Record<OriginKey, string>): Promise<ProofOutcome> {
+  const url = parseProofUrl(request.proofUrl);
+  const path = url ? wechatArticleUrl(url) : null;
+  if (!path) return fail("PROOF_URL", "Paste the article link, like https://mp.weixin.qq.com/s/….");
+  let page: { status: number; body: string };
+  try {
+    page = await fetchText(fetcher, `${origins.wechat}${path}`, { headers: { "User-Agent": BROWSER_UA } }, WECHAT_BODY_CHARS);
+  } catch {
+    return unavailable("WeChat");
+  }
+  if (page.status >= 500) return unavailable("WeChat");
+  const article = readWeChatArticle(page.body);
+  if (!article.account) return fail("PROOF_NOT_FOUND", "That article was not found, was deleted, or WeChat asked for a check. Try again or publish again.");
+  if (article.account !== request.account) {
+    return fail("WRONG_ACCOUNT", `That article is from ${article.name || article.account}, not ${request.account}.`);
+  }
+  const text = `${article.title}\n${article.text}`;
+  if (!containsCode(text, request.code)) return fail("CODE_MISSING", "The article does not contain your code.");
+  return {
+    ok: true,
+    stableRawId: article.account,
+    evidence: { url: `https://mp.weixin.qq.com${path}`, author: article.name || article.account, excerpt: excerpt(article.title || article.text) },
+  };
+}
+
+// --------------------------------------------------------------- resolving
+
+export type ResolvedAccount = { ok: true; account: string; name: string | null } | { ok: false; code: ProofFailure; message: string };
+
+/**
+ * Turns a profile link, custom domain or article link into the account id the
+ * vault stores, with the display name when the platform shares it.
+ */
+export async function resolveSocialAccount(
+  platform: SocialPlatform,
+  input: string,
+  options?: { fetcher?: FetchLike; env?: Record<string, string | undefined> }
+): Promise<ResolvedAccount> {
+  const fetcher = options?.fetcher ?? fetch;
+  const origins = proofOrigins(options?.env);
+  const raw = input.trim();
+  const url = /^https?:\/\//i.test(raw) ? parseProofUrl(raw) : /^[a-z0-9.-]+\.[a-z]{2,}\//i.test(raw) ? parseProofUrl(`https://${raw}`) : null;
+  try {
+    if (platform.key === "weibo") {
+      let query: string | null = null;
+      if (url) {
+        if (!/^(?:www\.|m\.)?weibo\.(?:com|cn)$/i.test(url.hostname)) return fail("PROOF_URL", "Paste a weibo.com profile link or the UID.") as ResolvedAccount;
+        const parts = url.pathname.split("/").filter(Boolean);
+        const value = parts[0] === "u" || parts[0] === "profile" ? parts[1] || "" : parts[0] || "";
+        query = /^\d{5,12}$/.test(value) ? `uid=${value}` : /^[A-Za-z0-9_-]{2,30}$/.test(value) ? `custom=${value}` : null;
+      } else {
+        const value = raw.replace(/^uid[:：\s]*/i, "");
+        query = /^\d{5,12}$/.test(value) ? `uid=${value}` : /^[A-Za-z0-9_-]{2,30}$/.test(value) ? `custom=${value}` : null;
+      }
+      if (!query) return fail("PROOF_URL", "Enter the Weibo UID or profile link.") as ResolvedAccount;
+      const profile = await weiboProfile(fetcher, origins, query);
+      if (!profile.json) return unavailable("Weibo") as ResolvedAccount;
+      const user = profile.json.data?.user;
+      if (!user?.idstr) return fail("PROOF_NOT_FOUND", "No Weibo account matches that.") as ResolvedAccount;
+      return { ok: true, account: user.idstr, name: user.screen_name || null };
+    }
+    if (platform.key === "bilibili") {
+      let mid = raw.replace(/^uid[:：\s]*/i, "");
+      if (url) {
+        const parts = url.pathname.split("/").filter(Boolean);
+        mid = url.hostname.toLowerCase().startsWith("space.") ? parts[0] || "" : parts[0] === "space" ? parts[1] || "" : "";
+      }
+      if (!/^[1-9]\d{0,11}$/.test(mid)) return fail("PROOF_URL", "Enter the Bilibili UID or space.bilibili.com link.") as ResolvedAccount;
+      const result = await bilibiliCard(fetcher, origins, mid);
+      if (!result.json) return unavailable("Bilibili") as ResolvedAccount;
+      const card = result.json.data?.card;
+      if (result.json.code !== 0 || !card?.mid) return fail("PROOF_NOT_FOUND", "No Bilibili account has that UID.") as ResolvedAccount;
+      return { ok: true, account: String(card.mid), name: card.name || null };
+    }
+    if (platform.key === "wechat") {
+      if (/^gh_[0-9a-f]{12}$/i.test(raw)) return { ok: true, account: raw.toLowerCase(), name: null };
+      const path = url ? wechatArticleUrl(url) : null;
+      if (!path) return fail("PROOF_URL", "Paste a link to any article from the Official Account, or its gh_ ID.") as ResolvedAccount;
+      const page = await fetchText(fetcher, `${origins.wechat}${path}`, { headers: { "User-Agent": BROWSER_UA } }, WECHAT_BODY_CHARS);
+      const article = readWeChatArticle(page.body);
+      if (!article.account) return fail("PROOF_NOT_FOUND", "That article could not be read. Try another article link.") as ResolvedAccount;
+      return { ok: true, account: article.account, name: article.name };
+    }
+    return fail("PROOF_URL", "This platform does not need a lookup.") as ResolvedAccount;
+  } catch {
+    return unavailable(platform.label) as ResolvedAccount;
+  }
+}
+
 const VERIFIERS: Record<SocialPlatformKey, (request: ProofRequest, fetcher: FetchLike, origins: Record<OriginKey, string>) => Promise<ProofOutcome>> = {
   x: verifyX,
   github: verifyGitHub,
@@ -428,6 +635,9 @@ const VERIFIERS: Record<SocialPlatformKey, (request: ProofRequest, fetcher: Fetc
   youtube: verifyYouTube,
   farcaster: verifyFarcaster,
   bluesky: verifyBluesky,
+  weibo: verifyWeibo,
+  bilibili: verifyBilibili,
+  wechat: verifyWeChat,
 };
 
 export async function verifySocialProof(

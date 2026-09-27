@@ -186,7 +186,8 @@ export default function DocsPage() {
             <p>
               A custom-pair launch can split its creator fee between up to ten
               recipients: wallets, and accounts on X, GitHub, TikTok, Telegram
-              channels, YouTube, Farcaster and Bluesky. The split is fixed at launch.
+              channels, YouTube, Farcaster, Bluesky, Weibo, Bilibili and WeChat
+              Official Accounts. The split is fixed at launch.
               Fees go to Fortune&apos;s fee vault, and each account claims its share
               on the Claims page after proving it owns the account.
             </p>
@@ -196,6 +197,7 @@ export default function DocsPage() {
               <li><strong>Handles cannot be recycled.</strong> Where the platform has a permanent account id (X, GitHub, Farcaster, Bluesky), the first binding pins it, so someone who takes the handle later cannot take the fees.</li>
               <li><strong>Pull, never push.</strong> Anyone can collect a launch&apos;s creator fees into the vault; only the bound wallet can claim. Transfer taxes are measured on the way in and on the way out.</li>
               <li><strong>Unclaimed fees wait.</strong> A named account that never verifies simply leaves its share in the vault. Naming an account is not an endorsement by its owner.</li>
+              <li><strong>Chinese platforms.</strong> Weibo and Bilibili accounts are named by their numeric UID and prove ownership with the code in their bio; WeChat Official Accounts are named by their gh_ ID and prove it with an article. The proof is only the bare code. Douyin, Xiaohongshu and personal WeChat accounts have no public page Fortune can check, so they are not offered yet.</li>
             </ul>
             <p className="reviewWarning">
               Unaudited beta on BSC Testnet. Fortune&apos;s verifier is trusted to check

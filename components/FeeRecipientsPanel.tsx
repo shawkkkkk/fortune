@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { formatUnits } from "viem";
 import { useLanguage } from "@/components/LanguageProvider";
+import { useResolvedName } from "@/components/SocialAccountName";
 import { formatAmount, shortAddress } from "@/lib/market-format";
-import { describeAccount, formatShareBps, socialPlatform, type SocialIdentity } from "@/lib/social-fees";
+import { describeAccount, formatShareBps, platformLabel, socialPlatform, type SocialIdentity } from "@/lib/social-fees";
 
 type Recipient = SocialIdentity & { shareBps: number };
 
@@ -37,6 +38,10 @@ export function RecipientState({ recipient, now }: { recipient: SocialIdentity; 
 }
 
 export function RecipientName({ recipient }: { recipient: SocialIdentity }) {
+  const { language } = useLanguage();
+  const zh = language === "zh";
+  const platform = socialPlatform(recipient.platform);
+  const name = useResolvedName(platform, recipient.account);
   if (recipient.platform === 0 && recipient.wallet) {
     return (
       <Link translate="no" href={`/profile/${recipient.wallet}`}>
@@ -44,14 +49,18 @@ export function RecipientName({ recipient }: { recipient: SocialIdentity }) {
       </Link>
     );
   }
-  const platform = socialPlatform(recipient.platform);
   if (!platform) return <span translate="no">{recipient.account}</span>;
+  const url = platform.profileUrl(recipient.account);
+  const handle = describeAccount(recipient.platform, recipient.account);
+  const text = name ? `${name} · ${handle}` : handle;
   return (
     <span className="recipientName">
-      <span className="recipientPlatform">{platform.label}</span>
-      <a translate="no" href={platform.profileUrl(recipient.account)} target="_blank" rel="noreferrer nofollow">
-        {describeAccount(recipient.platform, recipient.account)}
-      </a>
+      <span className="recipientPlatform" translate="no">{platformLabel(platform, zh)}</span>
+      {url ? (
+        <a translate="no" href={url} target="_blank" rel="noreferrer nofollow">{text}</a>
+      ) : (
+        <span translate="no">{text}</span>
+      )}
     </span>
   );
 }

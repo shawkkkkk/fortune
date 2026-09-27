@@ -16,7 +16,7 @@ export const SOCIAL_FEE_RULES = {
   rebindDelaySeconds: 3 * 24 * 60 * 60,
 } as const;
 
-export type SocialPlatformKey = "x" | "github" | "tiktok" | "telegram" | "youtube" | "farcaster" | "bluesky";
+export type SocialPlatformKey = "x" | "github" | "tiktok" | "telegram" | "youtube" | "farcaster" | "bluesky" | "weibo" | "bilibili" | "wechat";
 
 export type SocialPlatform = {
   /** Permanent onchain id. Never renumber. */
@@ -33,7 +33,19 @@ export type SocialPlatform = {
   proofExample: string | null;
   /** Whether the verifier pins the platform's permanent account id. */
   pinsAccountId: boolean;
-  profileUrl: (account: string) => string;
+  profileUrl: (account: string) => string | null;
+  /** Chinese platforms are listed separately in pickers. */
+  region: "global" | "china";
+  /** Name shown to Chinese readers. */
+  labelZh?: string;
+  /**
+   * The account is a platform id people rarely know by heart (a numeric UID, a
+   * WeChat gh_ id). Fortune's server turns profile or article links into it and
+   * looks up the display name.
+   */
+  resolvable: boolean;
+  /** The proof is only the bare code: no promotional text in the post or bio. */
+  bareCode: boolean;
 };
 
 export const SOCIAL_PLATFORMS: readonly SocialPlatform[] = [
@@ -48,6 +60,9 @@ export const SOCIAL_PLATFORMS: readonly SocialPlatform[] = [
     proofExample: "https://x.com/handle/status/1234567890",
     pinsAccountId: true,
     profileUrl: (account) => `https://x.com/${account}`,
+    region: "global",
+    resolvable: false,
+    bareCode: false,
   },
   {
     id: 2,
@@ -60,6 +75,9 @@ export const SOCIAL_PLATFORMS: readonly SocialPlatform[] = [
     proofExample: "https://gist.github.com/username/0123456789abcdef0123",
     pinsAccountId: true,
     profileUrl: (account) => `https://github.com/${account}`,
+    region: "global",
+    resolvable: false,
+    bareCode: false,
   },
   {
     id: 3,
@@ -72,6 +90,9 @@ export const SOCIAL_PLATFORMS: readonly SocialPlatform[] = [
     proofExample: "https://www.tiktok.com/@handle/video/1234567890",
     pinsAccountId: false,
     profileUrl: (account) => `https://www.tiktok.com/@${account}`,
+    region: "global",
+    resolvable: false,
+    bareCode: false,
   },
   {
     id: 4,
@@ -84,6 +105,9 @@ export const SOCIAL_PLATFORMS: readonly SocialPlatform[] = [
     proofExample: "https://t.me/channel/123",
     pinsAccountId: false,
     profileUrl: (account) => `https://t.me/${account}`,
+    region: "global",
+    resolvable: false,
+    bareCode: false,
   },
   {
     id: 5,
@@ -96,6 +120,9 @@ export const SOCIAL_PLATFORMS: readonly SocialPlatform[] = [
     proofExample: "https://www.youtube.com/watch?v=abcdefghijk",
     pinsAccountId: false,
     profileUrl: (account) => `https://www.youtube.com/@${account}`,
+    region: "global",
+    resolvable: false,
+    bareCode: false,
   },
   {
     id: 6,
@@ -108,6 +135,9 @@ export const SOCIAL_PLATFORMS: readonly SocialPlatform[] = [
     proofExample: null,
     pinsAccountId: true,
     profileUrl: (account) => `https://farcaster.xyz/${account}`,
+    region: "global",
+    resolvable: false,
+    bareCode: false,
   },
   {
     id: 7,
@@ -120,6 +150,57 @@ export const SOCIAL_PLATFORMS: readonly SocialPlatform[] = [
     proofExample: "https://bsky.app/profile/handle.bsky.social/post/3k2abc",
     pinsAccountId: true,
     profileUrl: (account) => `https://bsky.app/profile/${account}`,
+    region: "global",
+    resolvable: false,
+    bareCode: false,
+  },
+  {
+    id: 8,
+    key: "weibo",
+    label: "Weibo",
+    labelZh: "微博",
+    prefix: "",
+    pattern: /^[1-9]\d{4,11}$/,
+    placeholder: "UID or profile link",
+    proof: "Add the code to your Weibo bio (个人简介), then check. You can remove it afterwards.",
+    proofExample: null,
+    pinsAccountId: true,
+    profileUrl: (account) => `https://weibo.com/u/${account}`,
+    region: "china",
+    resolvable: true,
+    bareCode: true,
+  },
+  {
+    id: 9,
+    key: "bilibili",
+    label: "Bilibili",
+    labelZh: "哔哩哔哩",
+    prefix: "",
+    pattern: /^[1-9]\d{0,11}$/,
+    placeholder: "UID or space link",
+    proof: "Add the code to your Bilibili bio (个性签名), then check. You can remove it afterwards.",
+    proofExample: null,
+    pinsAccountId: true,
+    profileUrl: (account) => `https://space.bilibili.com/${account}`,
+    region: "china",
+    resolvable: true,
+    bareCode: true,
+  },
+  {
+    id: 10,
+    key: "wechat",
+    label: "WeChat Official Account",
+    labelZh: "微信公众号",
+    prefix: "",
+    pattern: /^gh_[0-9a-f]{12}$/,
+    placeholder: "article link or gh_ ID",
+    proof: "Publish an article from the Official Account that contains the code, then paste the article link.",
+    proofExample: "https://mp.weixin.qq.com/s/…",
+    pinsAccountId: true,
+    profileUrl: () => null,
+    region: "china",
+    resolvable: true,
+    bareCode: true,
   },
 ];
 
@@ -142,6 +223,9 @@ const PROFILE_HOSTS: Record<SocialPlatformKey, RegExp> = {
   youtube: /^(?:www\.|m\.)?youtube\.com$/,
   farcaster: /^(?:www\.)?(?:warpcast\.com|farcaster\.xyz)$/,
   bluesky: /^(?:www\.)?bsky\.app$/,
+  weibo: /^(?:www\.|m\.)?weibo\.(?:com|cn)$/,
+  bilibili: /^(?:space\.|m\.|www\.)?bilibili\.com$/,
+  wechat: /^mp\.weixin\.qq\.com$/,
 };
 
 /**
@@ -150,7 +234,7 @@ const PROFILE_HOSTS: Record<SocialPlatformKey, RegExp> = {
  */
 export function canonicalAccount(platformValue: number | string, raw: string):
   | { ok: true; platform: SocialPlatform; account: string }
-  | { ok: false; reason: string } {
+  | { ok: false; reason: string; /** Fortune's server may still resolve it (a custom Weibo domain, a WeChat article). */ resolvable?: boolean } {
   const platform = socialPlatform(platformValue);
   if (!platform) return { ok: false, reason: "Choose a supported platform." };
   let value = raw.trim();
@@ -167,10 +251,17 @@ export function canonicalAccount(platformValue: number | string, raw: string):
       return { ok: false, reason: `Paste a ${platform.label} profile link or just the ${platform.placeholder}.` };
     }
     const parts = url.pathname.split("/").filter(Boolean);
+    if (platform.key === "wechat") return { ok: false, reason: "Fortune reads the account from the article.", resolvable: true };
     if (platform.key === "bluesky") value = parts[0] === "profile" ? parts[1] || "" : "";
     else if (platform.key === "telegram" && parts[0] === "s") value = parts[1] || "";
+    else if (platform.key === "weibo") value = parts[0] === "u" || parts[0] === "profile" ? parts[1] || "" : parts[0] || "";
+    else if (platform.key === "bilibili") value = url.hostname.toLowerCase().startsWith("space.") ? parts[0] || "" : parts[0] === "space" ? parts[1] || "" : "";
     else value = parts[0] || "";
+    if ((platform.key === "weibo" || platform.key === "bilibili") && value && !/^\d+$/.test(value)) {
+      return { ok: false, reason: `Fortune looks up this ${platform.label} link on its server.`, resolvable: true };
+    }
   }
+  if (platform.key === "weibo" || platform.key === "bilibili") value = value.replace(/^uid[:：\s]*/i, "");
 
   value = value.replace(/^@/, "").toLowerCase();
   if (!platform.pattern.test(value) || !isVaultCanonical(value)) {
@@ -220,6 +311,8 @@ export function challengeCode(input: { chainId: number; vault: Address; identity
 }
 
 export function challengePost(platform: SocialPlatform, code: string) {
+  // Chinese platforms get the bare code: nothing promotional in a bio or article.
+  if (platform.bareCode) return code;
   const where = platform.key === "x" ? "@fortunepad" : "fortunepad.fun";
   return `Verifying this account to claim creator fees on ${where}: ${code}`;
 }
@@ -311,7 +404,12 @@ export function formatShareBps(bps: number) {
 export function describeAccount(platformId: number, account: string) {
   const platform = socialPlatform(platformId);
   if (!platform) return account;
+  if (platform.key === "weibo" || platform.key === "bilibili") return `UID ${account}`;
   return `${platform.prefix}${account}`;
+}
+
+export function platformLabel(platform: SocialPlatform, zh: boolean) {
+  return zh && platform.labelZh ? platform.labelZh : platform.label;
 }
 
 const NO_ADDRESS = "0x0000000000000000000000000000000000000000";

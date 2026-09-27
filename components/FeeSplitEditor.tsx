@@ -1,7 +1,17 @@
 "use client";
 
+import { useState } from "react";
 import { useLanguage } from "@/components/LanguageProvider";
-import { SOCIAL_FEE_RULES, SOCIAL_PLATFORMS, socialPlatform, type FeeShareInput } from "@/lib/social-fees";
+import { resolveAccount, useResolvedName } from "@/components/SocialAccountName";
+import {
+  SOCIAL_FEE_RULES,
+  SOCIAL_PLATFORMS,
+  canonicalAccount,
+  platformLabel,
+  socialPlatform,
+  type FeeShareInput,
+  type SocialPlatform,
+} from "@/lib/social-fees";
 
 /** "self" is the wallet that signs the launch; "wallet" is any other address; anything else is a platform key. */
 export type FeeSplitRow = { id: number; kind: string; value: string; percent: string };
@@ -20,6 +30,31 @@ export function feeSplitInputs(rows: FeeSplitRow[], self: string): FeeShareInput
     if (row.kind === "wallet") return { kind: "wallet", wallet: row.value, percent: row.percent };
     return { kind: "social", platform: socialPlatform(row.kind)?.id ?? 0, account: row.value, percent: row.percent };
   });
+}
+
+/** Platform options, global first, then Chinese platforms. */
+export function PlatformOptions({ zh }: { zh: boolean }) {
+  return (
+    <>
+      <optgroup label={zh ? "全球" : "Global"}>
+        {SOCIAL_PLATFORMS.filter((item) => item.region === "global").map((item) => (
+          <option key={item.key} value={item.key}>{platformLabel(item, zh)}</option>
+        ))}
+      </optgroup>
+      <optgroup label={zh ? "中国平台" : "China"}>
+        {SOCIAL_PLATFORMS.filter((item) => item.region === "china").map((item) => (
+          <option key={item.key} value={item.key}>{zh ? item.labelZh : `${item.label} · ${item.labelZh}`}</option>
+        ))}
+      </optgroup>
+    </>
+  );
+}
+
+function ResolvedName({ platform, value }: { platform: SocialPlatform | null; value: string }) {
+  const parsed = platform?.resolvable ? canonicalAccount(platform.key, value) : null;
+  const name = useResolvedName(platform, parsed?.ok ? parsed.account : "");
+  if (!name) return null;
+  return <span className="feeSplitResolved" translate="no">✓ {name}</span>;
 }
 
 function evenly(count: number) {
@@ -45,8 +80,27 @@ export default function FeeSplitEditor({
 }) {
   const { language } = useLanguage();
   const zh = language === "zh";
+  const [lookups, setLookups] = useState<Record<number, { text: string; error: boolean } | null>>({});
   const total = rows.reduce((sum, row) => sum + (Number(row.percent) || 0), 0);
   const update = (id: number, patch: Partial<FeeSplitRow>) => onChange(rows.map((row) => (row.id === id ? { ...row, ...patch } : row)));
+
+  // Weibo and Bilibili links or custom domains, and WeChat article links, are
+  // turned into the account id on Fortune's server.
+  async function resolve(row: FeeSplitRow) {
+    const platform = socialPlatform(row.kind);
+    if (!platform?.resolvable || !row.value.trim()) return;
+    const parsed = canonicalAccount(platform.key, row.value);
+    if (parsed.ok || !parsed.resolvable) return;
+    setLookups((current) => ({ ...current, [row.id]: { text: zh ? "查询中…" : "Looking up…", error: false } }));
+    try {
+      const resolved = await resolveAccount(platform.key, row.value);
+      onChange(rows.map((item) => (item.id === row.id ? { ...item, value: resolved.account } : item)));
+      setLookups((current) => ({ ...current, [row.id]: null }));
+    } catch (error) {
+      const text = error instanceof Error ? error.message : "That account could not be looked up.";
+      setLookups((current) => ({ ...current, [row.id]: { text, error: true } }));
+    }
+  }
 
   return (
     <div className="feeSplit">
@@ -63,9 +117,7 @@ export default function FeeSplitEditor({
                 <select aria-label={zh ? `接收方 ${index + 1}` : `Recipient ${index + 1}`} value={row.kind} disabled={disabled} onChange={(event) => update(row.id, { kind: event.target.value, value: "" })}>
                   <option value="self" disabled={rows.some((other) => other.kind === "self" && other.id !== row.id)}>Your wallet</option>
                   <option value="wallet">Another wallet</option>
-                  {SOCIAL_PLATFORMS.map((item) => (
-                    <option key={item.key} value={item.key}>{item.label}</option>
-                  ))}
+                  <PlatformOptions zh={zh} />
                 </select>
               </div>
               {row.kind === "self" ? (
@@ -80,8 +132,9 @@ export default function FeeSplitEditor({
                     value={row.value}
                     disabled={disabled}
                     onChange={(event) => update(row.id, { value: platform?.prefix === "@" ? event.target.value.replace(/^@+/, "") : event.target.value })}
+                    onBlur={() => void resolve(row)}
                     placeholder={platform ? platform.placeholder : "0x…"}
-                    maxLength={platform ? 120 : 42}
+                    maxLength={platform ? 300 : 42}
                     autoComplete="off"
                     spellCheck={false}
                     aria-invalid={errorRow === index}
@@ -108,6 +161,11 @@ export default function FeeSplitEditor({
               >
                 ×
               </button>
+              {lookups[row.id] ? (
+                <span className={"feeSplitResolved" + (lookups[row.id]?.error ? " feeSplitLookupError" : "")} role="status">{lookups[row.id]?.text}</span>
+              ) : (
+                <ResolvedName platform={platform} value={row.value} />
+              )}
             </li>
           );
         })}

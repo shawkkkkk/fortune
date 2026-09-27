@@ -31,6 +31,18 @@ export const FINDING_TEXT: Record<string, { title: string; detail: string }> = {
     detail: "The only balance found was in a DEX pool, where some tokens apply their own trading tax.",
   },
   SIMULATION_UNAVAILABLE: { title: "Simulation unavailable", detail: "The network did not answer the transfer simulation. Launch stays blocked; try again in a minute." },
+  VERIFIED_STOCK_TOKEN: {
+    title: "Verified tokenized stock",
+    detail: "This is the issuer's tokenized stock contract that Fortune tracks. It gives price exposure to the listed share, not ownership, votes or dividends, and the company has not endorsed launches paired with it.",
+  },
+  IMITATES_STOCK_TOKEN: {
+    title: "Imitates a tokenized stock",
+    detail: "It borrows a stock token's ticker or calls itself a tokenized share, but it is not a verified issuer contract. A memecoin paired with a counterfeit stock token was used to move a real Nasdaq stock in 2026. Fortune does not pair with it.",
+  },
+  SHARES_STOCK_NAME: {
+    title: "Shares a listed company's name or ticker",
+    detail: "It is not that company's stock or its tokenized version.",
+  },
 };
 
 export const CONTROL_LABELS: Record<string, string> = {

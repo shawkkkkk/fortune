@@ -39,7 +39,8 @@ pool launch tokens = delivered * S * a0 / (a0 + R)^2            capped at invent
 - Metadata, EIP-1967 implementation/beacon slots, EIP-1167 clones and owner.
 - Selector scan of the token and implementation bytecode for pause, blacklist, fee-change, transaction/wallet limits, mint and rebasing functions. A heuristic: presence of a selector, not proof of behavior.
 - A transfer simulation with `eth_call` state overrides. The probe (`contracts-custom-pairs/src/FortunePairTokenProbe.sol`) is placed at a fresh wallet whose balance slot is found with `eth_createAccessList` and overridden (like Foundry's `deal`), and at stand-in curve, wallet and pool addresses. It measures wallet → curve (a buy through `transferFrom`), curve → wallet (a sell payout) and curve → pool (graduation). If no slot can be synthesized it falls back to the connected wallet, the burn address, the owner, exchange wallets and DEX pools.
-- Verdicts: `unsupported` for no code, unreadable metadata, reverting transfers, 100% tax or tax charged on top; `caution` for any measured tax or control; `clear` otherwise.
+- Stock identity: a verified issuer stock token is labelled as such; a token posing as a tokenized stock (a verified stock token's symbol, stock-token wording, or a company's name with its ticker) is unsupported. See [STOCK_PAIRING.md](STOCK_PAIRING.md#counterfeit-stock-tokens).
+- Verdicts: `unsupported` for no code, unreadable metadata, reverting transfers, 100% tax, tax charged on top or a counterfeit stock token; `caution` for any measured tax or control; `clear` otherwise.
 
 Checked on BSC mainnet on 2026-09-26: bStocks, Ondo and xStocks stock tokens measure no transfer tax from a fresh wallet (all upgradeable and mintable; xStocks also rebasing); USDT and WBNB are clear; BabyDoge measures 0% today but is flagged because fees can be changed; SafeMoon v1 is unsupported (99.99% tax).
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useLanguage } from "@/components/LanguageProvider";
 import { isAddress } from "viem";
 import type { PairInspection, TransferLeg } from "@/lib/pair-inspector";
 import { FINDING_TEXT, VERDICT_TEXT, formatTaxBps } from "@/lib/pair-inspector-text";
@@ -37,6 +38,8 @@ export default function PairInspector({
   holder?: string | null;
   onResult?: (result: PairInspection | null) => void;
 }) {
+  const { language } = useLanguage();
+  const zh = language === "zh";
   const [result, setResult] = useState<PairInspection | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -106,6 +109,18 @@ export default function PairInspector({
               <li key={finding.code} className={"inspectorFinding-" + finding.level}>
                 <b>{text.title}{finding.value !== undefined ? <span translate="no"> · {formatTaxBps(finding.value)}</span> : null}</b>
                 {text.detail ? <span>{text.detail}</span> : null}
+                {(finding.code === "IMITATES_STOCK_TOKEN" || finding.code === "SHARES_STOCK_NAME") && result.stock?.official ? (
+                  <span className="inspectorOfficial">
+                    <span translate="no">
+                      {zh
+                        ? `${result.stock.official.underlying || result.stock.official.name} 的已验证代币：`
+                        : `Verified token for ${result.stock.official.underlying || result.stock.official.name}:`}
+                    </span>{" "}
+                    <a translate="no" href={`https://bscscan.com/token/${result.stock.official.address}`} target="_blank" rel="noreferrer">
+                      {result.stock.official.symbol} · {shortAddress(result.stock.official.address)} ↗
+                    </a>
+                  </span>
+                ) : null}
               </li>
             );
           })}

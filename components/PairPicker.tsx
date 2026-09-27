@@ -8,7 +8,7 @@ import PairAddressCheck from "@/components/PairAddressCheck";
 import { FORTUNE_NETWORK } from "@/lib/fortune-network";
 import { assetCoinStyle, formatPrice, formatUsd, shortAddress } from "@/lib/market-format";
 import { sessionLine, usMarketStatus } from "@/lib/market-hours";
-import { REASON_TEXT, tracksUsSession } from "@/lib/pair-reasons";
+import { PENNY_MAX_USD, REASON_TEXT, isPennyStock, tracksUsSession } from "@/lib/pair-reasons";
 import type { UniverseAsset } from "@/lib/pair-universe";
 
 type Universe = {
@@ -19,7 +19,7 @@ type Universe = {
   items: UniverseAsset[];
 };
 
-type Tab = "featured" | "crypto" | "stocks" | "rwa" | "preipo" | "new" | "any";
+type Tab = "featured" | "crypto" | "stocks" | "penny" | "rwa" | "preipo" | "new" | "any";
 type Issuer = "all" | "bStocks" | "Ondo" | "xStocks";
 type Kind = "all" | "stock" | "etf";
 
@@ -30,6 +30,7 @@ const TABS: Array<{ key: Tab; label: string }> = [
   { key: "featured", label: "Featured" },
   { key: "crypto", label: "Crypto" },
   { key: "stocks", label: "Stocks" },
+  { key: "penny", label: "Penny stocks" },
   { key: "rwa", label: "RWA" },
   { key: "preipo", label: "Pre-IPO" },
   { key: "new", label: "New" },
@@ -139,6 +140,11 @@ export default function PairPicker({
       list = list.filter((item) => order.has(item.id)).sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
     } else if (tab === "new") {
       list = list.filter((item) => item.isNew);
+    } else if (tab === "penny") {
+      // Most traded first: where a stock-paired memecoin's buying would matter most.
+      list = list
+        .filter(isPennyStock)
+        .sort((a, b) => (b.market.volume24h ?? -1) - (a.market.volume24h ?? -1) || (a.market.priceUsd ?? 0) - (b.market.priceUsd ?? 0));
     } else if (tab !== "any") {
       list = list.filter((item) => item.group === tab);
     }
@@ -200,7 +206,7 @@ export default function PairPicker({
         <>
           <div className="pickToolbar">
             <input type="search" aria-label="Search pairs by name, ticker or contract" value={query} onChange={(event) => { setQuery(event.target.value); setShown(PAGE); }} placeholder="Search name, ticker or contract" />
-            {tab === "stocks" || tab === "rwa" ? (
+            {tab === "stocks" || tab === "penny" || tab === "rwa" ? (
               <span className={"pickSession pickSession-" + market.session} translate="no" title="Tokenized stocks trade onchain 24/7. Outside US market hours their price can drift from the listed share and gap at the next open.">
                 <i aria-hidden="true" />{sessionLine(market, zh, now)}
               </span>
@@ -220,6 +226,14 @@ export default function PairPicker({
                 ))}
               </div>
             </div>
+          ) : null}
+
+          {tab === "penny" && !query.trim() ? (
+            <p className="pickNote" translate="no">
+              {zh
+                ? `股价低于 ${PENNY_MAX_USD} 美元的上市公司代币化股票（不含杠杆与反向基金），按 24 小时成交量排序。与其配对的 memecoin 每一笔买入都会买进该股票代币；memecoin 不是股票，发行公司也未为其背书。`
+                : `Tokenized shares of listed companies trading under $${PENNY_MAX_USD}, excluding leveraged and inverse funds, most traded first. A memecoin paired with one buys that stock token on every trade. The memecoin is not the stock, and the company has not endorsed it.`}
+            </p>
           ) : null}
 
           {tab === "preipo" && !query.trim() ? (

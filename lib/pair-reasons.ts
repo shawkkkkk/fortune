@@ -40,3 +40,22 @@ export const CONTROL_TEXT: Record<"upgradeable" | "pausable" | "rebasing", { on:
 export function tracksUsSession(asset: { kind: string; provider: string | null }) {
   return asset.kind === "stock" || asset.kind === "etf" || (asset.kind === "commodity" && asset.provider !== "Tether" && asset.provider !== "Matrixdock");
 }
+
+/**
+ * Penny stocks: companies whose tokenized share trades under $5. Leveraged and
+ * inverse funds are excluded, and so are Ondo's own managed portfolios, which
+ * the data lists as stocks but which hold baskets, not a company.
+ */
+export const PENNY_MAX_USD = 5;
+
+export function isPennyStock(asset: { group: string; kind: string; name: string; leveraged: boolean; market: { priceUsd: number | null } }) {
+  return (
+    asset.group === "stocks" &&
+    asset.kind === "stock" &&
+    !asset.leveraged &&
+    !/^ondo\b/i.test(asset.name) &&
+    asset.market.priceUsd !== null &&
+    asset.market.priceUsd > 0 &&
+    asset.market.priceUsd < PENNY_MAX_USD
+  );
+}

@@ -1445,6 +1445,13 @@ const ZH: Record<string, string> = {
   "That account could not be looked up.": "无法查询该账户。",
   "Chinese platforms.": "中国平台。",
   "Weibo and Bilibili accounts are named by their numeric UID and prove ownership with the code in their bio; WeChat Official Accounts are named by their gh_ ID and prove it with an article. The proof is only the bare code. Douyin, Xiaohongshu and personal WeChat accounts have no public page Fortune can check, so they are not offered yet.": "微博和哔哩哔哩账户以数字 UID 指定，通过把代码放进简介来证明归属；微信公众号以 gh_ 原始 ID 指定，通过发表文章来证明。证明内容只有代码本身。抖音、小红书和个人微信没有 Fortune 可以检查的公开页面，因此暂不提供。",
+  // Stock identity checks
+  "Verified tokenized stock": "已验证的代币化股票",
+  "This is the issuer's tokenized stock contract that Fortune tracks. It gives price exposure to the listed share, not ownership, votes or dividends, and the company has not endorsed launches paired with it.": "这是 Fortune 追踪的发行方代币化股票合约。它提供挂钩上市股票的价格敞口，不代表所有权、投票权或分红权，该公司也未为与其配对的发行背书。",
+  "Imitates a tokenized stock": "仿冒代币化股票",
+  "It borrows a stock token's ticker or calls itself a tokenized share, but it is not a verified issuer contract. A memecoin paired with a counterfeit stock token was used to move a real Nasdaq stock in 2026. Fortune does not pair with it.": "它借用股票代币的代码或自称代币化股票，但并非经过验证的发行方合约。2026 年曾有 memecoin 与仿冒股票代币配对，被用来拉动一只真实的纳斯达克股票。Fortune 不与其配对。",
+  "Shares a listed company's name or ticker": "与上市公司同名或同代码",
+  "It is not that company's stock or its tokenized version.": "它不是该公司的股票，也不是其代币化版本。",
 };
 
 // Code containers are skipped entirely. A textarea's typed text is never

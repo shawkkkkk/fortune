@@ -40,6 +40,24 @@ The UI verifies:
 
 The category uses a sub-$5 last-sale price as its UI definition of a penny stock. A stock above that threshold can still be available elsewhere in Fortune's stock-token catalog.
 
+## Penny stocks tab
+
+The pair picker (`/launch` and `/assets`) has a **Penny stocks** tab: companies whose tokenized share on BNB Smart Chain trades under $5, most traded first (`isPennyStock` in `lib/pair-reasons.ts`). Leveraged and inverse funds, ETFs and Ondo's managed portfolios are excluded. On 2026-09-27 that was 22 companies, including AMC Entertainment (Ondo), GoPro (bStocks), Hertz, Plug Power, Opendoor, BigBear.ai, NIO and Grab. They show why they are not launchable yet: they live on BNB Smart Chain mainnet, and tokenized securities are outside the mainnet v1 asset policy.
+
+## Counterfeit stock tokens
+
+`lib/stock-identity.ts` checks every token the pair inspector sees against the verified stock-token contracts in `data/pair-universe.json`:
+
+| Result | When | Inspector |
+| --- | --- | --- |
+| Verified | The address is an issuer contract on BNB Smart Chain | `VERIFIED_STOCK_TOKEN` (info) |
+| Imitation | Same symbol as a verified stock token (e.g. a second `GPROB`), stock-token wording (`xStock`, `bStock`, `Stock Token`, `(Ondo Tokenized)`, `Tokenized stock`), or a listed company's name together with its ticker | `IMITATES_STOCK_TOKEN` (block), naming the verified contract |
+| Overlap | Only the company name, or a company ticker of three or more letters | `SHARES_STOCK_NAME` (warning) |
+
+On any chain but BNB Smart Chain mainnet (including BSC Testnet) nothing can be a verified stock token, so anything posing as one is blocked. Across the 665 tokens in the pair universe the rules flag no crypto asset.
+
+Why: in September 2026 a memecoin (JINQIAN) was paired on Robinhood Chain with a token presented as tokenized Farmmi that one wallet had minted in full and kept repricing; the real Nasdaq stock rose as much as 350% and fell back within hours. On Long.xyz, where memecoins may only pair with official Robinhood Stock Tokens, a memecoin paired with tokenized AMC drew a public objection from AMC's chief executive, who called the stock tokens a "pseudo-fake market" and threatened an SEC complaint. Fortune pairs only with real issuer tokens, labels them as price exposure rather than shares, and never lets a lookalike stand in for a stock.
+
 ## What Fortune does not do
 
 Fortune does not create a BEP-20 with the same ticker as a public company and call it a tokenized stock.

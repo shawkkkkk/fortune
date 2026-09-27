@@ -18,6 +18,7 @@ import {
 import { bsc, bscTestnet } from "viem/chains";
 import { configuredRpcUrls } from "@/lib/bsc-rpc";
 import { FORTUNE_NETWORK } from "@/lib/fortune-network";
+import { checkStockIdentity, type StockIdentity } from "@/lib/stock-identity";
 import { PAIR_TOKEN_PROBE_ABI, PAIR_TOKEN_PROBE_RUNTIME } from "@/lib/custom-pairs-artifacts";
 
 // Pair-token inspector for custom pairs. It reads a token's metadata and
@@ -220,6 +221,8 @@ export type PairInspection = {
     pool: TransferLeg | null;
   };
   maxTaxBps: number | null;
+  /** Whether it is, or poses as, a tokenized stock Fortune tracks. */
+  stock: StockIdentity;
   verdict: "unsupported" | "caution" | "clear";
   findings: Finding[];
 };
@@ -388,6 +391,7 @@ export async function inspectPairToken(input: { address: string; chainId?: numbe
       contract: { codeSize: 0, implementation: null, owner: null, controls: empty.controls },
       simulation: { holder: null, holderKind: null, holderBalance: null, buy: null, sell: null, pool: null },
       maxTaxBps: null,
+      stock: { status: "none", official: null },
       verdict: "unsupported",
       findings,
     };
@@ -418,6 +422,11 @@ export async function inspectPairToken(input: { address: string; chainId?: numbe
   const implementationCode = implementation ? ((await rpc.getCode({ address: implementation, blockNumber }).catch(() => "0x")) ?? "0x") : "0x";
   const controls = controlsInCode([code, implementationCode]);
   const ownerAddress = [owner, getOwner].find((value) => value && isAddress(value) && !/^0x0{40}$/.test(value)) ?? null;
+
+  const stock = checkStockIdentity({ address, chainId, name, symbol });
+  if (stock.status === "verified") findings.push({ code: "VERIFIED_STOCK_TOKEN", level: "info" });
+  else if (stock.status === "imitation") findings.push({ code: "IMITATES_STOCK_TOKEN", level: "block" });
+  else if (stock.status === "overlap") findings.push({ code: "SHARES_STOCK_NAME", level: "warn" });
 
   if (decimals === null || totalSupply === null) findings.push({ code: "NOT_ERC20", level: "block" });
   else if (decimals > 36) findings.push({ code: "DECIMALS_UNSUPPORTED", level: "block" });
@@ -515,6 +524,7 @@ export async function inspectPairToken(input: { address: string; chainId?: numbe
     },
     simulation,
     maxTaxBps,
+    stock,
     verdict: verdictFor(findings),
     findings,
   };

@@ -6817,3 +6817,5 @@ html.entryGateOpen {
 @media (max-width: 900px) {
   .claimsLayout > .launchAside { position: static; }
 }
+.inspectorOfficial { display: block; margin-top: 4px; font-size: 13.5px; }
+.inspectorOfficial a { font-weight: 700; }

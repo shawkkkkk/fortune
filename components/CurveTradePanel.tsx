@@ -173,7 +173,8 @@ export default function CurveTradePanel({ curve, token, symbol, quotes, totalSup
     setBusy("approve");
     setStatus(zh ? `在钱包中批准 ${label}（仅本次交易金额）。` : `Approve ${label} in your wallet (this trade's amount only).`);
     const hash = await walletClient.writeContract({ address: asset, abi: ERC20_TRADE_ABI, functionName: "approve", args: [spender, needed] });
-    await publicClient.waitForTransactionReceipt({ hash });
+    const receipt = await publicClient.waitForTransactionReceipt({ hash });
+    if (receipt.status !== "success") throw new Error(zh ? "批准交易失败。" : "The approval transaction reverted.");
   }
 
   /** The curve's own events in a receipt: the exact fill, refund and payout of a trade. */
@@ -198,7 +199,8 @@ export default function CurveTradePanel({ curve, token, symbol, quotes, totalSup
             setBusy("wrap");
             setStatus(zh ? `将 ${amountText(shortfall, 18)} ${FORTUNE_NETWORK.nativeSymbol} 换成 ${quoteAsset.symbol}。` : `Wrap ${amountText(shortfall, 18)} ${FORTUNE_NETWORK.nativeSymbol} into ${quoteAsset.symbol}.`);
             const hash = await walletClient.writeContract({ address: quoteAsset.address, abi: WRAPPED_NATIVE_ABI, functionName: "deposit", value: shortfall });
-            await publicClient.waitForTransactionReceipt({ hash });
+            const receipt = await publicClient.waitForTransactionReceipt({ hash });
+            if (receipt.status !== "success") throw new Error(zh ? "包装交易失败。" : "The wrap transaction reverted.");
           }
         }
         await ensureAllowance(owner, quoteAsset.address, curve, amount, `${amountText(amount, quoteAsset.decimals)} ${quoteAsset.symbol}`);
@@ -223,7 +225,8 @@ export default function CurveTradePanel({ curve, token, symbol, quotes, totalSup
           setBusy("unwrap");
           try {
             const unwrapHash = await walletClient.writeContract({ address: quoteAsset.address, abi: WRAPPED_NATIVE_ABI, functionName: "withdraw", args: [unwrap] });
-            await publicClient.waitForTransactionReceipt({ hash: unwrapHash });
+            const unwrapReceipt = await publicClient.waitForTransactionReceipt({ hash: unwrapHash });
+            if (unwrapReceipt.status !== "success") throw new Error(zh ? "解包交易失败。" : "The unwrap transaction reverted.");
             unwrapped = unwrap === refund;
           } catch {
             // The buy stands; the refund stays wrapped and the status below says so.
@@ -254,7 +257,8 @@ export default function CurveTradePanel({ curve, token, symbol, quotes, totalSup
           setStatus(zh ? `将 ${amountText(gained, 18)} ${quoteAsset.symbol} 换回 ${FORTUNE_NETWORK.nativeSymbol}。` : `Unwrap ${amountText(gained, 18)} ${quoteAsset.symbol} to ${FORTUNE_NETWORK.nativeSymbol}.`);
           try {
             const unwrapHash = await walletClient.writeContract({ address: quoteAsset.address, abi: WRAPPED_NATIVE_ABI, functionName: "withdraw", args: [gained] });
-            await publicClient.waitForTransactionReceipt({ hash: unwrapHash });
+            const unwrapReceipt = await publicClient.waitForTransactionReceipt({ hash: unwrapHash });
+            if (unwrapReceipt.status !== "success") throw new Error(zh ? "解包交易失败。" : "The unwrap transaction reverted.");
             setStatus(zh ? `已卖出，获得 ${amountText(gained, 18)} ${FORTUNE_NETWORK.nativeSymbol}。` : `Sold for ${amountText(gained, 18)} ${FORTUNE_NETWORK.nativeSymbol}.`);
           } catch (error) {
             setStatus(zh ? `已卖出，获得 ${amountText(gained, 18)} ${quoteAsset.symbol}；未换回 ${FORTUNE_NETWORK.nativeSymbol}：${walletErrorMessage(error)}` : `Sold for ${amountText(gained, 18)} ${quoteAsset.symbol}. It stayed wrapped: ${walletErrorMessage(error)}`);

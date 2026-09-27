@@ -60,6 +60,12 @@ test("rankings put unknown values last and fall back to newest", () => {
   assert.deepEqual(rankMarkets(items(), "newest").map((x) => x.id), ["d", "c", "b", "a"]);
 });
 
+test("graduating ranks curve launches by progress, then everything past the curve newest first", () => {
+  const item = (id, createdAt, phase, graduationProgress) => ({ id, createdAt, phase, graduationProgress, marketCapUsd: null, activity24h: null, activityTrending: null });
+  const items = [item("low", 1, 0, 12.5), item("done", 2, 2, 100), item("high", 3, 0, 97.2), item("ready", 4, 1, 100), item("tie", 5, 0, 12.5), item("rescued", 6, 3, 100)];
+  assert.deepEqual(rankMarkets(items, "graduating").map((x) => x.id), ["high", "tie", "low", "rescued", "ready", "done"]);
+});
+
 function fakeProvider({ head, prunedBelow, failAddressCountAbove = 9 }) {
   const calls = [];
   const blockTime = 0.45;

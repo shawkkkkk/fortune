@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { PairAssetsPanel, type PairAssetView } from "@/components/PairAssets";
 import PriceChart, { type ChartPoint } from "@/components/PriceChart";
 import SupplyBreakdown, { type SupplyView } from "@/components/SupplyBreakdown";
+import CreatorCheck, { type CreatorView } from "@/components/CreatorCheck";
 import { useLanguage } from "@/components/LanguageProvider";
 import { useTheme } from "@/components/ThemeProvider";
 import { FORTUNE_NETWORK } from "@/lib/fortune-network";
@@ -39,6 +40,7 @@ type MarketResponse = {
     chart: { range: Range; points: ChartPoint[]; ledger: { available: boolean; coverage: Coverage | null; coversRange: boolean } } | null;
     trades: Trade[];
     supply?: SupplyView | null;
+    creator?: CreatorView | null;
   };
   error?: { message?: string };
 };
@@ -201,6 +203,7 @@ export default function TokenMarketPanel({ token }: { token: string }) {
       </div>
 
       {data.supply ? <SupplyBreakdown supply={data.supply} zh={zh} /> : null}
+      {data.creator ? <CreatorCheck creator={data.creator} symbol={summary.symbol} zh={zh} /> : null}
       <PairAssetsPanel pairs={summary.pairs} graduated={summary.phase === 2} zh={zh} />
 
       <p className="chartCoverage" translate="no">{zh

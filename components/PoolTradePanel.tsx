@@ -193,7 +193,8 @@ export default function PoolTradePanel({ token, symbol, quoteAsset, account, con
           setBusy("approve");
           setStatus(zh ? "在钱包中批准本次交易金额。" : "Approve this trade's amount in your wallet.");
           const approveHash = await walletClient.writeContract({ address: tokenIn, abi: ERC20_TRADE_ABI, functionName: "approve", args: [router, amount] });
-          await publicClient.waitForTransactionReceipt({ hash: approveHash });
+          const approveReceipt = await publicClient.waitForTransactionReceipt({ hash: approveHash });
+          if (approveReceipt.status !== "success") throw new Error(zh ? "批准交易失败。" : "The approval transaction reverted.");
         }
       }
       const { result } = await readClient.simulateContract({ address: periphery.quoter, abi: PANCAKE_V3_QUOTER_ABI, functionName: "quoteExactInputSingle", args: [{ tokenIn, tokenOut, amountIn: amount, fee: pool.fee, sqrtPriceLimitX96: 0n }] });

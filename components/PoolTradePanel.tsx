@@ -64,6 +64,9 @@ export default function PoolTradePanel({ token, symbol, quoteAsset, account, con
   // The official pool: Fortune's markets API resolves it from the permanent LP locker.
   useEffect(() => {
     let cancelled = false;
+    setPool(null);
+    setSqrtPriceX96(null);
+    setPoolError("");
     (async () => {
       let address: Address | null = null;
       let fee = GRADUATION_FEE;
@@ -79,20 +82,35 @@ export default function PoolTradePanel({ token, symbol, quoteAsset, account, con
       } catch {
         // Fall back to the factory's pool at the graduation fee tier below.
       }
-      if (!address) {
-        const found = await readClient.readContract({ address: V3_FACTORY, abi: FACTORY_ABI, functionName: "getPool", args: [token, quoteAsset.address, fee] }).catch(() => zeroAddress);
-        address = found !== zeroAddress ? found : null;
-      }
-      if (!address) {
-        if (!cancelled) setPoolError(zh ? "未找到毕业后的 PancakeSwap V3 资金池。" : "The graduated PancakeSwap V3 pool could not be found.");
+      // Even when Fortune's API supplies the locker-recorded pool, prove it is
+      // Pancake V3's canonical pool for this exact pair and fee tier before
+      // quoting or signing against it.
+      const canonical = await readClient.readContract({
+        address: V3_FACTORY,
+        abi: FACTORY_ABI,
+        functionName: "getPool",
+        args: [token, quoteAsset.address, fee],
+      }).catch(() => zeroAddress);
+      if (!address) address = canonical !== zeroAddress ? canonical : null;
+      if (!address || canonical === zeroAddress || canonical.toLowerCase() !== address.toLowerCase()) {
+        if (!cancelled) setPoolError(zh ? "无法验证毕业后的 PancakeSwap V3 资金池。" : "The graduated PancakeSwap V3 pool could not be verified.");
         return;
       }
-      const [token0, slot0] = await Promise.all([
+      const [token0, token1, slot0] = await Promise.all([
         readClient.readContract({ address, abi: PANCAKE_V3_POOL_ABI, functionName: "token0" }),
+        readClient.readContract({ address, abi: PANCAKE_V3_POOL_ABI, functionName: "token1" }),
         readClient.readContract({ address, abi: PANCAKE_V3_POOL_ABI, functionName: "slot0" }),
       ]);
+      const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
+      const pairMatches =
+        (same(token0, token) && same(token1, quoteAsset.address)) ||
+        (same(token0, quoteAsset.address) && same(token1, token));
+      if (!pairMatches) {
+        if (!cancelled) setPoolError(zh ? "资金池中的代币与该市场不匹配。" : "The pool tokens do not match this market.");
+        return;
+      }
       if (!cancelled) {
-        setPool({ address, fee, tokenIsToken0: token0.toLowerCase() === token.toLowerCase() });
+        setPool({ address, fee, tokenIsToken0: same(token0, token) });
         setSqrtPriceX96(slot0[0]);
       }
     })().catch(() => {

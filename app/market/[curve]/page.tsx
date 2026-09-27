@@ -14,6 +14,7 @@ import {
 import {
   FORTUNE_NETWORK,
   FORTUNE_NETWORK_CONFIGURED,
+  FORTUNE_TAX_NETWORK_CONFIGURED,
 } from "@/lib/fortune-network";
 import { graduationGasLimit } from "@/lib/graduation-gas";
 import CurveTradePanel from "@/components/CurveTradePanel";
@@ -144,6 +145,13 @@ const erc20Abi = [
 const factoryAbi = [
   {
     type: "function",
+    name: "curveIndexPlusOne",
+    stateMutability: "view",
+    inputs: [{ name: "curve", type: "address" }],
+    outputs: [{ type: "uint256" }],
+  },
+  {
+    type: "function",
     name: "finalizeGraduation",
     stateMutability: "nonpayable",
     inputs: [
@@ -235,12 +243,35 @@ export default function MarketPage() {
   }, []);
 
   const refresh = useCallback(async () => {
-    if (!curve || !FORTUNE_NETWORK_CONFIGURED) {
+    const configured = isTaxMarket
+      ? FORTUNE_TAX_NETWORK_CONFIGURED
+      : FORTUNE_NETWORK_CONFIGURED;
+    const trustedFactory = (
+      isTaxMarket
+        ? FORTUNE_NETWORK.contracts.taxFactory
+        : FORTUNE_NETWORK.contracts.factory
+    ) as Address;
+
+    if (!curve || !configured || !isAddress(trustedFactory)) {
+      setMarket(null);
       setLoading(false);
       return;
     }
 
     try {
+      // Never render signing controls for an arbitrary contract supplied in the
+      // URL. A valid market must be registered by the configured factory for
+      // its exact launch type.
+      const curveIndex = await publicClient.readContract({
+        address: trustedFactory,
+        abi: factoryAbi,
+        functionName: "curveIndexPlusOne",
+        args: [curve],
+      });
+      if (curveIndex === 0n) {
+        throw new Error("This address is not a launch from Fortune's configured factory.");
+      }
+
       const [
         token,
         phase,
@@ -311,6 +342,7 @@ export default function MarketPage() {
         quotes: previous && sameQuotes(previous.quotes, quotes) ? previous.quotes : quotes,
       }));
     } catch (error) {
+      setMarket(null);
       setMessage(
         error instanceof Error
           ? error.message
@@ -319,7 +351,16 @@ export default function MarketPage() {
     } finally {
       setLoading(false);
     }
-  }, [curve]);
+  }, [curve, isTaxMarket]);
+
+  useEffect(() => {
+    // Route transitions can reuse this client component. Clear the prior
+    // market immediately so a failed read can never leave old signing controls
+    // attached to a new curve URL.
+    setMarket(null);
+    setMessage("");
+    setLoading(true);
+  }, [curve, isTaxMarket]);
 
   useEffect(() => {
     void refresh();

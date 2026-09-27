@@ -24,11 +24,11 @@ const STOCK_ASSETS = (snapshot.assets as SnapshotAsset[]).filter(
 const STOCK_TOKENS: StockToken[] = STOCK_ASSETS.map(({ symbol, name, underlying, provider, address }) => ({ symbol, name, underlying, provider, address }));
 
 const BY_ADDRESS = new Map(STOCK_TOKENS.map((token) => [token.address.toLowerCase(), token]));
-const BY_SYMBOL = new Map(STOCK_TOKENS.map((token) => [token.symbol.toLowerCase(), token]));
+const BY_SYMBOL = new Map(STOCK_TOKENS.map((token) => [symbolKey(token.symbol), token]));
 const BY_TICKER = new Map<string, StockToken>();
 const BY_COMPANY = new Map<string, StockToken>();
 for (const [index, token] of STOCK_TOKENS.entries()) {
-  const ticker = token.underlying?.trim().toLowerCase();
+  const ticker = symbolKey(token.underlying || "");
   // One- and two-letter tickers (T, X, ON, AI…) and fund tickers (NEAR, BITO…) collide with too many crypto tokens to mean anything.
   const company = STOCK_ASSETS[index].kind === "stock";
   if (company && ticker && ticker.length >= 3 && /^[a-z.]+$/.test(ticker) && !BY_TICKER.has(ticker)) BY_TICKER.set(ticker, token);
@@ -37,12 +37,25 @@ for (const [index, token] of STOCK_TOKENS.entries()) {
 }
 
 /** How issuers and counterfeits label a tokenized share. */
-const STOCK_TOKEN_WORDING = /(x\s?stock|b\s?stock|stock\s?token|tokeni[sz]ed\s+(?:stock|share|equity)|\(ondo|ondo\s+tokeni[sz]ed|robinhood\s+(?:stock|token))/i;
+const STOCK_TOKEN_WORDING = /(?:^|\s)(?:x\s*stock|b\s*stock|stock\s*token|tokeni[sz]ed\s*(?:stock|share|equity)|ondo\s*tokeni[sz]ed|robinhood\s*(?:stock|token))(?:\s|$)/;
+
+function normalizedIdentityText(value: string) {
+  return value.normalize("NFKC").replace(/\p{Cf}/gu, "").toLowerCase();
+}
+
+/** Ignore punctuation and invisible format characters in symbols. */
+export function symbolKey(value: string) {
+  return normalizedIdentityText(value).replace(/[^a-z0-9]+/g, "");
+}
+
+/** Convert punctuation to word boundaries before testing stock-token wording. */
+function wordingKey(value: string) {
+  return normalizedIdentityText(value).replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
+}
 
 export function companyKey(name: string) {
-  return name
-    .toLowerCase()
-    .replace(/\((?:ondo )?tokeni[sz]ed\)|x ?stock|b ?stock|stock token/g, " ")
+  return normalizedIdentityText(name)
+    .replace(/\((?:ondo\s*)?tokeni[sz]ed\)|x[\s-]*stock|b[\s-]*stock|stock[\s-]*token/g, " ")
     .replace(/[^a-z0-9 ]+/g, " ")
     .replace(/\b(?:inc|incorporated|corp|corporation|co|company|holdings?|group|ltd|limited|plc|sa|nv|ag|class [a-c]|the)\b/g, " ")
     .replace(/\s+/g, " ")
@@ -63,14 +76,14 @@ export function checkStockIdentity(input: { address: string; chainId: number; na
 
   const symbol = (input.symbol || "").trim();
   const name = (input.name || "").trim();
-  const symbolKey = symbol.toLowerCase();
+  const normalizedSymbol = symbolKey(symbol);
   const company = name ? companyKey(name) : "";
   const byCompany = company.length >= 4 ? BY_COMPANY.get(company) ?? null : null;
-  const byTicker = BY_TICKER.get(symbolKey) ?? null;
+  const byTicker = BY_TICKER.get(normalizedSymbol) ?? null;
 
-  const bySymbol = BY_SYMBOL.get(symbolKey);
+  const bySymbol = BY_SYMBOL.get(normalizedSymbol);
   if (bySymbol) return { status: "imitation", reason: "TOKEN_SYMBOL", official: bySymbol };
-  if (STOCK_TOKEN_WORDING.test(name) || STOCK_TOKEN_WORDING.test(symbol)) {
+  if (STOCK_TOKEN_WORDING.test(wordingKey(name)) || STOCK_TOKEN_WORDING.test(wordingKey(symbol))) {
     return { status: "imitation", reason: "STOCK_NAMING", official: byCompany ?? byTicker };
   }
   if (byCompany && byTicker && byCompany.underlying === byTicker.underlying) {

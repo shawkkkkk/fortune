@@ -7164,3 +7164,153 @@ label.claimLinkSaved { display: flex; flex-direction: row; align-items: flex-sta
   border-color: var(--gold-line);
   color: var(--gold-ink, var(--ink-soft));
 }
+
+/* Launch rules: the optional editor on /launch/custom and the market panel. */
+.launchRulesEditor {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.launchRulesEditor legend {
+  margin-bottom: 4px;
+  padding: 0;
+  font-family: var(--font-display, inherit);
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.launchRulesEditor .launchRulesPresets {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.launchRulesEditor .launchRulesPresets button {
+  min-height: 72px;
+  padding: 14px 44px 14px 16px;
+}
+
+/* Presets add up, so they show + and ✓ rather than a radio dot. */
+.launchRulesEditor .launchRulesPresets button::after {
+  content: "+";
+  display: grid;
+  place-items: center;
+  top: 14px;
+  right: 14px;
+  width: 22px;
+  height: 22px;
+  border-width: 1.5px;
+  color: var(--red);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.launchRulesEditor .launchRulesPresets button.selectedMode::after {
+  content: "✓";
+  border-color: var(--red);
+  background: var(--red);
+  color: #fff;
+}
+
+.launchRulesEditor .launchRulesPresets button span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.launchRulesGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 12px;
+  min-width: 0;
+}
+
+.launchRulesEditor label small.fieldHint {
+  margin: 0;
+  font-weight: 500;
+}
+
+.launchRulesEditor textarea {
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.launchRulesMore {
+  display: grid;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-sunk);
+}
+
+.launchRulesMore > summary {
+  cursor: pointer;
+  font-weight: 750;
+}
+
+.launchRulesMore[open] > summary {
+  margin-bottom: 10px;
+}
+
+.launchRulesPanel .recipientBadge {
+  justify-self: start;
+  margin: 2px 0 10px;
+}
+
+.launchRulesList {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding-left: 18px;
+  font-size: 14.5px;
+  line-height: 1.45;
+}
+
+.launchRulesExempt {
+  margin: 0 0 12px;
+  font-size: 14px;
+}
+
+.launchRulesExempt summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.launchRulesExempt ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.launchRulesWallet {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--gold-line);
+  border-radius: 12px;
+  background: var(--gold-tint, var(--surface-sunk));
+}
+
+.launchRulesWallet ul {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+@media (max-width: 720px) {
+  .launchRulesEditor .launchRulesPresets {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.launchRulesChip {
+  justify-self: start;
+  width: fit-content;
+}

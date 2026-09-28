@@ -1,14 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { formatUnits, parseAbi, parseUnits, type Address } from "viem";
 import FeeRecipientsPanel from "@/components/FeeRecipientsPanel";
+import LaunchRulesPanel, { useRulesWalletStatus } from "@/components/LaunchRulesPanel";
 import PairInspector from "@/components/PairInspector";
 import { useLanguage } from "@/components/LanguageProvider";
 import { FORTUNE_NETWORK } from "@/lib/fortune-network";
-import { CUSTOM_PAIR_RULES, afterTax, pairForTokens, previewCurveBuy, shieldBpsAt } from "@/lib/custom-pairs";
-import { CUSTOM_PAIR_CURVE_ABI, SOCIAL_FEE_VAULT_ABI } from "@/lib/custom-pairs-artifacts";
+import { CUSTOM_PAIR_RULES, afterTax, chainClockSkew, pairForTokens, previewCurveBuy, shieldBpsAt } from "@/lib/custom-pairs";
+import { CUSTOM_PAIR_CURVE_ABI, LAUNCH_RULES_ABI, SOCIAL_FEE_VAULT_ABI } from "@/lib/custom-pairs-artifacts";
+import { launchRulesErrorMessage, lockedAt } from "@/lib/launch-rules";
 import type { CustomPairLaunchDetail } from "@/lib/custom-pairs-read";
 import { assertWalletIdentity } from "@/lib/launch-safety";
 import { formatAmount, formatShare, formatUnitPrice, shortAddress } from "@/lib/market-format";
@@ -23,6 +25,10 @@ const ERC20 = parseAbi([
 ]);
 
 const SLIPPAGE_OPTIONS = [50, 100, 300] as const;
+
+// Launch-rule reverts come from the token inside a curve call; with their errors
+// in the ABI, simulations decode them into something a person can act on.
+const CURVE_ABI = [...CUSTOM_PAIR_CURVE_ABI, ...LAUNCH_RULES_ABI.filter((item) => item.type === "error")] as const;
 
 function units(raw: string | bigint, decimals: number) {
   return Number(formatUnits(BigInt(raw), decimals));
@@ -59,6 +65,15 @@ export default function CustomPairMarket({ initial }: { initial: CustomPairLaunc
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [now, setNow] = useState(() => initial.blockTimestamp);
+  // Countdowns, vesting and cooldowns follow chain time, even on a device whose clock is off.
+  const skew = useRef(0);
+  const syncClock = useCallback((blockTimestamp: number) => {
+    const device = Date.now() / 1000;
+    skew.current = chainClockSkew(blockTimestamp, device);
+    setNow(Math.floor(device) + skew.current);
+  }, []);
+  const [statusKey, setStatusKey] = useState(0);
+  const rulesStatus = useRulesWalletStatus(launch.rules, launch.token, account, statusKey);
 
   const pair = launch.pair;
   const buyTax = inspection?.simulation.buy?.taxBps ?? 0;
@@ -83,11 +98,14 @@ export default function CustomPairMarket({ initial }: { initial: CustomPairLaunc
     try {
       const response = await fetch(`/api/public/v1/custom-pairs/${launch.curve}`, { cache: "no-store" });
       const body = await response.json();
-      if (response.ok && body?.data) setLaunch(body.data);
+      if (response.ok && body?.data) {
+        setLaunch(body.data);
+        syncClock(body.data.blockTimestamp);
+      }
     } catch {
       /* Keep the last good state. */
     }
-  }, [launch.curve]);
+  }, [launch.curve, syncClock]);
 
   const refreshBalances = useCallback(async (wallet: Address | null) => {
     if (!wallet) return setBalances(null);
@@ -108,14 +126,28 @@ export default function CustomPairMarket({ initial }: { initial: CustomPairLaunc
       setAccount(wallet);
       void refreshBalances(wallet);
     }).catch(() => undefined);
-    const tick = window.setInterval(() => setNow(Math.floor(Date.now() / 1000)), 1_000);
+    const tick = window.setInterval(() => setNow(Math.floor(Date.now() / 1000) + skew.current), 1_000);
     const poll = window.setInterval(() => void refresh(), 15_000);
-    setNow(Math.floor(Date.now() / 1000));
+    syncClock(initial.blockTimestamp);
     return () => {
       window.clearInterval(tick);
       window.clearInterval(poll);
     };
-  }, [refresh, refreshBalances]);
+  }, [refresh, refreshBalances, syncClock, initial.blockTimestamp]);
+
+  // Re-read the wallet's access as each access window closes, rather than at the next poll:
+  // that is the moment buyers are waiting for.
+  useEffect(() => {
+    const rules = launch.rules;
+    if (!rules?.active) return undefined;
+    const chainNow = Math.floor(Date.now() / 1000) + skew.current;
+    const timers = [rules.allowlistSeconds, rules.gateSeconds]
+      .filter((seconds) => seconds > 0)
+      .map((seconds) => rules.launchTimestamp + seconds - chainNow)
+      .filter((wait) => wait > 0)
+      .map((wait) => window.setTimeout(() => setStatusKey((key) => key + 1), (wait + 2) * 1_000));
+    return () => timers.forEach((timer) => window.clearTimeout(timer));
+  }, [launch.rules]);
 
   const quote = useMemo(() => {
     if (!trading) return null;
@@ -157,6 +189,37 @@ export default function CustomPairMarket({ initial }: { initial: CustomPairLaunc
     return { kind: "sell" as const, raw: tokens, gross, fees: fee, sent, delivered, minOut: (delivered * BigInt(10_000 - slippageBps)) / 10_000n, taxed: sent - delivered };
   }, [trading, side, amount, pair.decimals, buyTax, sellTax, supply, virtualReserve, reserve, target, shieldBps, launch.protocolFeeBps, launch.creatorFeeBps, launch.circulating, slippageBps, walletCapActive]);
 
+  // What the launch's rules would refuse, checked before anything is signed.
+  const ruleBlock = (() => {
+    const rules = launch.rules;
+    if (!rules?.active || !quote) return "";
+    const exempt = rulesStatus?.exempt ?? false;
+    const amount = (raw: bigint) => `${formatAmount(units(raw, 18))} ${launch.symbol}`;
+    if (quote.kind === "buy") {
+      const accessUntil = rules.launchTimestamp + Math.max(rules.allowlistSeconds, rules.gateSeconds);
+      if (rulesStatus && !rulesStatus.canBuy && now < accessUntil) {
+        return zh ? "访问限制期间，该钱包还不能买入。" : "This wallet cannot buy during the access window yet.";
+      }
+      const maxBuy = BigInt(rules.caps.maxBuy);
+      if (maxBuy > 0n && !exempt && quote.tokens > maxBuy) return zh ? `该发行每笔买入最多 ${amount(maxBuy)}。` : `This launch caps each buy at ${amount(maxBuy)}.`;
+      const maxWallet = BigInt(rules.caps.maxWallet);
+      if (maxWallet > 0n && !exempt && (balances?.token ?? 0n) + quote.tokens > maxWallet) {
+        return zh ? `该发行每个钱包最多持有 ${amount(maxWallet)}。` : `This launch caps each wallet at ${amount(maxWallet)}.`;
+      }
+      return "";
+    }
+    const maxSell = BigInt(rules.caps.maxSell);
+    if (maxSell > 0n && quote.raw > maxSell) return zh ? `该发行每笔卖出最多 ${amount(maxSell)}。` : `This launch caps each sell at ${amount(maxSell)}.`;
+    if (rulesStatus && rulesStatus.sellReadyAt > now) {
+      return zh ? `卖出冷却中，还需等待 ${rulesStatus.sellReadyAt - now} 秒。` : `Sell cooldown: ${rulesStatus.sellReadyAt - now}s to go.`;
+    }
+    const locked = rulesStatus ? lockedAt(rulesStatus.vested, rulesStatus.unlockStart, rulesStatus.unlockEnd, now) : 0n;
+    if (locked > 0n && (balances?.token ?? 0n) - quote.raw < locked) {
+      return zh ? `${amount(locked)} 仍在锁仓中，只能卖出超出部分。` : `${amount(locked)} is still vesting; you can sell only the rest.`;
+    }
+    return "";
+  })();
+
   async function run(label: string, action: (wallet: Address) => Promise<void>) {
     setBusy(true);
     setMessage(label);
@@ -166,9 +229,10 @@ export default function CustomPairMarket({ initial }: { initial: CustomPairLaunc
       await action(wallet);
       await Promise.all([refresh(), refreshBalances(wallet)]);
     } catch (error) {
-      setMessage(walletErrorMessage(error));
+      setMessage(launchRulesErrorMessage(error, (raw) => `${formatAmount(units(raw, 18))} ${launch.symbol}`, zh) ?? walletErrorMessage(error));
     } finally {
       setBusy(false);
+      setStatusKey((key) => key + 1);
     }
   }
 
@@ -189,7 +253,7 @@ export default function CustomPairMarket({ initial }: { initial: CustomPairLaunc
       if (quote.kind === "buy") {
         await ensureAllowance(wallet, pair.address, quote.raw, pair.symbol);
         setMessage("Simulating the buy…");
-        await publicClient.simulateContract({ account: wallet, address: launch.curve, abi: CUSTOM_PAIR_CURVE_ABI, functionName: "buy", args: [quote.raw, quote.minOut] });
+        await publicClient.simulateContract({ account: wallet, address: launch.curve, abi: CURVE_ABI, functionName: "buy", args: [quote.raw, quote.minOut] });
         setMessage("Confirm the buy in your wallet…");
         await assertWalletIdentity(injectedProvider(), wallet, FORTUNE_NETWORK.chainId);
         const hash = await walletClient.writeContract({ address: launch.curve, abi: CUSTOM_PAIR_CURVE_ABI, functionName: "buy", args: [quote.raw, quote.minOut] });
@@ -199,7 +263,7 @@ export default function CustomPairMarket({ initial }: { initial: CustomPairLaunc
       } else {
         await ensureAllowance(wallet, launch.token, quote.raw, launch.symbol);
         setMessage("Simulating the sell…");
-        await publicClient.simulateContract({ account: wallet, address: launch.curve, abi: CUSTOM_PAIR_CURVE_ABI, functionName: "sell", args: [quote.raw, quote.minOut] });
+        await publicClient.simulateContract({ account: wallet, address: launch.curve, abi: CURVE_ABI, functionName: "sell", args: [quote.raw, quote.minOut] });
         setMessage("Confirm the sell in your wallet…");
         await assertWalletIdentity(injectedProvider(), wallet, FORTUNE_NETWORK.chainId);
         const hash = await walletClient.writeContract({ address: launch.curve, abi: CUSTOM_PAIR_CURVE_ABI, functionName: "sell", args: [quote.raw, quote.minOut] });
@@ -332,6 +396,7 @@ export default function CustomPairMarket({ initial }: { initial: CustomPairLaunc
                 </dl>
               ) : null}
               {quote?.kind === "buy" && quote.overCap ? <p className="fieldError" role="alert">Over the 2% early-wallet cap for the first 15 seconds. Lower the amount or wait.</p> : null}
+              {ruleBlock ? <p className="fieldError" role="alert" translate="no">{ruleBlock}</p> : null}
 
               <div className="slippageRow" role="group" aria-label="Slippage tolerance">
                 <span className="fieldHint">Slippage</span>
@@ -339,7 +404,7 @@ export default function CustomPairMarket({ initial }: { initial: CustomPairLaunc
                   <button key={bps} type="button" className={slippageBps === bps ? "active" : undefined} aria-pressed={slippageBps === bps} onClick={() => setSlippageBps(bps)} translate="no">{formatTaxBps(bps)}</button>
                 ))}
               </div>
-              <button className="launchButton" disabled={busy || !quote || (quote.kind === "buy" && quote.overCap)} onClick={() => void trade()}>
+              <button className="launchButton" disabled={busy || !quote || (quote.kind === "buy" && quote.overCap) || Boolean(ruleBlock)} onClick={() => void trade()}>
                 {busy ? (zh ? "处理中…" : "Working…") : side === "buy" ? (zh ? `买入 ${launch.symbol}` : `Buy ${launch.symbol}`) : (zh ? `卖出换取 ${pair.symbol}` : `Sell for ${pair.symbol}`)}
               </button>
               <p className="fieldHint" translate="no">{zh ? `滑点按扣除 ${pair.symbol} 转账税后实际到账的金额检查。` : `Slippage is checked against what actually reaches your wallet, after any ${pair.symbol} transfer tax.`}</p>
@@ -394,6 +459,10 @@ export default function CustomPairMarket({ initial }: { initial: CustomPairLaunc
 
         <div className="customMarketSide">
           <PairInspector address={pair.address} holder={account} onResult={setInspection} />
+
+          {launch.rules ? (
+            <LaunchRulesPanel rules={launch.rules} symbol={launch.symbol} phase={launch.phase} status={rulesStatus} account={account} now={now} zh={zh} />
+          ) : null}
 
           {launch.feeSplit ? (
             <FeeRecipientsPanel

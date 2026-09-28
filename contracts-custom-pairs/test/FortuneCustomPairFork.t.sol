@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {Test} from "forge-std/Test.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {FortuneCustomPairFactory} from "../src/FortuneCustomPairFactory.sol";
+import {FortuneLaunchRules} from "../src/FortuneLaunchRules.sol";
 import {FortuneCustomPairCurve} from "../src/FortuneCustomPairCurve.sol";
 import {FortuneCustomPairToken} from "../src/FortuneCustomPairToken.sol";
 import {IPancakeV2PairLike} from "../src/interfaces/IPancakeV2.sol";
@@ -40,7 +41,7 @@ contract FortuneCustomPairForkTest is Test {
             return;
         }
         vm.createSelectFork(rpc);
-        factory = new FortuneCustomPairFactory(address(this), PANCAKE_V2_FACTORY, 50, makeAddr("treasury"));
+        factory = new FortuneCustomPairFactory(address(this), PANCAKE_V2_FACTORY, 50, makeAddr("treasury"), FortuneLaunchRules(address(0)));
     }
 
     function _launch(address pairToken, uint256 target) internal returns (FortuneCustomPairCurve curve) {

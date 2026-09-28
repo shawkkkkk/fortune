@@ -290,7 +290,7 @@ export async function GET(request: Request) {
             { name: "offset", in: "query", schema: { type: "integer", minimum: 0 } },
             { name: "limit", in: "query", schema: { type: "integer", minimum: 1, maximum: 48 } },
           ],
-          responses: { "200": { description: "Factory, protocol fee, pause state and one page of launches" }, "503": { description: "The network could not be read" } },
+          responses: { "200": { description: "Factory, protocol fee, pause state, launchRules (the factory's launch rules contract, or null when it offers none) and one page of launches, each with rulesContract when it was created with rules" }, "503": { description: "The network could not be read" } },
         },
       },
       "/custom-pairs/{curve}": {
@@ -298,7 +298,7 @@ export async function GET(request: Request) {
           tags: ["Launches"],
           summary: "One custom-pair launch: curve state, fees, graduation or rescue",
           parameters: [{ name: "curve", in: "path", required: true, schema: { type: "string" } }],
-          responses: { "200": { description: "Launch detail read at one block" }, "404": { description: "No custom-pair launch uses this curve" } },
+          responses: { "200": { description: "Launch detail read at one block. rules is null unless the launch chose launch rules; then it lists every setting, caps in launch tokens, exempt wallets and active (false after graduation or rescue)" }, "404": { description: "No custom-pair launch uses this curve" } },
         },
       },
       "/social/status": {

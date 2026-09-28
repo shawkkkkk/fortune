@@ -3,7 +3,8 @@ import { bsc, bscTestnet } from "viem/chains";
 import { configuredRpcUrls } from "@/lib/bsc-rpc";
 import { FORTUNE_NETWORK } from "@/lib/fortune-network";
 import { CUSTOM_PAIRS, customPhase, type CustomPairPhase } from "@/lib/custom-pairs";
-import { CUSTOM_PAIR_CURVE_ABI, CUSTOM_PAIR_FACTORY_ABI, SOCIAL_FEE_VAULT_ABI } from "@/lib/custom-pairs-artifacts";
+import { CUSTOM_PAIR_CURVE_ABI, CUSTOM_PAIR_FACTORY_ABI, CUSTOM_PAIR_TOKEN_ABI, LAUNCH_RULES_ABI, SOCIAL_FEE_VAULT_ABI } from "@/lib/custom-pairs-artifacts";
+import type { LaunchRulesView } from "@/lib/launch-rules";
 import { toIdentity, type IdentityTuple, type SocialIdentity } from "@/lib/social-fees";
 
 const ERC20 = parseAbi([
@@ -44,6 +45,8 @@ export type CustomPairLaunch = {
   tradeCount: number;
   protocolFeeBps: number;
   creatorFeeBps: number;
+  /** FortuneLaunchRules when the launch was created with rules; null otherwise (and for launches from before rules existed). */
+  rulesContract: Address | null;
 };
 
 export type CustomPairLaunchDetail = CustomPairLaunch & {
@@ -66,6 +69,8 @@ export type CustomPairLaunchDetail = CustomPairLaunch & {
   rescue: { circulating: string; holderClaims: string } | null;
   /** Set when the creator fee is split between wallets and social accounts through the social fee vault. */
   feeSplit: { vault: Address; collected: string; recipients: Array<SocialIdentity & { shareBps: number }> } | null;
+  /** The launch's rules, when it has any. */
+  rules: LaunchRulesView | null;
   blockNumber: string;
   blockTimestamp: number;
 };
@@ -87,6 +92,68 @@ async function readFeeSplit(rpc: PublicClient, curve: Address, recipient: Addres
       vault: recipient,
       collected: collected.toString(),
       recipients: identities.map((identity, index) => ({ ...toIdentity(identity), shareBps: Number(shares[index]) })),
+    };
+  } catch {
+    return null;
+  }
+}
+
+const NO_ADDRESS = "0x0000000000000000000000000000000000000000";
+
+type StoredRules = {
+  launchTimestamp: bigint;
+  maxWalletBps: number;
+  maxBuyBps: number;
+  maxSellBps: number;
+  sellCooldown: number;
+  curveOnly: boolean;
+  vestingWindow: number;
+  vestingCliff: number;
+  vestingDuration: number;
+  allowlistSeconds: number;
+  allowlistCount: number;
+  gateToken: Address;
+  gateMinBalance: bigint;
+  gateSeconds: number;
+  exemptList: readonly Address[];
+};
+
+async function readLaunchRules(rpc: PublicClient, token: Address, contract: Address, blockNumber: bigint): Promise<LaunchRulesView | null> {
+  try {
+    const [stored, caps, active] = await Promise.all([
+      rpc.readContract({ address: contract, abi: LAUNCH_RULES_ABI, functionName: "rulesOf", args: [token], blockNumber }) as Promise<StoredRules>,
+      rpc.readContract({ address: contract, abi: LAUNCH_RULES_ABI, functionName: "capsOf", args: [token], blockNumber }) as Promise<readonly [bigint, bigint, bigint]>,
+      rpc.readContract({ address: contract, abi: LAUNCH_RULES_ABI, functionName: "active", args: [token], blockNumber }) as Promise<boolean>,
+    ]);
+    const gateToken = stored.gateToken.toLowerCase() === NO_ADDRESS ? null : stored.gateToken;
+    let gate: LaunchRulesView["gate"] = null;
+    if (gateToken) {
+      const [symbol, decimals] = await Promise.all([
+        rpc.readContract({ address: gateToken, abi: ERC20, functionName: "symbol", blockNumber }).catch(() => "TOKEN"),
+        rpc.readContract({ address: gateToken, abi: ERC20, functionName: "decimals", blockNumber }).catch(() => 18),
+      ]);
+      gate = { symbol: String(symbol).slice(0, 16), decimals: Number(decimals) };
+    }
+    return {
+      address: contract,
+      active,
+      launchTimestamp: Number(stored.launchTimestamp),
+      maxWalletBps: Number(stored.maxWalletBps),
+      maxBuyBps: Number(stored.maxBuyBps),
+      maxSellBps: Number(stored.maxSellBps),
+      sellCooldown: Number(stored.sellCooldown),
+      curveOnly: Boolean(stored.curveOnly),
+      vestingWindow: Number(stored.vestingWindow),
+      vestingCliff: Number(stored.vestingCliff),
+      vestingDuration: Number(stored.vestingDuration),
+      allowlistSeconds: Number(stored.allowlistSeconds),
+      allowlistCount: Number(stored.allowlistCount),
+      gateToken,
+      gateMinBalance: stored.gateMinBalance.toString(),
+      gateSeconds: Number(stored.gateSeconds),
+      gate,
+      exempt: [...stored.exemptList],
+      caps: { maxWallet: caps[0].toString(), maxBuy: caps[1].toString(), maxSell: caps[2].toString() },
     };
   } catch {
     return null;
@@ -128,7 +195,7 @@ type LaunchRecord = { creator: Address; token: Address; curve: Address; pairToke
 async function readRow(rpc: PublicClient, id: number, record: LaunchRecord, blockNumber: bigint) {
   const factory = CUSTOM_PAIRS.factory as Address;
   const at = { blockNumber };
-  const [state, name, symbol, pairSymbol, pairName, pairDecimals, target, supply, protocolFeeBps, creatorFeeBps, metadata, totalSupply] = await Promise.all([
+  const [state, name, symbol, pairSymbol, pairName, pairDecimals, target, supply, protocolFeeBps, creatorFeeBps, metadata, totalSupply, rulesContract] = await Promise.all([
     rpc.readContract({ address: record.curve, abi: CUSTOM_PAIR_CURVE_ABI, functionName: "state", ...at }) as Promise<CurveStateTuple>,
     rpc.readContract({ address: record.token, abi: ERC20, functionName: "name", ...at }),
     rpc.readContract({ address: record.token, abi: ERC20, functionName: "symbol", ...at }),
@@ -141,6 +208,8 @@ async function readRow(rpc: PublicClient, id: number, record: LaunchRecord, bloc
     rpc.readContract({ address: record.curve, abi: CUSTOM_PAIR_CURVE_ABI, functionName: "creatorFeeBps", ...at }),
     rpc.readContract({ address: factory, abi: CUSTOM_PAIR_FACTORY_ABI, functionName: "metadataOf", args: [record.token], ...at }),
     rpc.readContract({ address: record.token, abi: ERC20, functionName: "totalSupply", ...at }),
+    // Tokens from before launch rules have no rules() at all.
+    rpc.readContract({ address: record.token, abi: CUSTOM_PAIR_TOKEN_ABI, functionName: "rules", ...at }).catch(() => NO_ADDRESS as Address),
   ]);
   const phase = customPhase(state.phase);
   let spotPriceX18 = state.spotPriceX18;
@@ -181,6 +250,7 @@ async function readRow(rpc: PublicClient, id: number, record: LaunchRecord, bloc
     tradeCount: Number(state.tradeCount),
     protocolFeeBps: Number(protocolFeeBps),
     creatorFeeBps: Number(creatorFeeBps),
+    rulesContract: String(rulesContract).toLowerCase() === NO_ADDRESS ? null : (rulesContract as Address),
   };
   return { row, state, metadata };
 }
@@ -194,16 +264,19 @@ export async function readCustomPairLaunches(offset = 0, limit = 24) {
       blockNumber: null,
       protocolFeeBps: null,
       launchesPaused: null,
+      launchRules: null as Address | null,
       launches: [] as CustomPairLaunch[],
     };
   }
   const rpc = customPairClient();
   const blockNumber = await rpc.getBlockNumber();
   const factory = CUSTOM_PAIRS.factory;
-  const [count, protocolFeeBps, launchesPaused] = await Promise.all([
+  const [count, protocolFeeBps, launchesPaused, launchRules] = await Promise.all([
     rpc.readContract({ address: factory, abi: CUSTOM_PAIR_FACTORY_ABI, functionName: "launchCount", blockNumber }),
     rpc.readContract({ address: factory, abi: CUSTOM_PAIR_FACTORY_ABI, functionName: "protocolFeeBps", blockNumber }),
     rpc.readContract({ address: factory, abi: CUSTOM_PAIR_FACTORY_ABI, functionName: "launchesPaused", blockNumber }),
+    // Factories from before launch rules have no launchRules() at all.
+    rpc.readContract({ address: factory, abi: CUSTOM_PAIR_FACTORY_ABI, functionName: "launchRules", blockNumber }).catch(() => NO_ADDRESS as Address),
   ]);
   const total = Number(count);
   const ids: number[] = [];
@@ -221,6 +294,8 @@ export async function readCustomPairLaunches(offset = 0, limit = 24) {
     blockNumber: blockNumber.toString(),
     protocolFeeBps: Number(protocolFeeBps),
     launchesPaused: Boolean(launchesPaused),
+    /** Set when this factory offers optional launch rules. */
+    launchRules: String(launchRules).toLowerCase() === NO_ADDRESS ? null : (launchRules as Address),
     launches,
   };
 }
@@ -263,7 +338,10 @@ export async function readCustomPairLaunch(curveAddress: string): Promise<Custom
     poolReserves = { pair: (pairFirst ? reserves[0] : reserves[1]).toString(), launch: (pairFirst ? reserves[1] : reserves[0]).toString() };
   }
 
-  const feeSplit = await readFeeSplit(rpc, curve, creatorFeeRecipient, blockNumber);
+  const [feeSplit, rules] = await Promise.all([
+    readFeeSplit(rpc, curve, creatorFeeRecipient, blockNumber),
+    row.rulesContract ? readLaunchRules(rpc, record.token, row.rulesContract, blockNumber) : Promise.resolve(null),
+  ]);
 
   return {
     ...row,
@@ -285,6 +363,7 @@ export async function readCustomPairLaunch(curveAddress: string): Promise<Custom
     poolReserves,
     rescue: row.phase === "Rescued" ? { circulating: rescueCirculating.toString(), holderClaims: rescueHolderClaims.toString() } : null,
     feeSplit,
+    rules,
     blockNumber: blockNumber.toString(),
     blockTimestamp: Number(block.timestamp),
   };

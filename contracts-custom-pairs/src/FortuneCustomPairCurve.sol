@@ -43,6 +43,8 @@ contract FortuneCustomPairCurve is ReentrancyGuard {
         /// Where creator fees go. Zero means the creator. The factory sets its
         /// social fee vault here when a launch splits its creator fee.
         address feeRecipient;
+        /// FortuneLaunchRules when the launch has rules, otherwise zero.
+        address rules;
     }
 
     struct State {
@@ -205,7 +207,7 @@ contract FortuneCustomPairCurve is ReentrancyGuard {
         launchTimestamp = uint64(block.timestamp);
 
         FortuneCustomPairToken token =
-            new FortuneCustomPairToken(c.name, c.symbol, c.supply, c.pairToken, c.pancakeFactory);
+            new FortuneCustomPairToken(c.name, c.symbol, c.supply, c.pairToken, c.pancakeFactory, c.rules);
         launchToken = token;
         pool = token.pool();
 

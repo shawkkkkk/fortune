@@ -6,6 +6,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {FortuneCustomPairFactory} from "../src/FortuneCustomPairFactory.sol";
 import {FortuneCustomPairCurve} from "../src/FortuneCustomPairCurve.sol";
 import {FortuneCustomPairToken} from "../src/FortuneCustomPairToken.sol";
+import {FortuneLaunchRules} from "../src/FortuneLaunchRules.sol";
 import {MockPancakeV2Factory, MockPancakeV2Pair} from "./mocks/MockPancakeV2.sol";
 
 interface IMintable {
@@ -19,6 +20,7 @@ abstract contract CustomPairBase is Test {
 
     MockPancakeV2Factory internal pancake;
     FortuneCustomPairFactory internal factory;
+    FortuneLaunchRules internal launchRules;
 
     address internal owner = makeAddr("owner");
     address internal treasury = makeAddr("treasury");
@@ -30,7 +32,9 @@ abstract contract CustomPairBase is Test {
     function setUp() public virtual {
         vm.warp(1_800_000_000);
         pancake = new MockPancakeV2Factory();
-        factory = new FortuneCustomPairFactory(owner, address(pancake), PROTOCOL_FEE_BPS, treasury);
+        // The rules contract is bound to the factory's address, so it comes first.
+        launchRules = new FortuneLaunchRules(vm.computeCreateAddress(address(this), vm.getNonce(address(this)) + 1));
+        factory = new FortuneCustomPairFactory(owner, address(pancake), PROTOCOL_FEE_BPS, treasury, launchRules);
     }
 
     function params(address pairToken, uint256 target) internal pure returns (FortuneCustomPairFactory.LaunchParams memory p) {

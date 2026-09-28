@@ -87,6 +87,9 @@ export default function CustomPairBoard() {
                     <span className={"statusPill " + (launch.phase === "Graduated" ? "statusGraduated" : launch.phase === "GraduationReady" ? "statusGraduating" : "")}>{statusText(launch.phase)}</span>
                   </div>
                   <PairChips pairs={[{ address: launch.pair.address, symbol: launch.pair.symbol }]} zh={zh} />
+                  {launch.rulesContract && (launch.phase === "CurveActive" || launch.phase === "GraduationReady") ? (
+                    <span className="recipientBadge recipientVerified launchRulesChip">Launch rules</span>
+                  ) : null}
                   <div className="marketStats">
                     <div><span>Price</span><strong translate="no">{formatUnitPrice(price)} {launch.pair.symbol}</strong></div>
                     <div><span>Market cap</span><strong translate="no">{formatAmount(marketCap)} {launch.pair.symbol}</strong></div>

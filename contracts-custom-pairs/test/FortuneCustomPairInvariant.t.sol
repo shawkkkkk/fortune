@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
 import {FortuneCustomPairFactory} from "../src/FortuneCustomPairFactory.sol";
+import {FortuneLaunchRules} from "../src/FortuneLaunchRules.sol";
 import {FortuneCustomPairCurve} from "../src/FortuneCustomPairCurve.sol";
 import {FortuneCustomPairToken} from "../src/FortuneCustomPairToken.sol";
 import {MockPancakeV2Factory} from "./mocks/MockPancakeV2.sol";
@@ -83,7 +84,7 @@ contract FortuneCustomPairInvariantTest is Test {
         vm.warp(1_800_000_000);
         MockPancakeV2Factory pancake = new MockPancakeV2Factory();
         FortuneCustomPairFactory factory =
-            new FortuneCustomPairFactory(address(this), address(pancake), 50, makeAddr("treasury"));
+            new FortuneCustomPairFactory(address(this), address(pancake), 50, makeAddr("treasury"), FortuneLaunchRules(address(0)));
         pair = new TaxToken("TAX", 18, 300);
         FortuneCustomPairFactory.LaunchParams memory p;
         p.name = "Invariant";

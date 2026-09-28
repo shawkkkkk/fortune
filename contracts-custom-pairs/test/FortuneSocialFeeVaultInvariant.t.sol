@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {Test} from "forge-std/Test.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {FortuneCustomPairFactory} from "../src/FortuneCustomPairFactory.sol";
+import {FortuneLaunchRules} from "../src/FortuneLaunchRules.sol";
 import {FortuneCustomPairCurve} from "../src/FortuneCustomPairCurve.sol";
 import {FortuneSocialFeeVault} from "../src/FortuneSocialFeeVault.sol";
 import {IFortuneSocialFeeVault} from "../src/interfaces/IFortuneSocialFeeVault.sol";
@@ -126,7 +127,8 @@ contract FortuneSocialFeeVaultInvariantTest is Test {
         address owner = makeAddr("owner");
         uint256 attestorKey = 0xA77E57;
         MockPancakeV2Factory pancake = new MockPancakeV2Factory();
-        FortuneCustomPairFactory factory = new FortuneCustomPairFactory(owner, address(pancake), 50, makeAddr("treasury"));
+        FortuneCustomPairFactory factory =
+            new FortuneCustomPairFactory(owner, address(pancake), 50, makeAddr("treasury"), FortuneLaunchRules(address(0)));
         vault = new FortuneSocialFeeVault(owner, vm.addr(attestorKey), makeAddr("guardian"));
         vm.startPrank(owner);
         vault.setRegistrar(address(factory), true);

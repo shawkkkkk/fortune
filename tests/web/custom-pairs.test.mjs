@@ -5,6 +5,7 @@ import {
   CUSTOM_PAIRS,
   CUSTOM_PAIR_RULES,
   afterTax,
+  chainClockSkew,
   firstBuyTokens,
   pairForTokens,
   previewCurveBuy,
@@ -23,6 +24,16 @@ const SUPPLY = 1_000_000_000n * E18;
 
 test("Launch Shield decay matches the Standard curve table", () => {
   assert.deepEqual([0, 1, 2, 3, 4, 5, 60].map(shieldBpsAt), [9_900, 2_475, 309, 38, 4, 0, 0]);
+});
+
+test("the market clock follows the chain only when the device clock is clearly off", () => {
+  const block = 1_790_637_146;
+  assert.equal(chainClockSkew(block, block), 0);
+  assert.equal(chainClockSkew(block, block + 3.4), 0, "page load and block timing are ignored");
+  assert.equal(chainClockSkew(block, block - 60), 0, "a minute of drift is tolerated");
+  assert.equal(chainClockSkew(block, block - 13 * 3_600), 13 * 3_600, "a device 13 h behind follows the chain");
+  assert.equal(chainClockSkew(block, block + 300.6), -301, "a device 5 min ahead follows the chain");
+  assert.equal(chainClockSkew(block, block + 90, 120), 0, "the tolerance is configurable");
 });
 
 test("buy split: shield first, then each fee on the rest, rounded down", () => {

@@ -26,7 +26,7 @@ The factory gained `LaunchParams.feeShares` and `setSocialFeeVault`; the curve c
 
 ## Platforms and proofs
 
-The verifier (`lib/social-verify.ts`) only calls configured platform endpoints; a pasted link supplies an id, never a host. Redirects fail closed, unsuccessful HTTP response bodies cannot establish ownership, and responses are bounded while streaming (1,000,000 bytes normally; 6,000,000 for WeChat articles). A platform that requires a redirect needs a reviewed endpoint update before verification can succeed. No platform credentials are needed.
+The verifier (`lib/social-verify.ts`) only calls configured platform endpoints; a pasted link supplies an id, never a host. Redirects are never followed, unsuccessful HTTP response bodies cannot establish ownership, and responses are bounded while streaming (1,000,000 bytes normally; 6,000,000 for WeChat articles). Two reads look at a redirect's `Location` without fetching it: Xiaohongshu sends a missing note to `/404`, and an `xhslink.com` short link names the note, whose page is then fetched from the fixed Xiaohongshu origin. Any other redirect fails closed. No platform credentials are needed.
 
 | Id | Platform | Account | Proof | Permanent id pinned |
 | --- | --- | --- | --- | --- |
@@ -40,19 +40,37 @@ The verifier (`lib/social-verify.ts`) only calls configured platform endpoints; 
 | 8 | Weibo 微博 | numeric UID | Code in the bio (个人简介), read with Weibo's visitor cookies | UID |
 | 9 | Bilibili 哔哩哔哩 | numeric UID | Code in the bio (个性签名), public card API | UID |
 | 10 | WeChat Official Account 微信公众号 | `gh_` original id | Article containing the code, published by that account | `gh_` id |
+| 11 | Xiaohongshu 小红书 (RedNote) | 24-character user id | Public note whose title or text contains the code, read from the note page's server-rendered state | user id |
+| 12 | Private claim link 私密领取链接 | `keccak256(secret)`, 64 hex characters | The link's secret (see below) | the account itself |
 
 The challenge code is `fortune-` plus 24 hex characters of `keccak256(abi.encode("fortune-social-bind-v1", chainId, vault, identityId, wallet, nonce))`: specific to the wallet and single-use per binding. Chinese platforms get only the bare code, with no promotional wording.
 
-Weibo, Bilibili and WeChat accounts are stored by id because the vault only accepts ASCII handles and Chinese display names can change. `GET /api/public/v1/social/resolve` turns profile links, Weibo custom domains and WeChat article links into ids and returns display names, so launchers can paste links and everyone sees names.
+Weibo, Bilibili, WeChat and Xiaohongshu accounts are stored by id because the vault only accepts ASCII handles and Chinese display names can change. `GET /api/public/v1/social/resolve` turns profile links, Weibo custom domains, WeChat article links and Xiaohongshu note links or share text into ids and returns display names, so launchers can paste links and everyone sees names. Xiaohongshu profile pages need a login, so a profile link gives the id but not the name; a note link gives both.
 
-### Not supported yet, and why
+### Platforms Fortune cannot check
 
-Checked from a server outside mainland China on 2026-09-27:
+Checked again from a server outside mainland China on 2026-09-28. Fortune does not solve bot challenges or reverse-engineer request signing, so these stay unverifiable:
 
-- **Douyin 抖音**: share pages now load data client-side through signed requests. Reading them would mean reverse-engineering request signatures against Douyin's terms. The supported path is a Douyin Open Platform app ("log in with Douyin"), which requires a mainland company registration and Douyin's approval.
-- **Personal WeChat 微信**: personal accounts have no public page or handle anyone can reference. The only path is WeChat Login through the WeChat Open Platform (mainland business verification and an ICP-filed website).
-- **Xiaohongshu 小红书** and **Zhihu 知乎**: profile pages and APIs redirect to login.
-- **Binance Square**: only a posting API with an API key; no public read endpoint.
+- **Douyin 抖音**: share pages and the open player page (`open.douyin.com/player/video`) answer with a `byted_acrawler` script challenge. The supported path would be a Douyin Open Platform app ("log in with Douyin"), which needs a mainland company registration and Douyin's approval.
+- **Personal WeChat 微信**: no public page or handle anyone can reference. The only official path is WeChat Login (mainland business verification and an ICP-filed website).
+- **Zhihu 知乎**: every page answers 403 with a `zse-ck` script challenge.
+- **Binance Square**: every page answers 202 with an AWS WAF challenge (`x-amzn-waf-action: challenge`); the API only posts, with a key.
+
+Xiaohongshu note pages, by contrast, are served to plain requests with the note and its author in `window.__INITIAL_STATE__`, so Xiaohongshu is verified directly (id 11). Its profile pages and `/discovery/item/` links still redirect to a login or `/404`, so the verifier always fetches `/explore/<note id>`. Share tokens (`xsec_token`) are not needed and are never forwarded.
+
+For everyone else there is the private claim link.
+
+### Private claim links (id 12)
+
+For people Fortune cannot verify: Douyin and personal WeChat users, Zhihu and Binance Square writers, or anyone without a public account.
+
+1. The launcher chooses **Private claim link** in the fee split. Their browser makes a 32-byte random secret; the launch names `keccak256(secret)` (64 hex characters) as the account. The secret never goes onchain or to Fortune's server at launch.
+2. The launcher sends the link, `https://fortunepad.fun/claims#claim=<secret>`, privately. The secret is in the URL fragment, which browsers never send to servers or in `Referer` headers. Launching stays disabled until the launcher ticks that each link is saved; the links are also kept in that browser's storage and listed on `/claims`.
+3. The recipient opens the link in a wallet browser and presses **Bind this wallet**. `POST /social/attest` checks `keccak256(secret) == account` and signs the binding, which the recipient's wallet submits. It takes effect after the usual hour.
+
+A link binds once. The attestor refuses a link once any wallet is bound or waiting to be (`409`, `LINK_USED`), and the vault's per-account nonce makes a second signature for the same nonce fail once the first binding lands, so two people racing with one link cannot both bind. After the first binding, a leaked link is worthless.
+
+What it does and does not prove: possession of the link, not identity. The launcher who made the link could claim it too, just as they could have routed the share to their own wallet. A link sent over an insecure channel can be intercepted before it is used. A lost link strands its share: nobody, including Fortune, can recover it. A bound wallet cannot be changed later, so a recipient who loses that wallet loses future fees too. That is the price of making a used link worthless. As for every platform, the guardian can cancel a pending first binding within its hour, after which the link can bind again.
 
 A launch can technically name any platform id up to 32, but the website only offers platforms the verifier supports, so fees are never routed to accounts that could not claim.
 
@@ -62,9 +80,9 @@ WeChat and Douyin developer terms prohibit virtual-currency services, and mainla
 
 ## Website and API
 
-- `/launch/custom`: fee split editor (your wallet, other wallets, social accounts; global and Chinese platforms), link resolution and display names.
+- `/launch/custom`: fee split editor (your wallet, other wallets, social accounts on global and Chinese platforms, private claim links with copy-link and bilingual copy-message buttons), link resolution and display names. Claim links are saved in the browser before the launch is signed and shown again on the receipt.
 - `/custom/[curve]`: who receives the creator fee, verification state, fees waiting in the curve and collected, and a permissionless collect button.
-- `/claims`: accounts and launches paying the connected wallet, account lookup, challenge code, proof check, binding, pending-change cancellation, collect-and-claim.
+- `/claims`: accounts and launches paying the connected wallet, account lookup, challenge code, proof check, binding, pending-change cancellation, collect-and-claim. Opening a claim link goes straight to a one-step bind; links this browser created are listed with their status.
 - `GET /api/public/v1/social/status`, `GET /api/public/v1/social/identity`, `GET /api/public/v1/social/resolve`, `POST /api/public/v1/social/attest` (rate limited). Documented in the OpenAPI spec.
 
 ## Configuration
@@ -89,6 +107,8 @@ The **Custom Pairs Beta Testnet Deploy + Drill** workflow deploys the factory an
 - Local rehearsal on a chain-97 node with the real PancakeSwap V2 factory bytecode: the deploy script and drill, and two browser runs. One launched a three-way split, collected, claimed the wallet share and verified a GitHub account through a mocked gist (claims matched shares exactly). The other named a Bilibili UID and a Weibo custom domain, verified the Bilibili bio, bound and claimed.
 - Live checks against the real platforms: X, TikTok, Telegram, YouTube, Bluesky, Farcaster, Weibo, Bilibili and WeChat articles accept a matching post or bio and reject a missing code or the wrong author. GitHub's API is covered by tests only (unreachable from the build sandbox).
 - axe: no violations on the launch split, market recipients and claims pages (light English desktop, dark Chinese mobile).
+- Xiaohongshu, live on 2026-09-28: note links and app share text resolve to the author's id and name; a real note fails verification without the code and for the wrong author, and passes when the searched text is in it. Unit tests cover a forged state inside escaped page text, `/404` and login redirects, and short links (only a note on xiaohongshu.com counts, fetched from the fixed origin). Every public `xhslink.com` sample found redirected to the home page from this server, so short links are covered by tests only; when one fails, the error asks for the full note link.
+- Private claim links, rehearsed in a browser on a local chain-97 node: a launch paying the launcher 40%, a claim link 30% and a Xiaohongshu account 30% (named by a note link). Launching stayed disabled until the link was marked saved; the link holder bound in one step and claimed exactly the 30% share; a second wallet with the same link was refused on the page and by the API (`409`, `LINK_USED`); the Xiaohongshu owner verified with a mocked note and claimed the same amount. axe found nothing, and Chinese dark mode at 390 px had no horizontal overflow.
 
 ## Before mainnet
 

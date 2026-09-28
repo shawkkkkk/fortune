@@ -54,5 +54,9 @@ export async function GET(request: Request) {
   const value = { account: resolved.account, name: resolved.name };
   if (cache.size > 2_000) cache.clear();
   cache.set(key, { value, expires: Date.now() + 10 * 60_000 });
+  // A note or article can name an account whose bare id cannot be looked up
+  // (Xiaohongshu profiles need a login): remember the name for the id too.
+  const byAccount = `${platform.key}:${value.account}`;
+  if (value.name && byAccount !== key && !cache.get(byAccount)?.value.name) cache.set(byAccount, { value, expires: Date.now() + 60 * 60_000 });
   return apiOk({ platform: platform.key, ...value }, { cacheSeconds: 600 });
 }

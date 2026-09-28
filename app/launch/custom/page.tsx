@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { decodeEventLog, formatUnits, hexToString, isAddress, parseAbi, parseUnits, type Address, type Hex } from "viem";
-import FeeSplitEditor, { feeSplitInputs, feeSplitRow, type FeeSplitRow } from "@/components/FeeSplitEditor";
+import FeeSplitEditor, { ClaimLinkBox, feeSplitInputs, feeSplitRow, unsavedClaimLinks, type FeeSplitRow } from "@/components/FeeSplitEditor";
+import { rememberClaimLinks } from "@/lib/claim-link-store";
 import PairInspector from "@/components/PairInspector";
 import TokenImageInput from "@/components/TokenImageInput";
 import { useLanguage } from "@/components/LanguageProvider";
@@ -92,7 +93,7 @@ export default function CustomPairLaunchPage() {
   const [paused, setPaused] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
-  const [launched, setLaunched] = useState<{ curve: Address; token: Address; hash: Hex } | null>(null);
+  const [launched, setLaunched] = useState<{ curve: Address; token: Address; hash: Hex; links: Array<{ secret: string; note: string }> } | null>(null);
 
   const pairAddress = isAddress(pairInput.trim()) ? (pairInput.trim() as Address) : null;
   const decimals = inspection?.token.decimals ?? 18;
@@ -180,7 +181,12 @@ export default function CustomPairLaunchPage() {
 
   const splitting = socialFees && creatorFeeBps > 0;
   const feeSplit = splitting ? buildFeeShares(feeSplitInputs(feeRows, account ?? PREVIEW_WALLET), account) : ({ ok: true, shares: [] } as const);
-  const feeError = feeSplit.ok ? "" : feeSplit.reason;
+  const unsavedLinks = splitting ? unsavedClaimLinks(feeRows) : 0;
+  const feeError = !feeSplit.ok
+    ? feeSplit.reason
+    : unsavedLinks
+      ? "Save each claim link and tick the box under it. Without the link, that share can never be claimed."
+      : "";
   const feeRecipientCount = feeSplit.ok ? feeSplit.shares.length : 0;
 
   const pairBlocked = !inspection || inspection.verdict === "unsupported";
@@ -198,6 +204,12 @@ export default function CustomPairLaunchPage() {
       const factory = CUSTOM_PAIRS.factory;
       const split = splitting ? buildFeeShares(feeSplitInputs(feeRows, wallet), wallet) : ({ ok: true, shares: [] } as const);
       if (!split.ok) throw new Error(split.reason);
+      // Claim links go into this browser's storage before anything is signed,
+      // so a closed tab never strands a share.
+      const links = splitting
+        ? feeRows.filter((row) => row.kind === "link" && row.secret).map((row) => ({ secret: row.secret as string, note: row.note?.trim() ?? "" }))
+        : [];
+      if (links.length) rememberClaimLinks(FORTUNE_NETWORK.chainId, links.map((link) => ({ ...link, symbol: symbol.trim() })));
       const params = {
         name: name.trim(),
         symbol: symbol.trim(),
@@ -271,7 +283,8 @@ export default function CustomPairLaunchPage() {
           const event = decodeEventLog({ abi: CUSTOM_PAIR_FACTORY_ABI, data: log.data, topics: log.topics });
           if (event.eventName === "LaunchCreated") {
             const args = event.args as unknown as { token: Address; curve: Address };
-            setLaunched({ curve: args.curve, token: args.token, hash });
+            if (links.length) rememberClaimLinks(FORTUNE_NETWORK.chainId, links.map((link) => ({ ...link, curve: args.curve, symbol: symbol.trim() })));
+            setLaunched({ curve: args.curve, token: args.token, hash, links });
             setMessage("Launched. Your curve is live.");
             return;
           }
@@ -367,7 +380,7 @@ export default function CustomPairLaunchPage() {
                 </div>
               </fieldset>
               {splitting ? (
-                <FeeSplitEditor rows={feeRows} onChange={setFeeRows} error={feeError} errorRow={feeSplit.ok ? undefined : feeSplit.row} disabled={busy} />
+                <FeeSplitEditor rows={feeRows} onChange={setFeeRows} error={feeError} errorRow={feeSplit.ok ? undefined : feeSplit.row} disabled={busy} token={symbol.trim() || null} />
               ) : null}
               <p className="fieldHint" translate="no">{zh
                 ? `另加 ${protocolFeeBps === null ? "—" : formatTaxBps(protocolFeeBps)} 的协议费。手续费累积在曲线中、由接收方领取，因此被封禁的接收方永远无法阻止交易。`
@@ -423,6 +436,18 @@ export default function CustomPairLaunchPage() {
               {message ? <p className="launchDescription" role="status">{message}</p> : null}
               {launched && feeRecipientCount ? (
                 <p className="fieldHint">Named accounts see their share on your market page and claim it after verifying. <Link href="/claims">Claims →</Link></p>
+              ) : null}
+              {launched?.links.length ? (
+                <div className="claimLinkReceipt">
+                  <strong>Send your claim links</strong>
+                  <p className="fieldHint">They are also saved in this browser, under Claims. Each works once.</p>
+                  {launched.links.map((link) => (
+                    <div key={link.secret}>
+                      {link.note ? <span className="claimLinkNote" translate="no">{link.note}</span> : null}
+                      <ClaimLinkBox secret={link.secret} token={symbol.trim() || null} />
+                    </div>
+                  ))}
+                </div>
               ) : null}
               {launched ? (
                 <div className="heroActions">

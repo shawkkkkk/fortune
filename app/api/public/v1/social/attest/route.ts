@@ -3,6 +3,7 @@ import { apiError, apiOk } from "@/lib/public-api";
 import {
   SOCIAL_FEE_RULES,
   ZERO_BYTES32,
+  bindingRefusal,
   bindingTypedData,
   canonicalAccount,
   challengeCode,
@@ -53,6 +54,8 @@ export async function POST(request: Request) {
   if (!wallet) return apiError("invalid_request", "Connect the wallet that should receive the fees.", 400);
   const proofUrl = typeof body.proofUrl === "string" && body.proofUrl.trim() ? body.proofUrl.trim().slice(0, 500) : null;
   if (parsed.platform.proofExample && !proofUrl) return apiError("invalid_request", "Paste the link to your proof post.", 400);
+  const secret = typeof body.secret === "string" ? body.secret.trim().slice(0, 100) : null;
+  if (parsed.platform.key === "link" && !secret) return apiError("invalid_request", "Open the whole claim link you were sent.", 400);
 
   const client = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || request.headers.get("x-real-ip") || "unknown";
   if (rateLimited(client)) return apiError("rate_limited", "Too many verification attempts. Try again in a few minutes.", 429);
@@ -75,13 +78,12 @@ export async function POST(request: Request) {
   } catch {
     return apiError("dependency_unavailable", "The social fee vault could not be read from BNB Chain right now.", 503);
   }
-  const lower = wallet.toLowerCase();
-  if (identity.wallet?.toLowerCase() === lower) return apiError("conflict", "This wallet already receives this account's fees.", 409);
-  if (identity.pendingWallet?.toLowerCase() === lower) return apiError("conflict", "This wallet is already waiting to take over this account's fees.", 409);
+  const refusal = bindingRefusal(parsed.platform.key, identity, wallet);
+  if (refusal) return apiError("conflict", refusal.message, 409, refusal.reason ? { reason: refusal.reason } : undefined);
 
   const nonce = BigInt(identity.nonce);
   const code = challengeCode({ chainId: FORTUNE_NETWORK.chainId, vault: status.vault, identityId, wallet, nonce });
-  const outcome = await verifySocialProof({ platform: parsed.platform, account: parsed.account, code, wallet, proofUrl });
+  const outcome = await verifySocialProof({ platform: parsed.platform, account: parsed.account, code, wallet, proofUrl, secret });
   if (!outcome.ok) {
     const unavailable = outcome.code === "SOURCE_UNAVAILABLE";
     return apiError(unavailable ? "dependency_unavailable" : "preflight_failed", outcome.message, unavailable ? 503 : 422, { reason: outcome.code, code });

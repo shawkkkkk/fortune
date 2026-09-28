@@ -7014,6 +7014,20 @@ html.entryGateOpen {
 .feeSplitActions .secondaryCta { padding: 8px 14px; font-size: 14px; }
 .feeSplitTotal { margin-left: auto; color: var(--red-ink); font-weight: 800; font-variant-numeric: tabular-nums; }
 .feeSplitTotalOk { color: var(--jade); }
+.claimLinkBox { display: grid; gap: 8px; min-width: 0; }
+.feeSplitRow > .claimLinkBox { display: grid; align-items: stretch; grid-column: 1 / -1; padding: 12px; border: 1px solid var(--gold-line); border-radius: 12px; background: var(--surface); }
+.claimLinkBox .claimsCode code { flex-basis: 100%; font-family: var(--font-mono); font-size: 12.5px; }
+.claimLinkBox .fieldHint { margin: 0; }
+label.claimLinkSaved { display: flex; flex-direction: row; align-items: flex-start; gap: 10px; margin: 0; color: var(--ink); font-size: 14px; font-weight: 650; line-height: 1.4; }
+.claimLinkSaved input[type="checkbox"] { flex: none; width: 18px; min-height: 18px; height: 18px; margin: 2px 0 0; padding: 0; accent-color: var(--red); }
+.claimLinkReceipt { display: grid; gap: 12px; margin-top: 14px; padding: 14px; border: 1px solid var(--gold-line); border-radius: 14px; background: var(--surface-sunk); }
+.claimLinkReceipt > div { display: grid; gap: 6px; }
+.claimLinkNote { font-weight: 750; }
+.savedClaimLinks { display: grid; gap: 14px; margin: 0; padding: 0; list-style: none; }
+.savedClaimLinks > li { display: grid; gap: 8px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
+.savedClaimLinks > li:last-child { padding-bottom: 0; border-bottom: 0; }
+.savedClaimLinkHead { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; }
+.savedClaimLinkHead span { color: var(--muted); font-size: 14px; }
 
 .feeRecipients { display: grid; gap: 12px; }
 .feeRecipients h2 { margin: 0; font-size: 20px; }

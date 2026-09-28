@@ -303,7 +303,7 @@ export async function GET(request: Request) {
           description:
             "Pass platform and account (a handle or profile link) for one account, or wallet for every account bound to it or waiting to be. Includes owed and claimable amounts per pair token, and each launch naming the account with its share of fees not yet collected.",
           parameters: [
-            { name: "platform", in: "query", schema: { type: "string", enum: ["x", "github", "tiktok", "telegram", "youtube", "farcaster", "bluesky", "weibo", "bilibili", "wechat"] } },
+            { name: "platform", in: "query", schema: { type: "string", enum: ["x", "github", "tiktok", "telegram", "youtube", "farcaster", "bluesky", "weibo", "bilibili", "wechat", "xiaohongshu", "link"] } },
             { name: "account", in: "query", schema: { type: "string" } },
             { name: "wallet", in: "query", schema: { type: "string" } },
           ],
@@ -317,9 +317,9 @@ export async function GET(request: Request) {
       "/social/resolve": {
         get: {
           tags: ["Launches"],
-          summary: "Turn a Weibo, Bilibili or WeChat link into the account id the vault stores",
+          summary: "Turn a Weibo, Bilibili, WeChat or Xiaohongshu link into the account id the vault stores",
           description:
-            "Weibo and Bilibili accounts are stored by numeric UID and WeChat Official Accounts by their gh_ id. Accepts a UID, a profile or space link, a Weibo custom domain or any WeChat article link, and returns the account id with the display name when the platform shares it. Other platforms return the canonical handle. Rate limited.",
+            "Weibo and Bilibili accounts are stored by numeric UID, WeChat Official Accounts by their gh_ id and Xiaohongshu accounts by their 24-character user id. Accepts a UID, a profile or space link, a Weibo custom domain, any WeChat article link, or a Xiaohongshu profile link, note link or share text, and returns the account id with the display name when the platform shares it. Other platforms return the canonical handle. Rate limited.",
           parameters: [
             { name: "platform", in: "query", required: true, schema: { type: "string" } },
             { name: "input", in: "query", required: true, schema: { type: "string" } },
@@ -337,7 +337,7 @@ export async function GET(request: Request) {
           tags: ["Launches"],
           summary: "Verify a public ownership proof and sign a wallet binding",
           description:
-            "Body: { platform, account, wallet, proofUrl }. The proof must be a public post by the account containing the challenge code for this wallet (fortune- followed by 24 hex characters, derived from the chain, vault, account, wallet and the account's nonce). Farcaster needs no post: the wallet must be a verified address of the account. Returns an EIP-712 Binding signature that only `wallet` can submit to FortuneSocialFeeVault.bind within 30 minutes; the binding then takes effect after 1 hour (3 days to change an existing wallet). Rate limited.",
+            "Body: { platform, account, wallet, proofUrl, secret }. The proof must be a public post by the account containing the challenge code for this wallet (fortune- followed by 24 hex characters, derived from the chain, vault, account, wallet and the account's nonce). Farcaster needs no post: the wallet must be a verified address of the account. A private claim link (platform link) needs no post either: send the link's secret, whose keccak256 is the account; a link binds once, so this returns 409 once any wallet is bound or pending. Returns an EIP-712 Binding signature that only `wallet` can submit to FortuneSocialFeeVault.bind within 30 minutes; the binding then takes effect after 1 hour (3 days to change an existing wallet). Rate limited.",
           requestBody: {
             required: true,
             content: {
@@ -350,6 +350,7 @@ export async function GET(request: Request) {
                     account: { type: "string" },
                     wallet: { type: "string" },
                     proofUrl: { type: "string" },
+                    secret: { type: "string", description: "Private claim links only: the 43-character secret after #claim= in the link" },
                   },
                 },
               },
@@ -358,7 +359,7 @@ export async function GET(request: Request) {
           responses: {
             "200": { description: "identityId, stableId, nonce, deadline, signature and the evidence that was checked" },
             "400": { description: "Invalid platform, handle, wallet or missing proof link" },
-            "409": { description: "Already bound or pending for this wallet, or the handle now belongs to a different account" },
+            "409": { description: "Already bound or pending for this wallet, the handle now belongs to a different account, or the claim link was already used (details.reason LINK_USED)" },
             "422": { description: "The proof failed: wrong author, code missing, post not found or wallet not verified (details.reason, details.code)" },
             "429": { description: "Too many attempts" },
             "503": { description: "Verification not configured, paused, or the platform did not answer" },

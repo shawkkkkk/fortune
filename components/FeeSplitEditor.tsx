@@ -1,26 +1,95 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLanguage } from "@/components/LanguageProvider";
 import { resolveAccount, useResolvedName } from "@/components/SocialAccountName";
 import {
   SOCIAL_FEE_RULES,
   SOCIAL_PLATFORMS,
   canonicalAccount,
+  claimAccountOf,
+  claimLinkMessage,
+  claimLinkUrl,
+  newClaimSecret,
   platformLabel,
   socialPlatform,
   type FeeShareInput,
   type SocialPlatform,
 } from "@/lib/social-fees";
 
-/** "self" is the wallet that signs the launch; "wallet" is any other address; anything else is a platform key. */
-export type FeeSplitRow = { id: number; kind: string; value: string; percent: string };
+/**
+ * "self" is the wallet that signs the launch; "wallet" is any other address;
+ * anything else is a platform key. A "link" row carries its claim link's
+ * secret, which never leaves this browser except inside the link itself.
+ */
+export type FeeSplitRow = { id: number; kind: string; value: string; percent: string; secret?: string; note?: string; saved?: boolean };
 
 let nextRowId = 1;
 
+/** A fresh claim link for a row: its account is keccak256 of the new secret. */
+function claimLinkFields() {
+  const secret = newClaimSecret();
+  return { value: claimAccountOf(secret) ?? "", secret, note: "", saved: false };
+}
+
 export function feeSplitRow(kind = "self", percent = "100", value = ""): FeeSplitRow {
   nextRowId += 1;
+  if (kind === "link") return { id: nextRowId, kind, percent, ...claimLinkFields() };
   return { id: nextRowId, kind, value, percent };
+}
+
+/** Claim-link rows the launcher has not yet confirmed saving. */
+export function unsavedClaimLinks(rows: FeeSplitRow[]) {
+  return rows.filter((row) => row.kind === "link" && !row.saved).length;
+}
+
+/** The link to send, with its copy buttons. */
+export function ClaimLinkBox({
+  secret,
+  token,
+  saved,
+  onSaved,
+  disabled,
+}: {
+  secret: string;
+  token?: string | null;
+  saved?: boolean;
+  onSaved?: (saved: boolean) => void;
+  disabled?: boolean;
+}) {
+  const { language } = useLanguage();
+  const zh = language === "zh";
+  const [origin, setOrigin] = useState("https://fortunepad.fun");
+  const [copied, setCopied] = useState<"" | "link" | "message">("");
+  useEffect(() => setOrigin(window.location.origin), []);
+  const link = claimLinkUrl(origin, secret);
+
+  async function copy(kind: "link" | "message") {
+    try {
+      await navigator.clipboard.writeText(kind === "link" ? link : claimLinkMessage(link, token ?? null));
+      setCopied(kind);
+      window.setTimeout(() => setCopied(""), 2_000);
+    } catch {
+      setCopied("");
+    }
+  }
+
+  return (
+    <div className="claimLinkBox">
+      <div className="claimsCode">
+        <code translate="no">{link}</code>
+        <button type="button" className="secondaryCta" onClick={() => void copy("link")}>{copied === "link" ? "Copied" : "Copy link"}</button>
+        <button type="button" className="secondaryCta" onClick={() => void copy("message")}>{copied === "message" ? "Copied" : "Copy message"}</button>
+      </div>
+      <p className="fieldHint">Send it privately, in a DM on Douyin, WeChat, Zhihu, Binance Square or anywhere else. Whoever opens it first and binds a wallet gets this share; after that the link is spent. Fortune cannot recover a lost link.</p>
+      {onSaved ? (
+        <label className="claimLinkSaved">
+          <input type="checkbox" checked={Boolean(saved)} disabled={disabled} onChange={(event) => onSaved(event.target.checked)} />
+          <span>I saved this link. Without it, this share can never be claimed.</span>
+        </label>
+      ) : null}
+    </div>
+  );
 }
 
 /** Rows as buildFeeShares expects them, with "self" resolved to the launching wallet. */
@@ -44,6 +113,11 @@ export function PlatformOptions({ zh }: { zh: boolean }) {
       <optgroup label={zh ? "中国平台" : "China"}>
         {SOCIAL_PLATFORMS.filter((item) => item.region === "china").map((item) => (
           <option key={item.key} value={item.key}>{zh ? item.labelZh : `${item.label} · ${item.labelZh}`}</option>
+        ))}
+      </optgroup>
+      <optgroup label={zh ? "任何平台" : "Any platform"}>
+        {SOCIAL_PLATFORMS.filter((item) => item.region === "any").map((item) => (
+          <option key={item.key} value={item.key}>{zh ? "私密领取链接（抖音、微信、知乎、币安广场等）" : "Private claim link (Douyin, WeChat, Zhihu, Binance Square…)"}</option>
         ))}
       </optgroup>
     </>
@@ -71,12 +145,15 @@ export default function FeeSplitEditor({
   error,
   errorRow,
   disabled,
+  token,
 }: {
   rows: FeeSplitRow[];
   onChange: (rows: FeeSplitRow[]) => void;
   error: string;
   errorRow?: number;
   disabled?: boolean;
+  /** The launch's ticker, for the message sent with a claim link. */
+  token?: string | null;
 }) {
   const { language } = useLanguage();
   const zh = language === "zh";
@@ -114,7 +191,15 @@ export default function FeeSplitEditor({
           return (
             <li key={row.id} className={"feeSplitRow" + (errorRow === index ? " feeSplitRowError" : "")}>
               <div className="feeSplitKind">
-                <select aria-label={zh ? `接收方 ${index + 1}` : `Recipient ${index + 1}`} value={row.kind} disabled={disabled} onChange={(event) => update(row.id, { kind: event.target.value, value: "" })}>
+                <select
+                  aria-label={zh ? `接收方 ${index + 1}` : `Recipient ${index + 1}`}
+                  value={row.kind}
+                  disabled={disabled}
+                  onChange={(event) => {
+                    const kind = event.target.value;
+                    update(row.id, kind === "link" ? { kind, ...claimLinkFields() } : { kind, value: "", secret: undefined, note: undefined, saved: undefined });
+                  }}
+                >
                   <option value="self" disabled={rows.some((other) => other.kind === "self" && other.id !== row.id)}>Your wallet</option>
                   <option value="wallet">Another wallet</option>
                   <PlatformOptions zh={zh} />
@@ -122,6 +207,18 @@ export default function FeeSplitEditor({
               </div>
               {row.kind === "self" ? (
                 <span className="feeSplitSelf">The wallet that signs the launch</span>
+              ) : row.kind === "link" ? (
+                <div className="feeSplitValue">
+                  <input
+                    aria-label={zh ? `接收方 ${index + 1} 的备注` : `Note for recipient ${index + 1}`}
+                    value={row.note ?? ""}
+                    disabled={disabled}
+                    onChange={(event) => update(row.id, { note: event.target.value.slice(0, 80) })}
+                    placeholder={zh ? "给谁的？仅保存在本设备" : "Who is it for? Kept on this device only"}
+                    maxLength={80}
+                    autoComplete="off"
+                  />
+                </div>
               ) : (
                 <div className="feeSplitValue">
                   {platform?.prefix ? <span className="feeSplitPrefix" aria-hidden="true">{platform.prefix}</span> : null}
@@ -161,7 +258,9 @@ export default function FeeSplitEditor({
               >
                 ×
               </button>
-              {lookups[row.id] ? (
+              {row.kind === "link" && row.secret ? (
+                <ClaimLinkBox secret={row.secret} token={token} saved={row.saved} disabled={disabled} onSaved={(saved) => update(row.id, { saved })} />
+              ) : lookups[row.id] ? (
                 <span className={"feeSplitResolved" + (lookups[row.id]?.error ? " feeSplitLookupError" : "")} role="status">{lookups[row.id]?.text}</span>
               ) : (
                 <ResolvedName platform={platform} value={row.value} />
@@ -197,6 +296,9 @@ export default function FeeSplitEditor({
       {error ? <p className="fieldError" role="alert">{error}</p> : null}
       <p className="fieldHint">
         Social accounts claim on Fortune after proving they own the account; until then their share waits in the fee vault. Naming an account does not mean its owner endorses the token. The split is fixed at launch.
+      </p>
+      <p className="fieldHint">
+        For someone on Douyin, personal WeChat, Zhihu, Binance Square or any platform Fortune cannot check, choose Private claim link and send them the link.
       </p>
     </div>
   );

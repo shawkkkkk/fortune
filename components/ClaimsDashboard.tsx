@@ -4,9 +4,10 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { formatUnits, getAddress, isAddress, type Address, type Hex } from "viem";
 import { RecipientName, RecipientState } from "@/components/FeeRecipientsPanel";
-import { PlatformOptions } from "@/components/FeeSplitEditor";
+import { ClaimLinkBox, PlatformOptions } from "@/components/FeeSplitEditor";
 import { resolveAccount } from "@/components/SocialAccountName";
 import { useLanguage } from "@/components/LanguageProvider";
+import { loadClaimLinks, type SavedClaimLink } from "@/lib/claim-link-store";
 import { SOCIAL_FEE_VAULT_ABI } from "@/lib/custom-pairs-artifacts";
 import { FORTUNE_NETWORK } from "@/lib/fortune-network";
 import { assertWalletIdentity } from "@/lib/launch-safety";
@@ -16,6 +17,7 @@ import {
   canonicalAccount,
   challengeCode,
   challengePost,
+  claimSecretFromText,
   describeAccount,
   formatShareBps,
   platformLabel,
@@ -162,6 +164,9 @@ export default function ClaimsDashboard() {
   const [lookup, setLookup] = useState<(SocialIdentityDetail & { vault: Address }) | null>(null);
   const [lookupError, setLookupError] = useState("");
   const [proofUrl, setProofUrl] = useState("");
+  // The secret of a private claim link this page was opened with (or that was pasted), and its account.
+  const [claimLink, setClaimLink] = useState<{ account: string; secret: string } | null>(null);
+  const [savedLinks, setSavedLinks] = useState<SavedClaimLink[]>([]);
   const [attestation, setAttestation] = useState<Attestation | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -191,6 +196,9 @@ export default function ClaimsDashboard() {
     setAttestation(null);
     const parsed = canonicalAccount(key, raw);
     let account = parsed.ok ? parsed.account : "";
+    // Keep a pasted link's secret; a lookup by account alone leaves the one already held.
+    const secret = parsed.ok && parsed.platform.key === "link" ? claimSecretFromText(raw) : null;
+    if (secret) setClaimLink({ account, secret });
     if (!parsed.ok) {
       if (!parsed.resolvable) {
         setLookup(null);
@@ -228,10 +236,17 @@ export default function ClaimsDashboard() {
         void loadMine(first);
       })
       .catch(() => undefined);
+    setSavedLinks(loadClaimLinks(FORTUNE_NETWORK.chainId));
+    // A private claim link carries its secret in the fragment, which never reaches a server log.
+    const secret = claimSecretFromText(window.location.hash);
     const params = new URLSearchParams(window.location.search);
     const queryPlatform = socialPlatform(params.get("platform"));
     const queryAccount = params.get("account");
-    if (queryPlatform && queryAccount) {
+    if (secret) {
+      setPlatformKey("link");
+      setHandle(window.location.href);
+      void runLookup("link", window.location.href);
+    } else if (queryPlatform && queryAccount) {
       setPlatformKey(queryPlatform.key);
       setHandle(queryAccount);
       void runLookup(queryPlatform.key, queryAccount);
@@ -261,6 +276,8 @@ export default function ClaimsDashboard() {
   const lookedUpPlatform = lookup ? socialPlatform(lookup.identity.platform) : null;
   const boundHere = Boolean(lookup && account && lookup.identity.wallet?.toLowerCase() === account.toLowerCase());
   const pendingHere = Boolean(lookup && account && lookup.identity.pendingWallet?.toLowerCase() === account.toLowerCase());
+  const linkSecret = lookup && claimLink?.account === lookup.identity.account ? claimLink.secret : null;
+  const linkMadeHere = Boolean(lookup && savedLinks.some((link) => link.account === lookup.identity.account));
 
   async function run(label: string, action: (wallet: Address) => Promise<void>) {
     setBusy(true);
@@ -298,8 +315,29 @@ export default function ClaimsDashboard() {
     }
   }
 
-  async function submitBinding() {
-    const signed = attestation;
+  /** Private claim links: the link's secret is the proof, so checking and binding are one step. */
+  async function bindClaimLink() {
+    if (!lookup || !account || !linkSecret) return;
+    setBusy(true);
+    setMessage("Checking the claim link…");
+    let signed: Attestation;
+    try {
+      signed = await api<Attestation>("/api/public/v1/social/attest", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ platform: lookup.identity.platform, account: lookup.identity.account, wallet: account, secret: linkSecret }),
+      });
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "The claim link could not be checked.");
+      setBusy(false);
+      return;
+    }
+    setBusy(false);
+    await submitBinding(signed);
+  }
+
+  async function submitBinding(signedNow?: Attestation) {
+    const signed = signedNow ?? attestation;
     const vault = status?.vault;
     if (!signed || !vault) return;
     await run("Preparing the binding…", async (wallet) => {
@@ -424,7 +462,7 @@ export default function ClaimsDashboard() {
             )}
           </section>
 
-          <section className="formCard">
+          <section className="formCard" id="verify-account">
             <div className="formSectionTitle"><span>02</span><div><h2>Verify an account</h2><p>Prove you own the account a launch named, then bind your wallet to it.</p></div></div>
             <form
               className="claimsLookup"
@@ -438,7 +476,7 @@ export default function ClaimsDashboard() {
                   <PlatformOptions zh={zh} />
                 </select>
               </label>
-              <label><span translate="no">{zh ? `${platformLabel(platform, true)} 账户` : `${platform.label} ${platform.placeholder}`}</span>
+              <label><span translate="no">{platform.key === "link" ? (zh ? "领取链接" : "Claim link") : zh ? `${platformLabel(platform, true)} 账户` : `${platform.label} ${platform.placeholder}`}</span>
                 <input value={handle} onChange={(event) => setHandle(event.target.value)} placeholder={platform.prefix + platform.placeholder} autoComplete="off" spellCheck={false} />
               </label>
               <button type="submit" className="secondaryCta" disabled={!enabled || busy}>Look up</button>
@@ -467,6 +505,35 @@ export default function ClaimsDashboard() {
                   <p className="verificationBadge" translate="no">
                     {zh ? `该钱包的绑定将于 ${new Date(((lookup.identity.pendingAt ?? 0) - chainOffset) * 1000).toLocaleString("zh-CN")} 生效。` : `This wallet takes over at ${new Date(((lookup.identity.pendingAt ?? 0) - chainOffset) * 1000).toLocaleString("en-US")}.`}
                   </p>
+                ) : lookedUpPlatform.key === "link" ? (
+                  lookup.identity.wallet || lookup.identity.pendingWallet ? (
+                    <p className="reviewWarning" translate="no">
+                      {zh
+                        ? `此领取链接已被 ${shortAddress(lookup.identity.wallet ?? lookup.identity.pendingWallet ?? "")} 使用。每个领取链接只能使用一次。`
+                        : `This claim link has already been used by ${shortAddress(lookup.identity.wallet ?? lookup.identity.pendingWallet ?? "")}. A claim link works once.`}
+                    </p>
+                  ) : !linkSecret ? (
+                    <p className="fieldHint">
+                      {linkMadeHere
+                        ? "You created this link in this browser. Send it to the person it is for, from the list below; they bind their own wallet."
+                        : "Only the person holding this private claim link can bind a wallet to it. Open the link you were sent."}
+                    </p>
+                  ) : (
+                    <ol className="claimsSteps">
+                      {linkMadeHere ? (
+                        <li className="reviewWarning">This browser created this link. Bind it only if these fees are meant for the connected wallet: once bound, the link is spent.</li>
+                      ) : null}
+                      <li>
+                        <strong translate="no">{zh ? `绑定 ${shortAddress(account)}` : `Bind ${shortAddress(account)}`}</strong>
+                        <p className="fieldHint" translate="no">
+                          {zh
+                            ? `在有钱包绑定之前，任何拿到此链接的人都能使用它，所以请现在绑定。绑定 ${firstDelayHours} 小时后生效，之后就可以在上方领取。`
+                            : `Until a wallet binds it, anyone holding this link can use it, so bind now. It takes effect after ${firstDelayHours} hour${firstDelayHours === 1 ? "" : "s"}; then claim above.`}
+                        </p>
+                        <button type="button" className="primaryCta" disabled={busy || !status?.ready} onClick={() => void bindClaimLink()}>Bind this wallet</button>
+                      </li>
+                    </ol>
+                  )
                 ) : (
                   <ol className="claimsSteps">
                     {lookup.identity.wallet ? (
@@ -534,6 +601,38 @@ export default function ClaimsDashboard() {
             ) : null}
             {message ? <p className="launchDescription" role="status">{message}</p> : null}
           </section>
+
+          {savedLinks.length ? (
+            <section className="formCard">
+              <div className="formSectionTitle"><span>03</span><div><h2>Claim links you created</h2><p>Saved in this browser only. Send each to the person it is for.</p></div></div>
+              <ul className="savedClaimLinks">
+                {savedLinks.map((link) => (
+                  <li key={link.account}>
+                    <div className="savedClaimLinkHead">
+                      <strong translate="no">{link.note || (zh ? "领取链接" : "Claim link")}</strong>
+                      <span translate="no">
+                        {link.curve ? <Link href={`/custom/${link.curve}`}>{link.symbol ? `$${link.symbol}` : shortAddress(link.curve)}</Link> : (zh ? "发行未确认" : "Launch not confirmed")}
+                        {" · "}
+                        <button
+                          type="button"
+                          className="linkButton"
+                          onClick={() => {
+                            setPlatformKey("link");
+                            setHandle(link.account);
+                            void runLookup("link", link.account);
+                            document.getElementById("verify-account")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                          }}
+                        >
+                          {zh ? "查看状态" : "Status"}
+                        </button>
+                      </span>
+                    </div>
+                    <ClaimLinkBox secret={link.secret} token={link.symbol} />
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
         </div>
 
         <aside className="launchAside" aria-label="How claims work">
@@ -541,7 +640,7 @@ export default function ClaimsDashboard() {
             <span className="eyebrow">HOW IT WORKS</span>
             <ol className="claimsHow">
               <li><strong>A launch names you.</strong> Custom-pair launches can split their creator fee between wallets and social accounts, fixed at launch.</li>
-              <li><strong>You prove the account.</strong> Publish a one-time code from the account, or add your wallet on Farcaster. Fortune checks it and signs a binding.</li>
+              <li><strong>You prove the account.</strong> Publish a one-time code from the account, add your wallet on Farcaster, or open the private claim link you were sent. Fortune checks it and signs a binding.</li>
               <li><strong>Your wallet binds it.</strong> One transaction. It takes effect after a short delay; changing the wallet later takes longer and the current wallet can cancel.</li>
               <li><strong>You claim.</strong> Fees from every launch that names the account, in each pair token, to your wallet.</li>
             </ol>

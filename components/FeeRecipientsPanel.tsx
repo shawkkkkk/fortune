@@ -99,7 +99,9 @@ export default function FeeRecipientsPanel({
             </div>
             <div className="recipientMeta">
               <RecipientState recipient={recipient} now={now} />
-              {recipient.platform !== 0 && !recipient.wallet ? (
+              {socialPlatform(recipient.platform)?.key === "link" && !recipient.wallet ? (
+                <span className="recipientClaim">Paid to whoever holds the claim link</span>
+              ) : recipient.platform !== 0 && !recipient.wallet ? (
                 <Link
                   className="recipientClaim"
                   href={`/claims?platform=${socialPlatform(recipient.platform)?.key ?? recipient.platform}&account=${encodeURIComponent(recipient.account)}`}

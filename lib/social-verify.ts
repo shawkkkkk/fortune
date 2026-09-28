@@ -1,5 +1,5 @@
 import type { Address } from "viem";
-import type { SocialPlatform, SocialPlatformKey } from "@/lib/social-fees";
+import { claimAccountOf, claimSecretFromText, type SocialPlatform, type SocialPlatformKey } from "@/lib/social-fees";
 
 // Server-side ownership checks for social fee recipients. Every request goes to
 // a fixed public endpoint of the platform itself; the proof link a person pastes
@@ -25,6 +25,8 @@ export type ProofRequest = {
   code: string;
   wallet: Address;
   proofUrl: string | null;
+  /** Private claim links only: the secret from the link. Never logged or echoed. */
+  secret?: string | null;
 };
 
 type FetchLike = (url: string, init?: RequestInit) => Promise<Response>;
@@ -42,6 +44,8 @@ const ORIGINS = {
   weibo: "https://weibo.com",
   bilibili: "https://api.bilibili.com",
   wechat: "https://mp.weixin.qq.com",
+  xiaohongshu: "https://www.xiaohongshu.com",
+  xhslink: "https://xhslink.com",
 } as const;
 
 type OriginKey = keyof typeof ORIGINS;
@@ -64,25 +68,29 @@ const MAX_BODY_BYTES = 1_000_000;
 // WeChat article pages run to several megabytes and name the account near the end.
 const WECHAT_BODY_BYTES = 6_000_000;
 
-/** One retry for a network error or a 5xx: platform edges drop the odd request. */
-async function fetchText(fetcher: FetchLike, url: string, init?: RequestInit, maxBytes = MAX_BODY_BYTES) {
+/**
+ * One retry for a network error or a 5xx: platform edges drop the odd request.
+ * Redirects are errors unless `manualRedirect` is set; then a 3xx comes back
+ * with its Location and no body, and is never followed.
+ */
+async function fetchText(fetcher: FetchLike, url: string, init?: RequestInit, maxBytes = MAX_BODY_BYTES, manualRedirect = false) {
   try {
-    const first = await fetchOnce(fetcher, url, init, maxBytes);
+    const first = await fetchOnce(fetcher, url, init, maxBytes, manualRedirect);
     if (first.status < 500) return first;
   } catch {
     // retried below
   }
   await new Promise((resolve) => setTimeout(resolve, 300));
-  return fetchOnce(fetcher, url, init, maxBytes);
+  return fetchOnce(fetcher, url, init, maxBytes, manualRedirect);
 }
 
-async function fetchOnce(fetcher: FetchLike, url: string, init?: RequestInit, maxBytes = MAX_BODY_BYTES) {
+async function fetchOnce(fetcher: FetchLike, url: string, init?: RequestInit, maxBytes = MAX_BODY_BYTES, manualRedirect = false) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 8_000);
   try {
     const response = await fetcher(url, {
       ...init,
-      redirect: "error",
+      redirect: manualRedirect ? "manual" : "error",
       cache: "no-store",
       signal: controller.signal,
       headers: { "User-Agent": "fortunepad-social-verifier/1.0 (+https://fortunepad.fun)", ...(init?.headers || {}) },
@@ -91,10 +99,11 @@ async function fetchOnce(fetcher: FetchLike, url: string, init?: RequestInit, ma
     // to contain fields resembling a successful platform response.
     if (!response.ok) {
       await response.body?.cancel();
-      return { status: response.status, body: "" };
+      const location = manualRedirect && response.status >= 300 && response.status < 400 ? response.headers.get("location") : null;
+      return { status: response.status, body: "", location };
     }
     const reader = response.body?.getReader();
-    if (!reader) return { status: response.status, body: "" };
+    if (!reader) return { status: response.status, body: "", location: null };
     const decoder = new TextDecoder();
     let bytes = 0;
     let body = "";
@@ -114,7 +123,7 @@ async function fetchOnce(fetcher: FetchLike, url: string, init?: RequestInit, ma
     } finally {
       reader.releaseLock();
     }
-    return { status: response.status, body };
+    return { status: response.status, body, location: null };
   } finally {
     clearTimeout(timer);
   }
@@ -589,6 +598,154 @@ async function verifyWeChat(request: ProofRequest, fetcher: FetchLike, origins: 
   };
 }
 
+// ------------------------------------------------- Xiaohongshu (RedNote)
+
+const XHS_ID = /^[0-9a-f]{24}$/;
+
+/** The first link in what someone pasted: the app's Share button copies a sentence around it. */
+function firstLink(text: string | null) {
+  if (!text) return null;
+  const value = text.trim();
+  const match = value.match(/https?:\/\/[A-Za-z0-9._~:/?#[\]@!$&'()*+,;=%-]+/)?.[0]?.replace(/[.,;:!?)\]]+$/, "");
+  if (match) return parseProofUrl(match);
+  return /^(?:www\.)?(?:xiaohongshu\.com|xhslink\.com)\//i.test(value) ? parseProofUrl(`https://${value}`) : null;
+}
+
+/** A note id from a note link, or the path of an xhslink.com short link. */
+export function xiaohongshuNoteRef(url: URL): { noteId: string } | { short: string } | null {
+  const host = url.hostname.toLowerCase();
+  const parts = url.pathname.split("/").filter(Boolean);
+  if (/^(?:www\.)?xiaohongshu\.com$/.test(host)) {
+    const id = parts[0] === "explore" && parts.length === 2 ? parts[1] : parts[0] === "discovery" && parts[1] === "item" && parts.length === 3 ? parts[2] : "";
+    return XHS_ID.test(id.toLowerCase()) ? { noteId: id.toLowerCase() } : null;
+  }
+  if (host === "xhslink.com") {
+    const path = `/${parts.join("/")}`;
+    return /^\/(?:[a-z]\/)?[A-Za-z0-9]{4,24}$/.test(path) ? { short: path } : null;
+  }
+  return null;
+}
+
+export type XiaohongshuNote = { noteId: string; title: string; desc: string; userId: string; nickname: string | null };
+
+/** The note and its author from a note page's server-rendered state. */
+export function readXiaohongshuNote(html: string, noteId: string): XiaohongshuNote | "missing" | null {
+  // User text on the page is escaped, so it can never open a <script> of its own.
+  const marker = "<script>window.__INITIAL_STATE__=";
+  const start = html.indexOf(marker);
+  if (start < 0) return null;
+  const end = html.indexOf("</script>", start);
+  if (end < 0) return null;
+  let state: { note?: { noteDetailMap?: Record<string, { note?: Record<string, unknown> }> } };
+  try {
+    // A JavaScript object literal: `undefined` is its only value JSON lacks.
+    state = JSON.parse(html.slice(start + marker.length, end).replace(/([:[,])\s*undefined(?=\s*[,}\]])/g, "$1null"));
+  } catch {
+    return null;
+  }
+  const note = state?.note?.noteDetailMap?.[noteId]?.note;
+  if (!note) return "missing";
+  const user = (note.user ?? {}) as { userId?: unknown; nickname?: unknown };
+  const userId = typeof user.userId === "string" ? user.userId.toLowerCase() : "";
+  if (String(note.noteId ?? "").toLowerCase() !== noteId || !XHS_ID.test(userId)) return "missing";
+  return {
+    noteId,
+    title: typeof note.title === "string" ? note.title : "",
+    desc: typeof note.desc === "string" ? note.desc : "",
+    userId,
+    nickname: typeof user.nickname === "string" && user.nickname ? user.nickname : null,
+  };
+}
+
+const XHS_NOT_FOUND = "That note was not found, is private, or is still in review. New notes can take a few minutes to become public.";
+
+/** Reads the note a pasted link (note link, xhslink.com short link or share text) points to. */
+async function loadXiaohongshuNote(
+  input: string | null,
+  fetcher: FetchLike,
+  origins: Record<OriginKey, string>
+): Promise<{ ok: true; note: XiaohongshuNote } | { ok: false; code: ProofFailure; message: string }> {
+  const url = firstLink(input);
+  const ref = url ? xiaohongshuNoteRef(url) : null;
+  if (!ref) return { ok: false, code: "PROOF_URL", message: "Paste the note link, like https://www.xiaohongshu.com/explore/… or an xhslink.com link." };
+  let noteId: string;
+  if ("short" in ref) {
+    let hop: { status: number; location: string | null };
+    try {
+      hop = await fetchText(fetcher, `${origins.xhslink}${ref.short}`, undefined, MAX_BODY_BYTES, true);
+    } catch {
+      return { ok: false, code: "SOURCE_UNAVAILABLE", message: "Xiaohongshu did not answer. Try again in a minute." };
+    }
+    if (hop.status >= 500) return { ok: false, code: "SOURCE_UNAVAILABLE", message: "Xiaohongshu did not answer. Try again in a minute." };
+    let target: URL | null = null;
+    try {
+      target = hop.location ? new URL(hop.location) : null;
+    } catch {
+      target = null;
+    }
+    const resolved = target ? xiaohongshuNoteRef(target) : null;
+    if (!resolved || !("noteId" in resolved)) {
+      return {
+        ok: false,
+        code: "PROOF_NOT_FOUND",
+        message: "That short link did not lead to a note. Open it in a browser and paste the full xiaohongshu.com/explore/… address instead.",
+      };
+    }
+    noteId = resolved.noteId;
+  } else {
+    noteId = ref.noteId;
+  }
+
+  let page: { status: number; body: string; location: string | null };
+  try {
+    page = await fetchText(fetcher, `${origins.xiaohongshu}/explore/${noteId}`, undefined, MAX_BODY_BYTES, true);
+  } catch {
+    return { ok: false, code: "SOURCE_UNAVAILABLE", message: "Xiaohongshu did not answer. Try again in a minute." };
+  }
+  if (page.status >= 300 && page.status < 400) {
+    let path = "";
+    try {
+      path = new URL(page.location || "", "https://www.xiaohongshu.com").pathname;
+    } catch {
+      path = "";
+    }
+    // A missing, private or unreviewed note redirects to /404; anything else is a login or a check.
+    if (path.startsWith("/404")) return { ok: false, code: "PROOF_NOT_FOUND", message: XHS_NOT_FOUND };
+    return { ok: false, code: "SOURCE_UNAVAILABLE", message: "Xiaohongshu asked for a login or a check. Try again in a few minutes." };
+  }
+  if (page.status === 404) return { ok: false, code: "PROOF_NOT_FOUND", message: XHS_NOT_FOUND };
+  if (page.status !== 200) return { ok: false, code: "SOURCE_UNAVAILABLE", message: "Xiaohongshu did not answer. Try again in a minute." };
+  const note = readXiaohongshuNote(page.body, noteId);
+  if (note === null) return { ok: false, code: "SOURCE_UNAVAILABLE", message: "Xiaohongshu returned a page Fortune could not read. Try again in a few minutes." };
+  if (note === "missing") return { ok: false, code: "PROOF_NOT_FOUND", message: XHS_NOT_FOUND };
+  return { ok: true, note };
+}
+
+async function verifyXiaohongshu(request: ProofRequest, fetcher: FetchLike, origins: Record<OriginKey, string>): Promise<ProofOutcome> {
+  const loaded = await loadXiaohongshuNote(request.proofUrl, fetcher, origins);
+  if (!loaded.ok) return fail(loaded.code, loaded.message);
+  const { note } = loaded;
+  if (note.userId !== request.account) {
+    return fail("WRONG_ACCOUNT", `That note is by ${note.nickname || note.userId}, not the account named in the launch.`);
+  }
+  const text = `${note.title}\n${note.desc}`;
+  if (!containsCode(text, request.code)) return fail("CODE_MISSING", "The note's title and text do not contain your code.");
+  return {
+    ok: true,
+    stableRawId: note.userId,
+    evidence: { url: `https://www.xiaohongshu.com/explore/${note.noteId}`, author: note.nickname || note.userId, excerpt: excerpt(note.title || note.desc) },
+  };
+}
+
+// ------------------------------------------------------ private claim links
+
+async function verifyClaimLink(request: ProofRequest): Promise<ProofOutcome> {
+  const secret = claimSecretFromText(request.secret);
+  if (!secret) return fail("PROOF_URL", "Open the whole claim link you were sent.");
+  if (claimAccountOf(secret) !== request.account) return fail("WRONG_ACCOUNT", "This claim link does not match that recipient.");
+  return { ok: true, stableRawId: request.account, evidence: { url: null, author: "Private claim link", excerpt: "The link matches this recipient." } };
+}
+
 // --------------------------------------------------------------- resolving
 
 export type ResolvedAccount = { ok: true; account: string; name: string | null } | { ok: false; code: ProofFailure; message: string };
@@ -647,6 +804,21 @@ export async function resolveSocialAccount(
       if (!article.account) return fail("PROOF_NOT_FOUND", "That article could not be read. Try another article link.") as ResolvedAccount;
       return { ok: true, account: article.account, name: article.name };
     }
+    if (platform.key === "xiaohongshu") {
+      if (XHS_ID.test(raw.toLowerCase())) return { ok: true, account: raw.toLowerCase(), name: null };
+      const link = firstLink(raw);
+      const parts = link?.pathname.split("/").filter(Boolean) ?? [];
+      if (link && /^(?:www\.)?xiaohongshu\.com$/i.test(link.hostname) && parts[0] === "user" && parts[1] === "profile" && XHS_ID.test((parts[2] || "").toLowerCase())) {
+        return { ok: true, account: parts[2].toLowerCase(), name: null };
+      }
+      const loaded = await loadXiaohongshuNote(raw, fetcher, origins);
+      if (!loaded.ok) {
+        return loaded.code === "PROOF_URL"
+          ? (fail("PROOF_URL", "Paste the Xiaohongshu profile link or a link to one of the account's notes.") as ResolvedAccount)
+          : (fail(loaded.code, loaded.message) as ResolvedAccount);
+      }
+      return { ok: true, account: loaded.note.userId, name: loaded.note.nickname };
+    }
     return fail("PROOF_URL", "This platform does not need a lookup.") as ResolvedAccount;
   } catch {
     return unavailable(platform.label) as ResolvedAccount;
@@ -664,6 +836,8 @@ const VERIFIERS: Record<SocialPlatformKey, (request: ProofRequest, fetcher: Fetc
   weibo: verifyWeibo,
   bilibili: verifyBilibili,
   wechat: verifyWeChat,
+  xiaohongshu: verifyXiaohongshu,
+  link: verifyClaimLink,
 };
 
 export async function verifySocialProof(

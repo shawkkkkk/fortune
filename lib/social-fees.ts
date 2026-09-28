@@ -16,7 +16,19 @@ export const SOCIAL_FEE_RULES = {
   rebindDelaySeconds: 3 * 24 * 60 * 60,
 } as const;
 
-export type SocialPlatformKey = "x" | "github" | "tiktok" | "telegram" | "youtube" | "farcaster" | "bluesky" | "weibo" | "bilibili" | "wechat";
+export type SocialPlatformKey =
+  | "x"
+  | "github"
+  | "tiktok"
+  | "telegram"
+  | "youtube"
+  | "farcaster"
+  | "bluesky"
+  | "weibo"
+  | "bilibili"
+  | "wechat"
+  | "xiaohongshu"
+  | "link";
 
 export type SocialPlatform = {
   /** Permanent onchain id. Never renumber. */
@@ -34,8 +46,11 @@ export type SocialPlatform = {
   /** Whether the verifier pins the platform's permanent account id. */
   pinsAccountId: boolean;
   profileUrl: (account: string) => string | null;
-  /** Chinese platforms are listed separately in pickers. */
-  region: "global" | "china";
+  /**
+   * Chinese platforms are listed separately in pickers. "any" is the private
+   * claim link, which works for people on any platform, or none.
+   */
+  region: "global" | "china" | "any";
   /** Name shown to Chinese readers. */
   labelZh?: string;
   /**
@@ -202,6 +217,40 @@ export const SOCIAL_PLATFORMS: readonly SocialPlatform[] = [
     resolvable: true,
     bareCode: true,
   },
+  {
+    id: 11,
+    key: "xiaohongshu",
+    label: "Xiaohongshu (RedNote)",
+    labelZh: "小红书",
+    prefix: "",
+    pattern: /^[0-9a-f]{24}$/,
+    placeholder: "profile or note link",
+    proof: "Publish a public note whose title or text contains the code, then paste the note link. You can delete the note afterwards.",
+    proofExample: "https://www.xiaohongshu.com/explore/…",
+    pinsAccountId: true,
+    profileUrl: (account) => `https://www.xiaohongshu.com/user/profile/${account}`,
+    region: "china",
+    resolvable: true,
+    bareCode: true,
+  },
+  {
+    // The account is keccak256 of a secret only the claim link carries. Whoever
+    // opens the link first binds a wallet; after that the link is spent.
+    id: 12,
+    key: "link",
+    label: "Private claim link",
+    labelZh: "私密领取链接",
+    prefix: "",
+    pattern: /^[0-9a-f]{64}$/,
+    placeholder: "claim link",
+    proof: "Open the claim link you were sent, connect the wallet that should receive the fees, and bind it. The link works once.",
+    proofExample: null,
+    pinsAccountId: true,
+    profileUrl: () => null,
+    region: "any",
+    resolvable: false,
+    bareCode: true,
+  },
 ];
 
 export function socialPlatform(value: number | string | null | undefined) {
@@ -226,6 +275,8 @@ const PROFILE_HOSTS: Record<SocialPlatformKey, RegExp> = {
   weibo: /^(?:www\.|m\.)?weibo\.(?:com|cn)$/,
   bilibili: /^(?:space\.|m\.|www\.)?bilibili\.com$/,
   wechat: /^mp\.weixin\.qq\.com$/,
+  xiaohongshu: /^(?:www\.)?xiaohongshu\.com$/,
+  link: /^$/,
 };
 
 /**
@@ -240,6 +291,21 @@ export function canonicalAccount(platformValue: number | string, raw: string):
   let value = raw.trim();
   if (!value) return { ok: false, reason: `Enter the ${platform.label} ${platform.placeholder}.` };
 
+  if (platform.key === "link") {
+    // A claim link (or its secret) gives the account; the bare account is public and fine too.
+    const secret = claimSecretFromText(value);
+    const account = secret ? claimAccountOf(secret) : value.toLowerCase();
+    if (!account || !platform.pattern.test(account)) return { ok: false, reason: "Paste the whole claim link you were sent." };
+    return { ok: true, platform, account };
+  }
+
+  if (platform.key === "xiaohongshu") {
+    // The app's Share button copies a sentence with the link inside it.
+    const link = value.match(/https?:\/\/[A-Za-z0-9._~:/?#[\]@!$&'()*+,;=%-]+/)?.[0]?.replace(/[.,;:!?)\]]+$/, "");
+    if (link && !/^https?:\/\//i.test(value)) value = link;
+    if (/^(?:https?:\/\/)?xhslink\.com\//i.test(value)) return { ok: false, reason: "Fortune reads the account from the note.", resolvable: true };
+  }
+
   if (/^https?:\/\//i.test(value) || /^[a-z0-9.-]+\.[a-z]{2,}\//i.test(value)) {
     let url: URL;
     try {
@@ -252,11 +318,17 @@ export function canonicalAccount(platformValue: number | string, raw: string):
     }
     const parts = url.pathname.split("/").filter(Boolean);
     if (platform.key === "wechat") return { ok: false, reason: "Fortune reads the account from the article.", resolvable: true };
+    if (platform.key === "xiaohongshu") {
+      if (parts[0] === "explore" || (parts[0] === "discovery" && parts[1] === "item")) {
+        return { ok: false, reason: "Fortune reads the account from the note.", resolvable: true };
+      }
+      value = parts[0] === "user" && parts[1] === "profile" ? parts[2] || "" : "";
+    }
     if (platform.key === "bluesky") value = parts[0] === "profile" ? parts[1] || "" : "";
     else if (platform.key === "telegram" && parts[0] === "s") value = parts[1] || "";
     else if (platform.key === "weibo") value = parts[0] === "u" || parts[0] === "profile" ? parts[1] || "" : parts[0] || "";
     else if (platform.key === "bilibili") value = url.hostname.toLowerCase().startsWith("space.") ? parts[0] || "" : parts[0] === "space" ? parts[1] || "" : "";
-    else value = parts[0] || "";
+    else if (platform.key !== "xiaohongshu") value = parts[0] || "";
     if ((platform.key === "weibo" || platform.key === "bilibili") && value && !/^\d+$/.test(value)) {
       return { ok: false, reason: `Fortune looks up this ${platform.label} link on its server.`, resolvable: true };
     }
@@ -265,9 +337,79 @@ export function canonicalAccount(platformValue: number | string, raw: string):
 
   value = value.replace(/^@/, "").toLowerCase();
   if (!platform.pattern.test(value) || !isVaultCanonical(value)) {
+    if (platform.key === "xiaohongshu") {
+      return { ok: false, reason: "Paste the Xiaohongshu profile link or a link to one of the account's notes. A 小红书号 alone cannot be looked up." };
+    }
     return { ok: false, reason: `That is not a valid ${platform.label} ${platform.placeholder}.` };
   }
   return { ok: true, platform, account: value };
+}
+
+// ------------------------------------------------------------- claim links
+//
+// A launch can pay someone Fortune cannot verify on their platform (Douyin,
+// personal WeChat, Zhihu, Binance Square, or anyone without a public account).
+// The launcher's browser makes a 32-byte secret; the launch names
+// keccak256(secret) as the account; the launcher sends the link privately.
+// Fortune's verifier signs a binding for whoever presents the secret first,
+// and never again after that. The secret itself never goes onchain.
+
+const CLAIM_SECRET = /^[A-Za-z0-9_-]{43}$/;
+
+function toBase64Url(bytes: Uint8Array) {
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function claimSecretBytes(secret: string) {
+  if (!CLAIM_SECRET.test(secret)) return null;
+  try {
+    const binary = atob(secret.replace(/-/g, "+").replace(/_/g, "/") + "=");
+    const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+    // Only the canonical spelling: one secret, one link.
+    return bytes.length === 32 && toBase64Url(bytes) === secret ? bytes : null;
+  } catch {
+    return null;
+  }
+}
+
+/** A fresh claim-link secret: 32 random bytes, base64url. */
+export function newClaimSecret() {
+  return toBase64Url(crypto.getRandomValues(new Uint8Array(32)));
+}
+
+/** The vault account a claim link pays: keccak256 of the secret's bytes, as 64 hex characters. */
+export function claimAccountOf(secret: string) {
+  const bytes = claimSecretBytes(secret);
+  return bytes ? keccak256(bytes).slice(2) : null;
+}
+
+/** The secret from a claim link, from text around one, or on its own. */
+export function claimSecretFromText(text: string | null | undefined) {
+  if (!text) return null;
+  const value = text.trim();
+  const secret = CLAIM_SECRET.test(value) ? value : value.match(/[#?&]claim=([A-Za-z0-9_-]{43})(?![A-Za-z0-9_-])/)?.[1];
+  return secret && claimSecretBytes(secret) ? secret : null;
+}
+
+export function claimLinkUrl(origin: string, secret: string) {
+  return `${origin.replace(/\/+$/, "")}/claims#claim=${secret}`;
+}
+
+/** What the launcher sends with the link, in both languages. */
+export function claimLinkMessage(link: string, token: string | null) {
+  const what = token ? `$${token}` : "a Fortune launch";
+  const whatZh = token ? `$${token}` : "一个 Fortune 发行";
+  return [
+    `You have a share of the creator fees from ${what} on Fortune. Open this link in a wallet app's browser (MetaMask, Trust Wallet, Binance Wallet, OKX Wallet) and bind your wallet to claim:`,
+    link,
+    "Anyone with this link can claim it once, so keep it private.",
+    "",
+    `你获得了 ${whatZh} 在 Fortune 上的创作者手续费分成。请在钱包应用的浏览器（MetaMask、Trust Wallet、币安钱包、OKX 钱包）中打开此链接并绑定钱包领取：`,
+    link,
+    "此链接只能领取一次，任何拿到链接的人都能领取，请勿外传。",
+  ].join("\n");
 }
 
 /** keccak256(abi.encode(uint8 platform, string account)), as FortuneSocialFeeVault.identityIdOf. */
@@ -315,6 +457,23 @@ export function challengePost(platform: SocialPlatform, code: string) {
   if (platform.bareCode) return code;
   const where = platform.key === "x" ? "@fortunepad" : "fortunepad.fun";
   return `Verifying this account to claim creator fees on ${where}: ${code}`;
+}
+
+/**
+ * Why the verifier must not sign a binding of `wallet` to this identity now, or
+ * null. A private claim link binds once: after any wallet is bound or waiting to
+ * be, a leaked link is worthless, and the first wallet to bind cannot be raced.
+ */
+export function bindingRefusal(
+  platform: SocialPlatformKey,
+  identity: { wallet: string | null; pendingWallet: string | null },
+  wallet: string
+): { message: string; reason?: "LINK_USED" } | null {
+  const lower = wallet.toLowerCase();
+  if (identity.wallet?.toLowerCase() === lower) return { message: "This wallet already receives this account's fees." };
+  if (identity.pendingWallet?.toLowerCase() === lower) return { message: "This wallet is already waiting to take over this account's fees." };
+  if (platform === "link" && (identity.wallet || identity.pendingWallet)) return { message: "This claim link has already been used.", reason: "LINK_USED" };
+  return null;
 }
 
 /** EIP-712 binding the verifier signs and FortuneSocialFeeVault.bind checks. */
@@ -405,6 +564,7 @@ export function describeAccount(platformId: number, account: string) {
   const platform = socialPlatform(platformId);
   if (!platform) return account;
   if (platform.key === "weibo" || platform.key === "bilibili") return `UID ${account}`;
+  if (platform.key === "xiaohongshu" || platform.key === "link") return account.length > 12 ? `${account.slice(0, 6)}…${account.slice(-4)}` : account;
   return `${platform.prefix}${account}`;
 }
 

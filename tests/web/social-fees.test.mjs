@@ -64,7 +64,7 @@ test("website constants mirror the vault", () => {
   // Platform ids are permanent onchain values.
   assert.deepEqual(
     SOCIAL_PLATFORMS.map((item) => [item.id, item.key]),
-    [[1, "x"], [2, "github"], [3, "tiktok"], [4, "telegram"], [5, "youtube"], [6, "farcaster"], [7, "bluesky"], [8, "weibo"], [9, "bilibili"], [10, "wechat"]]
+    [[1, "x"], [2, "github"], [3, "tiktok"], [4, "telegram"], [5, "youtube"], [6, "farcaster"], [7, "bluesky"], [8, "weibo"], [9, "bilibili"], [10, "wechat"], [11, "xiaohongshu"], [12, "link"]]
   );
   for (const item of SOCIAL_PLATFORMS) assert.ok(item.id > 0 && item.id <= SOCIAL_FEE_RULES.maxPlatform);
 });
@@ -139,7 +139,7 @@ test("fee split rules match checkShares, and a lone creator wallet is a plain la
 
 test("Chinese platforms get the bare code, with nothing promotional", () => {
   const code = "fortune-0123456789abcdef01234567";
-  for (const key of ["weibo", "bilibili", "wechat"]) assert.equal(challengePost(platform(key), code), code);
+  for (const key of ["weibo", "bilibili", "wechat", "xiaohongshu"]) assert.equal(challengePost(platform(key), code), code);
   assert.match(challengePost(platform("x"), code), /@fortunepad: fortune-/);
 });
 

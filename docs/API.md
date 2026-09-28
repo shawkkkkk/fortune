@@ -194,6 +194,10 @@ These expose direct onchain records for the latest 25 factory launches at most. 
 
 Returns an exact onchain factory launch count through a single multicall. Volume, revenue, burns and rewards are `null` until reproducible event ledgers exist.
 
+### GET /holders/{token}
+
+The holder count, top ten holders and the Launch Shield opening window for one launch, from Fortune's holder index (`docs/HOLDER_INDEX.md`). Protocol addresses are excluded from holders. When the index started after the launch, or its history has a hole it cannot prove closed, `view.status` says so (`untracked`, `gap`, `inconsistent`) and no numbers are returned. `enabled: false` means no index store is configured. A read may advance the index once per interval, after the response.
+
 ### GET /release
 
 Returns the version-controlled Standard mainnet release gates and the separate Burn + Rewards v2 research status. It does not attest an independent audit.

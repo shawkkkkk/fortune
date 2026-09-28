@@ -7108,3 +7108,59 @@ label.claimLinkSaved { display: flex; flex-direction: row; align-items: flex-sta
 .metric[data-notable] strong {
   color: var(--red-ink);
 }
+
+/* Holder Shield: holder count, top ten and the opening window. */
+.holderShield .metricsGrid {
+  margin-bottom: 12px;
+}
+
+.holderTop {
+  display: grid;
+  gap: 2px;
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.holderTop li {
+  display: grid;
+  grid-template-columns: 28px minmax(0, auto) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 4px;
+  border-bottom: 1px solid var(--line);
+  font-size: 14.5px;
+}
+
+.holderTop li:last-child {
+  border-bottom: 0;
+}
+
+.holderRank {
+  color: var(--faint);
+  font-weight: 700;
+  text-align: right;
+}
+
+.holderTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.holderTag {
+  padding: 1px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.holderTagEarly {
+  border-color: var(--gold-line);
+  color: var(--gold-ink, var(--ink-soft));
+}

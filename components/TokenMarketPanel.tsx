@@ -6,6 +6,7 @@ import { PairAssetsPanel, type PairAssetView } from "@/components/PairAssets";
 import PriceChart, { type ChartPoint } from "@/components/PriceChart";
 import SupplyBreakdown, { type SupplyView } from "@/components/SupplyBreakdown";
 import CreatorCheck, { type CreatorView } from "@/components/CreatorCheck";
+import HolderShield from "@/components/HolderShield";
 import { useLanguage } from "@/components/LanguageProvider";
 import { useTheme } from "@/components/ThemeProvider";
 import { FORTUNE_NETWORK } from "@/lib/fortune-network";
@@ -204,6 +205,7 @@ export default function TokenMarketPanel({ token }: { token: string }) {
 
       {data.supply ? <SupplyBreakdown supply={data.supply} zh={zh} /> : null}
       {data.creator ? <CreatorCheck creator={data.creator} symbol={summary.symbol} zh={zh} /> : null}
+      <HolderShield token={token} pairs={summary.pairs} zh={zh} />
       <PairAssetsPanel pairs={summary.pairs} graduated={summary.phase === 2} zh={zh} />
 
       <p className="chartCoverage" translate="no">{zh

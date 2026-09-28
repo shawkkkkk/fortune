@@ -248,6 +248,20 @@ export async function GET(request: Request) {
           },
         },
       },
+      "/holders/{token}": {
+        get: {
+          tags: ["Markets"],
+          summary: "Holder count, top ten holders and the Launch Shield window for one launch",
+          description:
+            "From Fortune's holder index: every Transfer since the launch's creation block folded into exact balances. The curve, official pools, Fortune vaults and burn addresses are excluded from holders and the top list. view.status is tracked, untracked (created before indexing began), pending, gap or inconsistent (history incomplete; no numbers are returned). enabled is false when no index store is configured. Each read may advance the index once per interval, after the response.",
+          parameters: [{ name: "token", in: "path", required: true, schema: { type: "string" } }],
+          responses: {
+            "200": { description: "enabled, token, creator and view: holders, top[] (address, balance, share, early), topShare, shield (buys, wallets, tokens, share, taxedBuys, tax[], checked, stillHolding, holdingNow, holdingShare), indexedTo, updatedAt, reconciledAt" },
+            "404": { description: "Not a Fortune launch on this network" },
+            "503": { description: "The launch could not be read" },
+          },
+        },
+      },
       "/pairs/inspect": {
         get: {
           tags: ["Assets"],

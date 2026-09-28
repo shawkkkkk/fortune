@@ -61,6 +61,17 @@ The market page is where holders trade, from the first block to PancakeSwap:
 - **Graduation that actually graduates.** The factory catches a failed migration so it stays retryable, which makes wallet gas estimates stop where the migration runs out of gas. The page simulates and sends an explicit per-pool gas limit (`lib/graduation-gas.ts`) and reports success only when `GraduationFinalized` is emitted.
 - **Rescue.** If a launch reaches its target but cannot graduate for seven days, anyone can open rescue from the market page and every holder can redeem a pro-rata share of the reserve, paid out in BNB for WBNB reserves.
 
+## Holder Shield
+
+Token and market pages answer "who launched it and who holds it" with facts, not verdicts:
+
+- **Creator check.** The creator's Fortune launch record, what they hold now and every transfer of the token out of their wallet since launch, with the covered block range stated when the log provider cannot reach back that far.
+- **Holders.** The holder count, the top ten with their share of supply, tagged Creator or First 15 s, from Fortune's own holder index (`docs/HOLDER_INDEX.md`). Protocol addresses (the curve, official pools, Fortune vaults, burn addresses) are not holders and are left out.
+- **The opening window.** How much the first 15 seconds of buyers took, how many wallets they used, the Launch Shield tax they paid, and how much they still hold.
+- **Graduating soon.** Explore ranks active curves by how close they are to graduation.
+
+When the index cannot vouch for a launch's numbers (it started after the launch, or its log history has a hole it cannot prove closed) the panel shows nothing or says the data is paused.
+
 ## Current release boundary
 
 The BSC testnet alpha is live. The Standard mainnet candidate is paused pending the independent audit, governance signatures, production infrastructure and legal/asset policy gates in `mainnet-release.json`. The isolated v2 reward token has no Infinity hook, factory, indexer, or deployment and must never inherit Standard approval.

@@ -130,6 +130,17 @@ export default function DocsPage() {
             </p>
           </section>
 
+          <section className="panel" id="holders">
+            <span className="eyebrow">HOLDER SHIELD</span>
+            <h2>See who launched it and who holds it.</h2>
+            <p>
+              Every token page shows the creator&apos;s record on Fortune, what they hold and what has left their wallet. It also shows how many wallets hold the token, the ten largest holders, and what the first 15 seconds of buyers took and still hold.
+            </p>
+            <p>
+              The holder numbers come from Fortune&apos;s own index of every transfer since launch, so they are exact. The curve, official pools, Fortune vaults and burn addresses are not holders and are left out. If the index cannot vouch for a launch&apos;s history, the panel says the data is paused instead of guessing. A wallet is not a person: one person can use many wallets.
+            </p>
+          </section>
+
           <section className="panel" id="rewards">
             <span className="eyebrow">REWARDS</span>
             <h2>Public accounting before flashy APY.</h2>

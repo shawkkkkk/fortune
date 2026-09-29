@@ -116,7 +116,7 @@ export default function LaunchRulesEditor({
           <details className="launchRulesMore" open={Boolean(form.vestingWindowSeconds)}>
             <summary>Early-buyer vesting</summary>
             <div className="launchRulesGrid">
-              {field("vestingWindowSeconds", "Buys in the first · seconds", "off", "Up to 1 day. Your own first buy counts.")}
+              {field("vestingWindowSeconds", "Buys in the first · seconds", "off", "Up to 1 day, and no longer than the lock plus the unlock. Your own first buy counts.")}
               {field("vestingCliffHours", "Locked until · hours after launch", "0")}
               {field("vestingDurationHours", "Then unlocks over · hours", "0", "Cliff plus unlock: 30 days at most")}
             </div>

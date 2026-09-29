@@ -176,6 +176,8 @@ export function buildLaunchRules(form: LaunchRulesForm, gateDecimals = 18): Rule
     if (vestingWindow > L.maxVestingWindow) return fail("RULES_VESTING", "Early buys can vest for a window of at most one day.");
     const end = vestingCliff + vestingDuration;
     if (end === 0 || end > L.maxVestingEnd) return fail("RULES_VESTING", "The cliff plus the unlock period must be between one second and 30 days.");
+    // As onchain: a window that outlasts the unlock would record late buys as vested when they are already free.
+    if (vestingWindow > end) return fail("RULES_VESTING", "The vesting window can't be longer than the lock plus the unlock, or later buys would be free at once.");
   }
 
   const allowlistSeconds = seconds(form.allowlistMinutes, 60);

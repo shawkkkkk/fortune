@@ -13,7 +13,7 @@ Rules are optional. A launch without them behaves exactly as before, and every l
 | Max sell | Each curve sell returns at most this share of supply | 0.05% to 10% |
 | Sell cooldown | A wallet waits this long between curve sells | up to 1 day |
 | Curve-only | Until graduation, tokens move only through the curve (buys and sells), not wallet to wallet | on or off |
-| Early-buyer vesting | Tokens bought in the first N seconds stay locked until a cliff, then unlock evenly. The cliff and the unlock count from launch, not from each buy. | window up to 1 day; cliff plus unlock up to 30 days |
+| Early-buyer vesting | Tokens bought in the first N seconds stay locked until a cliff, then unlock evenly. The cliff and the unlock count from launch, not from each buy. | window up to 1 day, ending no later than the unlock; cliff plus unlock up to 30 days |
 | Allowlist | For the first minutes, only listed addresses can buy | up to 1 hour, 200 addresses |
 | Holder gate | For the first minutes, only holders of a chosen token (at least a minimum balance) can buy | up to 1 hour |
 | Exempt wallets | Listed wallets may exceed the wallet and buy caps, move tokens under curve-only, and buy during access windows | up to 10, public |
@@ -32,6 +32,7 @@ Presets on the launch form:
 - **They cannot trap funds:**
   - Sell caps and cooldowns only pace sales.
   - Vesting ends by a fixed time within 30 days of launch.
+  - Every buy that vests is locked when it lands. The window can't outlast the unlock, so a rule can never claim to vest buys that are already free.
   - Curve-only never blocks selling to the curve.
   - Rescue redemptions are never blocked, because the rules stop when rescue opens.
   - Graduation cannot be blocked either, because the pool transfer happens after the token has opened.
@@ -97,13 +98,15 @@ Fortune offers the rules people ask for most. The rest are left out on purpose:
 
 ## Verification so far
 
-- **Foundry:** 16 launch-rules tests, covering:
+- **Foundry:** 17 launch-rules tests, covering:
   - each bound and reason code, and the preflight;
   - immutability, and that anyone can call the hook without effect;
   - wallet and buy caps, including exemptions;
   - sell cap and cooldown for exempt wallets too;
   - curve-only through exempt wallets;
-  - vesting including the creator's first buy, and a 1,000-run fuzz that vesting only ever unlocks and that the free part always sells;
+  - vesting including the creator's first buy;
+  - a 1,000-run fuzz over every accepted window, cliff, unlock and buy time: a buy in the window is locked when it lands, vesting only ever unlocks, and the free part always sells;
+  - a buy in the last second of a vesting window, locked exactly as the displayed schedule says, and a window longer than the unlock refused at preflight;
   - allowlist and gate windows, a gas-burning gate token, and a gate token that replies with 100 KB;
   - rules ending at graduation, including a pool sell of formerly vested tokens;
   - a max-wallet launch still graduating;
@@ -116,7 +119,8 @@ Fortune offers the rules people ask for most. The rest are left out on purpose:
   - dropping curve-only;
   - nothing vesting;
   - vesting ending late;
-  - copying a gate token's whole reply.
+  - copying a gate token's whole reply;
+  - accepting a vesting window longer than the unlock.
 - **Browser rehearsal on a local BSC Testnet node (chain 97):** the deploy script, the production site build, and a launch made through `/launch/custom` with all three presets. Then:
   - the review list and the API report every rule;
   - a buy over the max buy is refused before signing;

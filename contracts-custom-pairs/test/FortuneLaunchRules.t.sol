@@ -124,7 +124,21 @@ contract FortuneLaunchRulesTest is CustomPairBase {
         r.vestingWindow = 1 days + 1;
         (, reason) = launchRules.checkRules(r);
         assertEq(reason, "RULES_VESTING");
+        // The window may not outlast the unlock: a 24-hour window with a 1-hour unlock is refused.
+        r.vestingWindow = 1 days;
+        r.vestingCliff = 0;
+        r.vestingDuration = 1 hours;
+        (, reason) = launchRules.checkRules(r);
+        assertEq(reason, "RULES_VESTING", "the window may not outlast the unlock");
+        r.vestingCliff = 1 hours;
+        r.vestingDuration = 23 hours - 1;
+        (, reason) = launchRules.checkRules(r);
+        assertEq(reason, "RULES_VESTING", "not even by one second");
+        r.vestingDuration = 23 hours;
+        (ok,) = launchRules.checkRules(r);
+        assertTrue(ok, "a window that ends exactly when unlocking ends is fine");
         r.vestingWindow = 60;
+        r.vestingDuration = 29 days;
 
         r.allowlistSeconds = 600;
         (, reason) = launchRules.checkRules(r);
@@ -375,33 +389,103 @@ contract FortuneLaunchRulesTest is CustomPairBase {
         vm.stopPrank();
     }
 
-    function testFuzzVestingNeverLocksMoreThanBoughtAndOnlyEverUnlocks(uint32 cliff, uint32 duration, uint64 t1, uint64 t2)
-        public
-    {
+    function testFuzzVestingNeverLocksMoreThanBoughtAndOnlyEverUnlocks(
+        uint32 window,
+        uint32 cliff,
+        uint32 duration,
+        uint32 buyAt,
+        uint64 t1,
+        uint64 t2
+    ) public {
         cliff = uint32(bound(cliff, 0, 15 days));
-        duration = uint32(bound(duration, cliff == 0 ? 1 : 0, 30 days - cliff));
+        duration = uint32(bound(duration, cliff >= 17 ? 0 : 17 - cliff, 30 days - cliff));
+        // Any window the contract accepts: at most a day, and never past the end of the unlock.
+        uint256 longest = uint256(cliff) + duration < 1 days ? uint256(cliff) + duration : 1 days;
+        window = uint32(bound(window, 17, longest));
         FortuneLaunchRules.Rules memory r = none();
-        r.vestingWindow = 60;
+        r.vestingWindow = window;
         r.vestingCliff = cliff;
         r.vestingDuration = duration;
         (FortuneCustomPairCurve curve, FortuneCustomPairToken token) = launchWithRules(r, 0);
-        vm.warp(block.timestamp + 20);
-        uint256 early = buyFor(alice, curve, 1e18);
         uint256 launched = launchRules.rulesOf(address(token)).launchTimestamp;
+
+        // A buy anywhere in the window, after the Launch Shield, vests and is locked when it lands.
+        vm.warp(launched + bound(buyAt, 16, window - 1));
+        uint256 early = buyFor(alice, curve, 1e18);
+        (uint256 lockedAtBuy, uint256 vested,,) = launchRules.lockOf(address(token), alice);
+        assertEq(vested, early, "a buy in the window vests");
+        assertGt(lockedAtBuy, 0, "and is locked when it lands");
+
         t1 = uint64(bound(t1, block.timestamp, launched + 40 days));
         t2 = uint64(bound(t2, t1, launched + 40 days));
         vm.warp(t1);
         (uint256 lockedAt1,,,) = launchRules.lockOf(address(token), alice);
         vm.warp(t2);
         (uint256 lockedAt2,,,) = launchRules.lockOf(address(token), alice);
-        assertLe(lockedAt1, early);
+        assertLe(lockedAt1, lockedAtBuy);
         assertLe(lockedAt2, lockedAt1, "never locks more later");
         if (t2 >= launched + uint256(cliff) + duration) assertEq(lockedAt2, 0, "free by the end");
         // Whatever is not locked can always be sold.
         uint256 free = token.balanceOf(alice) - lockedAt2;
         vm.assume(free > 0 && free <= curve.circulating());
-        vm.warp(t2);
         sellAs(alice, curve, free);
+    }
+
+    function testABuyJustBeforeTheVestingWindowClosesIsLockedAsDisplayed() public {
+        // Refused before launch: a 24-hour window with a 1-hour unlock would record buys after
+        // hour 1 as vested when they are already free.
+        FortuneLaunchRules.Rules memory r = none();
+        r.vestingWindow = 1 days;
+        r.vestingDuration = 1 hours;
+        (bool ok, bytes32 reason) = factory.preflightWithRules(params(address(pair), TARGET), abi.encode(r));
+        assertFalse(ok);
+        assertEq(reason, "RULES_VESTING");
+        vm.prank(creator);
+        vm.expectRevert(abi.encodeWithSelector(FortuneCustomPairFactory.LaunchPreflightFailed.selector, bytes32("RULES_VESTING")));
+        factory.createLaunchWithRules(params(address(pair), TARGET), abi.encode(r), 0, 0);
+
+        // "Buys in the first 1 h unlock evenly over the 2 h after launch."
+        r.vestingWindow = 1 hours;
+        r.vestingDuration = 2 hours;
+        (FortuneCustomPairCurve curve, FortuneCustomPairToken token) = launchWithRules(r, 0);
+        uint256 launched = launchRules.rulesOf(address(token)).launchTimestamp;
+
+        // The last second of the window.
+        vm.warp(launched + 1 hours - 1);
+        uint256 bought = buyFor(alice, curve, 1e18);
+        (uint256 locked, uint256 vested, uint64 unlockStart, uint64 unlockEnd) = launchRules.lockOf(address(token), alice);
+        assertEq(vested, bought, "the buy vests");
+        assertEq(unlockStart, launched);
+        assertEq(unlockEnd, launched + 2 hours);
+        assertEq(locked, bought * (launched + 2 hours - block.timestamp) / 2 hours, "locked exactly as displayed");
+        assertGt(locked, bought / 2, "just over half is still locked");
+        vm.startPrank(alice);
+        token.approve(address(curve), type(uint256).max);
+        vm.expectRevert(abi.encodeWithSelector(FortuneLaunchRules.RulesVestingLocked.selector, locked));
+        curve.sell(bought - locked + 1, 0);
+        curve.sell(bought - locked, 0);
+        vm.stopPrank();
+
+        // The first second after the window: a buy no longer vests.
+        vm.warp(launched + 1 hours);
+        buyFor(bob, curve, 1e18);
+        (, uint256 bobVested,,) = launchRules.lockOf(address(token), bob);
+        assertEq(bobVested, 0, "buys after the window do not vest");
+
+        // The longest window allowed ends exactly when unlocking does, and its last buy is still locked.
+        r.vestingWindow = 1 days;
+        r.vestingCliff = 1 hours;
+        r.vestingDuration = 23 hours;
+        (curve, token) = launchWithRules(r, 0);
+        launched = launchRules.rulesOf(address(token)).launchTimestamp;
+        vm.warp(launched + 1 days - 1);
+        bought = buyFor(carol, curve, 1e18);
+        (locked,,,) = launchRules.lockOf(address(token), carol);
+        assertEq(locked, bought / 23 hours, "one second of unlock left");
+        assertGt(locked, 0);
+        vm.prank(carol);
+        vm.expectRevert(abi.encodeWithSelector(FortuneLaunchRules.RulesVestingLocked.selector, locked));
+        token.transfer(address(curve), bought);
     }
 
     // ------------------------------------------------------------ access windows

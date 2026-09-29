@@ -56,7 +56,7 @@ const PREFLIGHT_TEXT: Record<string, string> = {
   RULES_MAX_BUY: "Max buy must be between 0.1% and 10% of supply.",
   RULES_MAX_SELL: "Max sell must be between 0.05% and 10% of supply.",
   RULES_COOLDOWN: "The sell cooldown can be at most one day.",
-  RULES_VESTING: "Vesting needs a window of at most one day and a cliff plus unlock of at most 30 days.",
+  RULES_VESTING: "Vesting needs a window of at most one day that ends no later than the unlock, and a cliff plus unlock of at most 30 days.",
   RULES_ALLOWLIST: "The allowlist needs 1 to 200 addresses and a window of at most one hour.",
   RULES_GATE: "The holder gate needs a token contract, a minimum balance and a window of at most one hour.",
   RULES_EXEMPT: "Up to 10 distinct exempt wallets.",

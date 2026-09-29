@@ -41,6 +41,7 @@ test("website limits mirror FortuneLaunchRules", () => {
   assert.equal(seconds(constant("MAX_ACCESS_WINDOW")), LAUNCH_RULE_LIMITS.maxAccessWindow);
   assert.equal(Number(constant("MAX_EXEMPT")), LAUNCH_RULE_LIMITS.maxExempt);
   assert.equal(Number(constant("MAX_ALLOWLIST")), LAUNCH_RULE_LIMITS.maxAllowlist);
+  assert.match(source, /r\.vestingWindow > end\) \{\s*return \(false, "RULES_VESTING"\);/, "the contract refuses a window that outlasts the unlock, as the form does");
 });
 
 test("the form is checked with the contract's reason codes", () => {
@@ -59,6 +60,9 @@ test("the form is checked with the contract's reason codes", () => {
   assert.equal(code({ vestingWindowSeconds: "60", vestingCliffHours: "700", vestingDurationHours: "21" }), "RULES_VESTING", "over 30 days");
   assert.equal(code({ vestingWindowSeconds: "60", vestingCliffHours: "700", vestingDurationHours: "20" }), "OK");
   assert.equal(code({ vestingWindowSeconds: "86401", vestingCliffHours: "1" }), "RULES_VESTING");
+  assert.equal(code({ vestingWindowSeconds: "86400", vestingDurationHours: "1" }), "RULES_VESTING", "the window may not outlast the unlock");
+  assert.equal(code({ vestingWindowSeconds: "86400", vestingCliffHours: "1", vestingDurationHours: "22.99" }), "RULES_VESTING");
+  assert.equal(code({ vestingWindowSeconds: "86400", vestingCliffHours: "1", vestingDurationHours: "23" }), "OK", "a window ending with the unlock is fine");
   assert.equal(code({ allowlistMinutes: "10" }), "RULES_ALLOWLIST", "a window needs addresses");
   assert.equal(code({ allowlist: A }), "RULES_ALLOWLIST", "addresses need a window");
   assert.equal(code({ allowlistMinutes: "61", allowlist: A }), "RULES_ALLOWLIST");

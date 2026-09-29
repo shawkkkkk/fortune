@@ -53,7 +53,8 @@ contract FortuneLaunchRules {
         uint32 sellCooldown;
         /// Tokens move only between wallets and the curve until graduation.
         bool curveOnly;
-        /// Buys in the first `vestingWindow` seconds vest (up to one day).
+        /// Buys in the first `vestingWindow` seconds vest (up to one day). The window may not
+        /// outlast the unlock (`vestingCliff + vestingDuration`), so every buy that vests is locked.
         uint32 vestingWindow;
         /// Nothing vested unlocks before launch + cliff ...
         uint32 vestingCliff;
@@ -165,7 +166,10 @@ contract FortuneLaunchRules {
         if (r.curveOnly) any = true;
         if (r.vestingWindow != 0) {
             uint256 end = uint256(r.vestingCliff) + r.vestingDuration;
-            if (r.vestingWindow > MAX_VESTING_WINDOW || end == 0 || end > MAX_VESTING_END) return (false, "RULES_VESTING");
+            // A window that outlasts the unlock would record buys as vested that are already free.
+            if (r.vestingWindow > MAX_VESTING_WINDOW || end == 0 || end > MAX_VESTING_END || r.vestingWindow > end) {
+                return (false, "RULES_VESTING");
+            }
             any = true;
         } else if (r.vestingCliff != 0 || r.vestingDuration != 0) {
             return (false, "RULES_VESTING");

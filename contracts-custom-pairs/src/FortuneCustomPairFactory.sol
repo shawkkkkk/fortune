@@ -7,6 +7,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {FortuneCustomPairCurve} from "./FortuneCustomPairCurve.sol";
 import {FortuneCustomPairCurveDeployer} from "./FortuneCustomPairCurveDeployer.sol";
+import {FortuneLaunchRules} from "./FortuneLaunchRules.sol";
 import {IFortuneSocialFeeVault} from "./interfaces/IFortuneSocialFeeVault.sol";
 
 /// @notice Permissionless Fortune launches paired with any BEP-20, including
@@ -16,7 +17,8 @@ import {IFortuneSocialFeeVault} from "./interfaces/IFortuneSocialFeeVault.sol";
 ///      token can only affect launches that chose it. The owner can pause new
 ///      launches, set the protocol fee for future launches and choose the
 ///      social fee vault future launches use; it has no control over curves
-///      that already exist.
+///      that already exist. Launches may choose optional launch rules, fixed
+///      in the launch transaction by the rules contract this factory deploys.
 contract FortuneCustomPairFactory is Ownable2Step {
     using SafeERC20 for IERC20;
 
@@ -65,6 +67,9 @@ contract FortuneCustomPairFactory is Ownable2Step {
 
     address public immutable pancakeFactory;
     FortuneCustomPairCurveDeployer public immutable curveDeployer;
+    /// Shared, ownerless rules contract for launches created with rules.
+    /// Zero when this factory does not offer launch rules.
+    FortuneLaunchRules public immutable launchRules;
 
     uint16 public protocolFeeBps;
     address public protocolFeeRecipient;
@@ -96,13 +101,23 @@ contract FortuneCustomPairFactory is Ownable2Step {
 
     error LaunchPreflightFailed(bytes32 reasonCode);
 
-    constructor(address initialOwner, address pancakeFactory_, uint16 protocolFeeBps_, address protocolFeeRecipient_)
-        Ownable(initialOwner)
-    {
+    /// @param launchRules_ Deployed just before this factory, bound to this
+    ///        factory's address (see DeployCustomPairsTestnet); zero disables
+    ///        launch rules. It is not created here to keep this contract's
+    ///        initcode under the EIP-3860 limit.
+    constructor(
+        address initialOwner,
+        address pancakeFactory_,
+        uint16 protocolFeeBps_,
+        address protocolFeeRecipient_,
+        FortuneLaunchRules launchRules_
+    ) Ownable(initialOwner) {
         require(pancakeFactory_ != address(0) && pancakeFactory_.code.length > 0, "BAD_PANCAKE_FACTORY");
+        require(address(launchRules_) == address(0) || launchRules_.factory() == address(this), "BAD_LAUNCH_RULES");
         pancakeFactory = pancakeFactory_;
         // Keeps the curve's bytecode out of this contract's runtime size.
         curveDeployer = new FortuneCustomPairCurveDeployer();
+        launchRules = launchRules_;
         _setProtocolFee(protocolFeeBps_, protocolFeeRecipient_);
     }
 
@@ -188,8 +203,50 @@ contract FortuneCustomPairFactory is Ownable2Step {
         return (true, "OK", uint8(rawDecimals));
     }
 
+    /// @notice Preflight for a launch with rules: the launch checks, then the
+    ///         rules. `rules` is `abi.encode(FortuneLaunchRules.Rules)`.
+    function preflightWithRules(LaunchParams calldata p, bytes calldata rules)
+        public
+        view
+        returns (bool ready, bytes32 reasonCode)
+    {
+        (ready, reasonCode) = preflight(p);
+        if (!ready) return (ready, reasonCode);
+        if (address(launchRules) == address(0)) return (false, "RULES_DISABLED");
+        try launchRules.checkEncodedRules(rules) returns (bool ok, bytes32 reason) {
+            return (ok, reason);
+        } catch {
+            return (false, "RULES_ENCODING");
+        }
+    }
+
     function createLaunch(LaunchParams calldata p) external returns (address token, address curve) {
-        (token, curve) = _create(p);
+        (token, curve) = _create(p, false);
+    }
+
+    /// @notice A launch whose token enforces `rules` (`abi.encode` of a
+    ///         FortuneLaunchRules.Rules) on every transfer until graduation,
+    ///         fixed in this transaction for good. With `amountIn` above zero,
+    ///         the creator's first buy follows, and the rules already apply to it.
+    function createLaunchWithRules(LaunchParams calldata p, bytes calldata rules, uint256 amountIn, uint256 minTokensOut)
+        external
+        returns (address token, address curve, uint256 tokensOut)
+    {
+        (token, curve) = _createWithRules(p, rules);
+        if (amountIn > 0) {
+            IERC20(p.pairToken).safeTransferFrom(msg.sender, curve, amountIn);
+            tokensOut = FortuneCustomPairCurve(curve).initialBuy(msg.sender, minTokensOut);
+        }
+    }
+
+    function _createWithRules(LaunchParams calldata p, bytes calldata rules)
+        internal
+        returns (address token, address curve)
+    {
+        (bool ok, bytes32 reason) = preflightWithRules(p, rules);
+        if (!ok) revert LaunchPreflightFailed(reason);
+        (token, curve) = _create(p, true);
+        launchRules.register(token, curve, msg.sender, p.supply, rules);
     }
 
     /// @notice Creates the launch and makes the creator's first buy in the same
@@ -201,12 +258,12 @@ contract FortuneCustomPairFactory is Ownable2Step {
         returns (address token, address curve, uint256 tokensOut)
     {
         require(amountIn > 0, "ZERO_INITIAL_BUY");
-        (token, curve) = _create(p);
+        (token, curve) = _create(p, false);
         IERC20(p.pairToken).safeTransferFrom(msg.sender, curve, amountIn);
         tokensOut = FortuneCustomPairCurve(curve).initialBuy(msg.sender, minTokensOut);
     }
 
-    function _create(LaunchParams calldata p) internal returns (address token, address curveAddress) {
+    function _create(LaunchParams calldata p, bool withRules) internal returns (address token, address curveAddress) {
         (bool ready, bytes32 reason) = preflight(p);
         if (!ready) revert LaunchPreflightFailed(reason);
         (,, uint8 decimals) = checkPairToken(p.pairToken);
@@ -226,7 +283,8 @@ contract FortuneCustomPairFactory is Ownable2Step {
                 graduationTarget: p.graduationTarget,
                 protocolFeeBps: protocolFeeBps,
                 creatorFeeBps: p.creatorFeeBps,
-                feeRecipient: split ? vault : msg.sender
+                feeRecipient: split ? vault : msg.sender,
+                rules: withRules ? address(launchRules) : address(0)
             })
         );
         curveAddress = address(curve);

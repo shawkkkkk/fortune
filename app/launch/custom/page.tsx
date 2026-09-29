@@ -4,13 +4,15 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { decodeEventLog, formatUnits, hexToString, isAddress, parseAbi, parseUnits, type Address, type Hex } from "viem";
 import FeeSplitEditor, { ClaimLinkBox, feeSplitInputs, feeSplitRow, unsavedClaimLinks, type FeeSplitRow } from "@/components/FeeSplitEditor";
+import LaunchRulesEditor, { useGateToken } from "@/components/LaunchRulesEditor";
+import { buildLaunchRules, describeLaunchRules, emptyRulesForm, launchRulesErrorMessage, type LaunchRulesForm } from "@/lib/launch-rules";
 import { rememberClaimLinks } from "@/lib/claim-link-store";
 import PairInspector from "@/components/PairInspector";
 import TokenImageInput from "@/components/TokenImageInput";
 import { useLanguage } from "@/components/LanguageProvider";
 import { FORTUNE_NETWORK } from "@/lib/fortune-network";
 import { CUSTOM_PAIRS, CUSTOM_PAIR_RULES, afterTax, firstBuyTokens } from "@/lib/custom-pairs";
-import { CUSTOM_PAIR_FACTORY_ABI } from "@/lib/custom-pairs-artifacts";
+import { CUSTOM_PAIR_FACTORY_ABI, LAUNCH_RULES_ABI } from "@/lib/custom-pairs-artifacts";
 import { byteLength, publicMetadataUrl } from "@/lib/creator-metadata";
 import { assertWalletIdentity } from "@/lib/launch-safety";
 import { formatAmount, formatShare } from "@/lib/market-format";
@@ -47,7 +49,22 @@ const PREFLIGHT_TEXT: Record<string, string> = {
   BAD_ACCOUNT: "A social handle is not valid.",
   BAD_WALLET_SHARE: "A fee recipient wallet is not valid.",
   BAD_SOCIAL_SHARE: "A social fee recipient is not valid.",
+  RULES_DISABLED: "This factory does not offer launch rules yet.",
+  RULES_ENCODING: "The launch rules could not be read.",
+  RULES_EMPTY: "Choose at least one rule, or turn launch rules off.",
+  RULES_MAX_WALLET: "Max wallet must be between 0.5% and 10% of supply.",
+  RULES_MAX_BUY: "Max buy must be between 0.1% and 10% of supply.",
+  RULES_MAX_SELL: "Max sell must be between 0.05% and 10% of supply.",
+  RULES_COOLDOWN: "The sell cooldown can be at most one day.",
+  RULES_VESTING: "Vesting needs a window of at most one day that ends no later than the unlock, and a cliff plus unlock of at most 30 days.",
+  RULES_ALLOWLIST: "The allowlist needs 1 to 200 addresses and a window of at most one hour.",
+  RULES_GATE: "The holder gate needs a token contract, a minimum balance and a window of at most one hour.",
+  RULES_EXEMPT: "Up to 10 distinct exempt wallets.",
 };
+
+// Rule reverts come from the new token inside the launch; with their errors in
+// the ABI, a first buy over a cap reads as a sentence, not a selector.
+const FACTORY_ABI = [...CUSTOM_PAIR_FACTORY_ABI, ...LAUNCH_RULES_ABI.filter((item) => item.type === "error")] as const;
 
 // Only used to check the split before a wallet is connected.
 const PREVIEW_WALLET = "0x000000000000000000000000000000000000f0F0" as Address;
@@ -88,6 +105,9 @@ export default function CustomPairLaunchPage() {
   const [creatorFeeBps, setCreatorFeeBps] = useState<number>(50);
   const [feeRows, setFeeRows] = useState<FeeSplitRow[]>(() => [feeSplitRow("self", "100")]);
   const [socialFees, setSocialFees] = useState(false);
+  const [rulesAvailable, setRulesAvailable] = useState(false);
+  const [rulesOn, setRulesOn] = useState(false);
+  const [rulesForm, setRulesForm] = useState<LaunchRulesForm>(emptyRulesForm);
   const [firstBuy, setFirstBuy] = useState("");
   const [protocolFeeBps, setProtocolFeeBps] = useState<number | null>(null);
   const [paused, setPaused] = useState(false);
@@ -108,6 +128,7 @@ export default function CustomPairLaunchPage() {
       .then((body) => {
         if (typeof body?.data?.protocolFeeBps === "number") setProtocolFeeBps(body.data.protocolFeeBps);
         setPaused(body?.data?.launchesPaused === true);
+        setRulesAvailable(typeof body?.data?.launchRules === "string");
       })
       .catch(() => undefined);
     fetch("/api/public/v1/social/status")
@@ -189,8 +210,30 @@ export default function CustomPairLaunchPage() {
       : "";
   const feeRecipientCount = feeSplit.ok ? feeSplit.shares.length : 0;
 
+  const gateToken = useGateToken(rulesOn ? rulesForm.gateToken : "");
+  const gateInfo = gateToken.status === "ready" ? gateToken : null;
+  const rulesBuild = rulesAvailable && rulesOn ? buildLaunchRules(rulesForm, gateInfo?.decimals ?? 18) : null;
+  // The gate minimum is written in the gate token's own units, so its decimals are never guessed.
+  const gateUnread = Boolean(rulesBuild?.ok && rulesBuild.rules.gateSeconds && !gateInfo);
+  const rulesError = rulesBuild && !rulesBuild.ok
+    ? rulesBuild.reason
+    : gateUnread
+      ? gateToken.status === "error"
+        ? "Could not read the gate token's decimals. Check the address, or try again."
+        : "Reading the gate token…"
+      : "";
+  const rulesLines = rulesBuild?.ok
+    ? describeLaunchRules({
+        ...rulesBuild.rules,
+        allowlistCount: rulesBuild.rules.allowlist.length,
+        gateLabel: gateInfo?.symbol ?? null,
+        gateMin: rulesForm.gateMin.trim() || null,
+        exemptCount: rulesBuild.rules.exempt.length,
+      }, zh)
+    : [];
+
   const pairBlocked = !inspection || inspection.verdict === "unsupported";
-  const ready = CUSTOM_PAIRS.enabled && !paused && Boolean(pairAddress) && !pairBlocked && !identityError && !economicsError && !feeError;
+  const ready = CUSTOM_PAIRS.enabled && !paused && Boolean(pairAddress) && !pairBlocked && !identityError && !economicsError && !feeError && !rulesError;
 
   async function launch() {
     if (!ready || !pairAddress || !economics || !CUSTOM_PAIRS.factory) return;
@@ -225,8 +268,11 @@ export default function CustomPairLaunchPage() {
         feeShares: split.shares,
       };
 
+      const rules = rulesBuild?.ok ? rulesBuild.encoded : null;
       setMessage("Running the factory preflight…");
-      const [preflightOk, reason] = (await publicClient.readContract({ address: factory, abi: CUSTOM_PAIR_FACTORY_ABI, functionName: "preflight", args: [params] })) as [boolean, Hex];
+      const [preflightOk, reason] = (rules
+        ? await publicClient.readContract({ address: factory, abi: CUSTOM_PAIR_FACTORY_ABI, functionName: "preflightWithRules", args: [params, rules] })
+        : await publicClient.readContract({ address: factory, abi: CUSTOM_PAIR_FACTORY_ABI, functionName: "preflight", args: [params] })) as [boolean, Hex];
       if (!preflightOk) {
         const code = hexToString(reason).replace(/\0/g, "");
         throw new Error(PREFLIGHT_TEXT[code] || "Preflight failed: " + code);
@@ -249,29 +295,29 @@ export default function CustomPairLaunchPage() {
           await publicClient.waitForTransactionReceipt({ hash: approval });
         }
         setMessage("Simulating the launch and first buy…");
-        const simulation = await publicClient.simulateContract({
-          account: wallet,
-          address: factory,
-          abi: CUSTOM_PAIR_FACTORY_ABI,
-          functionName: "createLaunchAndBuy",
-          args: [params, amountIn, 1n],
-        });
+        // With rules, the first buy is part of createLaunchWithRules and the rules already apply to it.
+        const simulation = rules
+          ? await publicClient.simulateContract({ account: wallet, address: factory, abi: FACTORY_ABI, functionName: "createLaunchWithRules", args: [params, rules, amountIn, 1n] })
+          : await publicClient.simulateContract({ account: wallet, address: factory, abi: FACTORY_ABI, functionName: "createLaunchAndBuy", args: [params, amountIn, 1n] });
         const simulatedTokens = (simulation.result as readonly [Address, Address, bigint])[2];
         const minTokensOut = (simulatedTokens * 99n) / 100n || 1n;
         setMessage("Confirm the launch in your wallet…");
         await assertWalletIdentity(injectedProvider(), wallet, FORTUNE_NETWORK.chainId);
-        hash = await walletClient.writeContract({
-          address: factory,
-          abi: CUSTOM_PAIR_FACTORY_ABI,
-          functionName: "createLaunchAndBuy",
-          args: [params, amountIn, minTokensOut],
-        });
+        hash = rules
+          ? await walletClient.writeContract({ address: factory, abi: CUSTOM_PAIR_FACTORY_ABI, functionName: "createLaunchWithRules", args: [params, rules, amountIn, minTokensOut] })
+          : await walletClient.writeContract({ address: factory, abi: CUSTOM_PAIR_FACTORY_ABI, functionName: "createLaunchAndBuy", args: [params, amountIn, minTokensOut] });
       } else {
         setMessage("Simulating the launch…");
-        await publicClient.simulateContract({ account: wallet, address: factory, abi: CUSTOM_PAIR_FACTORY_ABI, functionName: "createLaunch", args: [params] });
+        if (rules) {
+          await publicClient.simulateContract({ account: wallet, address: factory, abi: FACTORY_ABI, functionName: "createLaunchWithRules", args: [params, rules, 0n, 0n] });
+        } else {
+          await publicClient.simulateContract({ account: wallet, address: factory, abi: FACTORY_ABI, functionName: "createLaunch", args: [params] });
+        }
         setMessage("Confirm the launch in your wallet…");
         await assertWalletIdentity(injectedProvider(), wallet, FORTUNE_NETWORK.chainId);
-        hash = await walletClient.writeContract({ address: factory, abi: CUSTOM_PAIR_FACTORY_ABI, functionName: "createLaunch", args: [params] });
+        hash = rules
+          ? await walletClient.writeContract({ address: factory, abi: CUSTOM_PAIR_FACTORY_ABI, functionName: "createLaunchWithRules", args: [params, rules, 0n, 0n] })
+          : await walletClient.writeContract({ address: factory, abi: CUSTOM_PAIR_FACTORY_ABI, functionName: "createLaunch", args: [params] });
       }
 
       setMessage("Waiting for BNB Chain to confirm…");
@@ -294,7 +340,7 @@ export default function CustomPairLaunchPage() {
       }
       throw new Error("The transaction confirmed but no launch event was found.");
     } catch (error) {
-      setMessage(walletErrorMessage(error, "The launch did not go through."));
+      setMessage(launchRulesErrorMessage(error, (raw) => `${formatAmount(toNumber(raw, 18))} ${symbol.trim() || "tokens"}`, zh) ?? walletErrorMessage(error, "The launch did not go through."));
     } finally {
       setBusy(false);
     }
@@ -397,6 +443,12 @@ export default function CustomPairLaunchPage() {
               ) : null}
             </section>
 
+            {rulesAvailable ? (
+              <section className="formCard">
+                <LaunchRulesEditor enabled={rulesOn} onToggle={setRulesOn} form={rulesForm} onChange={setRulesForm} error={rulesError} gateSymbol={gateInfo?.symbol ?? null} zh={zh} />
+              </section>
+            ) : null}
+
             <section className="formCard">
               <div className="formSectionTitle"><span>04</span><div><h2>Optional first buy</h2><p>Made in the launch transaction. The Launch Shield applies to it too.</p></div></div>
               <div className="fieldGrid"><label><span translate="no">{zh ? `金额 · ${pairSymbol}` : `Amount in ${pairSymbol}`}</span><input value={firstBuy} inputMode="decimal" onChange={(event) => setFirstBuy(event.target.value)} placeholder="0" /></label></div>
@@ -429,6 +481,13 @@ export default function CustomPairLaunchPage() {
                     ? (zh ? `创作者手续费分给 ${feeRecipientCount} 个接收方` : `Creator fee split between ${feeRecipientCount} recipients`)
                     : (zh ? "创作者手续费归你的钱包" : "Creator fee goes to your wallet"))}
                 </li>
+                {rulesAvailable ? (
+                  <li className={!rulesError ? "done" : undefined} translate="no">
+                    {rulesError || (rulesLines.length
+                      ? (zh ? `发行规则：${rulesLines.join("；")}` : `Launch rules: ${rulesLines.join("; ")}`)
+                      : (zh ? "没有发行规则" : "No launch rules"))}
+                  </li>
+                ) : null}
               </ul>
               <button className="launchButton" disabled={!ready || busy} onClick={() => void launch()}>
                 {busy ? "Working…" : !CUSTOM_PAIRS.enabled ? "Custom pairs are not live on this network" : paused ? "Launches paused" : FORTUNE_NETWORK.isMainnet ? "Launch custom pair on BNB Chain →" : "Launch custom pair on BSC Testnet →"}

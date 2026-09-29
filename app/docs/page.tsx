@@ -130,6 +130,17 @@ export default function DocsPage() {
             </p>
           </section>
 
+          <section className="panel" id="holders">
+            <span className="eyebrow">HOLDER SHIELD</span>
+            <h2>See who launched it and who holds it.</h2>
+            <p>
+              Every token page shows the creator&apos;s record on Fortune, what they hold and what has left their wallet. It also shows how many wallets hold the token, the ten largest holders, and what the first 15 seconds of buyers took and still hold.
+            </p>
+            <p>
+              The holder numbers come from Fortune&apos;s own index of every transfer since launch, so they are exact. The curve, official pools, Fortune vaults and burn addresses are not holders and are left out. If the index cannot vouch for a launch&apos;s history, the panel says the data is paused instead of guessing. A wallet is not a person: one person can use many wallets.
+            </p>
+          </section>
+
           <section className="panel" id="rewards">
             <span className="eyebrow">REWARDS</span>
             <h2>Public accounting before flashy APY.</h2>
@@ -184,6 +195,7 @@ export default function DocsPage() {
               <li><strong>Check a token before you launch.</strong> Fortune simulates a buy, a sell and a graduation transfer and reports the tax on each, plus pause, blacklist, fee-change, limit and rebasing functions found in the bytecode.</li>
               <li><strong>Same Launch Shield.</strong> 99% decaying to zero within five seconds and a 2% wallet cap for fifteen seconds. Shield tax becomes pool liquidity and is never paid to the creator.</li>
               <li><strong>Graduation to PancakeSwap V2.</strong> The pool is created in the launch transaction and locked until graduation, then opened at the final curve price with the LP tokens burned.</li>
+              <li><strong>Optional launch rules.</strong> A launch can cap wallets, buys and sells, space out sells, vest early buyers, keep tokens on the curve, or let an allowlist or holders buy first. The token enforces them on every transfer until graduation, and nobody can change them after launch, not the creator and not Fortune.</li>
               <li><strong>If the pair token breaks.</strong> Losses hit Launch Shield reserve and unclaimed fees first. If the reserve itself falls short, or graduation stays impossible for seven days, holders redeem a pro-rata share of everything the curve holds.</li>
             </ul>
             <p className="reviewWarning">

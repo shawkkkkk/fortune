@@ -3,12 +3,13 @@ pragma solidity ^0.8.24;
 
 import {Script, console2} from "forge-std/Script.sol";
 import {FortuneCustomPairFactory} from "../src/FortuneCustomPairFactory.sol";
+import {FortuneLaunchRules} from "../src/FortuneLaunchRules.sol";
 import {FortuneSocialFeeVault} from "../src/FortuneSocialFeeVault.sol";
 import {FortuneTestnetTaxToken} from "../src/testnet/FortuneTestnetTaxToken.sol";
 
 /// @notice Deploys the UNAUDITED custom-pairs beta to BSC Testnet only: the
-///         factory, the social fee vault wired to it, and two faucet test tokens
-///         (5% transfer tax and no tax) to pair with.
+///         launch rules contract, the factory, the social fee vault wired to
+///         it, and two faucet test tokens (5% transfer tax and no tax).
 contract DeployCustomPairsTestnet is Script {
     function run() external {
         require(block.chainid == 97, "BSC_TESTNET_ONLY");
@@ -26,8 +27,11 @@ contract DeployCustomPairsTestnet is Script {
         require(pancakeFactory.code.length > 0, "PANCAKE_V2_FACTORY_NO_CODE");
 
         vm.startBroadcast(key);
+        // The rules contract is bound to the factory's address, which is the
+        // deployer's next contract after it; the factory checks the binding.
+        FortuneLaunchRules launchRules = new FortuneLaunchRules(vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 1));
         FortuneCustomPairFactory factory =
-            new FortuneCustomPairFactory(deployer, pancakeFactory, uint16(feeBps), feeRecipient);
+            new FortuneCustomPairFactory(deployer, pancakeFactory, uint16(feeBps), feeRecipient, launchRules);
         FortuneSocialFeeVault vault = new FortuneSocialFeeVault(deployer, attestor, guardian);
         vault.setRegistrar(address(factory), true);
         factory.setSocialFeeVault(address(vault));
@@ -44,6 +48,7 @@ contract DeployCustomPairsTestnet is Script {
 
         console2.log("CUSTOM_PAIR_FACTORY=%s", address(factory));
         console2.log("CUSTOM_PAIR_CURVE_DEPLOYER=%s", address(factory.curveDeployer()));
+        console2.log("CUSTOM_PAIR_LAUNCH_RULES=%s", address(launchRules));
         console2.log("SOCIAL_FEE_VAULT=%s", address(vault));
         console2.log("SOCIAL_FEE_ATTESTOR=%s", attestor);
         console2.log("SOCIAL_FEE_GUARDIAN=%s", guardian);

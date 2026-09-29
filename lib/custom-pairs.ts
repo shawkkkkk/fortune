@@ -51,6 +51,15 @@ export function customPhase(value: number | bigint): CustomPairPhase {
 }
 
 /** Same decay as the curve: 9900 >> (elapsed * 14 / 5), zero from five seconds. */
+/**
+ * Seconds to add to the device clock to follow the chain. Zero unless the device is more than
+ * `toleranceSeconds` off, so ordinary drift and block timing never make the countdowns jitter.
+ */
+export function chainClockSkew(blockTimestamp: number, deviceSeconds: number, toleranceSeconds = 60) {
+  const measured = Math.round(blockTimestamp - deviceSeconds);
+  return Math.abs(measured) > toleranceSeconds ? measured : 0;
+}
+
 export function shieldBpsAt(elapsedSeconds: number) {
   const elapsed = Math.max(0, Math.floor(elapsedSeconds));
   if (elapsed >= CUSTOM_PAIR_RULES.snipeTaxSeconds) return 0;

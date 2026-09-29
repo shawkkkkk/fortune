@@ -248,6 +248,20 @@ export async function GET(request: Request) {
           },
         },
       },
+      "/holders/{token}": {
+        get: {
+          tags: ["Markets"],
+          summary: "Holder count, top ten holders and the Launch Shield window for one launch",
+          description:
+            "From Fortune's holder index: every Transfer since the launch's creation block folded into exact balances. The curve, official pools, Fortune vaults and burn addresses are excluded from holders and the top list. view.status is tracked, untracked (created before indexing began), pending, gap or inconsistent (history incomplete; no numbers are returned). enabled is false when no index store is configured. Each read may advance the index once per interval, after the response.",
+          parameters: [{ name: "token", in: "path", required: true, schema: { type: "string" } }],
+          responses: {
+            "200": { description: "enabled, token, creator and view: holders, top[] (address, balance, share, early), topShare, shield (buys, wallets, tokens, share, taxedBuys, tax[], checked, stillHolding, holdingNow, holdingShare), indexedTo, updatedAt, reconciledAt" },
+            "404": { description: "Not a Fortune launch on this network" },
+            "503": { description: "The launch could not be read" },
+          },
+        },
+      },
       "/pairs/inspect": {
         get: {
           tags: ["Assets"],
@@ -276,7 +290,7 @@ export async function GET(request: Request) {
             { name: "offset", in: "query", schema: { type: "integer", minimum: 0 } },
             { name: "limit", in: "query", schema: { type: "integer", minimum: 1, maximum: 48 } },
           ],
-          responses: { "200": { description: "Factory, protocol fee, pause state and one page of launches" }, "503": { description: "The network could not be read" } },
+          responses: { "200": { description: "Factory, protocol fee, pause state, launchRules (the factory's launch rules contract, or null when it offers none) and one page of launches, each with rulesContract when it was created with rules" }, "503": { description: "The network could not be read" } },
         },
       },
       "/custom-pairs/{curve}": {
@@ -284,7 +298,7 @@ export async function GET(request: Request) {
           tags: ["Launches"],
           summary: "One custom-pair launch: curve state, fees, graduation or rescue",
           parameters: [{ name: "curve", in: "path", required: true, schema: { type: "string" } }],
-          responses: { "200": { description: "Launch detail read at one block" }, "404": { description: "No custom-pair launch uses this curve" } },
+          responses: { "200": { description: "Launch detail read at one block. rules is null unless the launch chose launch rules; then it lists every setting, caps in launch tokens, exempt wallets and active (false after graduation or rescue)" }, "404": { description: "No custom-pair launch uses this curve" } },
         },
       },
       "/social/status": {

@@ -21,6 +21,7 @@ LESGO shipped custom pairs on Solana: launch against any token, including Token-
 | Graduation is permissionless, prices the pool from what the pool received, burns LP to `0x…dEaD`, and requires its mint to be the pool's only mint | Price continuity even with a tax on the way into the pool; a pair token that reenters the pool from a transfer hook to mint LP for itself makes graduation revert instead of taking the liquidity. |
 | Loss order: Launch Shield reserve, then protocol fees, then creator fees, then the reserve | Holders are hit last. |
 | Rescue when the reserve is short, or graduation has been impossible for seven days | Live pro-rata redemption of every pair token the curve holds, so later rebases or taxes are shared fairly. |
+| Optional launch rules, fixed at launch, enforced by the token until graduation | Caps, sell pacing, early-buyer vesting, curve-only transfers and time-boxed access, with nobody able to change them later. See [LAUNCH_RULES.md](LAUNCH_RULES.md). |
 
 Curve math (pair base units `R`, virtual pair reserve `a0`, supply `S`):
 
@@ -49,12 +50,19 @@ Checked on BSC mainnet on 2026-09-26: bStocks, Ondo and xStocks stock tokens mea
 - `/launch/custom`: pair-token check, identity, curve and creator fee (0 to 1%), optional first buy with a tax-aware preview, preflight, approval and a simulated transaction before signing.
 - `/custom/[curve]`: curve price and market cap in pair units, tax-aware buy/sell quotes, slippage on delivered amounts, graduation, rescue, redemption and creator-fee claims.
 - Explore lists custom-pair launches; the Standard launch page links to the beta.
-- Creator fee splits: a launch can send its creator fee to up to ten wallets and social accounts (X, GitHub, TikTok, Telegram, YouTube, Farcaster, Bluesky, Weibo, Bilibili, WeChat Official Accounts), who claim on `/claims`. See [SOCIAL_FEES.md](SOCIAL_FEES.md).
+- Creator fee splits: a launch can send its creator fee to up to ten wallets and social accounts (X, GitHub, TikTok, Telegram, YouTube, Farcaster, Bluesky, Weibo, Bilibili, WeChat Official Accounts, Xiaohongshu, or anyone through a private claim link), who claim on `/claims`. See [SOCIAL_FEES.md](SOCIAL_FEES.md).
+- Launch rules: an optional section on `/launch/custom` and a rules panel on the market page. See [LAUNCH_RULES.md](LAUNCH_RULES.md).
 - Configuration: `NEXT_PUBLIC_FORTUNE_CUSTOM_PAIR_FACTORY_ADDRESS` and optional `NEXT_PUBLIC_FORTUNE_CUSTOM_PAIR_TEST_TOKENS` (comma-separated). Ignored on every chain except BSC Testnet (97).
 
 ## Deployment
 
-Owner-run workflow `.github/workflows/custom-pairs-testnet-deploy.yml` (confirm with `DEPLOY_CUSTOM_PAIRS_BETA`). It uses the existing `FORTUNE_TESTNET_PRIVATE_KEY` and `BSC_TESTNET_RPC_URL` secrets, refuses any chain but 97, runs the suites, deploys the factory plus faucet tokens tSTONK (5% transfer tax) and tSHARE (no tax), runs a real launch → trade → graduate drill on BSC Testnet PancakeSwap V2, and prints the environment variables to set.
+Owner-run workflow `.github/workflows/custom-pairs-testnet-deploy.yml` (confirm with `DEPLOY_CUSTOM_PAIRS_BETA`). It uses the existing `FORTUNE_TESTNET_PRIVATE_KEY` and `BSC_TESTNET_RPC_URL` secrets and refuses any chain but 97. It:
+- runs the suites;
+- deploys the launch rules contract, bound to the factory's predicted address, then the factory, plus faucet tokens tSTONK (5% transfer tax) and tSHARE (no tax);
+- runs a real launch → trade → graduate drill on BSC Testnet PancakeSwap V2;
+- prints the environment variables to set.
+
+Launch rules need a factory deployed this way. Launches on an older factory keep working.
 
 ## Verification so far
 

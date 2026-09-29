@@ -1,7 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { spawn, spawnSync } from "node:child_process";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { createServer } from "node:http";
-import { MemoryStore, UpstashStore, holderStore } from "../../lib/holder-store.ts";
+import { createConnection } from "node:net";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { COMMIT_IF_OWNER_SCRIPT, MemoryStore, RELEASE_IF_OWNER_SCRIPT, UpstashStore, commitIfOwnerCommand, holderStore, splitCommand } from "../../lib/holder-store.ts";
 import { advanceHolderIndex, applyTransfers, historyPruned, holderKeys, rangeTooLarge, readHolderView } from "../../lib/holder-index.ts";
 
 const ZERO = "0x0000000000000000000000000000000000000000";
@@ -271,18 +276,106 @@ test("one writer at a time, and a run that lost its lock writes nothing", async 
   let commits = 0;
   const stealing = {
     pipeline: (commands) => inner.pipeline(commands),
-    transaction: async (commands) => {
-      const result = await inner.transaction(commands);
-      commits += 1;
+    commitIfOwner: async (...args) => {
+      const written = await inner.commitIfOwner(...args);
+      if (written) commits += 1;
       if (commits === 1) await inner.pipeline([["SET", holderKeys(97).lock, "thief", "PX", "60000"]]);
-      return result;
+      return written;
     },
+    releaseIfOwner: (...args) => inner.releaseIfOwner(...args),
   };
   const run = await advanceHolderIndex(options(chain, stealing));
   assert.equal(run.status, "busy");
   assert.equal(commits, 1, "no commit after the lock was lost");
   const [lock] = await inner.pipeline([["GET", holderKeys(97).lock]]);
   assert.equal(lock, "thief", "the other run's lock is left alone");
+});
+
+/** Everything the index keeps for the chain and TOKEN, for before/after comparisons. */
+async function snapshot(store) {
+  const keys = holderKeys(97);
+  return store.pipeline([["HGETALL", keys.state], ["HGETALL", keys.tokens], ["HGETALL", keys.bal(TOKEN)], ["ZREVRANGE", keys.rank(TOKEN), "0", "-1", "WITHSCORES"], ["HGETALL", keys.shield(TOKEN)], ["SMEMBERS", keys.buyers(TOKEN)]]);
+}
+
+/**
+ * Wraps a store so its run stops at its first ownership check: right after
+ * reading the lock when that is its own request, or just before the atomic
+ * commit that performs the check on the server.
+ */
+function pausedAtOwnershipCheck(store, lockKey) {
+  let reached;
+  let resume;
+  const atCheck = new Promise((resolve) => (reached = resolve));
+  const gate = new Promise((resolve) => (resume = resolve));
+  let paused = false;
+  const pause = async () => {
+    if (paused) return;
+    paused = true;
+    reached();
+    await gate;
+  };
+  return {
+    atCheck,
+    resume,
+    store: {
+      async pipeline(commands) {
+        const result = await store.pipeline(commands);
+        if (commands.some(([name, key]) => name === "GET" && key === lockKey)) await pause();
+        return result;
+      },
+      async commitIfOwner(...args) {
+        await pause();
+        return store.commitIfOwner(...args);
+      },
+      releaseIfOwner: (...args) => store.releaseIfOwner(...args),
+    },
+  };
+}
+
+test("a writer paused at its ownership check, whose lease then expires, can never write", async () => {
+  let clock = 1_000_000;
+  const shared = new MemoryStore(() => clock);
+  const keys = holderKeys(97);
+  const chain = scenario();
+  assert.equal((await advanceHolderIndex(options(chain, shared))).cursor, "280");
+  chain.transfer(TOKEN, E, G, 10, 290); // first range after the cursor
+  chain.transfer(TOKEN, A, B, 5, 320); // a later range
+  chain.head = 360n; // ranges 281-305, 306-330, 331-340
+
+  // The old writer stops at its first commit, then its lease (budget + 60 s) runs out.
+  const old = pausedAtOwnershipCheck(shared, keys.lock);
+  const oldRun = advanceHolderIndex(options(chain, old.store, { lockId: "old-writer" }));
+  await old.atCheck;
+  clock += 120_001;
+
+  // A new writer takes the expired lease and folds every range.
+  const fresh = await advanceHolderIndex(options(chain, shared, { lockId: "new-writer" }));
+  assert.equal(fresh.status, "ok", fresh.message);
+  assert.equal(fresh.cursor, "340");
+  const before = await snapshot(shared);
+
+  // The old writer resumes and must change nothing: no rollback of the cursor, no second fold.
+  old.resume();
+  const stale = await oldRun;
+  assert.equal(stale.status, "busy");
+  assert.deepEqual(await snapshot(shared), before, "the old writer wrote nothing");
+  assert.deepEqual(await balancesOf(shared, TOKEN), { [CURVE]: "830", [A]: "55", [B]: "5", [D]: "20", [E]: "30", [G]: "10" });
+  const next = await advanceHolderIndex(options(chain, shared));
+  assert.equal(next.chunks, 0);
+  assert.deepEqual(await balancesOf(shared, TOKEN), Object.fromEntries([...chain.balances(TOKEN, 340n)].filter(([, value]) => value > 0n).map(([holder, value]) => [holder, value.toString()])), "balances match the chain");
+
+  // An old writer that resumes while a new one holds the lock leaves that lock alone.
+  const late = pausedAtOwnershipCheck(shared, keys.lock);
+  chain.transfer(TOKEN, E, D, 1, 350);
+  chain.head = 380n;
+  const lateRun = advanceHolderIndex(options(chain, late.store, { lockId: "late-writer" }));
+  await late.atCheck;
+  clock += 120_001;
+  await shared.pipeline([["SET", keys.lock, "current-writer", "NX", "PX", "60000"]]);
+  late.resume();
+  assert.equal((await lateRun).status, "busy");
+  const [lock] = await shared.pipeline([["GET", keys.lock]]);
+  assert.equal(lock, "current-writer", "the current writer keeps its lock");
 });
 
 test("the in-memory store keeps Redis semantics for the commands the index uses", async () => {
@@ -293,11 +386,185 @@ test("the in-memory store keeps Redis semantics for the commands the index uses"
   assert.deepEqual(await store.pipeline([["GET", "k"], ["SET", "k", "3", "NX", "PX", "100"], ["PEXPIRE", "k", "500"]]), [null, "OK", 1]);
   clock += 400;
   assert.deepEqual(await store.pipeline([["GET", "k"], ["PEXPIRE", "missing", "5"]]), ["3", 0]);
-  await store.transaction([["ZADD", "z", "1.5", "a", "3", "b", "3", "c"], ["HSET", "h", "a", "1", "b", "2"]]);
+  await store.pipeline([["ZADD", "z", "1.5", "a", "3", "b", "3", "c"], ["HSET", "h", "a", "1", "b", "2"]]);
   assert.deepEqual(await store.pipeline([["ZREVRANGE", "z", "0", "1", "WITHSCORES"], ["ZCARD", "z"], ["ZSCORE", "z", "a"], ["HMGET", "h", "a", "x"]]), [["c", "3", "b", "3"], 3, "1.5", ["1", null]]);
   await store.pipeline([["HDEL", "h", "a", "b"], ["ZREM", "z", "a", "b", "c"]]);
   assert.deepEqual(await store.pipeline([["HGETALL", "h"], ["ZCARD", "z"]]), [[], 0]);
   await assert.rejects(store.pipeline([["HGET", "k", "x"]]), /WRONGTYPE/);
+
+  // Commits and releases happen only for the lock's owner, and a commit extends the lease.
+  await store.pipeline([["SET", "lock", "me", "PX", "100"]]);
+  assert.equal(await store.commitIfOwner("lock", "you", 1_000, [["HSET", "w", "f", "1"]]), false);
+  assert.deepEqual(await store.pipeline([["HGETALL", "w"]]), [[]], "a refused commit writes nothing");
+  assert.equal(await store.commitIfOwner("lock", "me", 1_000, [["HSET", "w", "f", "1"], ["SADD", "s", "x"]]), true);
+  assert.deepEqual(await store.pipeline([["HGETALL", "w"], ["SMEMBERS", "s"]]), [["f", "1"], ["x"]]);
+  clock += 900;
+  assert.deepEqual(await store.pipeline([["GET", "lock"]]), ["me"], "the commit extended the lease");
+  assert.equal(await store.releaseIfOwner("lock", "you"), false);
+  assert.equal(await store.releaseIfOwner("lock", "me"), true);
+  assert.equal(await store.commitIfOwner("lock", "me", 1_000, [["HSET", "w", "f", "2"]]), false, "a released lock is never this run's again");
+});
+
+test("long commands are split into equivalent ones that Lua can unpack", () => {
+  const fields = Array.from({ length: 1_500 }, (_, i) => [`f${i}`, String(i)]).flat();
+  const parts = splitCommand(["HSET", "h", ...fields], 1_000);
+  assert.ok(parts.length > 1 && parts.every((part) => part.length <= 1_000 && part[0] === "HSET" && part[1] === "h" && part.length % 2 === 0));
+  assert.deepEqual(parts.flatMap((part) => part.slice(2)), fields, "pairs stay together and in order");
+  const members = Array.from({ length: 2_500 }, (_, i) => `m${i}`);
+  assert.deepEqual(splitCommand(["SADD", "s", ...members], 1_000).flatMap((part) => part.slice(2)), members);
+  assert.deepEqual(splitCommand(["DEL", "a", "b"]), [["DEL", "a", "b"]]);
+  const [eval_, script, numkeys, ...rest] = commitIfOwnerCommand("lock", "me", 5_000, [["HSET", "h", "f", "1"], ["DEL", "a", "b"], ["SADD", "h2", "x"]]);
+  assert.equal(eval_, "EVAL");
+  assert.equal(script, COMMIT_IF_OWNER_SCRIPT);
+  assert.equal(numkeys, 5);
+  assert.deepEqual(rest, ["lock", "h", "a", "b", "h2", "me", 5_000, 4, "HSET", "h", "f", "1", 3, "DEL", "a", "b", 3, "SADD", "h2", "x"]);
+});
+
+// A minimal RESP client, enough to run the scripts on a real Redis server.
+function parseResp(buffer, at) {
+  const eol = buffer.indexOf("\r\n", at);
+  if (eol < 0) return null;
+  const type = String.fromCharCode(buffer[at]);
+  const head = buffer.toString("utf8", at + 1, eol);
+  const next = eol + 2;
+  if (type === "+") return { value: head, end: next };
+  if (type === "-") return { value: new Error(head), end: next };
+  if (type === ":") return { value: Number(head), end: next };
+  if (type === "$") {
+    const length = Number(head);
+    if (length < 0) return { value: null, end: next };
+    return buffer.length < next + length + 2 ? null : { value: buffer.toString("utf8", next, next + length), end: next + length + 2 };
+  }
+  if (type === "*") {
+    const items = [];
+    let position = next;
+    for (let i = 0; i < Number(head); i += 1) {
+      const item = parseResp(buffer, position);
+      if (!item) return null;
+      items.push(item.value);
+      position = item.end;
+    }
+    return { value: items, end: position };
+  }
+  throw new Error("Unexpected RESP reply " + type);
+}
+
+async function redisClient(path) {
+  const socket = createConnection(path);
+  await new Promise((resolve, reject) => socket.once("connect", resolve).once("error", reject));
+  let buffer = Buffer.alloc(0);
+  const waiting = [];
+  socket.on("data", (chunk) => {
+    buffer = Buffer.concat([buffer, chunk]);
+    for (let parsed = parseResp(buffer, 0); parsed && waiting.length; parsed = parseResp(buffer, 0)) {
+      buffer = buffer.subarray(parsed.end);
+      const { resolve, reject } = waiting.shift();
+      if (parsed.value instanceof Error) reject(parsed.value);
+      else resolve(parsed.value);
+    }
+  });
+  return {
+    send: (args) => new Promise((resolve, reject) => {
+      waiting.push({ resolve, reject });
+      socket.write(`*${args.length}\r\n` + args.map((arg) => `$${Buffer.byteLength(String(arg))}\r\n${arg}\r\n`).join(""));
+    }),
+    close: () => socket.end(),
+  };
+}
+
+test("the commit and release scripts hold on a real Redis server", async (t) => {
+  if (spawnSync("redis-server", ["--version"]).error) return t.skip("redis-server is not installed");
+  const dir = mkdtempSync(join(tmpdir(), "fortune-redis-"));
+  const path = join(dir, "redis.sock");
+  const server = spawn("redis-server", ["--port", "0", "--unixsocket", path, "--save", "", "--appendonly", "no", "--dir", dir], { stdio: "ignore" });
+  try {
+    for (let i = 0; i < 100 && !existsSync(path); i += 1) await new Promise((resolve) => setTimeout(resolve, 50));
+    const redis = await redisClient(path);
+    try {
+      await redis.send(["SET", "lock", "me", "PX", "1000"]);
+      assert.equal(await redis.send(commitIfOwnerCommand("lock", "you", 60_000, [["HSET", "h", "f", "1"]])), 0);
+      assert.equal(await redis.send(["EXISTS", "h"]), 0, "a refused commit writes nothing");
+
+      // The owner's commit extends the lease and applies every write, including one longer than Lua can unpack at once.
+      const fields = Array.from({ length: 6_000 }, (_, i) => [`f${i}`, String(i)]).flat();
+      await redis.send(["SET", "gone", "x"]);
+      assert.equal(await redis.send(commitIfOwnerCommand("lock", "me", 60_000, [["HSET", "h", ...fields], ["ZADD", "z", "5", "a"], ["SADD", "s", "x"], ["DEL", "gone"]])), 1);
+      assert.equal(await redis.send(["HLEN", "h"]), 6_000);
+      assert.deepEqual(await redis.send(["ZRANGE", "z", "0", "-1", "WITHSCORES"]), ["a", "5"]);
+      assert.deepEqual(await redis.send(["SMEMBERS", "s"]), ["x"]);
+      assert.equal(await redis.send(["EXISTS", "gone"]), 0);
+      assert.ok((await redis.send(["PTTL", "lock"])) > 59_000, "the commit extended the lease");
+      await assert.rejects(redis.send(["EVAL", COMMIT_IF_OWNER_SCRIPT, 2, "lock", "h", "me", 60_000, fields.length + 2, "HSET", "h", ...fields]), /unpack|too many/i, "unsplit, the same write is too long for Lua");
+
+      // Only the owner releases, and a lock that is gone is nobody's.
+      assert.equal(await redis.send(["EVAL", RELEASE_IF_OWNER_SCRIPT, 1, "lock", "you"]), 0);
+      assert.equal(await redis.send(["GET", "lock"]), "me");
+      assert.equal(await redis.send(["EVAL", RELEASE_IF_OWNER_SCRIPT, 1, "lock", "me"]), 1);
+      assert.equal(await redis.send(commitIfOwnerCommand("lock", "me", 60_000, [["HSET", "h", "f0", "changed"]])), 0);
+      assert.equal(await redis.send(["HGET", "h", "f0"]), "0");
+    } finally {
+      redis.close();
+    }
+  } finally {
+    server.kill();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("the index runs through the Upstash client on a real Redis server, and a paused writer still cannot write", async (t) => {
+  if (spawnSync("redis-server", ["--version"]).error) return t.skip("redis-server is not installed");
+  const dir = mkdtempSync(join(tmpdir(), "fortune-redis-"));
+  const path = join(dir, "redis.sock");
+  const server = spawn("redis-server", ["--port", "0", "--unixsocket", path, "--save", "", "--appendonly", "no", "--dir", dir], { stdio: "ignore" });
+  let rest;
+  try {
+    for (let i = 0; i < 100 && !existsSync(path); i += 1) await new Promise((resolve) => setTimeout(resolve, 50));
+    const redis = await redisClient(path);
+    // Upstash's REST pipeline endpoint, in front of the real server.
+    rest = createServer((req, res) => {
+      let body = "";
+      req.on("data", (chunk) => (body += chunk));
+      req.on("end", async () => {
+        const rows = [];
+        for (const command of JSON.parse(body)) {
+          rows.push(await redis.send(command).then((result) => ({ result }), (error) => ({ error: error.message })));
+        }
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify(rows));
+      });
+    });
+    await new Promise((resolve) => rest.listen(0, "127.0.0.1", resolve));
+    const store = new UpstashStore(`http://127.0.0.1:${rest.address().port}`, "token", fetch, /^http:\/\/127\.0\.0\.1:\d+$/);
+    const keys = holderKeys(97);
+    try {
+      const chain = scenario();
+      const first = await advanceHolderIndex(options(chain, store));
+      assert.equal(first.status, "ok", first.message);
+      assert.deepEqual(await balancesOf(store, TOKEN), { [CURVE]: "830", [A]: "60", [D]: "20", [E]: "40" });
+      assert.deepEqual((await view(store)).shield.tax, [{ asset: WBNB, amount: "5" }]);
+
+      chain.transfer(TOKEN, E, G, 10, 290);
+      chain.transfer(TOKEN, A, B, 5, 320);
+      chain.head = 360n;
+      const old = pausedAtOwnershipCheck(store, keys.lock);
+      const oldRun = advanceHolderIndex(options(chain, old.store, { lockId: "old-writer" }));
+      await old.atCheck;
+      await redis.send(["DEL", keys.lock]); // the old writer's lease runs out
+      assert.equal((await advanceHolderIndex(options(chain, store, { lockId: "new-writer" }))).cursor, "340");
+      const before = await snapshot(store);
+      old.resume();
+      assert.equal((await oldRun).status, "busy");
+      assert.deepEqual(await snapshot(store), before, "the old writer wrote nothing");
+      assert.deepEqual(await balancesOf(store, TOKEN), { [CURVE]: "830", [A]: "55", [B]: "5", [D]: "20", [E]: "30", [G]: "10" });
+      assert.equal(await redis.send(["EXISTS", keys.lock]), 0, "every run released its lock");
+    } finally {
+      redis.close();
+    }
+  } finally {
+    rest?.close();
+    server.kill();
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test("holder analytics stay off unless a store is configured, and memory is never used on Vercel", () => {
@@ -311,9 +578,9 @@ test("holder analytics stay off unless a store is configured, and memory is neve
   assert.throws(() => new UpstashStore("http://127.0.0.1:1", "t"), /Invalid Upstash/);
 });
 
-test("the Upstash client sends pipelines and transactions over REST and fails loudly", async () => {
+test("the Upstash client sends pipelines and owner-checked scripts over REST and fails loudly", async () => {
   const seen = [];
-  let reply = (commands) => [200, commands.map((command) => ({ result: command[0] === "GET" ? "v" : "OK" }))];
+  let reply = (commands) => [200, commands.map((command) => ({ result: command[0] === "GET" ? "v" : command[0] === "EVAL" ? 1 : "OK" }))];
   const server = createServer((req, res) => {
     let body = "";
     req.on("data", (chunk) => (body += chunk));
@@ -330,9 +597,14 @@ test("the Upstash client sends pipelines and transactions over REST and fails lo
   const store = new UpstashStore(url, "secret-token", fetch, /^http:\/\/127\.0\.0\.1:\d+$/);
   try {
     assert.deepEqual(await store.pipeline([["SET", "k", 1], ["GET", "k"]]), ["OK", "v"]);
-    assert.deepEqual(await store.transaction([["HSET", "h", "f", 2]]), ["OK"]);
-    assert.deepEqual(seen.map((row) => [row.path, row.auth]), [["/pipeline", "Bearer secret-token"], ["/multi-exec", "Bearer secret-token"]]);
+    assert.equal(await store.commitIfOwner("lock", "me", 5_000, [["HSET", "h", "f", 2]]), true);
+    assert.equal(await store.releaseIfOwner("lock", "me"), true);
+    assert.deepEqual(seen.map((row) => [row.path, row.auth]), [["/pipeline", "Bearer secret-token"], ["/pipeline", "Bearer secret-token"], ["/pipeline", "Bearer secret-token"]]);
     assert.deepEqual(seen[0].commands, [["SET", "k", "1"], ["GET", "k"]], "every argument is sent as a string");
+    assert.deepEqual(seen[1].commands, [commitIfOwnerCommand("lock", "me", 5_000, [["HSET", "h", "f", 2]]).map(String)], "one script does the check and the writes");
+    assert.deepEqual(seen[2].commands, [["EVAL", RELEASE_IF_OWNER_SCRIPT, "1", "lock", "me"]]);
+    reply = (commands) => [200, commands.map(() => ({ result: 0 }))];
+    assert.equal(await store.commitIfOwner("lock", "me", 5_000, [["HSET", "h", "f", 2]]), false, "a refused commit reads as false");
     assert.deepEqual(await store.pipeline([]), []);
 
     reply = () => [200, [{ error: "WRONGTYPE" }]];

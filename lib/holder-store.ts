@@ -8,8 +8,62 @@ export type RedisCommand = Array<string | number>;
 export interface HolderStore {
   /** Runs commands in order; not atomic. */
   pipeline(commands: RedisCommand[]): Promise<RedisValue[]>;
-  /** Runs commands atomically (MULTI/EXEC). */
-  transaction(commands: RedisCommand[]): Promise<RedisValue[]>;
+  /**
+   * In one atomic step on the server: if `lockKey` still holds `token`, extends it by `ttlMs`
+   * and runs `commands`. Returns false, having written nothing, when the lock has expired or
+   * belongs to another run.
+   */
+  commitIfOwner(lockKey: string, token: string, ttlMs: number, commands: RedisCommand[]): Promise<boolean>;
+  /** Deletes `lockKey` only if it still holds `token`, in one atomic step. */
+  releaseIfOwner(lockKey: string, token: string): Promise<boolean>;
+}
+
+/**
+ * KEYS[1] is the lock; ARGV is the token, the lease in ms, then each command as its word count
+ * followed by its words. The ownership check covers the writes themselves: nothing can run
+ * between them, so a run whose lease expired can never write, even after another run took over.
+ */
+export const COMMIT_IF_OWNER_SCRIPT = `if redis.call("GET", KEYS[1]) ~= ARGV[1] then return 0 end
+redis.call("PEXPIRE", KEYS[1], ARGV[2])
+local i = 3
+while i <= #ARGV do
+  local n = tonumber(ARGV[i])
+  redis.call(unpack(ARGV, i + 1, i + n))
+  i = i + n + 1
+end
+return 1`;
+
+export const RELEASE_IF_OWNER_SCRIPT = `if redis.call("GET", KEYS[1]) == ARGV[1] then return redis.call("DEL", KEYS[1]) end
+return 0`;
+
+// Lua's unpack() stops at about 8,000 values, so long commands are split into
+// equivalent shorter ones: HSET and ZADD keep their field/value and score/member pairs.
+const MAX_WORDS = 1_000;
+const PAIRED = new Set(["HSET", "ZADD"]);
+const SPLITTABLE = new Set(["HSET", "ZADD", "HDEL", "ZREM", "SADD"]);
+
+export function splitCommand(command: RedisCommand, maxWords = MAX_WORDS): RedisCommand[] {
+  const name = String(command[0]).toUpperCase();
+  if (command.length <= maxWords || !SPLITTABLE.has(name)) return [command];
+  const [verb, key, ...rest] = command;
+  const step = PAIRED.has(name) ? 2 : 1;
+  const per = Math.max(step, Math.floor((maxWords - 2) / step) * step);
+  const out: RedisCommand[] = [];
+  for (let i = 0; i < rest.length; i += per) out.push([verb, key, ...rest.slice(i, i + per)]);
+  return out;
+}
+
+/** The EVAL command for `commitIfOwner`, with every key it touches declared. */
+export function commitIfOwnerCommand(lockKey: string, token: string, ttlMs: number, commands: RedisCommand[]): RedisCommand {
+  const keys = new Set<string>();
+  const words: Array<string | number> = [];
+  for (const command of commands.flatMap((command) => splitCommand(command))) {
+    if (String(command[0]).toUpperCase() === "DEL") command.slice(1).forEach((key) => keys.add(String(key)));
+    else keys.add(String(command[1]));
+    words.push(command.length, ...command);
+  }
+  keys.delete(lockKey);
+  return ["EVAL", COMMIT_IF_OWNER_SCRIPT, keys.size + 1, lockKey, ...keys, token, ttlMs, ...words];
 }
 
 const UPSTASH_HOST = /^https:\/\/[a-zA-Z0-9-]+\.upstash\.io\/?$/;
@@ -22,7 +76,7 @@ export class UpstashStore implements HolderStore {
     this.url = url.replace(/\/$/, "");
   }
 
-  private async send(path: "/pipeline" | "/multi-exec", commands: RedisCommand[]) {
+  private async send(path: "/pipeline", commands: RedisCommand[]) {
     if (!commands.length) return [];
     const response = await this.fetcher(this.url + path, {
       method: "POST",
@@ -45,8 +99,14 @@ export class UpstashStore implements HolderStore {
     return this.send("/pipeline", commands);
   }
 
-  transaction(commands: RedisCommand[]) {
-    return this.send("/multi-exec", commands);
+  async commitIfOwner(lockKey: string, token: string, ttlMs: number, commands: RedisCommand[]) {
+    const [result] = await this.send("/pipeline", [commitIfOwnerCommand(lockKey, token, ttlMs, commands)]);
+    return Number(result) === 1;
+  }
+
+  async releaseIfOwner(lockKey: string, token: string) {
+    const [result] = await this.send("/pipeline", [["EVAL", RELEASE_IF_OWNER_SCRIPT, 1, lockKey, token]]);
+    return Number(result) === 1;
   }
 }
 
@@ -201,9 +261,18 @@ export class MemoryStore implements HolderStore {
     return commands.map((command) => this.run(command));
   }
 
-  async transaction(commands: RedisCommand[]) {
-    // Single-threaded: running the batch without awaiting between commands is atomic.
-    return commands.map((command) => this.run(command));
+  // Single-threaded: with no await between the check and the writes, nothing can run in between.
+  async commitIfOwner(lockKey: string, token: string, ttlMs: number, commands: RedisCommand[]) {
+    if (this.run(["GET", lockKey]) !== token) return false;
+    this.run(["PEXPIRE", lockKey, ttlMs]);
+    for (const command of commands) this.run(command);
+    return true;
+  }
+
+  async releaseIfOwner(lockKey: string, token: string) {
+    if (this.run(["GET", lockKey]) !== token) return false;
+    this.run(["DEL", lockKey]);
+    return true;
   }
 }
 

@@ -14,8 +14,11 @@ The page states facts. A large top-ten share or a large early-buyer position is 
 ## How it runs
 
 - One cursor per chain moves through confirmed blocks (the head minus 20). Each step reads the factories' `LaunchCreated` and `TaxLaunchCreated` logs, then every `Transfer` of every tracked launch, and the curve's Launch Shield events for launches in their first 64 blocks.
-- A step's balances, rankings, Launch Shield stats and the new cursor are written in one Redis `MULTI/EXEC`, so a crash can repeat a range but never half-apply it.
-- One writer at a time: a run takes a lock (`SET NX PX`). Before every commit it checks the lock is still its own and extends it, so a run that outlives its lock writes nothing.
+- One writer at a time: a run takes a lock (`SET NX PX`) holding its own random id.
+- Every write is one Lua script (`EVAL`) that runs atomically on the server. It checks the lock still holds this run's id, extends the lease, and writes the step's balances, rankings, Launch Shield stats and new cursor.
+  - A crash can repeat a range but never half-apply it.
+  - The ownership check covers the writes themselves. A lock, once lost, can never hold that run's id again, so a run whose lease expired can never write, even after another run has taken over and finished.
+  - Releasing the lock is also a script, so a run never deletes another run's lock.
 - A launch created before the index started is **untracked** and shows nothing. A new index starts about 80,000 blocks back, which is what public log providers keep; with a full-history provider, set `FORTUNE_HOLDER_INDEX_START_BLOCK` to the factory's deployment block to cover every launch.
 - A range the provider refuses for its size ("exceed maximum block range", too many results) is halved and retried. The smaller span then holds for the rest of the run.
 
@@ -55,7 +58,7 @@ No `vercel.json` cron is committed, because the right schedule depends on the pl
 
 ## Cost
 
-Each step costs one pipeline read plus one transaction (roughly 5 to 30 Redis commands). A page view reads about 8 commands. Upstash's free tier covers a quiet testnet. With steady traffic, expect pay-as-you-go pricing, a few dollars a month at thousands of views a day.
+Each step costs one pipeline read plus one script call, which runs roughly 5 to 30 Redis writes. A page view reads about 8 commands. Upstash's free tier covers a quiet testnet. With steady traffic, expect pay-as-you-go pricing, a few dollars a month at thousands of views a day.
 
 Log reads grow with the number of tracked launches: one `eth_getLogs` per nine launches per 5,000-block step on the public provider, or per 50 on a configured one. Past a few thousand active launches, move to a dedicated indexing service.
 

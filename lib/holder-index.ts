@@ -6,8 +6,10 @@ import type { LedgerProviderConfig } from "@/lib/trade-ledger";
 // created it, folded into exact balances. A scheduled run (or a throttled run
 // after a holders API read) moves one shared cursor forward through confirmed
 // blocks; each range's balances, rankings, Launch Shield stats and the cursor
-// are written in a single MULTI/EXEC, so a crash can only repeat a range, never
-// half-apply it. A launch created before indexing began is "untracked".
+// are written in one atomic step on the server, which first checks that this
+// run still holds the index lock. A crash can only repeat a range, never
+// half-apply it, and a run whose lease expired can never write. A launch
+// created before indexing began is "untracked".
 //
 // If the log provider has already pruned blocks the index still needed (the
 // index went quiet for longer than the provider's history), every launch being
@@ -205,19 +207,18 @@ export async function advanceHolderIndex(options: IndexOptions): Promise<IndexRu
   const keys = holderKeys(chainId);
   const rpc = provider.client as PublicClient;
   const lockId = options.lockId ?? `${started}-${Math.random().toString(36).slice(2)}`;
-  const lockTtl = String(Math.max(budget, 5_000) + 60_000);
+  const lockTtl = Math.max(budget, 5_000) + 60_000;
   const run: IndexRun = { status: "ok", from: null, cursor: null, target: null, chunks: 0, discovered: 0, transfers: 0, gap: null, reconciled: 0 };
 
   if (await rpc.getChainId() !== chainId) return { ...run, status: "error", message: "Wrong chain." };
-  // Single writer. Every commit first checks the lock is still this run's and
-  // extends it, so a run that outlives its lock can never write over another.
+  // Single writer. Each commit checks the lock is still this run's, extends it
+  // and writes, all in one atomic step on the server. Once lost, a lock can
+  // never hold this run's id again, so a run that outlived its lease can never
+  // write, not even after another run has taken over.
   const [locked] = await store.pipeline([["SET", keys.lock, lockId, "NX", "PX", lockTtl]]);
   if (locked !== "OK") return { ...run, status: "busy" };
   const commit = async (commands: RedisCommand[]) => {
-    const [holder] = await store.pipeline([["GET", keys.lock]]);
-    if (holder !== lockId) throw new LockLost();
-    await store.pipeline([["PEXPIRE", keys.lock, lockTtl]]);
-    await store.transaction(commands);
+    if (!(await store.commitIfOwner(keys.lock, lockId, lockTtl, commands))) throw new LockLost();
   };
 
   try {
@@ -285,8 +286,7 @@ export async function advanceHolderIndex(options: IndexOptions): Promise<IndexRu
     if (error instanceof LockLost) return { ...run, status: "busy", message: "Another run took over." };
     return { ...run, status: "error", message: String((error as Error)?.message || error).slice(0, 200) };
   } finally {
-    const [holder] = await store.pipeline([["GET", keys.lock]]).catch(() => [null]);
-    if (holder === lockId) await store.pipeline([["DEL", keys.lock]]).catch(() => undefined);
+    await store.releaseIfOwner(keys.lock, lockId).catch(() => undefined);
   }
 }
 

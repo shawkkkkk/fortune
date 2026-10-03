@@ -4,7 +4,7 @@ import { configuredRpcUrls } from "@/lib/bsc-rpc";
 import { FORTUNE_NETWORK } from "@/lib/fortune-network";
 import { CUSTOM_PAIRS, customPhase, type CustomPairPhase } from "@/lib/custom-pairs";
 import { CUSTOM_PAIR_CURVE_ABI, CUSTOM_PAIR_FACTORY_ABI, CUSTOM_PAIR_TOKEN_ABI, LAUNCH_RULES_ABI, SOCIAL_FEE_VAULT_ABI } from "@/lib/custom-pairs-artifacts";
-import type { LaunchRulesView } from "@/lib/launch-rules";
+import type { CapLevel, LaunchRulesView } from "@/lib/launch-rules";
 import { toIdentity, type IdentityTuple, type SocialIdentity } from "@/lib/social-fees";
 
 const ERC20 = parseAbi([
@@ -118,13 +118,44 @@ type StoredRules = {
   exemptList: readonly Address[];
 };
 
+type StoredTradeRules = {
+  marketHours: number;
+  sellTierSmallBps: number;
+  sellTierFloorBps: number;
+  sellTierBagBps: number;
+  slideMaxBuyBps: number;
+  slideMaxSellBps: number;
+  levelCount: number;
+  risingStartBps: number;
+  risingStepBps: number;
+  risingDoubles: boolean;
+  risingPeriod: number;
+  chapterStartBps: number;
+  chapterVolumeBps: number;
+  maxBuysPerBlock: number;
+  bundleMinBps: number;
+  maxGasPrice: bigint;
+  gasCapSeconds: number;
+  walletVestWindow: number;
+  walletVestCliff: number;
+  walletVestUnlockBps: number;
+  walletVestPeriod: number;
+};
+
 async function readLaunchRules(rpc: PublicClient, token: Address, contract: Address, blockNumber: bigint): Promise<LaunchRulesView | null> {
   try {
-    const [stored, caps, active] = await Promise.all([
+    const [stored, caps, active, trade, flow] = await Promise.all([
       rpc.readContract({ address: contract, abi: LAUNCH_RULES_ABI, functionName: "rulesOf", args: [token], blockNumber }) as Promise<StoredRules>,
       rpc.readContract({ address: contract, abi: LAUNCH_RULES_ABI, functionName: "capsOf", args: [token], blockNumber }) as Promise<readonly [bigint, bigint, bigint]>,
       rpc.readContract({ address: contract, abi: LAUNCH_RULES_ABI, functionName: "active", args: [token], blockNumber }) as Promise<boolean>,
+      rpc.readContract({ address: contract, abi: LAUNCH_RULES_ABI, functionName: "tradeRulesOf", args: [token], blockNumber }) as Promise<
+        readonly [StoredTradeRules, readonly CapLevel[]]
+      >,
+      rpc.readContract({ address: contract, abi: LAUNCH_RULES_ABI, functionName: "flowOf", args: [token], blockNumber }) as Promise<
+        readonly [bigint, bigint, number, number]
+      >,
     ]);
+    const [t, levels] = trade;
     const gateToken = stored.gateToken.toLowerCase() === NO_ADDRESS ? null : stored.gateToken;
     let gate: LaunchRulesView["gate"] = null;
     if (gateToken) {
@@ -154,6 +185,29 @@ async function readLaunchRules(rpc: PublicClient, token: Address, contract: Addr
       gate,
       exempt: [...stored.exemptList],
       caps: { maxWallet: caps[0].toString(), maxBuy: caps[1].toString(), maxSell: caps[2].toString() },
+      marketHours: Number(t.marketHours),
+      sellTierSmallBps: Number(t.sellTierSmallBps),
+      sellTierFloorBps: Number(t.sellTierFloorBps),
+      sellTierBagBps: Number(t.sellTierBagBps),
+      slideMaxBuyBps: Number(t.slideMaxBuyBps),
+      slideMaxSellBps: Number(t.slideMaxSellBps),
+      levels: levels.map((level) => ({ fromProgressBps: Number(level.fromProgressBps), maxBuyBps: Number(level.maxBuyBps), maxSellBps: Number(level.maxSellBps) })),
+      risingStartBps: Number(t.risingStartBps),
+      risingStepBps: Number(t.risingStepBps),
+      risingDoubles: Boolean(t.risingDoubles),
+      risingPeriod: Number(t.risingPeriod),
+      chapterStartBps: Number(t.chapterStartBps),
+      chapterVolumeBps: Number(t.chapterVolumeBps),
+      maxGasPrice: BigInt(t.maxGasPrice).toString(),
+      gasCapSeconds: Number(t.gasCapSeconds),
+      maxBuysPerBlock: Number(t.maxBuysPerBlock),
+      bundleMinBps: Number(t.bundleMinBps),
+      walletVestWindow: Number(t.walletVestWindow),
+      walletVestCliff: Number(t.walletVestCliff),
+      walletVestUnlockBps: Number(t.walletVestUnlockBps),
+      walletVestPeriod: Number(t.walletVestPeriod),
+      volume: flow[0].toString(),
+      level: Number(flow[3]),
     };
   } catch {
     return null;

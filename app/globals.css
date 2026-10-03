@@ -7315,6 +7315,25 @@ label.claimLinkSaved { display: flex; flex-direction: row; align-items: flex-sta
   width: fit-content;
 }
 
+/* Trade rules: a sliding-caps level row, and the panel's live state. */
+.launchRulesLevel {
+  align-items: end;
+  padding-top: 10px;
+  border-top: 1px dashed var(--line);
+}
+
+.launchRulesLevel .linkButton {
+  justify-self: start;
+  margin-bottom: 6px;
+}
+
+.launchRulesLive {
+  padding: 10px 14px 10px 32px;
+  border-radius: 12px;
+  background: var(--surface-sunk);
+  font-size: 14px;
+}
+
 /* Stock Rewards beta: launch form stock picker, market basket and rewards panel. */
 .stockRewardsTabs { margin-bottom: 12px; }
 .stockPickGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }

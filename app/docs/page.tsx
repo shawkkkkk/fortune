@@ -17,6 +17,7 @@ const sections = [
   ["rewards", "Holder rewards"],
   ["pairs", "Pair assets on BNB"],
   ["any-bep20", "Any reviewed BEP-20"],
+  ["stock-rewards", "Stock Rewards (beta)"],
   ["custom-pairs", "Custom pairs (beta)"],
   ["social-fees", "Creator fees to social accounts"],
   ["launch", "Launching a token"],
@@ -178,6 +179,34 @@ export default function DocsPage() {
               must pass before the asset becomes launchable. The permissionless
               alternative is the <a href="#custom-pairs">custom-pairs beta</a>.
             </p>
+          </section>
+
+          <section className="panel" id="stock-rewards">
+            <span className="eyebrow">STOCK REWARDS · BETA</span>
+            <h2>Holders earn up to five stocks, onchain.</h2>
+            <p>
+              A Stock Rewards launch is paired with one to five tokenized stocks, each
+              with a fixed share of the raise. Buyers pay with any stock whose share is
+              not full yet, and holders earn every one of them: no keeper and no
+              snapshots, just a claim whenever you like.
+            </p>
+            <ul className="docsPoints">
+              <li><strong>Paid in the stocks themselves.</strong> Each curve trade pays the holder fee (0.25% to 2.5%, chosen by the creator) in the stock it used. The creator can also hand their own fee to holders, for good.</li>
+              <li><strong>Streamed over six hours.</strong> New rewards stream to holders over six hours, pro rata to what each wallet holds at every moment, so buying just before a payment and selling right after earns almost nothing.</li>
+              <li><strong>One claim for every stock.</strong> Claim all of them in one transaction, at any time. A stock whose issuer pauses it never blocks the others or any transfer.</li>
+              <li><strong>Graduation to one pool per stock.</strong> When the target is raised, anyone can graduate the launch into one PancakeSwap V3 pool per stock, locked forever.</li>
+              <li><strong>The pools keep paying.</strong> After graduation the stock side of every pool fee goes to holders and the token side is burned. PancakeSwap keeps 32% of each fee first.</li>
+              <li><strong>Same Launch Shield, with the tax to the protocol.</strong> The opening 99% tax goes to the protocol, never back to the snipers who paid it.</li>
+              <li><strong>If graduation fails for seven days.</strong> Holders redeem a pro-rata share of every stock the curve holds, and keep what they have earned.</li>
+            </ul>
+            <p className="reviewWarning">
+              Unaudited beta on BSC Testnet, using faucet test shares with test prices.
+              The contracts refuse BNB Smart Chain mainnet. A launch token is not a stock,
+              and no company endorses it.
+            </p>
+            <div className="heroActions">
+              <Link href="/launch/stock-rewards" className="secondaryCta">Launch with stock rewards →</Link>
+            </div>
           </section>
 
           <section className="panel" id="custom-pairs">

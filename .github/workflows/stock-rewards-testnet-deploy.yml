@@ -1,0 +1,186 @@
+name: Stock Rewards Beta Testnet Deploy + Drill
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type DEPLOY_STOCK_REWARDS_BETA to deploy the UNAUDITED Stock Rewards beta to BSC Testnet and run a real lifecycle drill"
+        required: true
+        type: string
+      pancake_v3_factory:
+        description: "PancakeSwap V3 factory on BSC testnet (verify before every run)"
+        required: true
+        default: "0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865"
+        type: string
+      pancake_v3_position_manager:
+        description: "PancakeSwap V3 NonfungiblePositionManager on BSC testnet (verify before every run)"
+        required: true
+        default: "0x427bF5b37357632377eCbEC9de3626C71A5396c1"
+        type: string
+      pancake_v3_swap_router:
+        description: "PancakeSwap V3 SwapRouter on BSC testnet, used only by the drill's swaps"
+        required: true
+        default: "0x1b81D678ffb9C0263b24A97847620C99d213eB14"
+        type: string
+      pancake_v2_factory:
+        description: "PancakeSwap V2 factory on BSC testnet, so anyone can exclude this token's V2 pairs from rewards"
+        required: true
+        default: "0x6725F303b657a9451d8BA641348b6761A6CC7a17"
+        type: string
+
+jobs:
+  deploy-and-drill:
+    if: ${{ inputs.confirm == 'DEPLOY_STOCK_REWARDS_BETA' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: contracts-stock-rewards
+    env:
+      PRIVATE_KEY: ${{ secrets.FORTUNE_TESTNET_PRIVATE_KEY }}
+      BSC_TESTNET_RPC_URL: ${{ secrets.BSC_TESTNET_RPC_URL }}
+      PANCAKE_V3_FACTORY: ${{ inputs.pancake_v3_factory }}
+      PANCAKE_V3_POSITION_MANAGER: ${{ inputs.pancake_v3_position_manager }}
+      PANCAKE_V3_SWAP_ROUTER: ${{ inputs.pancake_v3_swap_router }}
+      PANCAKE_V2_FACTORY: ${{ inputs.pancake_v2_factory }}
+      # Forge simulates every transaction at one timestamp, which skips the
+      # token's once-per-block reward release; leave room for it.
+      FORGE_FLAGS: --broadcast --slow --legacy --with-gas-price 1000000000 --gas-estimate-multiplier 200
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09
+        with:
+          version: v1.8.3
+
+      - name: Require BSC testnet secrets
+        run: |
+          test -n "$PRIVATE_KEY" || (echo "Missing FORTUNE_TESTNET_PRIVATE_KEY secret" && exit 1)
+          test -n "$BSC_TESTNET_RPC_URL" || (echo "Missing BSC_TESTNET_RPC_URL secret" && exit 1)
+
+      - name: Install pinned Solidity libraries
+        working-directory: contracts
+        run: |
+          forge install OpenZeppelin/openzeppelin-contracts@69c8def5f222ff96f2b5beff05dfba996368aa79 --no-commit
+          forge install foundry-rs/forge-std@8bbcf6e3f8f62f419e5429a0bd89331c85c37824 --no-commit
+
+      - name: Verify testnet chain, PancakeSwap contracts and gas budget
+        run: |
+          set -euo pipefail
+          CHAIN_ID=$(cast chain-id --rpc-url "$BSC_TESTNET_RPC_URL")
+          test "$CHAIN_ID" = "97" || (echo "Expected BSC Testnet chain 97, got $CHAIN_ID" && exit 1)
+          for NAME in PANCAKE_V3_FACTORY PANCAKE_V3_POSITION_MANAGER PANCAKE_V3_SWAP_ROUTER PANCAKE_V2_FACTORY; do
+            ADDRESS="${!NAME}"
+            printf '%s' "$ADDRESS" | grep -Eq '^0x[0-9a-fA-F]{40}$' || (echo "$NAME is not an address" && exit 1)
+            CODE=$(cast code "$ADDRESS" --rpc-url "$BSC_TESTNET_RPC_URL")
+            test "$CODE" != "0x" || (echo "$NAME has no bytecode: $ADDRESS" && exit 1)
+          done
+          MANAGER_FACTORY=$(cast call "$PANCAKE_V3_POSITION_MANAGER" "factory()(address)" --rpc-url "$BSC_TESTNET_RPC_URL")
+          test "$(echo "$MANAGER_FACTORY" | tr 'A-F' 'a-f')" = "$(echo "$PANCAKE_V3_FACTORY" | tr 'A-F' 'a-f')" || (echo "Position manager belongs to $MANAGER_FACTORY" && exit 1)
+          WALLET=$(cast wallet address --private-key "$PRIVATE_KEY")
+          BALANCE=$(cast balance "$WALLET" --rpc-url "$BSC_TESTNET_RPC_URL")
+          echo "Testnet deployer: $WALLET"
+          echo "tBNB balance (wei): $BALANCE"
+          if [ "$BALANCE" -lt 100000000000000000 ]; then
+            echo "Need at least 0.1 tBNB for the beta deployment and lifecycle drill."
+            exit 1
+          fi
+
+      - name: Unit, fuzz and invariant suites
+        run: forge test --no-match-contract Fork --fuzz-runs 1000 -vv
+
+      - name: Deploy the Stock Rewards beta, its registry and faucet test stocks
+        run: |
+          set -euo pipefail
+          forge script script/DeployStockRewardsTestnet.s.sol --rpc-url "$BSC_TESTNET_RPC_URL" $FORGE_FLAGS \
+            2>&1 | tee /tmp/stock-rewards-deploy.log
+          for NAME in STOCK_REWARDS_FACTORY STOCK_REWARDS_REGISTRY STOCK_REWARDS_ORACLE STOCK_REWARDS_ADAPTER STOCK_REWARDS_LOCKER; do
+            VALUE=$(sed -nE "s/.*${NAME}=(0x[0-9a-fA-F]{40}).*/\1/p" /tmp/stock-rewards-deploy.log | tail -1)
+            test -n "$VALUE" || (echo "Missing $NAME in deploy output" && exit 1)
+            echo "$NAME=$VALUE" >> "$GITHUB_ENV"
+          done
+          STOCKS=$(sed -nE 's/.*STOCK_REWARDS_TEST_STOCKS=([0-9a-fA-Fx,]+).*/\1/p' /tmp/stock-rewards-deploy.log | tail -1)
+          test -n "$STOCKS" || (echo "Missing STOCK_REWARDS_TEST_STOCKS in deploy output" && exit 1)
+          echo "STOCK_REWARDS_TEST_STOCKS=$STOCKS" >> "$GITHUB_ENV"
+          echo "STOCK_REWARDS_DRILL_LARGE_CAP=$(echo "$STOCKS" | cut -d, -f1)" >> "$GITHUB_ENV"
+          echo "STOCK_REWARDS_DRILL_PENNY=$(echo "$STOCKS" | cut -d, -f6)" >> "$GITHUB_ENV"
+
+      - name: Verify the factory is bound to its adapter and locker
+        run: |
+          set -euo pipefail
+          lower() { echo "$1" | tr 'A-F' 'a-f'; }
+          ADAPTER=$(cast call "$STOCK_REWARDS_FACTORY" "graduationAdapter()(address)" --rpc-url "$BSC_TESTNET_RPC_URL")
+          test "$(lower "$ADAPTER")" = "$(lower "$STOCK_REWARDS_ADAPTER")" || (echo "Factory adapter $ADAPTER" && exit 1)
+          APPROVED=$(cast call "$STOCK_REWARDS_LOCKER" "approvedDepositor(address)(bool)" "$STOCK_REWARDS_ADAPTER" --rpc-url "$BSC_TESTNET_RPC_URL")
+          test "$APPROVED" = "true" || (echo "Adapter is not an approved locker depositor" && exit 1)
+          COUNT=$(cast call "$STOCK_REWARDS_REGISTRY" "assetCount()(uint256)" --rpc-url "$BSC_TESTNET_RPC_URL")
+          test "$COUNT" = "8" || (echo "Registry lists $COUNT assets, expected 8" && exit 1)
+
+      - name: Drill phase 1 - launch paired with a large-cap and a penny test stock
+        run: |
+          set -euo pipefail
+          forge script script/StockRewardsTestnetDrill.s.sol --sig "launch()" --rpc-url "$BSC_TESTNET_RPC_URL" $FORGE_FLAGS \
+            2>&1 | tee /tmp/stock-rewards-drill-launch.log
+          CURVE=$(sed -nE 's/.*STOCK_REWARDS_DRILL_CURVE=(0x[0-9a-fA-F]{40}).*/\1/p' /tmp/stock-rewards-drill-launch.log | tail -1)
+          test -n "$CURVE" || (echo "Missing drill curve" && exit 1)
+          echo "STOCK_REWARDS_DRILL_CURVE=$CURVE" >> "$GITHUB_ENV"
+
+      - name: Wait out the Launch Shield
+        run: sleep 30
+
+      - name: Drill phase 2 - fill both shares, graduate to PancakeSwap V3, swap and collect pool fees
+        run: |
+          set -euo pipefail
+          forge script script/StockRewardsTestnetDrill.s.sol --sig "complete()" --rpc-url "$BSC_TESTNET_RPC_URL" $FORGE_FLAGS \
+            2>&1 | tee /tmp/stock-rewards-drill-complete.log
+          grep -q "STOCK_REWARDS_ONCHAIN_EXECUTION_COMPLETE_AND_SUCCESSFUL" /tmp/stock-rewards-drill-complete.log
+          for NAME in STOCK_REWARDS_DRILL_LARGE_CAP_POOL STOCK_REWARDS_DRILL_PENNY_POOL; do
+            VALUE=$(sed -nE "s/.*${NAME}=(0x[0-9a-fA-F]{40}).*/\1/p" /tmp/stock-rewards-drill-complete.log | tail -1)
+            echo "$NAME=$VALUE" >> "$GITHUB_ENV"
+          done
+
+      - name: Let rewards stream for a minute
+        run: sleep 60
+
+      - name: Drill phase 3 - claim streamed rewards in both stocks
+        run: |
+          set -euo pipefail
+          forge script script/StockRewardsTestnetDrill.s.sol --sig "claim()" --rpc-url "$BSC_TESTNET_RPC_URL" $FORGE_FLAGS \
+            2>&1 | tee /tmp/stock-rewards-drill-claim.log
+          grep -q "STOCK_REWARDS_CLAIM_COMPLETE_AND_SUCCESSFUL" /tmp/stock-rewards-drill-claim.log
+
+      - name: Summary
+        run: |
+          {
+            echo "## Stock Rewards beta deployed to BSC Testnet (UNAUDITED)"
+            echo ""
+            echo "| Contract | Address |"
+            echo "| --- | --- |"
+            echo "| Stock Rewards factory | \`$STOCK_REWARDS_FACTORY\` |"
+            echo "| Asset registry (test stocks) | \`$STOCK_REWARDS_REGISTRY\` |"
+            echo "| Test stock oracle | \`$STOCK_REWARDS_ORACLE\` |"
+            echo "| Graduation adapter | \`$STOCK_REWARDS_ADAPTER\` |"
+            echo "| Liquidity locker | \`$STOCK_REWARDS_LOCKER\` |"
+            echo "| Drill curve (graduated) | \`$STOCK_REWARDS_DRILL_CURVE\` |"
+            echo "| Drill large-cap pool | \`$STOCK_REWARDS_DRILL_LARGE_CAP_POOL\` |"
+            echo "| Drill penny pool | \`$STOCK_REWARDS_DRILL_PENNY_POOL\` |"
+            echo ""
+            echo "Test stocks (faucet): \`$STOCK_REWARDS_TEST_STOCKS\`"
+            echo ""
+            echo "To enable the website beta, set this Vercel environment variable and redeploy:"
+            echo ""
+            echo "- \`NEXT_PUBLIC_FORTUNE_STOCK_REWARDS_FACTORY_ADDRESS=$STOCK_REWARDS_FACTORY\`"
+            echo ""
+            echo "The website reads the registry, the test stocks and their prices from the factory."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload deployment and drill logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stock-rewards-testnet-deploy
+          path: /tmp/stock-rewards-*.log
+          if-no-files-found: ignore
+          retention-days: 30

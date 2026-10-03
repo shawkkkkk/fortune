@@ -1,0 +1,3 @@
+@openzeppelin/=frozen/lib/openzeppelin-contracts/
+forge-std/=frozen/lib/forge-std/src/
+fortune/=frozen/src/

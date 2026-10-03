@@ -1,0 +1,66 @@
+name: Stock Rewards Beta (unaudited)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "contracts-stock-rewards/**"
+      - "contracts/src/**"
+      - "lib/stock-rewards-artifacts.ts"
+      - "scripts/export-stock-rewards-artifacts.mjs"
+      - ".github/workflows/stock-rewards-beta.yml"
+  pull_request:
+    paths:
+      - "contracts-stock-rewards/**"
+      - "contracts/src/**"
+      - "lib/stock-rewards-artifacts.ts"
+      - "scripts/export-stock-rewards-artifacts.mjs"
+      - ".github/workflows/stock-rewards-beta.yml"
+  workflow_dispatch:
+
+jobs:
+  unit-fuzz-invariant:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09
+        with:
+          version: v1.8.3
+      - name: Install pinned Solidity libraries
+        working-directory: contracts
+        run: |
+          forge install OpenZeppelin/openzeppelin-contracts@69c8def5f222ff96f2b5beff05dfba996368aa79 --no-commit
+          forge install foundry-rs/forge-std@8bbcf6e3f8f62f419e5429a0bd89331c85c37824 --no-commit
+      - name: The frozen Standard sources are reached through the symlink
+        working-directory: contracts-stock-rewards
+        run: test "$(readlink frozen)" = "../contracts"
+      - name: Contract sizes stay under EIP-170
+        working-directory: contracts-stock-rewards
+        run: forge build --sizes
+      - name: Website ABIs match the contracts
+        run: node scripts/export-stock-rewards-artifacts.mjs --check
+      - name: Unit, 1,000-run fuzz and invariant suites
+        working-directory: contracts-stock-rewards
+        run: forge test --no-match-contract Fork --fuzz-runs 1000 -vv
+
+  bsc-testnet-fork:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      BSC_TESTNET_RPC_URL: ${{ secrets.BSC_TESTNET_RPC_URL || 'https://bsc-testnet-dataseed.bnbchain.org' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09
+        with:
+          version: v1.8.3
+      - name: Install pinned Solidity libraries
+        working-directory: contracts
+        run: |
+          forge install OpenZeppelin/openzeppelin-contracts@69c8def5f222ff96f2b5beff05dfba996368aa79 --no-commit
+          forge install foundry-rs/forge-std@8bbcf6e3f8f62f419e5429a0bd89331c85c37824 --no-commit
+      - name: Real PancakeSwap V3 lifecycle on a BSC Testnet fork
+        working-directory: contracts-stock-rewards
+        run: forge test --match-contract FortuneStockRewardsForkTest -vv

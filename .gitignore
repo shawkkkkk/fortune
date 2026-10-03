@@ -14,6 +14,9 @@ contracts-v2/out
 contracts-custom-pairs/cache
 contracts-custom-pairs/out
 contracts-custom-pairs/broadcast
+contracts-stock-rewards/cache
+contracts-stock-rewards/out
+contracts-stock-rewards/broadcast
 tsconfig.tsbuildinfo
 
 # Local e2e screenshots (tests/e2e/creator-flow.mjs)

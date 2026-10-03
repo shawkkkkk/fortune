@@ -33,6 +33,26 @@ like.
 - **Fixed graduation fee tier.** The pool fee tier is fixed per launch (0.25% or 1%) and enforced at graduation, so a keeper cannot graduate into a low-fee pool that starves holders.
 - **No owner power over launches.** The owner can only pause new launches and choose the protocol fee recipient for future launches.
 
+## Website
+
+| Where | What |
+| --- | --- |
+| `/launch/stock-rewards` | Launch form. Pick one to five stocks (Stocks and Penny stocks tabs, read from the registry), their shares, the target, the holder fee, the creator fee and the pool fee tier. A preflight mirrors the factory's checks, including the pool price range. |
+| `/stock-rewards/{curve}` | Market page. Shows the basket with each stock's share and lifetime rewards. Trades with any stock whose share is not full, using exact quotes from the curve. Has a live rewards panel with one-click claim of every stock, plus starting new streams, pool-fee collection, graduation, rescue and the creator's one-way hand-off of their fee to holders. |
+| `/rewards` | Every Stock Rewards token the connected wallet holds, with what it can claim in each. Also a public ledger of what each launch has paid its holders, read from the token contracts. |
+| `/markets` | Explore board of Stock Rewards launches. |
+| `/docs#stock-rewards` | How it works. |
+
+Public API, all read live from BSC Testnet:
+
+- `GET /api/public/v1/stock-rewards`: launches, newest first.
+- `GET /api/public/v1/stock-rewards/stocks`: registry stocks with prices.
+- `GET /api/public/v1/stock-rewards/{curve}`: one launch. Includes per-stock reserves, targets, prices, reward streams, pools and uncollected pool fees.
+
+Graduation and pool-fee collection run inside the factory's try/catch. A wallet gas estimate would therefore settle on a limit at which the inner work runs out of gas and is caught. The site instead sends a fixed limit (`lib/graduation-gas.ts`), requires the simulated result to show success, and reads the curve afterwards. Every other call adds 30,000 gas per stock for the token's once-per-block release.
+
+A browser rehearsal on a BSC Testnet fork covered the full path through the real pages: launch with a large cap and a penny stock, buys with each, rewards streaming and claimed in both stocks, both shares filled, graduation into two PancakeSwap V3 pools, a real swap, pool fees collected and claimed, Explore, `/rewards`, and Chinese, dark and mobile views (axe-clean, no overflow).
+
 ## Owner actions to go live on testnet
 
 1. Run **Stock Rewards Beta Testnet Deploy + Drill** (Actions tab), typing `DEPLOY_STOCK_REWARDS_BETA`. It needs the existing `FORTUNE_TESTNET_PRIVATE_KEY` and `BSC_TESTNET_RPC_URL` secrets and about 0.1 tBNB. It deploys the registry, eight faucet test stocks (five large caps, three penny stocks) and the contracts. It then runs a real launch, graduation, swap, fee collection and claim.

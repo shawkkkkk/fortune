@@ -7314,3 +7314,56 @@ label.claimLinkSaved { display: flex; flex-direction: row; align-items: flex-sta
   justify-self: start;
   width: fit-content;
 }
+
+/* Stock Rewards beta: launch form stock picker, market basket and rewards panel. */
+.stockRewardsTabs { margin-bottom: 12px; }
+.stockPickGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.stockPick { position: relative; display: grid; gap: 2px; min-width: 0; padding: 12px 30px 12px 14px; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--surface); color: var(--ink); text-align: left; }
+.stockPick strong { font-size: 15px; }
+.stockPick span { overflow: hidden; color: var(--muted); font-size: 12.5px; text-overflow: ellipsis; white-space: nowrap; }
+.stockPick small { color: var(--ink-soft); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.stockPick:hover:not(:disabled) { border-color: var(--gold-line); background: var(--gold-tint); }
+.stockPick.selected { border-color: var(--red); box-shadow: 0 0 0 3px rgba(216, 20, 29, 0.08); }
+.stockPick.selected::after { content: "✓"; position: absolute; top: 9px; right: 11px; color: var(--red); font-weight: 800; }
+.stockPick:disabled { cursor: not-allowed; opacity: 0.45; }
+.stockShares { display: grid; gap: 10px; margin-top: 14px; padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface-sunk); }
+.stockSharesHead { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.stockShareRow { display: grid; grid-template-columns: minmax(64px, 1fr) 118px minmax(0, 1.2fr) auto; align-items: center; gap: 10px; }
+.stockShareName { font-weight: 700; overflow-wrap: anywhere; }
+.stockShares .stockShareInput { display: flex; flex-direction: row; align-items: center; gap: 6px; margin: 0; }
+.stockShareInput input { width: 84px; text-align: right; font-variant-numeric: tabular-nums; }
+.stockTargetInput { display: grid; gap: 6px; max-width: 280px; margin-top: 12px; font-weight: 600; }
+.stockBasket { display: grid; gap: 12px; margin-bottom: 20px; }
+.stockBasket h2 { margin: 6px 0 0; }
+.stockBasketRows { display: grid; gap: 10px; }
+.stockBasketRow { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1fr); align-items: center; gap: 16px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.stockBasketName, .stockBasketRewards { display: grid; gap: 2px; min-width: 0; }
+.stockBasketName span, .stockBasketName small, .stockBasketRewards span, .stockBasketRewards small { color: var(--muted); font-size: 12.5px; overflow-wrap: anywhere; }
+.stockBasketRewards strong { font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.stockBasketFill { display: grid; gap: 6px; min-width: 0; }
+.stockPayRow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.stockPayRow button { padding: 6px 12px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--surface); color: var(--ink); font-size: 13px; font-weight: 650; }
+.stockPayRow button.active { border-color: var(--red); background: var(--red-tint); color: var(--red); }
+.stockPayRow button:disabled { cursor: not-allowed; opacity: 0.45; }
+.stockRewardsPanel { display: grid; gap: 12px; }
+.stockRewardsPanel .statRows strong { font-variant-numeric: tabular-nums; }
+/* Tickers such as tTSLA keep their case. */
+.stockRewardsPanel .statRows span { text-transform: none; }
+
+@media (max-width: 720px) {
+  .stockBasketRow { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .stockShareRow { grid-template-columns: minmax(0, 1fr) auto; row-gap: 4px; }
+  .stockShareRow .linkButton { justify-self: end; }
+}
+.stockRewardsHub, .stockRewardsLedger { display: grid; gap: 12px; margin-top: 18px; }
+.stockRewardsHub h2, .stockRewardsLedger h2 { margin: 6px 0 0; }
+.stockRewardsHoldings, .stockLedgerRows { display: grid; gap: 8px; }
+.stockRewardsHolding { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) auto; align-items: center; gap: 14px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.stockRewardsAmounts { display: flex; flex-wrap: wrap; gap: 6px 14px; font-variant-numeric: tabular-nums; }
+.stockLedgerRow { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 16px; padding: 10px 0; border-bottom: 1px dashed var(--line); }
+.stockLedgerRow:last-child { border-bottom: 0; }
+.stockLedgerRow a span { color: var(--muted); font-size: 13px; }
+.stockLedgerAmounts { color: var(--ink-soft); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+@media (max-width: 720px) {
+  .stockRewardsHolding { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+}

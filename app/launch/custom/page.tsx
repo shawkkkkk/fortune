@@ -5,7 +5,9 @@ import { useEffect, useMemo, useState } from "react";
 import { decodeEventLog, formatUnits, hexToString, isAddress, parseAbi, parseUnits, type Address, type Hex } from "viem";
 import FeeSplitEditor, { ClaimLinkBox, feeSplitInputs, feeSplitRow, unsavedClaimLinks, type FeeSplitRow } from "@/components/FeeSplitEditor";
 import LaunchRulesEditor, { useGateToken } from "@/components/LaunchRulesEditor";
-import { buildLaunchRules, describeLaunchRules, emptyRulesForm, launchRulesErrorMessage, type LaunchRulesForm } from "@/lib/launch-rules";
+import { MARKET_IGNORE_HOLIDAYS, buildLaunchRules, describeLaunchRules, emptyRulesForm, launchRulesErrorMessage, type LaunchRulesForm } from "@/lib/launch-rules";
+import { marketSession } from "@/lib/market-calendar";
+import { formatEtTime } from "@/lib/market-hours";
 import { rememberClaimLinks } from "@/lib/claim-link-store";
 import PairInspector from "@/components/PairInspector";
 import TokenImageInput from "@/components/TokenImageInput";
@@ -60,6 +62,18 @@ const PREFLIGHT_TEXT: Record<string, string> = {
   RULES_ALLOWLIST: "The allowlist needs 1 to 200 addresses and a window of at most one hour.",
   RULES_GATE: "The holder gate needs a token contract, a minimum balance and a window of at most one hour.",
   RULES_EXEMPT: "Up to 10 distinct exempt wallets.",
+  RULES_MARKET_HOURS: "Market hours must be on to keep sells open or ignore holidays.",
+  RULES_SELL_TIERS: "Graduated sell caps need a small holders' cap of 0.05% to 5%, a floor of 0.01% to 1% below it, and a bag size of 0.5% to 10% above it.",
+  RULES_SLIDING: "Sliding caps need one to five levels of rising graduation progress, with caps of 0.1% to 10% per buy and 0.05% to 10% per sell.",
+  RULES_RISING: "A rising max per wallet starts at 0.01% to 5% and rises by 0.01% to 5%, or doubles, every 1 minute to 1 day.",
+  RULES_CHAPTERS: "Chapters start the max per wallet at 0.1% to 5% and double it every 0.1% to 10% of supply traded.",
+  RULES_GAS_CAP: "The gas cap must be 0.1 to 100 gwei, for 1 minute to 1 day.",
+  RULES_BUNDLE: "Anti-bundle allows 1 to 20 buys per block, counting buys of 0.01% to 1% of supply or more.",
+  RULES_WALLET_VESTING: "Holder vesting unlocks 0.1% to 100% every 1 hour to 7 days after a cliff of up to 7 days, and frees every wallet within 30 days.",
+  RULES_WALLET_CAP_CONFLICT: "Max wallet, the rising max per wallet and chapters each cap wallets: choose one.",
+  RULES_BUY_CAP_CONFLICT: "Sliding caps set the buy cap: clear the fixed max buy.",
+  RULES_SELL_CAP_CONFLICT: "Max sell, graduated sell caps and sliding caps each cap sells: choose one.",
+  RULES_VESTING_CONFLICT: "Choose early-buyer vesting or holder vesting, not both.",
 };
 
 // Rule reverts come from the new token inside the launch; with their errors in
@@ -215,13 +229,21 @@ export default function CustomPairLaunchPage() {
   const rulesBuild = rulesAvailable && rulesOn ? buildLaunchRules(rulesForm, gateInfo?.decimals ?? 18) : null;
   // The gate minimum is written in the gate token's own units, so its decimals are never guessed.
   const gateUnread = Boolean(rulesBuild?.ok && rulesBuild.rules.gateSeconds && !gateInfo);
+  // Market hours apply to the creator too: a first buy outside the session would be refused.
+  const firstBuyClosed = Boolean(rulesBuild?.ok && rulesBuild.rules.marketHours && parseAmount(firstBuy, decimals))
+    ? marketSession(Math.floor(Date.now() / 1000), ((rulesBuild?.ok ? rulesBuild.rules.marketHours : 0) & MARKET_IGNORE_HOLIDAYS) === 0)
+    : null;
   const rulesError = rulesBuild && !rulesBuild.ok
     ? rulesBuild.reason
     : gateUnread
       ? gateToken.status === "error"
         ? "Could not read the gate token's decimals. Check the address, or try again."
         : "Reading the gate token…"
-      : "";
+      : firstBuyClosed && !firstBuyClosed.open
+        ? (zh
+          ? `美股休市中，首笔买入会被拒绝。请不设首笔买入发行，或等到 ${formatEtTime(firstBuyClosed.changesAt * 1000)} 开市。`
+          : `The US market is closed, so a first buy would be refused. Launch without a first buy, or wait until it opens ${formatEtTime(firstBuyClosed.changesAt * 1000)}.`)
+        : "";
   const rulesLines = rulesBuild?.ok
     ? describeLaunchRules({
         ...rulesBuild.rules,

@@ -4,13 +4,14 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { formatUnits, parseAbi, parseUnits, type Address } from "viem";
 import FeeRecipientsPanel from "@/components/FeeRecipientsPanel";
-import LaunchRulesPanel, { useRulesWalletStatus } from "@/components/LaunchRulesPanel";
+import LaunchRulesPanel, { lockedNow, marketState, useRulesWalletStatus } from "@/components/LaunchRulesPanel";
 import PairInspector from "@/components/PairInspector";
 import { useLanguage } from "@/components/LanguageProvider";
 import { FORTUNE_NETWORK } from "@/lib/fortune-network";
 import { CUSTOM_PAIR_RULES, afterTax, chainClockSkew, pairForTokens, previewCurveBuy, shieldBpsAt } from "@/lib/custom-pairs";
 import { CUSTOM_PAIR_CURVE_ABI, LAUNCH_RULES_ABI, SOCIAL_FEE_VAULT_ABI } from "@/lib/custom-pairs-artifacts";
-import { launchRulesErrorMessage, lockedAt } from "@/lib/launch-rules";
+import { capTokens, launchRulesErrorMessage, sellTierCap, walletCapBps } from "@/lib/launch-rules";
+import { formatEtTime } from "@/lib/market-hours";
 import type { CustomPairLaunchDetail } from "@/lib/custom-pairs-read";
 import { assertWalletIdentity } from "@/lib/launch-safety";
 import { formatAmount, formatShare, formatUnitPrice, shortAddress } from "@/lib/market-format";
@@ -195,30 +196,55 @@ export default function CustomPairMarket({ initial }: { initial: CustomPairLaunc
     if (!rules?.active || !quote) return "";
     const exempt = rulesStatus?.exempt ?? false;
     const amount = (raw: bigint) => `${formatAmount(units(raw, 18))} ${launch.symbol}`;
+    const market = marketState(rules, now);
+    const opens = market ? formatEtTime(market.changesAt * 1000, now * 1000) : "";
     if (quote.kind === "buy") {
+      if (market && !market.open) {
+        return zh ? `美股休市中：该发行只在美股交易时段买入，${opens} 开市。` : `The market is closed: this launch takes buys only during US market hours. It opens ${opens}.`;
+      }
       const accessUntil = rules.launchTimestamp + Math.max(rules.allowlistSeconds, rules.gateSeconds);
       if (rulesStatus && !rulesStatus.canBuy && now < accessUntil) {
         return zh ? "访问限制期间，该钱包还不能买入。" : "This wallet cannot buy during the access window yet.";
       }
       const maxBuy = BigInt(rules.caps.maxBuy);
       if (maxBuy > 0n && !exempt && quote.tokens > maxBuy) return zh ? `该发行每笔买入最多 ${amount(maxBuy)}。` : `This launch caps each buy at ${amount(maxBuy)}.`;
-      const maxWallet = BigInt(rules.caps.maxWallet);
+      // Rising caps grow on the clock, so work the wallet cap out now rather than at the last read.
+      const walletBps = walletCapBps(rules, now, BigInt(rules.volume), supply);
+      const maxWallet = walletBps ? capTokens(supply, walletBps) : 0n;
       if (maxWallet > 0n && !exempt && (balances?.token ?? 0n) + quote.tokens > maxWallet) {
-        return zh ? `该发行每个钱包最多持有 ${amount(maxWallet)}。` : `This launch caps each wallet at ${amount(maxWallet)}.`;
+        return zh ? `该发行目前每个钱包最多持有 ${amount(maxWallet)}。` : `This launch caps each wallet at ${amount(maxWallet)} right now.`;
       }
       return "";
     }
-    const maxSell = BigInt(rules.caps.maxSell);
-    if (maxSell > 0n && quote.raw > maxSell) return zh ? `该发行每笔卖出最多 ${amount(maxSell)}。` : `This launch caps each sell at ${amount(maxSell)}.`;
+    if (market && !market.open && !market.sellsAlwaysOpen) {
+      return zh ? `美股休市中：该发行只在美股交易时段卖出，${opens} 开市。` : `The market is closed: this launch takes sells only during US market hours. It opens ${opens}.`;
+    }
+    const held = balances?.token ?? 0n;
+    const maxSell = rules.sellTierSmallBps
+      ? sellTierCap(supply, rules.sellTierSmallBps, rules.sellTierFloorBps, rules.sellTierBagBps, held)
+      : BigInt(rules.caps.maxSell);
+    if (maxSell > 0n && quote.raw > maxSell) {
+      return rules.sellTierSmallBps
+        ? (zh ? `按该钱包的持仓大小，每笔最多卖出 ${amount(maxSell)}。` : `For this wallet's bag, each sell may return at most ${amount(maxSell)}.`)
+        : (zh ? `该发行每笔卖出最多 ${amount(maxSell)}。` : `This launch caps each sell at ${amount(maxSell)}.`);
+    }
     if (rulesStatus && rulesStatus.sellReadyAt > now) {
       return zh ? `卖出冷却中，还需等待 ${rulesStatus.sellReadyAt - now} 秒。` : `Sell cooldown: ${rulesStatus.sellReadyAt - now}s to go.`;
     }
-    const locked = rulesStatus ? lockedAt(rulesStatus.vested, rulesStatus.unlockStart, rulesStatus.unlockEnd, now) : 0n;
-    if (locked > 0n && (balances?.token ?? 0n) - quote.raw < locked) {
+    const locked = lockedNow(rules, rulesStatus, now);
+    if (locked > 0n && held - quote.raw < locked) {
       return zh ? `${amount(locked)} 仍在锁仓中，只能卖出超出部分。` : `${amount(locked)} is still vesting; you can sell only the rest.`;
     }
     return "";
   })();
+
+  /** During a launch's gas-cap window, the gas price a buy from `wallet` must stay under; null otherwise. */
+  function gasCapFor(wallet: Address) {
+    const rules = launch.rules;
+    if (!rules?.active || BigInt(rules.maxGasPrice) === 0n || now >= rules.launchTimestamp + rules.gasCapSeconds) return null;
+    if (rulesStatus?.exempt || wallet.toLowerCase() === launch.creator.toLowerCase()) return null;
+    return BigInt(rules.maxGasPrice);
+  }
 
   async function run(label: string, action: (wallet: Address) => Promise<void>) {
     setBusy(true);
@@ -254,9 +280,21 @@ export default function CustomPairMarket({ initial }: { initial: CustomPairLaunc
         await ensureAllowance(wallet, pair.address, quote.raw, pair.symbol);
         setMessage("Simulating the buy…");
         await publicClient.simulateContract({ account: wallet, address: launch.curve, abi: CURVE_ABI, functionName: "buy", args: [quote.raw, quote.minOut] });
+        // Under a sniper gas cap, send at the network price, which must be within the cap.
+        const cap = gasCapFor(wallet);
+        let gasPrice: bigint | undefined;
+        if (cap !== null) {
+          const network = await publicClient.getGasPrice();
+          if (network > cap) {
+            throw new Error(zh
+              ? `网络 Gas 价格（${formatUnits(network, 9)} gwei）高于该发行的上限（${formatUnits(cap, 9)} gwei），请稍后再试。`
+              : `The network gas price (${formatUnits(network, 9)} gwei) is above this launch's cap (${formatUnits(cap, 9)} gwei). Try again shortly.`);
+          }
+          gasPrice = network;
+        }
         setMessage("Confirm the buy in your wallet…");
         await assertWalletIdentity(injectedProvider(), wallet, FORTUNE_NETWORK.chainId);
-        const hash = await walletClient.writeContract({ address: launch.curve, abi: CUSTOM_PAIR_CURVE_ABI, functionName: "buy", args: [quote.raw, quote.minOut] });
+        const hash = await walletClient.writeContract({ address: launch.curve, abi: CUSTOM_PAIR_CURVE_ABI, functionName: "buy", args: [quote.raw, quote.minOut], ...(gasPrice ? { gasPrice } : {}) });
         const receipt = await publicClient.waitForTransactionReceipt({ hash });
         if (receipt.status !== "success") throw new Error("The buy reverted.");
         setMessage(quote.completes ? "Bought. This buy completed the curve: anyone can now graduate it." : "Bought.");
@@ -461,7 +499,7 @@ export default function CustomPairMarket({ initial }: { initial: CustomPairLaunc
           <PairInspector address={pair.address} holder={account} onResult={setInspection} />
 
           {launch.rules ? (
-            <LaunchRulesPanel rules={launch.rules} symbol={launch.symbol} phase={launch.phase} status={rulesStatus} account={account} now={now} zh={zh} />
+            <LaunchRulesPanel rules={launch.rules} symbol={launch.symbol} supply={supply} phase={launch.phase} progressBps={launch.progressBps} status={rulesStatus} account={account} now={now} zh={zh} />
           ) : null}
 
           {launch.feeSplit ? (

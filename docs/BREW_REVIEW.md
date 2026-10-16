@@ -4,7 +4,7 @@ Competitor snapshot: 2026-09-25, after the owner identified Brew as Fortune's di
 
 Fortune implementation status reconciled on 2026-10-16 against [main `ade8c69f`](https://github.com/shawkkkkk/fortune/tree/ade8c69fd92bd5d3cb5303314fe180c944e7b4eb), `PRODUCT.md` and `RELEASE_HANDOFF.md`. This updates Fortune's side of the comparison; the competitor snapshot has not been refreshed.
 
-Sources: [Brew docs](https://brew.family/docs/) (owner-supplied text on this date; the public text crawler returned only the JavaScript shell) and [LESGO docs](https://www.lesgo.fun/docs) (retrieved on this date). Competitor descriptions below are documented behavior, not an independent audit or verification of deployed contracts. Competitor addresses are not Fortune deployment configuration.
+Sources: [Brew docs](https://brew.family/docs/) (owner-supplied text on 2026-09-25; the public text crawler returned only the JavaScript shell) and [LESGO docs](https://www.lesgo.fun/docs) (retrieved on 2026-09-25). Competitor descriptions below are documented behavior, not an independent audit or verification of deployed contracts. Competitor addresses are not Fortune deployment configuration.
 
 ## The distinction that matters
 

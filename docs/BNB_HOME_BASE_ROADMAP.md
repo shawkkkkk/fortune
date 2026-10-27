@@ -34,7 +34,7 @@ These are source-level observations, not proof that every deployment dependency 
 
 ## Launch catalog: the core product
 
-The owner's clarified priority is breadth of token launch models. A dashboard supports that goal but cannot substitute for it. The attached MEME OS screenshot and pasted documentation enumerate eight launch blocks, despite the owner's reference to nine. Fortune's proposed nine entries below are its own catalog, not a claim that the reference has nine blocks or that Fortune already implements them all.
+Breadth of token launch models is a core product requirement. A dashboard supports that goal. The nine proposed entries below define Fortune's own catalog; they are proposals with different implementation states, not nine currently available engines.
 
 | Proposed Fortune preset | Creator intent | Existing foundation and remaining work |
 | --- | --- | --- |

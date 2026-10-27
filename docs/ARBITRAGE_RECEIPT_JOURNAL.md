@@ -4,7 +4,9 @@ This adds a read-only receipt verifier and a disk-backed fill journal. It does n
 
 ## Verification boundary
 
-`readVerifiedFill` requires two distinct configured RPC clients to agree on a transaction's reconciled fill. Each checks the chain, successful receipt, transaction/receipt/block/log provenance, confirmation depth, strategy sender and configured router. Code hashes for the router, factory, pool and both assets must match the operator-reviewed manifest at the receipt block. The pool must match the canonical factory lookup, pool factory, exact token ordering, fee tier and both token precisions. The receipt block's hash is rechecked after the reads.
+`readVerifiedFill` requires two distinct configured RPC clients to agree on a transaction's reconciled fill. Each checks the chain, successful receipt, transaction/receipt/block/log provenance, confirmation depth and the configured sender/target path. Direct-wallet mode requires the wallet to call the router. Optional bounded-vault mode requires the reviewed operator to call that vault. Code hashes for the router, factory, pool and both assets must match the operator-reviewed manifest at the receipt block. Vault mode also pins the vault runtime. The pool must match the canonical factory lookup, pool factory, exact token ordering, fee tier and both token precisions. The receipt block's hash is rechecked after the reads.
+
+Vault mode decodes the actual `executeSwap` calldata and requires exactly one later `SwapExecuted` event from that vault. Input token/amount, output amount, nonce, epoch, minimum and deadline must agree with the submitted order, the pool event and wallet transfers. The function/event ABI is generated from the compiled isolated vault and checked for drift in engine CI. The returned observation preserves vault, epoch, nonce and actual operator gas payer. This mode currently supports direct EOA operator transactions; smart-account/bundler call paths need a separate adapter. The code pin/order checks do not independently approve constructor budgets, role addresses or price floors; deployment manifests still require review.
 
 Exactly one configured V3 swap must match exactly two direct ERC-20 transfers between the strategy wallet and that pool. Swap deltas and wallet deltas must reconcile. Other wallet assets/transfers, intermediate custody, native-value swaps, reverted transactions, duplicate/removed logs, ambiguous swaps and insufficient depth fail closed. Both Pancake V3 and Uniswap V3 event formats are explicit manifest choices. Fee-on-transfer, rebasing, proxy/upgradeable or otherwise unreviewed tokens are outside this adapter; runtime hashes alone do not prove plain-token behavior.
 
@@ -32,9 +34,12 @@ token, settlement: { address, codeHash, decimals }
 fee: V3 fee tier
 confirmations: integer 1..256
 eventKind: "pancake-v3" | "uniswap-v3"
+vault: optional { codeHash, operator } // wallet is the vault address in this mode
 ```
 
 `codeHash` is keccak256 of the independently reviewed runtime bytecode; it is not an automatically trusted observation from the RPC under test. All addresses/roles must be distinct. Both precisions must be integers 0..18. The strategy wallet must be dedicated capital, separate from holders, creators and launch reserves.
+
+Omitting `vault` preserves the previous direct-router policy fingerprint and payload shape. Vault mode separately binds its code hash and operator to the journal policy. Operator rotation therefore requires a reviewed journal-policy migration/rebuild that preserves global receipt uniqueness; do not evade a policy mismatch by silently copying or summing independent databases. In vault mode native gas belongs to the recorded operator, not the custody vault. Neither mode performs gas-cost conversion or profit allocation.
 
 Configure `FORTUNE_ARBITRAGE_READ_RPC_URL` and `FORTUNE_ARBITRAGE_SECONDARY_RPC_URL` through the operator's server environment, then:
 
@@ -51,3 +56,5 @@ Tests use fixture RPC clients, not live receipt evidence. Real disk tests cover 
 Still required: retained live/fork receipt evidence for reviewed routes, provider/finality drills, durable cycle/job orchestration, authenticated native-cost conversion, inventory/rebalance/bridge settlement, global deduplication, enforced execution limits, failure/unwind recovery and separately reviewed profit/buyback policy. Pair-asset holder claims, creator earnings and liquidity cannot fund this strategy. All mainnet review/governance/operations gates remain in force.
 
 References: [Node 22 SQLite API](https://nodejs.org/download/release/latest-jod/docs/api/sqlite.html), [SQLite transactions](https://www.sqlite.org/lang_transaction.html). The database mechanism establishes storage behavior, not economic correctness or independent audit approval.
+
+The bounded-vault RPC rehearsal in `contracts-omnichain/scripts/strategy-vault-runtime.mjs` executes actual local fork transactions through Pancake V3 and verifies their resulting receipts into this journal, including native gas, restart and retry uniqueness. Two clients read the same isolated Anvil fixture; this is runtime integration evidence, not independent public-provider agreement or a public deployment. See `STRATEGY_EXECUTOR.md` for exact scope, reproduction and retained block evidence.

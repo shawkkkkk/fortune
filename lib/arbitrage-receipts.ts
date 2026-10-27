@@ -1,4 +1,5 @@
-import { decodeEventLog, isAddress, keccak256, parseAbi, parseAbiItem, stringToHex, type Address, type Hex, type PublicClient } from "viem";
+import { decodeEventLog, decodeFunctionData, isAddress, keccak256, parseAbi, parseAbiItem, stringToHex, type Address, type Hex, type PublicClient } from "viem";
+import { STRATEGY_EXECUTION_ABI } from "@/lib/strategy-executor-abi";
 
 export const FILL_EVENTS = [
   parseAbiItem("event Transfer(address indexed from, address indexed to, uint256 value)"),
@@ -16,12 +17,15 @@ export type FillMarket = {
   wallet: Address; router: Pin; factory: Pin; pool: Pin;
   token: Pin & { decimals: number }; settlement: Pin & { decimals: number };
   fee: number; confirmations: number; eventKind: "pancake-v3" | "uniswap-v3";
+  /** Omit for legacy direct-router fills. Wallet is the vault address in this mode. */
+  vault?: { codeHash: Hex; operator: Address };
 };
 export type VerifiedFill = Readonly<{
   receiptId: string; chainId: number; transactionHash: Hex; blockNumber: string; blockHash: Hex; swapLogIndex: number;
   marketHash: Hex; receiptDigest: Hex; wallet: Address; pool: Address; token: Address; settlement: Address;
   tokenDecimals: number; settlementDecimals: number; side: "buy" | "sell";
   tokenUnits: string; settlementUnits: string; nativeGasCost: string; observedAtMs: number;
+  executionVault?: Address; gasPayer?: Address; authorizationEpoch?: string; executionNonce?: string;
   executionAuthorized: false;
 }>;
 const approved = new WeakSet<object>();
@@ -44,7 +48,13 @@ export function fillMarketHash(m: FillMarket): Hex {
     || !Number.isInteger(m.confirmations) || m.confirmations < 1 || m.confirmations > 256
     || !["pancake-v3", "uniswap-v3"].includes(m.eventKind)) throw new Error("Invalid receipt verification policy");
   // Fixed field order and normalized addresses/hashes make a stable configuration fingerprint.
-  return digest([m.chainId, m.wallet.toLowerCase(), ...pins.flatMap(p => [p.address.toLowerCase(), p.codeHash.toLowerCase()]), m.token.decimals, m.settlement.decimals, m.fee, m.confirmations, m.eventKind]);
+  const parts = [m.chainId, m.wallet.toLowerCase(), ...pins.flatMap(p => [p.address.toLowerCase(), p.codeHash.toLowerCase()]), m.token.decimals, m.settlement.decimals, m.fee, m.confirmations, m.eventKind];
+  if (m.vault !== undefined) {
+    if (!m.vault || !hash(m.vault.codeHash) || !address(m.vault.operator) || same(m.vault.operator, m.wallet)
+      || pins.some(p => same(p.address, m.vault!.operator))) throw new Error("Reviewed vault runtime and distinct operator required");
+    parts.push("strategy-vault-v1", m.vault.codeHash.toLowerCase(), m.vault.operator.toLowerCase());
+  }
+  return digest(parts);
 }
 
 async function observe(client: PublicClient, m: FillMarket, txHash: Hex) {
@@ -52,10 +62,12 @@ async function observe(client: PublicClient, m: FillMarket, txHash: Hex) {
   const [receipt, tx, head] = await Promise.all([
     client.getTransactionReceipt({ hash: txHash }), client.getTransaction({ hash: txHash }), client.getBlockNumber({ cacheTime: 0 }),
   ]);
+  const sender = m.vault?.operator ?? m.wallet;
+  const target = m.vault ? m.wallet : m.router.address;
   if (receipt.status !== "success" || !same(receipt.transactionHash, txHash) || !same(tx.hash, txHash)
     || receipt.blockNumber < 0n || head < receipt.blockNumber + BigInt(m.confirmations)
-    || !same(receipt.from, m.wallet) || !receipt.to || !same(receipt.to, m.router.address)
-    || !same(tx.from, m.wallet) || !tx.to || !same(tx.to, m.router.address) || tx.value !== 0n
+    || !same(receipt.from, sender) || !receipt.to || !same(receipt.to, target)
+    || !same(tx.from, sender) || !tx.to || !same(tx.to, target) || tx.value !== 0n
     || !["legacy", "eip2930", "eip1559"].includes(tx.type) || (receipt.blobGasUsed ?? 0n) !== 0n
     || tx.blockNumber !== receipt.blockNumber || tx.blockHash !== receipt.blockHash
     || !hash(receipt.blockHash) || receipt.logs.length > 256
@@ -65,7 +77,7 @@ async function observe(client: PublicClient, m: FillMarket, txHash: Hex) {
   const blockNumber = receipt.blockNumber;
   const block = await client.getBlock({ blockNumber });
   if (block.number !== blockNumber || block.hash !== receipt.blockHash) throw new Error("Receipt block is not canonical");
-  await Promise.all([m.router, m.factory, m.pool, m.token, m.settlement].map(async p => {
+  await Promise.all([m.router, m.factory, m.pool, m.token, m.settlement, ...(m.vault ? [{ address: m.wallet, codeHash: m.vault.codeHash }] : [])].map(async p => {
     const code = await client.getCode({ address: p.address, blockNumber });
     if (!code || code === "0x" || !same(keccak256(code), p.codeHash)) throw new Error("Receipt contract runtime mismatch");
   }));
@@ -105,10 +117,32 @@ async function observe(client: PublicClient, m: FillMarket, txHash: Hex) {
     if (same(l.address, m.token.address)) walletToken += delta; else walletSettlement += delta;
   }
   if (transferCount !== 2 || walletToken !== -tokenDelta || walletSettlement !== -settlementDelta) throw new Error("Swap and wallet transfers do not reconcile");
+  let execution: Pick<VerifiedFill, "executionVault" | "gasPayer" | "authorizationEpoch" | "executionNonce"> = {};
+  if (m.vault) {
+    const decoded = decodeFunctionData({ abi: STRATEGY_EXECUTION_ABI, data: tx.input });
+    if (decoded.functionName !== "executeSwap") throw new Error("Expected bounded vault order");
+    const order = decoded.args[0];
+    const executions = receipt.logs.filter(l => same(l.address, m.wallet)).flatMap(l => {
+      try { return [{ log: l, args: decodeEventLog({ abi: STRATEGY_EXECUTION_ABI, eventName: "SwapExecuted", data: l.data, topics: l.topics, strict: true }).args }]; }
+      catch { return []; }
+    });
+    if (executions.length !== 1) throw new Error("One authenticated vault execution required");
+    const event = executions[0];
+    const tokenIn = tokenDelta > 0n ? m.token.address : m.settlement.address;
+    const amountIn = tokenDelta > 0n ? tokenDelta : settlementDelta;
+    const amountOut = tokenDelta < 0n ? -tokenDelta : -settlementDelta;
+    if (event.log.logIndex <= log.logIndex || !same(order.tokenIn, tokenIn) || !same(event.args.tokenIn, tokenIn)
+      || order.amountIn !== amountIn || event.args.amountIn !== amountIn || event.args.amountOut !== amountOut
+      || event.args.nonce !== order.nonce || event.args.epoch !== order.epoch || order.epoch === 0n
+      || event.args.minimumOut <= 0n || event.args.minimumOut < order.minAmountOut || event.args.minimumOut > amountOut
+      || order.deadline < block.timestamp || order.deadline > block.timestamp + 120n) throw new Error("Vault order, execution and pool fill differ");
+    execution = { executionVault: m.wallet.toLowerCase() as Address, gasPayer: sender.toLowerCase() as Address, authorizationEpoch: order.epoch.toString(), executionNonce: order.nonce.toString() };
+  }
   const gasCost = positive(receipt.gasUsed * receipt.effectiveGasPrice);
   const after = await client.getBlock({ blockNumber });
   if (await client.getChainId() !== m.chainId || after.number !== blockNumber || after.hash !== block.hash) throw new Error("Receipt reorged during verification");
   return {
+    ...execution,
     receiptDigest: digest([receipt.status, txHash.toLowerCase(), receipt.blockNumber, receipt.blockHash.toLowerCase(), receipt.from.toLowerCase(), receipt.to.toLowerCase(),
       receipt.gasUsed, receipt.effectiveGasPrice, tx.type, tx.input, tx.value,
       [...receipt.logs].sort((a, b) => a.logIndex - b.logIndex).map(l => [l.logIndex, l.address.toLowerCase(), l.data.toLowerCase(), l.topics.map(t => t.toLowerCase())])]),

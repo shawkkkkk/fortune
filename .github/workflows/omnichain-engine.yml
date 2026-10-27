@@ -1,10 +1,10 @@
 name: Omnichain Testnet Engine
 on:
   pull_request:
-    paths: ["contracts-omnichain/**", ".github/workflows/omnichain-engine.yml"]
+    paths: ["contracts-omnichain/**", "lib/arbitrage-receipts.ts", "lib/strategy-executor-abi.ts", "scripts/arbitrage-fill-journal.mjs", "scripts/register-ts.mjs", "package.json", "package-lock.json", ".github/workflows/omnichain-engine.yml"]
   push:
     branches: [main]
-    paths: ["contracts-omnichain/**", ".github/workflows/omnichain-engine.yml"]
+    paths: ["contracts-omnichain/**", "lib/arbitrage-receipts.ts", "lib/strategy-executor-abi.ts", "scripts/arbitrage-fill-journal.mjs", "scripts/register-ts.mjs", "package.json", "package-lock.json", ".github/workflows/omnichain-engine.yml"]
 permissions:
   contents: read
 jobs:
@@ -25,9 +25,44 @@ jobs:
         run: |
           git clone https://github.com/foundry-rs/forge-std.git lib/forge-std
           git -C lib/forge-std checkout 8bbcf6e3f8f62f419e5429a0bd89331c85c37824
-      - name: Compile and test local endpoint lifecycle with 1000 fuzz runs
+      - name: Compile and test local token and strategy lifecycles with 1000 fuzz runs
         run: npm test
+      - name: Verify strategy swaps on a real Pancake V3 BSC Testnet fork
+        timeout-minutes: 5
+        env:
+          FORTUNE_STRATEGY_FORK_RPC_URL: https://bsc-testnet-dataseed.bnbchain.org
+        run: |
+          set -o pipefail
+          mkdir -p .tmp
+          node scripts/run-forge.mjs test --match-contract FortuneTestnetStrategyVaultForkTest -vv | tee .tmp/strategy-fork.log
       - name: Verify formatting and token size
         run: |
-          node scripts/run-forge.mjs fmt --check src/FortuneOmnichainToken.sol test/FortuneOmnichainToken.t.sol
+          node scripts/run-forge.mjs fmt --check src test
           node scripts/check-sizes.mjs
+          node scripts/export-strategy-abi.mjs --check
+      - name: Install pinned isolated local EVM runner
+        run: npm install --prefix /tmp/fortune-strategy-anvil --no-package-lock --ignore-scripts --no-audit @foundry-rs/anvil-linux-amd64@1.7.1
+      - name: Install locked receipt-reader dependencies
+        working-directory: .
+        run: npm ci --ignore-scripts
+      - name: Verify vault transactions through real RPC receipts and durable journal
+        timeout-minutes: 5
+        working-directory: .
+        env:
+          FORTUNE_ANVIL_BIN: /tmp/fortune-strategy-anvil/node_modules/@foundry-rs/anvil-linux-amd64/bin/anvil
+          FORTUNE_STRATEGY_FORK_RPC_URL: https://bsc-testnet-dataseed.bnbchain.org
+        run: |
+          set -o pipefail
+          mkdir -p .tmp
+          node --import ./scripts/register-ts.mjs contracts-omnichain/scripts/strategy-vault-runtime.mjs | tee .tmp/strategy-runtime.log
+      - name: Preserve strategy fork verification
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: testnet-strategy-fork
+          path: |
+            contracts-omnichain/.tmp/strategy-fork.log
+            .tmp/strategy-runtime.log
+            .tmp/strategy-runtime.json
+          if-no-files-found: warn
+          retention-days: 14

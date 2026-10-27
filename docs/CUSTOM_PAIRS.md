@@ -21,7 +21,7 @@ LESGO shipped custom pairs on Solana: launch against any token, including Token-
 | Graduation is permissionless, prices the pool from what the pool received, burns LP to `0x…dEaD`, and requires its mint to be the pool's only mint | Price continuity even with a tax on the way into the pool; a pair token that reenters the pool from a transfer hook to mint LP for itself makes graduation revert instead of taking the liquidity. |
 | Loss order: Launch Shield reserve, then protocol fees, then creator fees, then the reserve | Holders are hit last. |
 | Rescue when the reserve is short, or graduation has been impossible for seven days | Live pro-rata redemption of every pair token the curve holds, so later rebases or taxes are shared fairly. |
-| Optional launch rules, fixed at launch, enforced by the token until graduation | Caps, sell pacing, early-buyer vesting, curve-only transfers and time-boxed access, with nobody able to change them later. See [LAUNCH_RULES.md](LAUNCH_RULES.md). |
+| Optional launch rules, fixed at launch, enforced by the token until graduation | Caps, sell pacing, vesting, curve-only transfers and time-boxed access, plus HookedPad-style trade rules: stock-market hours, graduated and sliding caps, rising and chapter wallet caps, a sniper gas cap, anti-bundle and holder vesting. Nobody can change them later. See [LAUNCH_RULES.md](LAUNCH_RULES.md). |
 
 Curve math (pair base units `R`, virtual pair reserve `a0`, supply `S`):
 

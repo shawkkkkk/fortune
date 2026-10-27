@@ -1,0 +1,7 @@
+.launchCatalogGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; margin: 24px 0; }
+.launchCatalogCard { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; margin: 0; }
+.launchCatalogCard .secondaryCta { margin-top: auto; }
+.omniPlanOutput { overflow-x: auto; max-width: 100%; font-size: 13px; }
+.omniNetworkChoice span { display: flex; align-items: center; gap: 10px; }
+.omniNetworkChoice input[type="checkbox"] { width: 20px; height: 20px; min-height: 20px; padding: 0; flex: 0 0 auto; accent-color: var(--red); }
+@media (max-width: 680px) { .launchCatalogGrid { grid-template-columns: 1fr; } }

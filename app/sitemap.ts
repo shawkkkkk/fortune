@@ -12,6 +12,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "/assets",
     "/portfolio",
     "/launch",
+    "/launch/types",
+    "/launch/omnichain",
     "/launch/custom",
     "/claims",
     "/testnet",

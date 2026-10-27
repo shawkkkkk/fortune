@@ -22,6 +22,23 @@ export async function GET(request: Request) {
       { name: "Analytics" },
     ],
     paths: {
+      "/omnichain/preview": {
+        post: {
+          tags: ["Launches"],
+          summary: "Validate a static testnet supply plan, without deployment or signing",
+          description: "Maximum body 8192 bytes. Distinct supported testnets including chain 97; positive whole-token allocations must equal globalSupply. Canonical planId is not transaction authority. transactionReady is always false.",
+          requestBody: { required: true, content: { "application/json": { schema: {
+            type: "object", additionalProperties: false, required: ["name", "symbol", "globalSupply", "allocations"],
+            properties: {
+              name: { type: "string", description: "1–64 UTF-8 bytes, no control characters" },
+              symbol: { type: "string", description: "1–16 UTF-8 bytes, no control characters" },
+              globalSupply: { type: "string", pattern: "^[1-9][0-9]{0,13}$", description: "Whole tokens, limited by 6 shared-decimal uint64 capacity" },
+              allocations: { type: "array", minItems: 2, maxItems: 3, items: { type: "object", additionalProperties: false, required: ["chainId", "supply"], properties: { chainId: { type: "integer", enum: [97, 84532, 11155111] }, supply: { type: "string", pattern: "^[1-9][0-9]{0,13}$" } } } },
+            },
+          } } } },
+          responses: { "200": { description: "Non-executable plan with canonical planId, normalized allocations and outstanding blockers" }, "400": { description: "Malformed JSON or invalid plan" }, "413": { description: "Body exceeds 8192 bytes" }, "415": { description: "JSON content type required" } },
+        },
+      },
       "/meta": {
         get: {
           tags: ["Protocol"],

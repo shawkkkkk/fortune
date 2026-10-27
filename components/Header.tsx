@@ -27,7 +27,7 @@ declare global {
 const links = [
   ["/", "Home"],
   ["/explore", "Explore"],
-  ["/launch", "Launch"],
+  ["/launch/types", "Launch"],
   ["/assets", "Stocks"],
   ["/burns", "Burns"],
   ["/rewards", "Rewards"],
@@ -40,6 +40,10 @@ const links = [
 const pillLinks = links.filter(([href]) => href !== "/");
 const leftLinks = pillLinks.slice(0, 4);
 const rightLinks = pillLinks.slice(4);
+
+function activeLink(pathname: string, href: string) {
+  return href === "/launch/types" ? pathname === "/launch" || pathname.startsWith("/launch/") : pathname === href;
+}
 
 function short(address: string) {
   return address.slice(0, 6) + "…" + address.slice(-4);
@@ -247,8 +251,8 @@ export default function Header() {
     <Link
       key={href}
       href={href}
-      className={pathname === href ? "navActive" : ""}
-      aria-current={pathname === href ? "page" : undefined}
+      className={activeLink(pathname, href) ? "navActive" : ""}
+      aria-current={activeLink(pathname, href) ? "page" : undefined}
     >
       {label}
     </Link>
@@ -316,8 +320,8 @@ export default function Header() {
               <Link
                 key={href}
                 href={href}
-                className={pathname === href ? "navActive" : ""}
-                aria-current={pathname === href ? "page" : undefined}
+                className={activeLink(pathname, href) ? "navActive" : ""}
+                aria-current={activeLink(pathname, href) ? "page" : undefined}
                 onClick={() => setMenuOpen(false)}
               >
                 {label}

@@ -149,6 +149,27 @@ Separate operational jobs (indexing, alerts and receipt reconciliation) from fin
 
 Legitimate liquidity management requires separate economic and conflict-of-interest review. Do not introduce self-trading, artificial-volume targets or guaranteed price-floor claims. Omnichain issuance is a separate in-scope workstream with the independent testnet and release sequence above; it cannot inherit Standard approval.
 
+## Economics by launch mode
+
+Every executable preset needs a versioned fee policy in its launch manifest. It must state the fee source, denominator, asset, rate, recipient allocations, signing/claim model, deductions, minimum payout, pending-funds behavior and pre/post-graduation changes. Publish whether each setting is immutable or which disclosed authority can change it. A preset cannot inherit a different engine's rates.
+
+Model two layers separately:
+
+1. **Trading venue fee:** what the trader pays, in which asset, and which amount the venue retains or makes claimable.
+2. **Allocation of received fees:** how the actual reconciled receipt is assigned to creator/social recipients, holder liabilities, operating/strategy capital and earned protocol revenue.
+
+Do not describe a share of claimable creator fees as a share of volume. Each allocation tree must reconcile to 100% of its own explicitly named pool, subject to documented rounding. Platform-token recirculation is a use of earned protocol revenue and is not counted again as additional revenue or funded from holder obligations. Never assume a Fortune platform-token address or adopt the reference's percentages without review.
+
+Mode-specific requirements:
+- Standard retains its existing economics. Custom pairing alone does not justify a new allocation.
+- Social Fees routes only the declared creator allocation; identity/claim failures keep it owed to that recipient.
+- Holder/Basket Rewards declares assets, eligibility, snapshots, liabilities and any settlement costs; no reward claim may consume creator or protocol balances.
+- AI Assisted distinguishes trading fees from any separately quoted application charge. Autonomous Agent discloses its operating reserve, spending limits and earned-revenue funding source.
+- Managed Liquidity distinguishes risk-bearing strategy capital from creator earnings and holder liabilities; trading losses cannot silently become a holder liability haircut.
+- Omnichain records fees, funds owed and payouts per chain/asset. Gas, conversion, messaging, deployment costs and refunds appear separately from trading allocations. A cross-chain payout policy must account for conversion costs, failure and finality before promising a payout currency.
+
+For engines collecting launch-token-side fees, those fees remain permanent burns only. They cannot be converted to finance any of these allocations. No new fee rate or allocation is activated by this specification.
+
 ## Accounting and release invariants
 
 - The frozen Standard mainnet candidate remains unchanged and WBNB-only. This roadmap does not add rewards to Standard.

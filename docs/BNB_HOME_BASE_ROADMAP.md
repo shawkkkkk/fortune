@@ -34,7 +34,7 @@ These are source-level observations, not proof that every deployment dependency 
 
 ## Launch catalog: the core product
 
-Breadth of token launch models is a core product requirement. A dashboard supports that goal. The nine proposed entries below define Fortune's own catalog; they are proposals with different implementation states, not nine currently available engines.
+Breadth of token launch models is a core product requirement. A dashboard supports that goal. The ten proposed entries below define Fortune's own catalog; they are proposals with different implementation states, not ten currently available engines.
 
 | Proposed Fortune preset | Creator intent | Existing foundation and remaining work |
 | --- | --- | --- |
@@ -47,6 +47,7 @@ Breadth of token launch models is a core product requirement. A dashboard suppor
 | AI Assisted | Run the project personally with an assistant for analysis and drafts | Proposed application layer; supported financial actions still require user review and signature |
 | Autonomous Agent | Give the project a constrained operational agent and explicit treasury policy | New engine/runtime and permission design; no inherited approval from AI Assisted or Standard |
 | Managed Liquidity | Operate an explicitly funded, bounded liquidity strategy | New financial engine with separate economics, execution, conflict and audit requirements; no artificial-volume objective |
+| Omnichain | Launch one transferable token across selected chains from a BNB-centered checkout | New isolated token, messaging, deployment-orchestration and pool-adapter engine; all routes and deployments require independent verification |
 
 These are proposed user-facing presets, not nine mandatory factories. Separate the choices into:
 
@@ -60,7 +61,40 @@ The launch screen should begin with “What kind of token do you want to launch?
 
 The manifest identifies chain, exact contract/version, fixed settings and changeable settings, recipients, all authorities, fee bases, allocation destinations and post-graduation behavior. The wallet review must match the executable configuration. UI labels never stand in for onchain checks.
 
-**Reference coverage:** Fortune's agent, AI-assisted, protected, social, rewards and managed-liquidity proposals address the corresponding product use cases. Bitcoin Runes would require real Bitcoin issuance/custody/bridging; a BTCB pair is not a Rune. Omnichain issuance requires cross-chain supply, messaging and recovery controls; BNB-first discovery is not that feature. Retain both as separate future research options, outside the first BNB release. Do not invent a superficial equivalent to fill a launch card.
+**Reference coverage:** Fortune's agent, AI-assisted, protected, social, rewards and managed-liquidity proposals address the corresponding product use cases. Omnichain issuance is explicitly in product scope through the separate engine below. Bitcoin Runes remain separate research: a BTCB pair is not Bitcoin issuance or a Rune bridge.
+
+## Omnichain launch engine
+
+**Target experience:** choose Omnichain, enter token identity, choose supported chains and allocations, review all fees and authorities, pay through one BNB-centered checkout, and follow a resumable deployment. The project page shows every verified address, chain-specific pools/trades, creator fees and transfer status. The proposed chain set includes BNB Chain, Ethereum, Base, Solana and Robinhood Chain. These are targets, not a supported-chain claim; each needs verified messaging endpoints, verifier/executor availability, RPCs, explorer support, pool contracts and route drills before selection.
+
+BNB is the product's home and proposed checkout asset, not an exclusive settlement chain or universal source of truth for every remote balance. Native gas and fee obligations on each remote chain still need funding. Funding conversion, sponsorship and execution authority require an explicit design; one payment does not imply one transaction, no gas cost, or trustless deployment.
+
+### Supply and transport
+
+Evaluate LayerZero V2 OFT as a transport candidate. Its [native OFT implementation](https://github.com/LayerZero-Labs/LayerZero-v2/blob/main/packages/layerzero-v2/evm/oapp/contracts/oft/OFT.sol) debits through source burns and credits through destination minting; its [core implementation](https://github.com/LayerZero-Labs/LayerZero-v2/blob/main/packages/layerzero-v2/evm/oapp/contracts/oft/OFTCore.sol) handles shared decimals and dust. Pin a reviewed package/version during implementation; selecting the standard is not a Fortune audit.
+
+Choose one global issuance cap and explicit initial per-chain allocations that sum to it. For example, a 1B global cap allocated across five chains remains 1B total, not 1B minted on each chain. The final economics must be reviewed rather than copying the reference's supply or fee percentages.
+
+Reconcile local minted supplies plus authenticated, debited-but-not-yet-credited transfer obligations against approved issuance less permanent burns, using compatible units and consistent finality. Completed credits must remove the corresponding in-flight obligation exactly once. Retry a failed delivery through the original authenticated message; never create compensating supply from an operator's database flag. Account for dust explicitly.
+
+Bridge transport burns are matched by destination issuance. They are distinct from permanent fee burns and must never inflate a public burn metric. Launch-token-side fee allocations remain permanent burns only; cross-chain creator fees, holder liabilities and earned platform revenue remain separate accounting categories.
+
+### Deployment and trading
+
+Persist a job and configuration hash before executing: quoted → funded → deploying → configuring peers/security → preparing pools → verifying → opening → live, with explicit paused/failed/recovery states per chain. Reconcile receipts, deployed code/configuration and finality before retrying. A refresh cannot collect payment again or duplicate an already completed deployment. Publish cancellation, unused-funds/refund, gas-overrun and partial-deployment policy before accepting payment.
+
+Prepare all selected chains and verify supply allocations, peers, security configuration, authorities and liquidity custody before authorizing opening. Opening remains asynchronous across chains; expose per-chain state and pause/recovery procedures rather than promising atomic global trading or zero arbitrage.
+
+Each chain's venue adapter must prove initialization, price units, quote funding or reviewed one-sided liquidity mechanics, fee collection and LP custody. “No creator-supplied liquidity” is not a default promise. A common starting reference price does not guarantee equal live prices, liquidity or exit capacity. Display per-chain data; never multiply a full global FDV by the number of chains. With stale prices or inconsistent supply snapshots, withhold the aggregate and explain why.
+
+### Independent implementation and release
+
+Start with an isolated two-EVM-chain testnet vertical slice, including BNB testnet, and then extend verified routes to additional EVM chains and Solana. Robinhood Chain remains a candidate until its exact endpoint, security providers and venue support are verified. No placeholder route is selectable.
+
+The initial slice uses a plain token and fixed reviewed allocations. Combining Omnichain with rewards, trading rules or autonomy is unavailable until its own compatibility tests pass. Do not retrofit the frozen Standard candidate or silently bridge existing launches.
+
+Acceptance requires supply/dust invariants, peer/spoof/replay rejection, duplicate job/payment handling, delayed/failed delivery and retry, reorg/finality handling, insufficient destination gas, partial-chain opening/recovery drills and fee/LP reconciliation. Publish administrative/configuration and minting powers, message-security assumptions and emergency limits. Use no private keys or real-funds transactions in preparation. Mainnet requires independent audit/remediation, deployment/route evidence, operations ownership, authorized signing/funding, legal review and incident procedures for this engine.
+
 
 ## Five connected surfaces
 
@@ -113,7 +147,7 @@ Acceptance: untrusted metadata or community text cannot issue assistant commands
 
 Separate operational jobs (indexing, alerts and receipt reconciliation) from financial execution. Any future spending agent requires a distinct approved design with narrow onchain permissions, asset/target allowlists, enforced budgets, revocation, monitoring and public execution history. Model prompts are not spending controls.
 
-Legitimate liquidity management requires separate economic and conflict-of-interest review. Do not introduce self-trading, artificial-volume targets or guaranteed price-floor claims. Cross-chain issuance and bridges are outside the first BNB home-base release.
+Legitimate liquidity management requires separate economic and conflict-of-interest review. Do not introduce self-trading, artificial-volume targets or guaranteed price-floor claims. Omnichain issuance is a separate in-scope workstream with the independent testnet and release sequence above; it cannot inherit Standard approval.
 
 ## Accounting and release invariants
 

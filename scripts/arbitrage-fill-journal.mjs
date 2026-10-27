@@ -22,6 +22,7 @@ export class ArbitrageFillJournal {
       this.#db.exec("COMMIT");
     } catch (e) { try { this.#db.exec("ROLLBACK"); } catch {} this.#db.close(); throw e; }
   }
+  get marketHash() { return this.#marketHash; }
   record(fill) {
     if (!isVerifiedFill(fill) || fill.marketHash !== this.#marketHash || Date.now() - fill.observedAtMs > 60_000 || fill.observedAtMs > Date.now()) throw new Error("Fresh verified receipt for this exact market required");
     // Re-verification times may differ; economic and block evidence must be identical.

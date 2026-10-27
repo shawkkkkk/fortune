@@ -104,6 +104,10 @@ The output includes the chain, block/hash, every included factory record and a S
 
 ## Verification commands
 
+### October 27 production-dependency failure
+
+[Mainnet-readiness run 40535152363](https://github.com/shawkkkkk/fortune/actions/runs/40535152363) failed at `npm audit --omit=dev --audit-level=high`: Next.js was critical; sharp and source-map-js were high. This supersedes the historical zero-finding npm snapshot above for the current pinned web dependencies. Builds, public-site health and successful deployments do not clear that gate. See `WEB_SECURITY_CANDIDATE.md` for bounded raster artwork hardening and the independently tested proposed dependency refresh. The root pins and frozen Standard fingerprint remain unchanged; merging the isolated candidate does not patch Vercel's root runtime. The release owner must authorize and verify a new dependency baseline before applying the proposed root dependency files; old release evidence cannot silently approve the changed fingerprint.
+
 ```bash
 node --import ./scripts/register-ts.mjs --test tests/web/*.test.mjs
 npm run build

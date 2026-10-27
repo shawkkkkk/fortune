@@ -5,35 +5,13 @@ import { isAddress, type Address } from "viem";
 import { FORTUNE_NETWORK } from "@/lib/fortune-network";
 import { formatPrice, formatUsd } from "@/lib/market-format";
 import { readTokenSummary } from "@/lib/market-insights";
-import { trustedShareArtworkSource } from "@/lib/share-artwork";
+import { readShareArtwork } from "@/lib/share-artwork-fetch";
 import { readTokenMetadata } from "@/lib/token-metadata";
 
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 export const alt = "Fortune launch share card";
 export const revalidate = 300;
-
-const IMAGE_BYTES_LIMIT = 1_500_000;
-
-/**
- * Token artwork as a data URI, only for small PNG/JPEG files that answer quickly.
- * Creator-controlled HTTPS hosts are intentionally not fetched here: hostname
- * validation alone cannot prevent DNS rebinding into a private network. Valid
- * IPFS URIs use Fortune's fixed gateway, with a timeout and response-size bound.
- */
-async function artwork(url: string | null) {
-  const source = trustedShareArtworkSource(url);
-  if (!source) return null;
-  try {
-    const response = await fetch(source, { signal: AbortSignal.timeout(3_000), redirect: "error" });
-    const type = (response.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
-    if (!response.ok || (type !== "image/png" && type !== "image/jpeg")) return null;
-    const bytes = Buffer.from(await response.arrayBuffer());
-    return bytes.length <= IMAGE_BYTES_LIMIT ? `data:${type};base64,${bytes.toString("base64")}` : null;
-  } catch {
-    return null;
-  }
-}
 
 type CardFont = { name: string; data: ArrayBuffer; weight: 500 | 700 | 800; style: "normal" };
 
@@ -70,7 +48,7 @@ export default async function TokenShareImage({ params }: { params: Promise<{ id
   const read = isAddress(id) ? await readTokenSummary(id as Address).catch(() => null) : null;
   const summary = read?.summary ?? null;
   const image = summary && summary.mode === "standard" && read
-    ? await readTokenMetadata(summary.factory, summary.token, summary.creator, read.blockNumber, read.blockHash!).then((meta) => artwork(meta.image), () => null)
+    ? await readTokenMetadata(summary.factory, summary.token, summary.creator, read.blockNumber, read.blockHash!).then((meta) => readShareArtwork(meta.image), () => null)
     : null;
 
   const name = summary?.name || "Fortune token";

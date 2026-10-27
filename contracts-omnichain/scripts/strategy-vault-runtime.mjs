@@ -32,6 +32,10 @@ try {
   const fork = new URL(process.env.FORTUNE_STRATEGY_FORK_RPC_URL || "https://bsc-testnet-dataseed.bnbchain.org");
   // This fixture only accepts credential-free public read URLs; never put credentials in process arguments.
   assert.ok(fork.protocol === "https:" && !fork.username && !fork.password && !fork.search && !fork.hash && fork.pathname === "/");
+  stage = "read-only fork chain identity";
+  // Do not let --chain-id mask an accidentally supplied mainnet/wrong-network fork source.
+  const source = createPublicClient({ transport: http(fork.href, { timeout: 15_000, retryCount: 0 }) });
+  assert.equal(await source.getChainId(), 97, "fork source must itself be BSC Testnet");
   const lease = createServer(); lease.listen(0, "127.0.0.1"); await once(lease, "listening");
   const port = lease.address().port; await new Promise(r => lease.close(r));
   const args = ["--host", "127.0.0.1", "--port", String(port), "--chain-id", "97", "--accounts", "0", "--quiet", "--fork-url", fork.href];

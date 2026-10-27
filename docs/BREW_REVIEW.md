@@ -1,8 +1,10 @@
 # Brew / LESGO comparison and Fortune release decisions
 
-Updated 2026-09-25 after the owner identified Brew as Fortune's direct BNB competitor and supplied its full docs. LESGO remains the primary reference for the simple launch flow and pair-asset reward model.
+Competitor snapshot: 2026-09-25, after the owner identified Brew as Fortune's direct BNB competitor and supplied its full docs. LESGO remains the primary reference for the simple launch flow and pair-asset reward model.
 
-Sources: [Brew docs](https://brew.family/docs/) (owner-supplied text on this date; the public text crawler returned only the JavaScript shell) and [LESGO docs](https://www.lesgo.fun/docs) (retrieved on this date). Competitor descriptions below are documented behavior, not an independent audit or verification of deployed contracts. Competitor addresses are not Fortune deployment configuration.
+Fortune implementation status reconciled on 2026-10-16 against [main `ade8c69f`](https://github.com/shawkkkkk/fortune/tree/ade8c69fd92bd5d3cb5303314fe180c944e7b4eb), `PRODUCT.md` and `RELEASE_HANDOFF.md`. This updates Fortune's side of the comparison; the competitor snapshot has not been refreshed.
+
+Sources: [Brew docs](https://brew.family/docs/) (owner-supplied text on 2026-09-25; the public text crawler returned only the JavaScript shell) and [LESGO docs](https://www.lesgo.fun/docs) (retrieved on 2026-09-25). Competitor descriptions below are documented behavior, not an independent audit or verification of deployed contracts. Competitor addresses are not Fortune deployment configuration.
 
 ## The distinction that matters
 
@@ -35,10 +37,10 @@ Permanent LP locking prevents withdrawal through that locked position. It does n
 | Token creation | Identity, artwork, links, pair, fee recipient, optional first purchase | Simple Standard testnet flow exists; optional fields are in Advanced. Upload hosting is still missing; public image URLs/IPFS work. |
 | Market lifecycle | Launch directly into Pancake V3 | Standard uses a curve, then Pancake V3 graduation and permanent LP custody. The candidate is frozen but not independently audited or approved for mainnet. |
 | Pair selection | BNB, USDT, compatible address lookup | Registry-backed discovery and capability checks exist. First mainnet scope is WBNB only. A pasted address does not authorize custody. |
-| Trading | Pair asset or BNB through an available route; quotes refreshed around approval | Curve trading exists. General BNB routing for arbitrary pairs and a complete post-graduation swap experience still need implementation and verification. |
-| Holder economics | Optional creator-fee buyback/burn; no direct payout | Standard has no holder rewards. Direct pair-asset claims are an isolated v2 prototype, not a released feature. |
+| Trading | Pair asset or BNB through an available route; quotes refreshed around approval | The testnet market UI supports WBNB curve buys/sells with BNB wrapping/redemption, single-pair graduated Standard swaps through Pancake V3, and holder rescue. Arbitrary-pair BNB routing and tax-mode post-graduation swaps remain outside this path; mainnet activation remains gated. |
+| Holder economics | Optional creator-fee buyback/burn; no direct payout | Standard has no holder rewards. Burn + Rewards v2 remains an isolated prototype without an integrated Infinity hook. The separate Stock Rewards beta implements onchain stock-asset claims but remains unaudited, BSC-Testnet-only and unconfigured in the public release; it does not establish v2 or mainnet approval. |
 | Multiple pools | Two-pool V1; two-to-five pool V2 completed across transactions | Multi-reserve curves/graduation are research capabilities. First mainnet release permits one pair; no multipair parity claim. |
-| Public data | Token pages, charts, trades, holders, analytics, explorer links | Token/profile pages and bounded onchain history exist. Full trade/holder ledgers, durable event indexing and complete analytics remain gaps. Unknown totals stay unavailable. |
+| Public data | Token pages, charts, trades, holders, analytics, explorer links | Token/profile pages and bounded onchain history exist. Holder Shield's exact holder-index implementation is merged, but its panels remain off until server-only Redis and index configuration are supplied; incomplete histories fail closed. Full-history production indexing/reconciliation and complete analytics remain release gaps. Unknown totals stay unavailable. |
 | Fee claims | Pair-asset creator claims and permanent redirection option | Fee recipients and immutable destinations require disclosure for the exact deployed generation. Legacy tax or Fee Matrix research must not be presented as v2. |
 | Contracts and trust | Published factory/locker/distributor addresses and risk terms | Public status/API expose Fortune's configured deployment and failed mainnet gates. No official mainnet CA has been published by this release. |
 

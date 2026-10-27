@@ -11,6 +11,10 @@ contracts/broadcast
 contracts/lib
 contracts-v2/cache
 contracts-v2/out
+contracts-omnichain/out
+contracts-omnichain/cache
+contracts-omnichain/broadcast
+contracts-omnichain/lib
 contracts-custom-pairs/cache
 contracts-custom-pairs/out
 contracts-custom-pairs/broadcast

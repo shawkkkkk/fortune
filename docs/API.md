@@ -250,6 +250,22 @@ never be reported as creator revenue or organic curve buy pressure.
 
 ## OpenAPI
 
+### Omnichain supply planner
+
+`POST /api/public/v1/omnichain/preview` accepts JSON (maximum 8192 streamed bytes):
+
+```json
+{"name":"Test Lucky","symbol":"LUCK","globalSupply":"1000000000","allocations":[{"chainId":97,"supply":"600000000"},{"chainId":84532,"supply":"400000000"}]}
+```
+
+Supply values are positive whole-token decimal strings, not floating-point numbers. Use two or three distinct planning testnets from 97, 84532 and 11155111, including 97. Allocations must equal global supply. Identity uses UTF-8 byte limits; unknown fields, controls and shared-decimal overflow are rejected. These network IDs do not assert that Fortune has deployed messaging routes there.
+
+`data` contains normalized allocations, a deterministic `planId`, outstanding blockers and `transactionReady: false`. A plan ID is not a payment quote, job, onchain manifest or authorization. No signing/deployment endpoint exists. Malformed input returns 400, oversized bodies 413 and unsupported content types 415. Responses use `no-store`.
+
+The browser planner at `/launch/omnichain` shares this validator and can validate through the API. The launch catalog at `/launch/types` links existing builders and explicitly labels unconfigured/planned engines.
+
+### OpenAPI document
+
 ```
 GET /api/public/v1/openapi
 ```

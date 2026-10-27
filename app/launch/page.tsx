@@ -688,6 +688,7 @@ export default function LaunchPage() {
           <span className="eyebrow">BNB CHAIN · CREATE</span>
           <h1>Make your own luck.</h1>
           <p>Name it, choose a reviewed pair, then inspect the exact launch before your wallet signs.</p>
+          <Link className="secondaryCta" href="/launch/types">Explore all launch types →</Link>
         </div>
         <img className="launchHeadingArt" src="/fortune-cat-cutout-400.webp" alt="Fortune lucky cat holding a fortune cookie" width="170" height="170" />
       </section>

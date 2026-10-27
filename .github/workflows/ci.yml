@@ -61,6 +61,11 @@ jobs:
           FORTUNE_PLAYWRIGHT_MODULE: /tmp/fortune-browser/node_modules/playwright/index.mjs
         run: node tests/e2e/creator-flow.mjs
 
+      - name: Desktop and mobile launch-catalog and omnichain-plan regressions
+        env:
+          FORTUNE_PLAYWRIGHT_MODULE: /tmp/fortune-browser/node_modules/playwright/index.mjs
+        run: node tests/e2e/launch-catalog.mjs
+
       - name: Upload creator-flow screenshots
         if: always()
         uses: actions/upload-artifact@v4

@@ -36,8 +36,9 @@ export class ArbitrageFillJournal {
       const siblings = this.#db.prepare("SELECT receipt_id FROM fills WHERE receipt_id LIKE ? AND receipt_id<>?")
         .all(`${this.#market.chainId}:${fill.transactionHash.toLowerCase()}:%`, fill.receiptId);
       if (siblings.length) {
+        this.#db.prepare("UPDATE fills SET state='quarantined' WHERE receipt_id LIKE ?")
+          .run(`${this.#market.chainId}:${fill.transactionHash.toLowerCase()}:%`);
         for (const sibling of siblings) {
-          this.#db.prepare("UPDATE fills SET state='quarantined' WHERE receipt_id=?").run(sibling.receipt_id);
           this.#db.prepare("INSERT OR IGNORE INTO conflicts VALUES(?,?)").run(sibling.receipt_id, payload);
         }
         this.#db.exec("COMMIT");

@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { spawnSync } from "node:child_process";
+import { readVerifiedFill } from "../../lib/arbitrage-receipts.ts";
 import { ArbitrageFillJournal as Journal } from "../../scripts/arbitrage-fill-journal.mjs";
 import { revalidateFillBatch } from "../../scripts/revalidate-arbitrage-fills.mjs";
 import { market, receiptClient, TX, h } from "../fixtures/arbitrage-receipts.mjs";
@@ -77,4 +78,15 @@ test('operator CLI refuses missing or uninitialized journals and hides private d
       if(path.includes('missing'))assert.equal(existsSync(path),false);else {const db=new DatabaseSync(path,{readOnly:true});assert.equal(db.prepare('SELECT count(*) AS n FROM sqlite_master').get().n,0);db.close();}
     }
   }finally{f.clean();}
+});
+
+test('legacy duplicate identities are all quarantined, including an identity matching the newest receipt',async()=>{
+  const f=setup(),j=f.journal;
+  try{
+    const verified=await readVerifiedFill(clients(),market(),TX);j.record(verified);
+    const db=new DatabaseSync(f.path),payload={...verified,receiptId:`97:${TX}:7`,swapLogIndex:7};delete payload.observedAtMs;
+    db.prepare('INSERT INTO fills VALUES(?,?,?,?,?)').run(payload.receiptId,JSON.stringify(payload),verified.blockHash,Date.now(),'observed');db.close();
+    assert.throws(()=>j.record(verified),/identity changed/);
+    assert.deepEqual(j.status(),{observed:0,quarantined:2});
+  }finally{j.close();f.clean();}
 });

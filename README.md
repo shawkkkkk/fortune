@@ -284,6 +284,6 @@ MIT
 ## Official channels
 
 - X: [@fortunepad](https://x.com/fortunepad)
-- Public alpha: https://fortune-rho-snowy.vercel.app
-- Intended domain: `fortunepad.fun` (DNS/HTTPS cutover remains pending)
+- Public site: https://fortunepad.fun
+- Canonical domain: `fortunepad.fun` (`www.fortunepad.fun` redirects to the apex)
 - Current release handoff: [docs/RELEASE_HANDOFF.md](docs/RELEASE_HANDOFF.md)

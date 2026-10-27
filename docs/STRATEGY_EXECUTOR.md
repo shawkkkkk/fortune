@@ -41,6 +41,8 @@ Two additional tests use the actual Pancake V3 factory/router/position manager o
 
 A separate Anvil 1.7.1 RPC rehearsal passed on October 27, 2026 at source blocks **139270794** and **139271015**: actual vault transactions swapped twice through the real forked venue, the receipt reader checked calldata/events/transfers and native gas, and SQLite retained exactly two observations across reopen/retry. Mined bad-fill and revoked-operator transactions reverted; treasury recovery passed. The runner starts with **zero generated accounts**, uses local VM impersonation and constructs every writable client from a fresh loopback URL. It uses no private keys or public broadcasts. Its two receipt clients point at **one local fixture**; that does not establish agreement from independent public providers. Synthetic fixture pins are observed for testing, not independently approved deployment manifests.
 
+The queued-observer integration rehearsal passed on October 27, 2026 at source block **139280665**. Both actual local vault transaction hashes entered the durable queue; `observeNextReceipt` verified and journaled them before marking their jobs done. Closing/reopening both SQLite files preserved exactly two journal rows and two done jobs; duplicate enqueue returned false and the next observation was idle. The existing native-gas, bad-fill rollback, revocation and treasury-recovery checks still passed. This extends the local fixture pipeline, not public provider independence, a deployed worker, continuous revalidation or complete strategy settlement. The existing CI runtime command retains the added queue counters in its JSON report. See `RECEIPT_OBSERVER_QUEUE.md` for lease and trusted-host boundaries.
+
 ```bash
 cd contracts-omnichain
 npm ci --ignore-scripts

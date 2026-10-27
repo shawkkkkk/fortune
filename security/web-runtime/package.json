@@ -1,0 +1,38 @@
+{
+  "name": "fortune",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "smoke:release": "node scripts/release-smoke.mjs",
+    "load-test": "node scripts/load-test.mjs",
+    "launch-storm": "node scripts/launch-storm.mjs",
+    "mainnet:check": "node scripts/check-mainnet-release.mjs --phase=check",
+    "mainnet:require-deploy": "node scripts/check-mainnet-release.mjs --phase=deploy",
+    "mainnet:require-activate": "node scripts/check-mainnet-release.mjs --phase=activate",
+    "mainnet:deps": "node scripts/check-mainnet-dependencies.mjs",
+    "mainnet:deps:require": "node scripts/check-mainnet-dependencies.mjs --require-assets",
+    "mainnet:sizes": "node scripts/check-mainnet-contract-sizes.mjs",
+    "mainnet:deployment:export": "node scripts/export-mainnet-deployment.mjs",
+    "mainnet:fingerprint": "node scripts/mainnet-candidate-fingerprint.mjs"
+  },
+  "dependencies": {
+    "next": "16.4.3",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "viem": "2.56.8"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.4",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "typescript": "5.9.3"
+  },
+  "overrides": {
+    "sharp": "0.35.5",
+    "source-map-js": "1.2.2"
+  }
+}

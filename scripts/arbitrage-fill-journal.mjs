@@ -6,18 +6,18 @@ export class ArbitrageFillJournal {
   #db;
   #marketHash;
   #market;
-  constructor(path, reviewedMarket) {
+  constructor(path, reviewedMarket, { readOnly = false } = {}) {
     if (typeof path !== "string" || !path || path === ":memory:") throw new Error("Durable journal path required");
     this.#marketHash = fillMarketHash(reviewedMarket);
     this.#market = structuredClone(reviewedMarket);
-    this.#db = new DatabaseSync(path);
+    this.#db = new DatabaseSync(path, { readOnly });
     try {
-      this.#db.exec("PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA busy_timeout=5000; BEGIN IMMEDIATE;");
-      this.#db.exec(`CREATE TABLE IF NOT EXISTS config (singleton INTEGER PRIMARY KEY CHECK(singleton=1), schema_version INTEGER NOT NULL, market_hash TEXT NOT NULL);
+      this.#db.exec(readOnly ? "PRAGMA busy_timeout=5000; BEGIN;" : "PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA busy_timeout=5000; BEGIN IMMEDIATE;");
+      if (!readOnly) this.#db.exec(`CREATE TABLE IF NOT EXISTS config (singleton INTEGER PRIMARY KEY CHECK(singleton=1), schema_version INTEGER NOT NULL, market_hash TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS fills (receipt_id TEXT PRIMARY KEY, payload TEXT NOT NULL, block_hash TEXT NOT NULL, observed_at_ms INTEGER NOT NULL, state TEXT NOT NULL CHECK(state IN ('observed','quarantined')));
         CREATE TABLE IF NOT EXISTS conflicts (receipt_id TEXT NOT NULL, payload TEXT NOT NULL, PRIMARY KEY(receipt_id,payload));`);
       const row = this.#db.prepare("SELECT * FROM config WHERE singleton=1").get();
-      if (row && (row.schema_version !== 1 || row.market_hash !== this.#marketHash)) throw new Error("Journal policy differs from reviewed market");
+      if ((readOnly && !row) || (row && (row.schema_version !== 1 || row.market_hash !== this.#marketHash))) throw new Error("Journal policy differs from reviewed market");
       if (!row) this.#db.prepare("INSERT INTO config VALUES(1,1,?)").run(this.#marketHash);
       this.#db.exec("COMMIT");
     } catch (e) { try { this.#db.exec("ROLLBACK"); } catch {} this.#db.close(); throw e; }
@@ -64,6 +64,11 @@ export class ArbitrageFillJournal {
   conflicts(limit = 100) {
     if (!Number.isInteger(limit) || limit < 1 || limit > 1000) throw new Error("Bounded conflict read required");
     return this.#db.prepare("SELECT payload FROM conflicts ORDER BY receipt_id LIMIT ?").all(limit).map(r => JSON.parse(r.payload));
+  }
+  status() {
+    const counts = { observed: 0, quarantined: 0 };
+    for (const row of this.#db.prepare("SELECT state,count(*) AS n FROM fills GROUP BY state").all()) counts[row.state] = row.n;
+    return Object.freeze(counts);
   }
   close() { this.#db.close(); }
 }

@@ -1,5 +1,6 @@
 // End-to-end local fork only. Zero generated accounts, VM impersonation, no keys or public broadcasts.
 import assert from "node:assert/strict";
+import { runtimeFailureKind } from "./runtime-failure.mjs";
 import { readFileSync, mkdtempSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -21,7 +22,7 @@ const TREASURY = "0x0000000000000000000000000000000000003333";
 const AGENT = "0x0000000000000000000000000000000000004444";
 const E18 = 10n ** 18n, Q96 = 1n << 96n;
 const artifact = (file, name) => JSON.parse(readFileSync(new URL(`../out/${file}/${name}.json`, import.meta.url), "utf8"));
-let node, journal, queue, stage = "initialization";
+let node, journal, queue, fixtureBlock, stage = "initialization";
 const folder = mkdtempSync(join(tmpdir(), "fortune-strategy-runtime-"));
 // A failed repeat must not leave an old passing artifact available to CI.
 rmSync(resolve(".tmp/strategy-runtime.json"), { force: true });
@@ -54,7 +55,7 @@ try {
     await new Promise(r => setTimeout(r, 100));
   }
   assert.ok(ready);
-  const forkBlock = await rpc.getBlockNumber({ cacheTime: 0 });
+  const forkBlock = await rpc.getBlockNumber({ cacheTime: 0 }); fixtureBlock = forkBlock.toString();
   assert.deepEqual(await rpc.request({ method: "eth_accounts" }), [], "Anvil generated no wallet accounts or keys");
   stage = "local VM account provisioning";
   for (const who of [GOV, AGENT, GUARDIAN]) {
@@ -65,10 +66,12 @@ try {
   const wallet = who => createWalletClient({ account: who, chain: bscTestnet, transport: transport() });
   const receipt = hash => rpc.waitForTransactionReceipt({ hash, pollingInterval: 25, timeout: 30_000 });
   const deploy = async (item, params = []) => {
+    stage = "local contract deployment";
     const r = await receipt(await wallet(GOV).deployContract({ abi: item.abi, bytecode: item.bytecode.object, args: params, gas: 10_000_000n }));
     assert.equal(r.status, "success"); assert.ok(r.contractAddress); return r.contractAddress;
   };
   const write = async (who, address, abi, functionName, params = [], succeeds = true) => {
+    stage = "local contract call: " + functionName;
     const r = await receipt(await wallet(who).writeContract({ address, abi, functionName, args: params, gas: 10_000_000n }));
     assert.equal(r.status, succeeds ? "success" : "reverted"); return r;
   };
@@ -139,7 +142,7 @@ try {
     readClientsUseOneLocalFixture: true, generatedAccounts: 0, privateKeysUsed: false, publicBroadcasts: false, deployedToPublicNetwork: false, profitAllocated: false };
   const report = resolve(".tmp/strategy-runtime.json"); mkdirSync(resolve(".tmp"), { recursive: true }); writeFileSync(report, JSON.stringify(result, null, 2) + "\n");
   console.log(JSON.stringify(result, null, 2));
-} catch { console.error(`Local strategy runtime verification failed at ${stage}; no public transaction was submitted.`); process.exitCode = 1; }
+} catch (error) { console.error(JSON.stringify({ verification: "failed", stage, kind: runtimeFailureKind(error), sourceForkBlock: fixtureBlock, publicBroadcasts: false })); process.exitCode = 1; }
 finally {
   try { try { queue?.close(); } finally { journal?.close(); } }
   finally {

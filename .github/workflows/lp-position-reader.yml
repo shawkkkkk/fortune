@@ -1,0 +1,53 @@
+name: Testnet LP Position Reader
+on:
+  pull_request:
+    paths: ["contracts-omnichain/**", "lib/managed-liquidity-position.ts", "scripts/inspect-liquidity-position.mjs", "tests/web/managed-liquidity-position.test.mjs", "scripts/register-ts.mjs", "package.json", "package-lock.json", ".github/workflows/lp-position-reader.yml"]
+  push:
+    branches: [main]
+    paths: ["contracts-omnichain/**", "lib/managed-liquidity-position.ts", "scripts/inspect-liquidity-position.mjs", "tests/web/managed-liquidity-position.test.mjs", "scripts/register-ts.mjs", "package.json", "package-lock.json", ".github/workflows/lp-position-reader.yml"]
+permissions:
+  contents: read
+jobs:
+  token-engine:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: contracts-omnichain
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+      - run: npm ci --ignore-scripts
+      - name: Install pinned test-only forge-std
+        run: |
+          git clone https://github.com/foundry-rs/forge-std.git lib/forge-std
+          git -C lib/forge-std checkout 8bbcf6e3f8f62f419e5429a0bd89331c85c37824
+      - name: Compile and test local token and strategy lifecycles with 1000 fuzz runs
+        run: npm test
+      - name: Install pinned isolated local EVM runner
+        run: npm install --prefix /tmp/fortune-lp-anvil --no-package-lock --ignore-scripts --no-audit @foundry-rs/anvil-linux-amd64@1.7.1
+      - name: Install locked reader dependencies
+        working-directory: .
+        run: npm ci --ignore-scripts
+      - name: Verify actual Pancake V3 position observation and ownership change
+        timeout-minutes: 5
+        working-directory: .
+        env:
+          FORTUNE_ANVIL_BIN: /tmp/fortune-lp-anvil/node_modules/@foundry-rs/anvil-linux-amd64/bin/anvil
+        run: |
+          set -o pipefail
+          mkdir -p .tmp
+          node --import ./scripts/register-ts.mjs contracts-omnichain/scripts/lp-position-runtime.mjs 2>&1 | tee .tmp/lp-position-runtime.log
+      - name: Retain LP position verification
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: testnet-lp-position
+          path: |
+            .tmp/lp-position-runtime.json
+            .tmp/lp-position-runtime.log
+          retention-days: 14
+          if-no-files-found: warn

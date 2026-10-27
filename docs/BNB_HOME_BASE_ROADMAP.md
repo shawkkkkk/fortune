@@ -32,6 +32,36 @@ Repository baseline inspected: main `ade8c69fd92bd5d3cb5303314fe180c944e7b4eb`, 
 
 These are source-level observations, not proof that every deployment dependency is configured. [RELEASE_HANDOFF.md](RELEASE_HANDOFF.md) and live readiness checks control availability.
 
+## Launch catalog: the core product
+
+The owner's clarified priority is breadth of token launch models. A dashboard supports that goal but cannot substitute for it. The attached MEME OS screenshot and pasted documentation enumerate eight launch blocks, despite the owner's reference to nine. Fortune's proposed nine entries below are its own catalog, not a claim that the reference has nine blocks or that Fortune already implements them all.
+
+| Proposed Fortune preset | Creator intent | Existing foundation and remaining work |
+| --- | --- | --- |
+| Standard | Launch a straightforward BNB-paired token | Existing Standard testnet flow; frozen mainnet candidate keeps its existing gates |
+| Custom Pair | Price a token against an approved BSC asset | Isolated custom-pairs beta; deployment, compatibility, registry and asset-policy gates remain |
+| Burn + Rewards | Burn token-side fees and distribute a distinct pair-asset allocation to holders | Isolated v2 prototype; hook, factory, indexer, lifecycle accounting and audit work remain |
+| Basket Rewards | Pay holders in a chosen set of approved reward assets | Isolated stock-rewards foundation; do not imply arbitrary baskets, multi-pair liquidity or general asset support are implemented |
+| Protected Launch | Set disclosed launch-period trading restrictions | Basic custom-pair rules foundation and expanded rules in #54; preserve expiry and disclose enforceability/limits |
+| Social Fees | Route creator fees to verified social recipients or wallet splits | Isolated social-fee implementation; verification, recovery, claim and operational drills remain |
+| AI Assisted | Run the project personally with an assistant for analysis and drafts | Proposed application layer; supported financial actions still require user review and signature |
+| Autonomous Agent | Give the project a constrained operational agent and explicit treasury policy | New engine/runtime and permission design; no inherited approval from AI Assisted or Standard |
+| Managed Liquidity | Operate an explicitly funded, bounded liquidity strategy | New financial engine with separate economics, execution, conflict and audit requirements; no artificial-volume objective |
+
+These are proposed user-facing presets, not nine mandatory factories. Separate the choices into:
+
+- **Launch mechanics:** compatible engine/version, curve or pool, pair asset, graduation and lifecycle.
+- **Economic policy:** creator/social allocations, burn behavior and holder rewards.
+- **Operating mode:** creator-operated, AI-assisted or constrained autonomous execution.
+
+A preset is a reviewed combination of these choices. Start with an explicit compatibility allowlist. Do not show every combination as available merely because its components exist. For example, social routing in the custom-pairs beta does not establish a social-fee Standard deployment, and stock rewards do not establish Burn + Rewards compatibility.
+
+The launch screen should begin with “What kind of token do you want to launch?” Each card explains its purpose, pair/reward assets, fees, signer model, restrictions, graduation behavior and availability. Selection leads to the relevant short form and a common review manifest. Unavailable presets explain the missing capability without offering an executable launch button.
+
+The manifest identifies chain, exact contract/version, fixed settings and changeable settings, recipients, all authorities, fee bases, allocation destinations and post-graduation behavior. The wallet review must match the executable configuration. UI labels never stand in for onchain checks.
+
+**Reference coverage:** Fortune's agent, AI-assisted, protected, social, rewards and managed-liquidity proposals address the corresponding product use cases. Bitcoin Runes would require real Bitcoin issuance/custody/bridging; a BTCB pair is not a Rune. Omnichain issuance requires cross-chain supply, messaging and recovery controls; BNB-first discovery is not that feature. Retain both as separate future research options, outside the first BNB release. Do not invent a superficial equivalent to fill a launch card.
+
 ## Five connected surfaces
 
 1. **Discover.** New launches, graduation progress, verified pools, watchlists, creator history and address search. External venues get explicit source labels and coverage. Rankings distinguish organic activity from known automated activity; paid placement is labeled.
@@ -42,13 +72,15 @@ These are source-level observations, not proof that every deployment dependency 
 
 ## Delivery sequence and acceptance
 
-### 1. Unify existing capabilities
+### 1. Establish the launch catalog and unify existing capabilities
 
-First implementation PR: a Creator Studio landing page and shared project-status presentation over existing creator, market, readiness and transaction APIs. Link existing launch/trade/claim flows before adding any new transaction behavior.
+First implementation PR: a capability-driven launch selector that routes available presets into their existing flows, with explicit unavailable states for proposed engines and a shared configuration/review model. Preserve the current Standard path and keep all advanced configuration behind its existing gates. Follow with Creator Studio and shared project status over the existing creator, market, readiness and transaction APIs.
 
 Use a typed capability description: engine/version, chain, deployment address when configured, release state, required dependencies, signer/authority model and evidence links. Suggested states are testnet available, unconfigured beta, under review, and planned. Mainnet availability must come from authoritative release/configuration checks. The presentation layer cannot override server or contract gates.
 
 Acceptance:
+- Every launch card maps to an exact supported configuration and lifecycle; unsupported combinations cannot reach a transaction request.
+- The Standard flow remains reachable without enabling a new engine or changing its contracts.
 - A creator can find a known testnet launch and reach its current trading and lifecycle actions from one workspace.
 - Disconnected, wrong-chain, empty, partial-history and unavailable-provider states are explicit.
 - Switching wallet/project cannot display or act on stale authorization or quotes.

@@ -31,6 +31,19 @@ export class ArbitrageFillJournal {
     this.#db.exec("BEGIN IMMEDIATE");
     let conflict = false;
     try {
+      // A reorg can change the swap log index and therefore receipt_id. Bind all
+      // observations of this transaction before permitting a new row.
+      const siblings = this.#db.prepare("SELECT receipt_id FROM fills WHERE receipt_id LIKE ? AND receipt_id<>?")
+        .all(`${this.#market.chainId}:${fill.transactionHash.toLowerCase()}:%`, fill.receiptId);
+      if (siblings.length) {
+        this.#db.prepare("UPDATE fills SET state='quarantined' WHERE receipt_id LIKE ?")
+          .run(`${this.#market.chainId}:${fill.transactionHash.toLowerCase()}:%`);
+        for (const sibling of siblings) {
+          this.#db.prepare("INSERT OR IGNORE INTO conflicts VALUES(?,?)").run(sibling.receipt_id, payload);
+        }
+        this.#db.exec("COMMIT");
+        throw new Error("Transaction receipt identity changed; journal quarantined it");
+      }
       const existing = this.#db.prepare("SELECT payload,state FROM fills WHERE receipt_id=?").get(fill.receiptId);
       if (existing) {
         if (existing.payload !== payload) {
@@ -51,6 +64,13 @@ export class ArbitrageFillJournal {
   list(limit = 100) {
     if (!Number.isInteger(limit) || limit < 1 || limit > 1000) throw new Error("Bounded journal read required");
     return this.#db.prepare("SELECT receipt_id,payload,state,observed_at_ms FROM fills ORDER BY receipt_id LIMIT ?").all(limit).map(r => ({ fill: JSON.parse(r.payload), state: r.state, observedAtMs: r.observed_at_ms }));
+  }
+  dueForRevalidation(nowMs, maxAgeMs = 300_000, limit = 10) {
+    if (!Number.isSafeInteger(nowMs) || nowMs < 0 || !Number.isSafeInteger(maxAgeMs) || maxAgeMs < 1000 || maxAgeMs > 86_400_000
+      || !Number.isInteger(limit) || limit < 1 || limit > 100) throw new Error("Bounded revalidation policy required");
+    if (this.#db.prepare("SELECT 1 FROM fills WHERE observed_at_ms>? OR observed_at_ms<0 LIMIT 1").get(nowMs)) throw new Error("Journal observation clock is invalid or reversed");
+    return this.#db.prepare("SELECT payload FROM fills WHERE state='observed' AND observed_at_ms<=? ORDER BY observed_at_ms,receipt_id LIMIT ?")
+      .all(nowMs - maxAgeMs, limit).map(row => JSON.parse(row.payload).transactionHash);
   }
   async refresh(clients, txHash) {
     if (typeof txHash !== "string" || !/^0x[0-9a-fA-F]{64}$/.test(txHash)) throw new Error("Transaction hash required");

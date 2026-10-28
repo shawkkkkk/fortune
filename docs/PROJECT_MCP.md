@@ -1,5 +1,11 @@
 # Project canon reader and MCP
 
+The subsequent [project snapshot extension](PROJECT_SNAPSHOT.md) adds a second
+read-only tool/resource for same-block metadata and curve accounting. The original
+canon behavior and setup below remain supported; the original one-tool scope is
+historical. Full analytics, treasury/notebook/thoughts and wallet authority are not
+added by that extension.
+
 This implements the first executable P02/P03/P04 slice in MEME_OS_PARITY.md.
 It is a local, read-only MCP stdio server for one BSC Testnet Standard project.
 It is not a complete project agent, hosted MCP service or full character editor.

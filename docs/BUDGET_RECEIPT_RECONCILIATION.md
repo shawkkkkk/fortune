@@ -1,9 +1,8 @@
 # Budgeted receipt reconciliation
 
-This integration is stacked on #77 and incorporates #74 (including #73) as a
-reviewed dependency. Merge those branches into main first, then retarget this PR
-to main. Do not merge into an already-integrated feature branch. No active branch
-is overwritten. #74's transaction-identity guard is required: a changed swap log
+This integration reached main through #78 with #77 and #74 (including #73) as
+reviewed dependencies. Those sources are now integrated; the original stack no
+longer requires retargeting. #74's transaction-identity guard is required: a changed swap log
 index must not create a second trusted observation of the same transaction.
 
 ## Durable hold before network work
@@ -34,8 +33,10 @@ The budget schema is **version2**, with a fenced-hold table. It rejects version1
 books created by #77 and makes no automatic data migration or policy repin. The
 v1 implementation likewise rejects v2 books instead of ignoring their holds.
 Preserve old files for review; do not delete/recreate them or edit SQL to recover
-capacity. An explicit reviewed migration/recovery tool is still required before
-existing installations can adopt this candidate. Journal schema/policy is unchanged.
+capacity. The explicit offline schema migration tool is now documented in
+`NATIVE_GAS_BUDGET_MIGRATION.md`; constructors never migrate automatically.
+Manual offline cutover and separate schema2 hold recovery remain required before
+an existing installation can operate an unattended service. Journal schema/policy is unchanged.
 
 A crashed recheck is intentionally not resumed by a new worker: it cannot acquire
 a second hold or clear the old fence. Protected recovery needs a separately

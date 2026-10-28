@@ -12,6 +12,7 @@ function policy(input){
   if(new Set(p.marketHashes).size!==p.marketHashes.length||amount(p.perTransactionWei)>amount(p.rollingDayWei))throw Error('Invalid native gas limits');
   return {chainId:97,fundingScope:p.fundingScope,payer:p.payer,marketHashes:p.marketHashes,perTransactionWei:p.perTransactionWei,rollingDayWei:p.rollingDayWei};
 }
+export function nativeGasPolicyDigest(input){return createHash('sha256').update(JSON.stringify(policy(input))).digest('hex');}
 /** Trusted single-host scheduling/accounting only; never a wallet permission. */
 export class StrategyNativeGasBudget {
   #db;#policy;#clock;#readOnly;

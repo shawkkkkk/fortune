@@ -42,8 +42,9 @@ The receipt journal is documented in `ARBITRAGE_RECEIPT_JOURNAL.md`. It verifies
 Recent merged #71–#78 add source-card assistance, queued actual local-fork receipts,
 read-only health, revalidation/quarantine, retained local rollback drills, a pinned
 LP-position reader and native-gas books/reconciliation with fenced holds. These
-are component foundations. Budget schema2 rejects schema1 without migration;
-crashed holds have no reviewed recovery tool. The complete project-facing modes,
+are component foundations. Budget schema2 rejects schema1 without explicit offline
+migration (NATIVE_GAS_BUDGET_MIGRATION.md); crashed holds still have no reviewed
+recovery tool. The complete project-facing modes,
 public services, constrained signer integration and global settlement are not
 made ready by those merges. See CREATOR_COPILOT.md, MANAGED_LIQUIDITY_READER.md,
 STRATEGY_NATIVE_GAS_BUDGET.md and BUDGET_RECEIPT_RECONCILIATION.md.

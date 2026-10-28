@@ -18,6 +18,12 @@ Brew remains the direct BNB competitor; LESGO remains the simple-launch and pair
 
 Repository baseline inspected: main `ade8c69fd92bd5d3cb5303314fe180c944e7b4eb`, [release handoff](RELEASE_HANDOFF.md), product/competitor documents, route implementations, open PRs, and recent CI. Open PR #54 owns launch-rules v2; #59 owns Brew reconciliation; #60 owns the README domain correction. This proposal adds a separate document and does not duplicate those changes.
 
+The owner subsequently supplied the complete eight-block reference and surrounding
+platform ecosystem. [MEME_OS_PARITY.md](MEME_OS_PARITY.md) is the explicit coverage
+checklist, including MCP/character tools, creator media, Discord, Runes, reward
+variants, Workshop, vanity addresses, Arena/Syndicate and trust/community tools.
+Use the current implementation ledger for progress; the baseline below is historical.
+
 ## Where Fortune starts
 
 | Area | Inspected implementation | Product gap |

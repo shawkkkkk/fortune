@@ -1,5 +1,6 @@
 // End-to-end local fork only. Zero generated accounts, VM impersonation, no keys or public broadcasts.
 import assert from "node:assert/strict";
+import { revalidateFillBatch } from "../../scripts/revalidate-arbitrage-fills.mjs";
 import { runtimeFailureKind } from "./runtime-failure.mjs";
 import { readFileSync, mkdtempSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -7,11 +8,14 @@ import { join, resolve } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { createServer } from "node:net";
 import { once } from "node:events";
+import { DatabaseSync } from "node:sqlite";
 import { createPublicClient, createWalletClient, http, keccak256, toHex, parseAbi } from "viem";
 import { bscTestnet } from "viem/chains";
-import { readVerifiedFill } from "../../lib/arbitrage-receipts.ts";
+import { fillMarketHash, readVerifiedFill } from "../../lib/arbitrage-receipts.ts";
 import { ArbitrageFillJournal } from "../../scripts/arbitrage-fill-journal.mjs";
 import { ReceiptObservationQueue, observeNextReceipt } from "../../scripts/arbitrage-observer-queue.mjs";
+import { StrategyNativeGasBudget } from "../../scripts/strategy-native-gas-budget.mjs";
+import { reconcileBudgetedReceipt } from "../../scripts/reconcile-budgeted-receipt.mjs";
 
 const FACTORY = "0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865";
 const ROUTER = "0x1b81D678ffb9C0263b24A97847620C99d213eB14";
@@ -22,7 +26,7 @@ const TREASURY = "0x0000000000000000000000000000000000003333";
 const AGENT = "0x0000000000000000000000000000000000004444";
 const E18 = 10n ** 18n, Q96 = 1n << 96n;
 const artifact = (file, name) => JSON.parse(readFileSync(new URL(`../out/${file}/${name}.json`, import.meta.url), "utf8"));
-let node, journal, queue, fixtureBlock, stage = "initialization";
+let node, journal, queue, book, fixtureBlock, stage = "initialization";
 const folder = mkdtempSync(join(tmpdir(), "fortune-strategy-runtime-"));
 // A failed repeat must not leave an old passing artifact available to CI.
 rmSync(resolve(".tmp/strategy-runtime.json"), { force: true });
@@ -106,6 +110,7 @@ try {
   const order = async (tokenIn, amountIn, minAmountOut = 0n) => ({ tokenIn, amountIn, minAmountOut, deadline: (await rpc.getBlock()).timestamp + 60n,
     epoch: await read(vault, vaultArtifact.abi, "authorizationEpoch"), nonce: await read(vault, vaultArtifact.abi, "nextNonce") });
   stage = "bounded swap transactions";
+  const beforeSwaps = await rpc.request({ method: "evm_snapshot" });
   const first = await write(AGENT, vault, vaultArtifact.abi, "executeSwap", [await order(a, 10n * E18)]);
   const second = await write(AGENT, vault, vaultArtifact.abi, "executeSwap", [await order(b, 5n * E18)]);
   assert.equal(await read(a, asset.abi, "allowance", [vault, ROUTER]), 0n); assert.equal(await read(b, asset.abi, "allowance", [vault, ROUTER]), 0n);
@@ -117,9 +122,53 @@ try {
   stage = "receipt verification and durable journal";
   journal = new ArbitrageFillJournal(join(folder, "fills.sqlite"), market);
   queue = new ReceiptObservationQueue(join(folder, "jobs.sqlite"), market);
+  // Fixture-only accounting limits, not signer limits or a proposed production policy.
+  const gasPolicy = { chainId: 97, fundingScope: "strategy-native-gas", payer: AGENT,
+    marketHashes: [fillMarketHash(market)], perTransactionWei: E18.toString(), rollingDayWei: (2n * E18).toString() };
+  const bookPath = join(folder, "gas.sqlite");
+  book = new StrategyNativeGasBudget(bookPath, gasPolicy);
+  const charges = () => {
+    const db = new DatabaseSync(bookPath, { readOnly: true });
+    try { return db.prepare("SELECT tx,cost,charged_at,evidence FROM gas_entries ORDER BY tx").all(); }
+    finally { db.close(); }
+  };
+  for (const r of [first, second]) assert.equal(book.reserve(r.transactionHash, E18.toString()).inserted, true);
+  assert.equal(book.status().reservedWei, (2n * E18).toString());
+  let heldRpcCalls = 0, journalCommitsWhileHeld = 0;
+  // Forward every real client action unchanged; inspect the committed SQLite hold
+  // before that action can reach Anvil. This is still one local fixture, not two providers.
+  const heldReaders = readers.map(client => new Proxy(client, { get(target, key) {
+    const action = Reflect.get(target, key);
+    if (typeof action !== "function") return action;
+    return (...args) => {
+      const status = book.status();
+      assert.equal(status.pendingRechecks, 1); assert.equal(status.blocked, true);
+      const persisted = new StrategyNativeGasBudget(bookPath, gasPolicy, Date.now, { readOnly: true });
+      try { assert.equal(persisted.status().pendingRechecks, 1); assert.equal(persisted.status().blocked, true); }
+      finally { persisted.close(); }
+      assert.throws(() => book.reserve("0x" + "ab".repeat(32), "1"));
+      heldRpcCalls++;
+      return action(...args);
+    };
+  } }));
+  const heldJournal = { marketHash: journal.marketHash,
+    record(fill) {
+      const result = journal.record(fill);
+      const reopened = new ArbitrageFillJournal(join(folder, "fills.sqlite"), market, { readOnly: true });
+      try { assert.ok(reopened.list().some(row => row.fill.receiptId === fill.receiptId && row.state === "observed")); }
+      finally { reopened.close(); }
+      assert.equal(book.status().pendingRechecks, 1); assert.equal(book.status().blocked, true);
+      journalCommitsWhileHeld++;
+      return result;
+    },
+    quarantineKnown(tx) { return journal.quarantineKnown(tx); }
+  };
   for (const r of [first, second]) {
     const verified = await readVerifiedFill(readers, market, r.transactionHash);
     assert.equal(verified.nativeGasCost, (r.gasUsed * r.effectiveGasPrice).toString());
+    stage = "budget hold, local RPC receipt and journal-before-charge";
+    assert.equal((await reconcileBudgetedReceipt(book, heldJournal, heldReaders, market, r.transactionHash)).state, "reconciled-observation");
+    assert.equal(book.status().pendingRechecks, 0); assert.equal(book.status().blocked, false);
     assert.equal(verified.gasPayer, AGENT.toLowerCase()); assert.equal(queue.enqueue(r.transactionHash).inserted, true);
     assert.equal((await observeNextReceipt(queue, journal, readers)).state, "done");
     assert.equal(journal.record(await readVerifiedFill(readers, market, r.transactionHash)).inserted, false);
@@ -129,6 +178,16 @@ try {
   assert.deepEqual(queue.stats(), { pending: 0, leased: 0, done: 2, exhausted: 0 });
   assert.equal(queue.enqueue(first.transactionHash).inserted, false);
   assert.equal((await observeNextReceipt(queue, journal, readers)).state, "idle");
+  stage = "durable native gas accounting and replay";
+  const exactSwapGasWei = (first.gasUsed * first.effectiveGasPrice + second.gasUsed * second.effectiveGasPrice).toString();
+  assert.equal(book.status().reservedWei, "0"); assert.equal(book.status().chargedRollingDayWei, exactSwapGasWei);
+  assert.equal(book.status().retainedEntries, 2);
+  const chargedBeforeReplay = charges();
+  book.close(); book = new StrategyNativeGasBudget(bookPath, gasPolicy);
+  assert.equal(book.status().chargedRollingDayWei, exactSwapGasWei);
+  assert.equal((await reconcileBudgetedReceipt(book, heldJournal, heldReaders, market, first.transactionHash)).state, "reconciled-observation");
+  assert.deepEqual(charges(), chargedBeforeReplay, "Replay cannot duplicate gas or reset its charge time/evidence");
+  assert.equal(journalCommitsWhileHeld, 3); assert.ok(heldRpcCalls > 0);
   stage = "failed fill rollback and revocation";
   const beforeA = await read(a, asset.abi, "balanceOf", [vault]), beforeB = await read(b, asset.abi, "balanceOf", [vault]);
   await write(AGENT, vault, vaultArtifact.abi, "executeSwap", [await order(a, 10n * E18, 100n * E18)], false);
@@ -137,14 +196,52 @@ try {
   await write(GUARDIAN, vault, vaultArtifact.abi, "revokeOperator");
   await write(AGENT, vault, vaultArtifact.abi, "executeSwap", [await order(a, E18)], false);
   await write(GOV, vault, vaultArtifact.abi, "withdrawToTreasury", [a, 100n * E18]); assert.equal(await read(a, asset.abi, "balanceOf", [TREASURY]), 100n * E18);
-  const result = { sourceForkBlock: forkBlock.toString(), chainId: 97, successfulSwaps: 2, journalRows: 2, durableObservationJobs: 2, observerQueueReopened: true, noRunnableDuplicateJobs: true, receiptVerification: "passed",
+  stage = "aged receipt revalidation";
+  // Wall time ages the actual journal; do not edit persisted evidence to force a pass.
+  await new Promise(r => setTimeout(r, 1100));
+  const refreshed = await revalidateFillBatch(journal, readers, { maxAgeMs: 1000 });
+  assert.equal(refreshed.selected, 2); assert.equal(refreshed.refreshed, 2); assert.equal(refreshed.healthy, true);
+  stage = "local chain rollback and persistent quarantine";
+  assert.equal(await rpc.request({ method: "evm_revert", params: [beforeSwaps] }), true);
+  await new Promise(r => setTimeout(r, 1100));
+  const invalidated = await revalidateFillBatch(journal, readers, { maxAgeMs: 1000 });
+  assert.equal(invalidated.selected, 2); assert.equal(invalidated.failed, 2);
+  assert.equal(invalidated.quarantined, 2); assert.equal(invalidated.healthy, false);
+  journal.close(); journal = new ArbitrageFillJournal(join(folder, "fills.sqlite"), market);
+  assert.deepEqual(journal.status(), { observed: 0, quarantined: 2 });
+  // Scheduling completion cannot overwrite invalidated evidence or requeue done hashes.
+  assert.deepEqual(queue.stats(), { pending: 0, leased: 0, done: 2, exhausted: 0 });
+  for (const r of [first, second]) assert.equal(queue.enqueue(r.transactionHash).inserted, false);
+  assert.equal((await observeNextReceipt(queue, journal, readers)).state, "idle");
+  const stillQuarantined = await revalidateFillBatch(journal, readers, { maxAgeMs: 1000 });
+  assert.equal(stillQuarantined.selected, 0); assert.equal(stillQuarantined.healthy, false);
+  stage = "budgeted recheck after actual local history rollback";
+  for (const r of [first, second]) {
+    assert.equal((await reconcileBudgetedReceipt(book, journal, readers, market, r.transactionHash)).state, "quarantined");
+  }
+  const frozen = book.status();
+  assert.equal(frozen.pendingRechecks, 2); assert.equal(frozen.blocked, true); assert.equal(frozen.healthy, false);
+  assert.equal(frozen.reservedWei, (2n * E18).toString()); assert.equal(frozen.remainingWei, "0");
+  book.close(); book = new StrategyNativeGasBudget(bookPath, gasPolicy);
+  assert.deepEqual(book.status(), frozen, "Restart cannot clear rollback holds or freeze");
+  assert.throws(() => book.reserve("0x" + "ab".repeat(32), "1"));
+  assert.throws(() => book.beginRecheck(first.transactionHash, market));
+  journal.close(); journal = new ArbitrageFillJournal(join(folder, "fills.sqlite"), market);
+  assert.deepEqual(journal.status(), { observed: 0, quarantined: 2 });
+  assert.equal((await observeNextReceipt(queue, journal, readers)).state, "idle");
+  const result = { agedReceiptsRefreshed: refreshed.refreshed, rollbackReceiptsQuarantined: invalidated.quarantined,
+    quarantineSurvivesReopen: true, completedQueueNotFreshnessAuthority: true, sourceForkBlock: forkBlock.toString(), chainId: 97, successfulSwaps: 2, journalRows: 2, durableObservationJobs: 2, observerQueueReopened: true, noRunnableDuplicateJobs: true, receiptVerification: "passed",
     minedBadFillRollback: "passed", revocation: "passed", treasuryRecovery: "passed", nativeGasReconciled: true,
+    budgetedReceiptReconciliation: { reconciledSwapReceipts: 2, exactSwapGasWei, heldRpcCalls,
+      journalCommitsWhileHeld, replayPreservedChargeTimeAndEvidence: true, reopenedAfterCharge: true,
+      rollbackFrozenEntries: 2, rollbackPendingHolds: frozen.pendingRechecks, rollbackReservedWei: frozen.reservedWei,
+      freezeSurvivesReopen: true, fixtureOnlyPolicy: true, nonSwapGasAccounted: false, executionAuthorized: false },
     readClientsUseOneLocalFixture: true, generatedAccounts: 0, privateKeysUsed: false, publicBroadcasts: false, deployedToPublicNetwork: false, profitAllocated: false };
   const report = resolve(".tmp/strategy-runtime.json"); mkdirSync(resolve(".tmp"), { recursive: true }); writeFileSync(report, JSON.stringify(result, null, 2) + "\n");
   console.log(JSON.stringify(result, null, 2));
 } catch (error) { console.error(JSON.stringify({ verification: "failed", stage, kind: runtimeFailureKind(error), sourceForkBlock: fixtureBlock, publicBroadcasts: false })); process.exitCode = 1; }
 finally {
-  try { try { queue?.close(); } finally { journal?.close(); } }
+  try { try { queue?.close(); } finally { try { journal?.close(); } finally { book?.close(); } } }
   finally {
     if (node && node.exitCode === null) {
       node.kill("SIGTERM");

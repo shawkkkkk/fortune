@@ -50,6 +50,14 @@ STRATEGY_NATIVE_GAS_BUDGET.md and BUDGET_RECEIPT_RECONCILIATION.md.
 
 ## Owner-operated dependencies
 
+`PROJECT_MCP.md` adds the first project-facing canon/MCP developer slice:
+an explicitly enabled local stdio server with real initialization/discovery/calls,
+one process-bound Standard testnet token and a public-metadata projection. Empty
+character/license fields remain null. This reads Fortune API attestations, not
+independent RPC evidence, and has no treasury/wallet/write tools. Local HTTP/stdio
+fixtures do not establish external-client interoperability or full agent readiness.
+Creator-authenticated character editing, broader tools and hosted auth/quotas remain.
+
 Use protected service/CI configuration for RPC, durable storage, holder cron, uploads and attestor provisioning. Do not share private keys in chat. Existing owner workflows need faucet tBNB and their explicit confirmation inputs, as documented in RELEASE_HANDOFF.md. Local fixtures are not provider, incident-alert or live cross-chain evidence.
 
 Audit readiness additionally requires reproducible pinned builds, scoped contract inventory, lifecycle/invariant/fork evidence and retained deployment artifacts for each engine. Mainnet also needs independent audit remediation, legal/asset review, governance acceptance/signatures, funding, production operations and activation evidence. An audit alone does not establish mainnet readiness.

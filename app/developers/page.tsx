@@ -21,6 +21,12 @@ const quickstart =
   "curl " + FORTUNE_SITE_URL + "/api/public/v1/readiness\n\n" +
   "curl " + FORTUNE_SITE_URL + "/api/public/v1/protocol";
 
+const mcpConfig = JSON.stringify({ mcpServers: { "fortune-project": {
+  command: "node",
+  args: ["--import", "/absolute/path/to/fortune/scripts/register-ts.mjs", "/absolute/path/to/fortune/scripts/project-mcp.mjs"],
+  env: { FORTUNE_PROJECT_MCP_ENABLED: "true", FORTUNE_PROJECT_TOKEN: "<BSC-Testnet-Standard-token-address>" },
+} } }, null, 2);
+
 export default function DevelopersPage() {
   return (
     <main className="page narrowPage">
@@ -75,6 +81,27 @@ export default function DevelopersPage() {
             </div>
           ))}
         </div>
+      </section>
+
+      <section className="panel contentSection" aria-labelledby="project-mcp-title">
+        <span className="eyebrow">PROJECT MCP · READ-ONLY</span>
+        <h2 id="project-mcp-title">Give your assistant the project facts.</h2>
+        <p>
+          Connect one supported BSC Testnet Standard project to a local MCP client.
+          The get_project_canon tool reads its creator-supplied name, description,
+          links and registry provenance from Fortune. Unspecified character details
+          stay empty. This reader has no wallet or treasury actions.
+        </p>
+        <p className="dataDisclaimer">
+          Use Node 22.15 or later with this repository&apos;s installed dependencies.
+          Replace both absolute paths and the token address below. This is a local
+          stdio server, not a hosted MCP URL. Creator text is untrusted; API provenance
+          is not an independent verification of ownership, finality or safety.
+        </p>
+        <pre className="apiCode">{mcpConfig}</pre>
+        <a className="secondaryCta" href="https://github.com/shawkkkkk/fortune/blob/main/docs/PROJECT_MCP.md">
+          Project MCP setup and limits →
+        </a>
       </section>
 
       <section className="twoColumn contentSection">

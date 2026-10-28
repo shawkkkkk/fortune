@@ -50,6 +50,11 @@ STRATEGY_NATIVE_GAS_BUDGET.md and BUDGET_RECEIPT_RECONCILIATION.md.
 
 ## Owner-operated dependencies
 
+`CREATOR_STUDIO.md` adds `/studio`: browser-local character drafts, bounded
+project-scoped JSON roundtrips and deterministic announcement wording with review
+before download. It is not creator authentication, onchain canon, AI generation or
+social publishing, and does not populate the MCP reader's missing character fields.
+
 `PROJECT_MCP.md` adds the first project-facing canon/MCP developer slice:
 an explicitly enabled local stdio server with real initialization/discovery/calls,
 one process-bound Standard testnet token and a public-metadata projection. Empty

@@ -53,7 +53,7 @@ BSC_FORK_RPC_URL=https://bsc-dataseed.bnbchain.org forge test --match-contract F
 - Invariants (random buys, sells, donations, time jumps, fee claims and graduation): the pair balance covers everything owed, circulating supply equals what holders hold, the curve never sells more than its formula allows, and every holder can still exit.
 - BSC mainnet fork: real PancakeSwap V2 with a 5% tax token, the bStocks Apple token (AAPLB) and WBNB, including swaps through the real router after graduation.
 
-CI: `.github/workflows/custom-pairs-beta.yml`. Testnet deployment is owner-run: `.github/workflows/custom-pairs-testnet-deploy.yml` deploys the factory and two faucet test tokens (tSTONK with a 5% transfer tax, tSHARE without), then runs a real launch → trade → graduate drill on BSC Testnet Pancake V2.
+CI: `.github/workflows/custom-pairs-beta.yml`. Testnet deployment is owner-run: `.github/workflows/custom-pairs-testnet-deploy.yml` requires a funded testnet deployer (at least 0.1 tBNB), deploys the factory, launch-rules contract and two faucet test tokens (tSTONK with a 5% transfer tax, tSHARE without), then runs a custom-pair launch → trade → graduate drill on BSC Testnet Pancake V2. It also launches a separate protected token, simulates a real pre-graduation curve-only transfer rejection against deployed state, graduates that token and verifies a broadcast post-graduation transfer and inactive rules. The workflow must complete successfully and retain receipts before either engine has live drill evidence; source and unit tests alone are insufficient.
 
 ## Before any mainnet use
 

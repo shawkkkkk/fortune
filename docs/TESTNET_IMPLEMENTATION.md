@@ -50,6 +50,12 @@ STRATEGY_NATIVE_GAS_BUDGET.md and BUDGET_RECEIPT_RECONCILIATION.md.
 
 ## Owner-operated dependencies
 
+`PROJECT_SNAPSHOT.md` adds a same-block Standard testnet metadata/curve API and
+the MCP get_project_snapshot tool/resource. It binds creator/factory/token/block,
+preserves exact supply and curve-accounting strings and hides retired curve prices.
+It does not infer volume/holders/treasury/market cap or supply a trade quote, and
+API attestations are not independent client RPC/finality or financial authority.
+
 `CREATOR_STUDIO.md` adds `/studio`: browser-local character drafts, bounded
 project-scoped JSON roundtrips and deterministic announcement wording with review
 before download. It is not creator authentication, onchain canon, AI generation or

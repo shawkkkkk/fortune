@@ -50,6 +50,9 @@ jobs:
       - name: Production-runtime smoke gate
         run: npm run smoke:release
 
+      - name: Same-block project RPC snapshot and MCP read fixture
+        run: node --import ./scripts/register-ts.mjs scripts/verify-project-snapshot.mjs
+
       # Keep browser tooling outside the frozen Standard dependency manifests.
       - name: Install isolated creator-flow browser runner
         run: |
@@ -79,6 +82,7 @@ jobs:
           path: |
             .tmp/creator-browser/
             .tmp/studio-browser/
+            .tmp/project-snapshot-runtime.json
           if-no-files-found: ignore
           retention-days: 7
 

@@ -198,6 +198,14 @@ export async function GET(request: Request) {
           responses: { "200": { description: "Creator-supplied metadata, filtered public links, registry/factory/creator binding, frozen flag and block evidence" }, "404": { description: "Not a verified Standard launch" }, "503": { description: "Onchain metadata unavailable" } },
         },
       },
+      "/tokens/{id}/project": {
+        get: {
+          tags: ["Markets"], summary: "Same-block Standard testnet metadata and curve-accounting snapshot",
+          description: "Chain97 only. Metadata and curve/supply fields bind to one block/hash. Curve reference price is null after graduation/rescue, never a pool quote. Reserve USD is contract accounting, not LP TVL or treasury. No volume, holders or market-cap inference.",
+          parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+          responses: { "200": { description: "Metadata and curve state with matching block provenance" }, "400": { description: "Invalid token" }, "403": { description: "Unsupported network" }, "404": { description: "Unsupported launch" }, "503": { description: "Consistent snapshot unavailable" } },
+        },
+      },
       "/tokens/{id}": {
         get: {
           tags: ["Markets"],

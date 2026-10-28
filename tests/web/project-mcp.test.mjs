@@ -80,7 +80,7 @@ test("MCP lifecycle/discovery is real JSON-RPC, fixed project and only a read to
   assert.equal((await h(request(2, "tools/list"))).error.code, -32600);
   await h(initialized);
   const tools = (await h(request(3, "tools/list"))).result.tools;
-  assert.deepEqual(tools.map(t => t.name), ["get_project_canon"]);
+  assert.deepEqual(tools.map(t => t.name), ["get_project_canon", "get_project_snapshot"]);
   assert.equal(tools[0].annotations.readOnlyHint, true);
   assert.equal((await h(request(4, "resources/list"))).result.resources[0].uri, `fortune://97/${token}/canon`);
   assert.equal((await h(request(5, "tools/call", { name: "transfer", arguments: {} }))).error.code, -32602);

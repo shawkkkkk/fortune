@@ -47,8 +47,10 @@ financial engines retain all existing gates. Frozen Standard is unchanged.
 
 ## Integration boundary
 
-The API has no CLI, public endpoint, auto-created service, credentials, key or
-provider URL. A reviewed worker can construct the book with a durable path and
+The book API has no public endpoint, auto-created service, credentials, key or
+provider URL. The version2 coordinator/CLI is documented in
+`BUDGET_RECEIPT_RECONCILIATION.md`; it adds durable fenced holds and failed-recheck
+quarantine, not execution authority or a complete recovery service. A reviewed worker can construct the book with a durable path and
 policy, reserve a **known transaction hash**, then pass a fresh `readVerifiedFill`
 result to `charge`. There is no atomic binding to a signer or pre-broadcast path
 in this change. A reservation supplied after mining proves accounting behavior,
@@ -63,9 +65,9 @@ policy needs an explicit future design and review rather than manual SQL edits.
 
 `healthy` describes the local book's blocked/capacity state. It is not worker
 liveness, receipt freshness, canonical chain provenance or available wallet cash.
-The book does not continuously recheck charges. A later reorg is detected only
-when a newly verified fill is presented, and a failed RPC read alone does not
-notify or freeze this book. Journal/queue/quarantine integration, continuous
+The book does not continuously recheck charges. The version2 coordinator explicitly
+rechecks a selected receipt and freezes on unavailable evidence; callers that
+bypass it do not inherit that behavior. Journal/queue/quarantine integration, continuous
 revalidation and durable supervision remain required before an execution service
 can use any native-budget constraint. Native charges after24hours can age out;
 that does not settle bridge inventory or realized profit.

@@ -75,8 +75,8 @@ jobs:
           BALANCE=$(cast balance "$WALLET" --rpc-url "$BSC_TESTNET_RPC_URL")
           echo "Testnet deployer: $WALLET"
           echo "tBNB balance (wei): $BALANCE"
-          if [ "$BALANCE" -lt 50000000000000000 ]; then
-            echo "Need at least 0.05 tBNB for the beta deployment and lifecycle drill."
+          if [ "$BALANCE" -lt 100000000000000000 ]; then
+            echo "Need at least 0.1 tBNB for the custom-pair and protected-rules lifecycle drills."
             exit 1
           fi
 
@@ -89,7 +89,7 @@ jobs:
           forge script script/DeployCustomPairsTestnet.s.sol \
             --rpc-url "$BSC_TESTNET_RPC_URL" --broadcast --slow --legacy --with-gas-price 1000000000 \
             2>&1 | tee /tmp/custom-pairs-deploy.log
-          for NAME in CUSTOM_PAIR_FACTORY CUSTOM_PAIR_CURVE_DEPLOYER SOCIAL_FEE_VAULT TESTNET_TAX_TOKEN TESTNET_PLAIN_TOKEN; do
+          for NAME in CUSTOM_PAIR_FACTORY CUSTOM_PAIR_CURVE_DEPLOYER CUSTOM_PAIR_LAUNCH_RULES SOCIAL_FEE_VAULT TESTNET_TAX_TOKEN TESTNET_PLAIN_TOKEN; do
             VALUE=$(sed -nE "s/.*${NAME}=(0x[0-9a-fA-F]{40}).*/\1/p" /tmp/custom-pairs-deploy.log | tail -1)
             test -n "$VALUE" || (echo "Missing $NAME in deploy output" && exit 1)
             echo "$NAME=$VALUE" >> "$GITHUB_ENV"
@@ -102,6 +102,8 @@ jobs:
           test "$(echo "$WIRED" | tr 'A-F' 'a-f')" = "$(echo "$SOCIAL_FEE_VAULT" | tr 'A-F' 'a-f')" || (echo "Factory vault $WIRED != $SOCIAL_FEE_VAULT" && exit 1)
           REGISTRAR=$(cast call "$SOCIAL_FEE_VAULT" "isRegistrar(address)(bool)" "$CUSTOM_PAIR_FACTORY" --rpc-url "$BSC_TESTNET_RPC_URL")
           test "$REGISTRAR" = "true" || (echo "Factory is not a vault registrar" && exit 1)
+          RULES=$(cast call "$CUSTOM_PAIR_FACTORY" "launchRules()(address)" --rpc-url "$BSC_TESTNET_RPC_URL")
+          test "$(echo "$RULES" | tr 'A-F' 'a-f')" = "$(echo "$CUSTOM_PAIR_LAUNCH_RULES" | tr 'A-F' 'a-f')" || (echo "Factory rules $RULES != $CUSTOM_PAIR_LAUNCH_RULES" && exit 1)
 
       - name: Drill phase 1 - launch paired with the 5% transfer-tax token, fees split with @fortunepad
         run: |
@@ -135,6 +137,37 @@ jobs:
           test "$LP" != "0" || (echo "LP not burned" && exit 1)
           echo "CUSTOM_PAIR_DRILL_POOL=$POOL" >> "$GITHUB_ENV"
 
+      - name: Drill protected launch rules on BSC Testnet
+        run: |
+          set -euo pipefail
+          forge script script/ProtectedRulesTestnetDrill.s.sol --sig "launch()" \
+            --rpc-url "$BSC_TESTNET_RPC_URL" --broadcast --slow --legacy --with-gas-price 1000000000 \
+            2>&1 | tee /tmp/custom-pairs-protected-launch.log
+          for NAME in PROTECTED_DRILL_TOKEN PROTECTED_DRILL_CURVE; do
+            VALUE=$(sed -nE "s/.*${NAME}=(0x[0-9a-fA-F]{40}).*/\1/p" /tmp/custom-pairs-protected-launch.log | tail -1)
+            test -n "$VALUE" || (echo "Missing $NAME in protected launch output" && exit 1)
+            echo "$NAME=$VALUE" >> "$GITHUB_ENV"
+          done
+
+      - name: Wait out protected launch shield
+        run: sleep 30
+
+      - name: Prove pre-graduation rule rejection and post-graduation transfer
+        run: |
+          set -euo pipefail
+          forge script script/ProtectedRulesTestnetDrill.s.sol --sig "complete()" \
+            --rpc-url "$BSC_TESTNET_RPC_URL" --broadcast --slow --legacy --with-gas-price 1000000000 \
+            2>&1 | tee /tmp/custom-pairs-protected-complete.log
+          grep -q "PROTECTED_RULES_ONCHAIN_EXECUTION_COMPLETE_AND_SUCCESSFUL" /tmp/custom-pairs-protected-complete.log
+          ACTIVE=$(cast call "$CUSTOM_PAIR_LAUNCH_RULES" "active(address)(bool)" "$PROTECTED_DRILL_TOKEN" --rpc-url "$BSC_TESTNET_RPC_URL")
+          test "$ACTIVE" = "false" || (echo "Protected rules remain active after graduation" && exit 1)
+          PHASE=$(cast call "$PROTECTED_DRILL_CURVE" "phase()(uint8)" --rpc-url "$BSC_TESTNET_RPC_URL")
+          test "$PHASE" = "2" || (echo "Protected curve not graduated (phase $PHASE)" && exit 1)
+          POOL=$(cast call "$PROTECTED_DRILL_CURVE" "pool()(address)" --rpc-url "$BSC_TESTNET_RPC_URL")
+          LP=$(cast call "$POOL" "balanceOf(address)(uint256)" 0x000000000000000000000000000000000000dEaD --rpc-url "$BSC_TESTNET_RPC_URL")
+          test "$LP" != "0" || (echo "Protected pool LP not burned" && exit 1)
+          echo "PROTECTED_DRILL_POOL=$POOL" >> "$GITHUB_ENV"
+
       - name: Summary
         run: |
           {
@@ -144,12 +177,16 @@ jobs:
             echo "| --- | --- |"
             echo "| Custom-pair factory | \`$CUSTOM_PAIR_FACTORY\` |"
             echo "| Curve deployer | \`$CUSTOM_PAIR_CURVE_DEPLOYER\` |"
+            echo "| Launch rules | \`$CUSTOM_PAIR_LAUNCH_RULES\` |"
             echo "| Social fee vault | \`$SOCIAL_FEE_VAULT\` |"
             echo "| Social fee attestor | \`${SOCIAL_FEE_ATTESTOR:-none (verification off)}\` |"
             echo "| tSTONK (5% transfer tax, faucet) | \`$TESTNET_TAX_TOKEN\` |"
             echo "| tSHARE (no tax, faucet) | \`$TESTNET_PLAIN_TOKEN\` |"
             echo "| Drill curve (graduated) | \`$CUSTOM_PAIR_DRILL_CURVE\` |"
             echo "| Drill Pancake V2 pool | \`$CUSTOM_PAIR_DRILL_POOL\` |"
+            echo "| Protected drill token | \`$PROTECTED_DRILL_TOKEN\` |"
+            echo "| Protected drill curve | \`$PROTECTED_DRILL_CURVE\` |"
+            echo "| Protected Pancake V2 pool | \`$PROTECTED_DRILL_POOL\` |"
             echo ""
             echo "To enable the website beta, set these Vercel environment variables and redeploy:"
             echo ""

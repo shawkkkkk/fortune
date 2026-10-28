@@ -121,9 +121,34 @@ npm run mainnet:require-activate
 
 The final two commands must currently fail: missing evidence is not a passing release. Foundry verification uses the pinned v1.8.3 toolchain, `forge test --fuzz-runs 1000`, and the dedicated `FortuneMainnetForkTest` with a real `BSC_MAINNET_FORK_RPC_URL`. The normal suite returns early from the fork test without that variable, so its success alone is not fork evidence.
 
-The 63-file frozen candidate fingerprint remains:
+The original frozen 63-file candidate had aggregate
+`d70ed0820e5cc9d86919dcfd15618ad021d777a86397ce5ebcb4450fc5677129`.
+That is a historical baseline, not the fingerprint of the current root after
+PR #89's dependency refresh. The measured source candidate now has this record:
 
-`d70ed0820e5cc9d86919dcfd15618ad021d777a86397ce5ebcb4450fc5677129`
+<!-- fortune-current-candidate -->
+```json
+{
+  "schemaVersion": 1,
+  "aggregateSha256": "f84734eeb945d7c93a206db40a67ec1925a3718b2d79e84468eca92f0ae1efc6",
+  "fileCount": 63,
+  "acceptance": "not-established",
+  "historicalAggregateSha256": "d70ed0820e5cc9d86919dcfd15618ad021d777a86397ce5ebcb4450fc5677129"
+}
+```
+<!-- /fortune-current-candidate -->
+
+Run `node scripts/check-release-handoff-fingerprint.mjs` to compare this record
+with a fresh measurement using the existing fingerprint algorithm. Fortune CI
+requires this consistency check. It does not edit candidate files or release
+gates, verify the historical source, or accept a new baseline. The report's
+commit/tree identify the checkout; uncommitted working-tree bytes can differ.
+Use a clean reviewed checkout for release evidence.
+
+The release owner still needs to explicitly accept the new baseline and obtain
+fresh evidence bound to its exact source. Old audit/governance/release approvals
+cannot be copied onto this aggregate. This record is neither that acceptance nor
+independent audit, legal review, signatures, deployment or activation approval.
 
 ## Manual dependencies before deploying any mainnet contracts
 

@@ -66,12 +66,19 @@ jobs:
           FORTUNE_PLAYWRIGHT_MODULE: /tmp/fortune-browser/node_modules/playwright/index.mjs
         run: node tests/e2e/launch-catalog.mjs
 
+      - name: Desktop and mobile local Creator Studio regressions
+        env:
+          FORTUNE_PLAYWRIGHT_MODULE: /tmp/fortune-browser/node_modules/playwright/index.mjs
+        run: node tests/e2e/creator-studio.mjs
+
       - name: Upload creator-flow screenshots
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: creator-flow-browser
-          path: .tmp/creator-browser/
+          path: |
+            .tmp/creator-browser/
+            .tmp/studio-browser/
           if-no-files-found: ignore
           retention-days: 7
 

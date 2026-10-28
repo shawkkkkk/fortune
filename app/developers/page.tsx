@@ -84,6 +84,7 @@ export default function DevelopersPage() {
       </section>
 
       <section className="panel contentSection" aria-labelledby="project-mcp-title">
+        <Link className="secondaryCta" href="/studio">Creator Studio · character and announcement drafts →</Link>
         <span className="eyebrow">PROJECT MCP · READ-ONLY</span>
         <h2 id="project-mcp-title">Give your assistant the project facts.</h2>
         <p>

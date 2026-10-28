@@ -41,6 +41,8 @@ Two additional tests use the actual Pancake V3 factory/router/position manager o
 
 A separate Anvil 1.7.1 RPC rehearsal passed on October 27, 2026 at source blocks **139270794** and **139271015**: actual vault transactions swapped twice through the real forked venue, the receipt reader checked calldata/events/transfers and native gas, and SQLite retained exactly two observations across reopen/retry. Mined bad-fill and revoked-operator transactions reverted; treasury recovery passed. The runner starts with **zero generated accounts**, uses local VM impersonation and constructs every writable client from a fresh loopback URL. It uses no private keys or public broadcasts. Its two receipt clients point at **one local fixture**; that does not establish agreement from independent public providers. Synthetic fixture pins are observed for testing, not independently approved deployment manifests.
 
+The queued-observer integration rehearsal passed on October 27, 2026 at source block **139280665**. Both actual local vault transaction hashes entered the durable queue; `observeNextReceipt` verified and journaled them before marking their jobs done. Closing/reopening both SQLite files preserved exactly two journal rows and two done jobs; duplicate enqueue returned false and the next observation was idle. The existing native-gas, bad-fill rollback, revocation and treasury-recovery checks still passed. This extends the local fixture pipeline, not public provider independence, a deployed worker, continuous revalidation or complete strategy settlement. The existing CI runtime command retains the added queue counters in its JSON report. See `RECEIPT_OBSERVER_QUEUE.md` for lease and trusted-host boundaries.
+
 ```bash
 cd contracts-omnichain
 npm ci --ignore-scripts
@@ -62,3 +64,38 @@ Without the fork RPC variable, Foundry explicitly skips the fork contract; norma
 ## Remaining gates
 
 This is the first constrained swap primitive, not a complete autonomous project agent or managed-liquidity engine. Required next: independently reviewed manifests and asset behavior, native/global exposure limits, oracle/price-policy design, durable jobs and live receipt reconciliation, failed-leg unwind, bridge/rebalance handling, operator/key custody, incident/recovery drills, loss disclosures and economic tests. Any public testnet deployment needs owner-reviewed public role addresses, policy/capital limits, protected deployment/faucet funding and retained verification evidence. No owner signing service or deployment workflow is provisioned here. Independent security/legal/governance/operations review and all normal release gates remain mandatory before any real-value use.
+
+Runtime failure diagnostics retain only fixed failure-kind labels, the current operation label and source block, never raw provider exceptions. The original queued integration CI run 40563972272 failed during vault configuration before reaching the observation queue; its generic log did not establish a root cause. Fresh local reruns passed at blocks 139284904 and 139284955 on October 27, 2026. The diagnostic update preserves nonzero failure status and fresh-fork checks; it does not infer that a failed attempt passed or waive unavailable-provider evidence. CI now captures sanitized stderr in the retained runtime log, and changes to the observation queue trigger the engine workflow.
+
+
+## Retained receipt revalidation and rollback drill
+
+The integration change is explicitly stacked on #74 and incorporates #72's
+queued runtime/diagnostics unchanged except for this added drill. Merge #72,
+#73 and #74 into main before retargeting the integration PR; do not merge it
+into a feature branch that has already reached main. No upstream source or
+financial engine is overwritten.
+
+After the two actual local swaps and the existing rollback/revocation/treasury
+checks, the runtime waits for the journal observations to age naturally. The
+real revalidation worker refreshes both receipts through the local RPC clients.
+A VM snapshot taken before the swaps is then restored, removing both receipts.
+A second aged revalidation must fail both reads and quarantine both fills. The
+SQLite journal is reopened and must retain two quarantined, zero observed rows.
+The queue still has two done jobs, refuses duplicate hashes and reports idle;
+a further revalidation selects no quarantined rows and remains unhealthy. This
+proves that scheduling completion cannot restore invalidated journal evidence.
+
+The retained JSON adds `agedReceiptsRefreshed`, `rollbackReceiptsQuarantined`,
+`quarantineSurvivesReopen` and `completedQueueNotFreshnessAuthority`. Existing
+checks still exit nonzero on failure, and a failed repeat cannot leave a prior
+passing JSON artifact. Changes to either revalidation script now trigger the
+engine workflow; the existing artifact step retains the report and sanitized
+log. This converts the prior disposable local drill into executable CI source.
+
+This is a local chain-history rollback, not an independent-provider disagreement
+or a replacement-block transaction reinclusion drill. The receipt-identity
+regression remains covered by #74's fixtures. The read clients share one Anvil
+instance; no public deployment, supervisor, independent-provider redundancy,
+realized profit, recovery authority, mainnet readiness or alert delivery is
+established. There is no automatic unquarantine or reset of done queue entries.

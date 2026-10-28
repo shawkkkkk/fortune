@@ -1,5 +1,7 @@
 // End-to-end local fork only. Zero generated accounts, VM impersonation, no keys or public broadcasts.
 import assert from "node:assert/strict";
+import { revalidateFillBatch } from "../../scripts/revalidate-arbitrage-fills.mjs";
+import { runtimeFailureKind } from "./runtime-failure.mjs";
 import { readFileSync, mkdtempSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -10,6 +12,7 @@ import { createPublicClient, createWalletClient, http, keccak256, toHex, parseAb
 import { bscTestnet } from "viem/chains";
 import { readVerifiedFill } from "../../lib/arbitrage-receipts.ts";
 import { ArbitrageFillJournal } from "../../scripts/arbitrage-fill-journal.mjs";
+import { ReceiptObservationQueue, observeNextReceipt } from "../../scripts/arbitrage-observer-queue.mjs";
 
 const FACTORY = "0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865";
 const ROUTER = "0x1b81D678ffb9C0263b24A97847620C99d213eB14";
@@ -20,7 +23,7 @@ const TREASURY = "0x0000000000000000000000000000000000003333";
 const AGENT = "0x0000000000000000000000000000000000004444";
 const E18 = 10n ** 18n, Q96 = 1n << 96n;
 const artifact = (file, name) => JSON.parse(readFileSync(new URL(`../out/${file}/${name}.json`, import.meta.url), "utf8"));
-let node, journal, stage = "initialization";
+let node, journal, queue, fixtureBlock, stage = "initialization";
 const folder = mkdtempSync(join(tmpdir(), "fortune-strategy-runtime-"));
 // A failed repeat must not leave an old passing artifact available to CI.
 rmSync(resolve(".tmp/strategy-runtime.json"), { force: true });
@@ -53,7 +56,7 @@ try {
     await new Promise(r => setTimeout(r, 100));
   }
   assert.ok(ready);
-  const forkBlock = await rpc.getBlockNumber({ cacheTime: 0 });
+  const forkBlock = await rpc.getBlockNumber({ cacheTime: 0 }); fixtureBlock = forkBlock.toString();
   assert.deepEqual(await rpc.request({ method: "eth_accounts" }), [], "Anvil generated no wallet accounts or keys");
   stage = "local VM account provisioning";
   for (const who of [GOV, AGENT, GUARDIAN]) {
@@ -64,10 +67,12 @@ try {
   const wallet = who => createWalletClient({ account: who, chain: bscTestnet, transport: transport() });
   const receipt = hash => rpc.waitForTransactionReceipt({ hash, pollingInterval: 25, timeout: 30_000 });
   const deploy = async (item, params = []) => {
+    stage = "local contract deployment";
     const r = await receipt(await wallet(GOV).deployContract({ abi: item.abi, bytecode: item.bytecode.object, args: params, gas: 10_000_000n }));
     assert.equal(r.status, "success"); assert.ok(r.contractAddress); return r.contractAddress;
   };
   const write = async (who, address, abi, functionName, params = [], succeeds = true) => {
+    stage = "local contract call: " + functionName;
     const r = await receipt(await wallet(who).writeContract({ address, abi, functionName, args: params, gas: 10_000_000n }));
     assert.equal(r.status, succeeds ? "success" : "reverted"); return r;
   };
@@ -102,6 +107,7 @@ try {
   const order = async (tokenIn, amountIn, minAmountOut = 0n) => ({ tokenIn, amountIn, minAmountOut, deadline: (await rpc.getBlock()).timestamp + 60n,
     epoch: await read(vault, vaultArtifact.abi, "authorizationEpoch"), nonce: await read(vault, vaultArtifact.abi, "nextNonce") });
   stage = "bounded swap transactions";
+  const beforeSwaps = await rpc.request({ method: "evm_snapshot" });
   const first = await write(AGENT, vault, vaultArtifact.abi, "executeSwap", [await order(a, 10n * E18)]);
   const second = await write(AGENT, vault, vaultArtifact.abi, "executeSwap", [await order(b, 5n * E18)]);
   assert.equal(await read(a, asset.abi, "allowance", [vault, ROUTER]), 0n); assert.equal(await read(b, asset.abi, "allowance", [vault, ROUTER]), 0n);
@@ -112,13 +118,19 @@ try {
   const readers = [createPublicClient({ transport: transport() }), createPublicClient({ transport: transport() })];
   stage = "receipt verification and durable journal";
   journal = new ArbitrageFillJournal(join(folder, "fills.sqlite"), market);
+  queue = new ReceiptObservationQueue(join(folder, "jobs.sqlite"), market);
   for (const r of [first, second]) {
     const verified = await readVerifiedFill(readers, market, r.transactionHash);
     assert.equal(verified.nativeGasCost, (r.gasUsed * r.effectiveGasPrice).toString());
-    assert.equal(verified.gasPayer, AGENT.toLowerCase()); assert.equal(journal.record(verified).inserted, true);
+    assert.equal(verified.gasPayer, AGENT.toLowerCase()); assert.equal(queue.enqueue(r.transactionHash).inserted, true);
+    assert.equal((await observeNextReceipt(queue, journal, readers)).state, "done");
     assert.equal(journal.record(await readVerifiedFill(readers, market, r.transactionHash)).inserted, false);
   }
   journal.close(); journal = new ArbitrageFillJournal(join(folder, "fills.sqlite"), market); assert.equal(journal.list().length, 2);
+  queue.close(); queue = new ReceiptObservationQueue(join(folder, "jobs.sqlite"), market);
+  assert.deepEqual(queue.stats(), { pending: 0, leased: 0, done: 2, exhausted: 0 });
+  assert.equal(queue.enqueue(first.transactionHash).inserted, false);
+  assert.equal((await observeNextReceipt(queue, journal, readers)).state, "idle");
   stage = "failed fill rollback and revocation";
   const beforeA = await read(a, asset.abi, "balanceOf", [vault]), beforeB = await read(b, asset.abi, "balanceOf", [vault]);
   await write(AGENT, vault, vaultArtifact.abi, "executeSwap", [await order(a, 10n * E18, 100n * E18)], false);
@@ -127,14 +139,34 @@ try {
   await write(GUARDIAN, vault, vaultArtifact.abi, "revokeOperator");
   await write(AGENT, vault, vaultArtifact.abi, "executeSwap", [await order(a, E18)], false);
   await write(GOV, vault, vaultArtifact.abi, "withdrawToTreasury", [a, 100n * E18]); assert.equal(await read(a, asset.abi, "balanceOf", [TREASURY]), 100n * E18);
-  const result = { sourceForkBlock: forkBlock.toString(), chainId: 97, successfulSwaps: 2, journalRows: 2, receiptVerification: "passed",
+  stage = "aged receipt revalidation";
+  // Wall time ages the actual journal; do not edit persisted evidence to force a pass.
+  await new Promise(r => setTimeout(r, 1100));
+  const refreshed = await revalidateFillBatch(journal, readers, { maxAgeMs: 1000 });
+  assert.equal(refreshed.selected, 2); assert.equal(refreshed.refreshed, 2); assert.equal(refreshed.healthy, true);
+  stage = "local chain rollback and persistent quarantine";
+  assert.equal(await rpc.request({ method: "evm_revert", params: [beforeSwaps] }), true);
+  await new Promise(r => setTimeout(r, 1100));
+  const invalidated = await revalidateFillBatch(journal, readers, { maxAgeMs: 1000 });
+  assert.equal(invalidated.selected, 2); assert.equal(invalidated.failed, 2);
+  assert.equal(invalidated.quarantined, 2); assert.equal(invalidated.healthy, false);
+  journal.close(); journal = new ArbitrageFillJournal(join(folder, "fills.sqlite"), market);
+  assert.deepEqual(journal.status(), { observed: 0, quarantined: 2 });
+  // Scheduling completion cannot overwrite invalidated evidence or requeue done hashes.
+  assert.deepEqual(queue.stats(), { pending: 0, leased: 0, done: 2, exhausted: 0 });
+  for (const r of [first, second]) assert.equal(queue.enqueue(r.transactionHash).inserted, false);
+  assert.equal((await observeNextReceipt(queue, journal, readers)).state, "idle");
+  const stillQuarantined = await revalidateFillBatch(journal, readers, { maxAgeMs: 1000 });
+  assert.equal(stillQuarantined.selected, 0); assert.equal(stillQuarantined.healthy, false);
+  const result = { agedReceiptsRefreshed: refreshed.refreshed, rollbackReceiptsQuarantined: invalidated.quarantined,
+    quarantineSurvivesReopen: true, completedQueueNotFreshnessAuthority: true, sourceForkBlock: forkBlock.toString(), chainId: 97, successfulSwaps: 2, journalRows: 2, durableObservationJobs: 2, observerQueueReopened: true, noRunnableDuplicateJobs: true, receiptVerification: "passed",
     minedBadFillRollback: "passed", revocation: "passed", treasuryRecovery: "passed", nativeGasReconciled: true,
     readClientsUseOneLocalFixture: true, generatedAccounts: 0, privateKeysUsed: false, publicBroadcasts: false, deployedToPublicNetwork: false, profitAllocated: false };
   const report = resolve(".tmp/strategy-runtime.json"); mkdirSync(resolve(".tmp"), { recursive: true }); writeFileSync(report, JSON.stringify(result, null, 2) + "\n");
   console.log(JSON.stringify(result, null, 2));
-} catch { console.error(`Local strategy runtime verification failed at ${stage}; no public transaction was submitted.`); process.exitCode = 1; }
+} catch (error) { console.error(JSON.stringify({ verification: "failed", stage, kind: runtimeFailureKind(error), sourceForkBlock: fixtureBlock, publicBroadcasts: false })); process.exitCode = 1; }
 finally {
-  try { journal?.close(); }
+  try { try { queue?.close(); } finally { journal?.close(); } }
   finally {
     if (node && node.exitCode === null) {
       node.kill("SIGTERM");

@@ -17,14 +17,14 @@ export const FINDING_TEXT: Record<string, { title: string; detail: string }> = {
   SELL_TAX: { title: "Tax when selling", detail: "Sellers receive less than the curve pays out. Slippage limits use what actually arrives." },
   POOL_TAX: { title: "Tax at graduation", detail: "The pool receives less than the curve sends. The pool is seeded at the curve price for what arrived." },
   TAX_OVER_25: { title: "Very high tax", detail: "More than 25% disappears on a transfer. Every trade loses that much in both directions." },
-  UPGRADEABLE: { title: "Upgradeable contract", detail: "Its code can be replaced by an admin, so any behaviour here can change later." },
-  PAUSABLE: { title: "Can be paused", detail: "An admin can stop transfers. Trading and graduation stop too; rescue opens after seven days." },
-  BLACKLIST: { title: "Blacklist functions", detail: "An admin can block addresses, including a curve or its pool." },
-  FEE_CHANGEABLE: { title: "Tax can change", detail: "An admin function can change the transfer tax after you launch." },
-  TRANSFER_LIMITS: { title: "Transaction or wallet limits", detail: "Max-transaction or max-wallet rules can block large buys or the pool at graduation." },
-  REBASING: { title: "Rebasing balances", detail: "Balances can grow or shrink on their own. Growth becomes pool liquidity; shrinkage hits fees first." },
-  MINTABLE: { title: "Mintable", detail: "New supply can be minted by an authorised account." },
-  HAS_OWNER: { title: "Has an owner", detail: "An owner address is set. Check what it can do on BscScan." },
+  UPGRADEABLE: { title: "Proxy target detected", detail: "Code delegates through a recognized proxy pattern or slot. This does not establish whether the target can change or who controls it." },
+  PAUSABLE: { title: "Pause-related selectors detected", detail: "Known pause selectors appear in bytecode. Their availability and permission checks need review; a working pause could stop transfers." },
+  BLACKLIST: { title: "Blacklist-related selectors detected", detail: "Known blacklist selectors appear in bytecode. This scan does not prove which addresses can be blocked or who can do it." },
+  FEE_CHANGEABLE: { title: "Fee-related selectors detected", detail: "Known fee-setting selectors appear in bytecode. Their permissions, limits and effect on transfers need review." },
+  TRANSFER_LIMITS: { title: "Limit-related selectors detected", detail: "Known transaction or wallet-limit selectors appear in bytecode. Effective limits and exemptions are not established by this scan." },
+  REBASING: { title: "Share or rebase selectors detected", detail: "Known share or rebase selectors appear in bytecode. Actual balance behavior and its effect on reserves need review." },
+  MINTABLE: { title: "Mint-related selectors detected", detail: "Known mint selectors appear in bytecode. This does not establish whether minting is reachable or who can authorize it." },
+  HAS_OWNER: { title: "Owner address returned", detail: "An owner getter returned a nonzero address. Other roles and the address's actual powers remain unverified." },
   NO_HOLDER_FOUND: { title: "Transfers not simulated", detail: "No balance could be found to simulate with. Connect a wallet that holds this token and check again. Launch stays blocked until the simulation succeeds." },
   SIMULATED_FROM_POOL: {
     title: "Simulated from a DEX pool",
@@ -59,8 +59,8 @@ export const CONTROL_LABELS: Record<string, string> = {
 };
 
 export const VERDICT_TEXT = {
-  clear: { label: "Works as a custom pair", detail: "No transfer tax measured and no issuer controls found in its bytecode." },
-  caution: { label: "Works, with warnings", detail: "The curve handles this token, but read every warning before launching." },
+  clear: { label: "No issue detected in this simulation", detail: "No transfer tax measured or known control selectors detected at the reported block. Unknown controls and future behavior remain unverified." },
+  caution: { label: "Simulation has warnings", detail: "Read every warning. A successful simulated transfer does not establish future compatibility or token safety." },
   unsupported: { label: "Not supported", detail: "A custom-pair curve could not trade this token safely." },
 } as const;
 

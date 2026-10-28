@@ -34,7 +34,7 @@ export async function GET(request: Request) {
       staleSeconds: holder ? 0 : 300,
       meta: {
         source: "BNB Chain RPC: bytecode, storage and eth_call transfer simulation with state overrides",
-        disclaimer: "A simulation at one block, not an audit. Issuers can change taxes, pause or blacklist later.",
+        disclaimer: "A simulation at the reported block/hash, not an audit, current-state guarantee or exhaustive control analysis. Issuers can change behavior later.",
       },
     });
   } catch {

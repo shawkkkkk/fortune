@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Fraunces, Plus_Jakarta_Sans } from "next/font/google";
+import localFont from "next/font/local";
 import "@/app/globals.css";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
@@ -10,17 +10,17 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 import { FORTUNE_NETWORK } from "@/lib/fortune-network";
 import { FORTUNE_SITE_URL, FORTUNE_X_HANDLE } from "@/lib/site";
 
-// next/font downloads these at build time and serves them from Fortune's own
-// origin; no browser request reaches a font CDN.
-const displayFont = Fraunces({
-  subsets: ["latin"],
-  axes: ["SOFT", "opsz"],
+// Bundle the licensed variable fonts so production builds do not fetch a font CDN.
+const displayFont = localFont({
+  src: "../public/fonts/fraunces-latin-full-normal.woff2",
+  weight: "100 900",
   display: "swap",
   variable: "--font-fraunces",
 });
 
-const sansFont = Plus_Jakarta_Sans({
-  subsets: ["latin"],
+const sansFont = localFont({
+  src: "../public/fonts/plus-jakarta-sans-latin-wght-normal.woff2",
+  weight: "200 800",
   display: "swap",
   variable: "--font-jakarta",
 });

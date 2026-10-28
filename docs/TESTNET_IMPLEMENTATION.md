@@ -76,6 +76,13 @@ and state-override fixtures exercise the actual reader, without broadcasts.
 
 ## Owner-operated dependencies
 
+`CHARACTER_PROVENANCE_RECHECK.md` adds an explicit default-disabled operator
+read-only recheck of stored character history against current factory/creator
+and recorded block hashes through two configured RPC clients. It detects changed
+local revision/policy after reads, never renews signatures or persists trust,
+and retains null current authorization/false execution authority. Fixture
+SQLite/provider/CLI tests are not live creator approval or hosted integration.
+
 `PROJECT_RESEARCH_NOTEBOOK.md` also documents an explicit, default-disabled
 project API capture command: real bounded snapshot reader -> whitelisted exact
 values/provenance -> expected-head SQLite append -> existing read-only MCP. It

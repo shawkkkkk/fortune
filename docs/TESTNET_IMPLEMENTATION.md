@@ -51,6 +51,13 @@ STRATEGY_NATIVE_GAS_BUDGET.md and BUDGET_RECEIPT_RECONCILIATION.md.
 
 ## Owner-operated dependencies
 
+`PROJECT_RESEARCH_NOTEBOOK.md` adds a default-disabled local operator notebook:
+expected-head/retry-ID append, correction-preserving hash-linked SQLite history
+and a separate opt-in read-only MCP research tool/resource. Notes and host times
+are unverified; no creator role, external timestamp, scoring or financial authority.
+Full Arena/agent research, public authentication/moderation and hosted operations
+remain missing. Real local CLI/SQLite/process/stdio tests are fixture evidence.
+
 `CHARACTER_RECORD_MCP.md` connects the local stdio server to an explicitly selected
 read-only character registry through a separate optional tool/resource. It checks
 stored signature consistency and labels historical provenance/current authorization

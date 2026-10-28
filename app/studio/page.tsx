@@ -49,7 +49,7 @@ export default function CreatorStudio() {
     <section className="formCard"><h2>Review and export</h2><p>This announcement template uses only your name, ticker and description. Appearance, voice, prompts and license claims are not treated as verified facts or instructions.</p>
       <pre className="apiCode">{announcement || "Add a name and description to prepare wording."}</pre>
       {error ? <p className="fieldHint">{error}</p> : null}
-      <label><input type="checkbox" checked={reviewed} onChange={e => setReviewed(e.target.checked)} /> I reviewed these local fields and announcement wording. This does not authorize a post or transaction.</label>
+      <label style={{ display: "flex", alignItems: "flex-start", gap: 10 }}><input style={{ width: 18, height: 18, minHeight: 18, flex: "none" }} type="checkbox" checked={reviewed} onChange={e => setReviewed(e.target.checked)} /> I reviewed these local fields and announcement wording. This does not authorize a post or transaction.</label>
       <div className="fieldGrid"><button className="secondaryCta" disabled={!reviewed || !!error} onClick={() => download("profile")}>Export character JSON</button><button className="secondaryCta" disabled={!reviewed || !!error || !announcement} onClick={() => download("announcement")}>Export announcement text</button></div>
       <p role="status">{message}</p>
     </section><Link className="secondaryCta" href="/developers">Developer tools and read-only MCP →</Link>

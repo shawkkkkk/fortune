@@ -51,6 +51,13 @@ STRATEGY_NATIVE_GAS_BUDGET.md and BUDGET_RECEIPT_RECONCILIATION.md.
 
 ## Owner-operated dependencies
 
+`CHARACTER_RECORD_MCP.md` connects the local stdio server to an explicitly selected
+read-only character registry through a separate optional tool/resource. It checks
+stored signature consistency and labels historical provenance/current authorization
+unknown. It never fills public canon fields or grants publication authority.
+Actual child stdio/SQLite fixture tests pass; live creator approval, current RPC
+revalidation, hosted identity/privacy/quotas and public agent readiness remain open.
+
 `CREATOR_CANON_REGISTRY.md` adds default-disabled operator-only EIP-712 character
 imports and append-only SQLite version history for one reviewed Standard testnet
 project. Two clients check pinned factory/creator/block bindings; replay and racing

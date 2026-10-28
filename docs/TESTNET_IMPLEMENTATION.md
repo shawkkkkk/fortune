@@ -60,6 +60,13 @@ and state-override fixtures exercise the actual reader, without broadcasts.
 
 ## Owner-operated dependencies
 
+`PROJECT_RESEARCH_NOTEBOOK.md` also documents an explicit, default-disabled
+project API capture command: real bounded snapshot reader -> whitelisted exact
+values/provenance -> expected-head SQLite append -> existing read-only MCP. It
+rejects concurrent head changes and malformed/stale bindings, excludes creator
+text and keeps unknown analytics null. This is recorded API attestation, not
+independent verification, autonomous research, scoring or hosted service.
+
 `PROJECT_RESEARCH_NOTEBOOK.md` adds a default-disabled local operator notebook:
 expected-head/retry-ID append, correction-preserving hash-linked SQLite history
 and a separate opt-in read-only MCP research tool/resource. Notes and host times

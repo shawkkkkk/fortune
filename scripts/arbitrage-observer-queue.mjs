@@ -6,17 +6,17 @@ const MAX_ATTEMPTS = 5, LEASE_MS = 120_000, CAPACITY = 10_000;
 const txValid = value => typeof value === "string" && /^0x[0-9a-fA-F]{64}$/.test(value) && !/^0x0{64}$/.test(value);
 export class ReceiptObservationQueue {
   #db; #clock; #policy;
-  constructor(path, market, clock = Date.now) {
+  constructor(path, market, clock = Date.now, { readOnly = false } = {}) {
     if (typeof path !== "string" || !path || path === ":memory:") throw Error("Durable queue path required");
     const policy = fillMarketHash(market);
     this.#clock = clock; this.#policy = policy;
-    this.#db = new DatabaseSync(path);
+    this.#db = new DatabaseSync(path, { readOnly });
     try {
-      this.#db.exec("PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA busy_timeout=5000; BEGIN IMMEDIATE;");
-      this.#db.exec(`CREATE TABLE IF NOT EXISTS observation_config(singleton INTEGER PRIMARY KEY CHECK(singleton=1), version INTEGER NOT NULL, policy TEXT NOT NULL, last_clock INTEGER NOT NULL);
+      this.#db.exec(readOnly ? "PRAGMA busy_timeout=5000; BEGIN;" : "PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA busy_timeout=5000; BEGIN IMMEDIATE;");
+      if (!readOnly) this.#db.exec(`CREATE TABLE IF NOT EXISTS observation_config(singleton INTEGER PRIMARY KEY CHECK(singleton=1), version INTEGER NOT NULL, policy TEXT NOT NULL, last_clock INTEGER NOT NULL);
         CREATE TABLE IF NOT EXISTS observation_jobs(tx TEXT PRIMARY KEY, state TEXT NOT NULL CHECK(state IN ('pending','leased','done','exhausted')), attempts INTEGER NOT NULL, available_at INTEGER NOT NULL, lease_until INTEGER NOT NULL, fence TEXT, last_failure TEXT);`);
       const row = this.#db.prepare("SELECT * FROM observation_config WHERE singleton=1").get();
-      if (row && (row.version !== 1 || row.policy !== policy)) throw Error("Queue policy differs from reviewed market");
+      if ((readOnly && !row) || (row && (row.version !== 1 || row.policy !== policy))) throw Error("Queue policy differs from reviewed market");
       if (!row) this.#db.prepare("INSERT INTO observation_config VALUES(1,1,?,0)").run(policy);
       this.#db.exec("COMMIT");
     } catch (e) { try { this.#db.exec("ROLLBACK"); } catch {} this.#db.close(); throw e; }
@@ -69,6 +69,33 @@ export class ReceiptObservationQueue {
     const counts = { pending: 0, leased: 0, done: 0, exhausted: 0 };
     for (const row of this.#db.prepare("SELECT state,count(*) AS n FROM observation_jobs GROUP BY state").all()) counts[row.state] = row.n;
     return counts;
+  }
+  /** One read snapshot; does not claim/retry jobs or advance the persisted clock. */
+  health(maxReadyDelayMs = 300_000) {
+    if (!Number.isSafeInteger(maxReadyDelayMs) || maxReadyDelayMs < 1 || maxReadyDelayMs > 3_600_000) throw Error("Invalid queue health threshold");
+    this.#db.exec("BEGIN");
+    try {
+      const { last_clock: last } = this.#db.prepare("SELECT last_clock FROM observation_config WHERE singleton=1").get();
+      const counts = this.stats(), total = Object.values(counts).reduce((n, value) => n + value, 0);
+      const now = this.#clock();
+      const clockValid = Number.isSafeInteger(now) && now >= last && now >= 0 && now <= Number.MAX_SAFE_INTEGER - 1_000_000;
+      let readyPending = null, expiredLeases = null, oldestReadyDelayMs = null;
+      if (clockValid) {
+        const ready = this.#db.prepare("SELECT count(*) AS n,min(available_at) AS oldest FROM observation_jobs WHERE state='pending' AND available_at<=?").get(now);
+        readyPending = ready.n; oldestReadyDelayMs = ready.oldest === null ? 0 : now - ready.oldest;
+        expiredLeases = this.#db.prepare("SELECT count(*) AS n FROM observation_jobs WHERE state='leased' AND lease_until<=?").get(now).n;
+      }
+      const reasons = [];
+      if (!clockValid) reasons.push("CLOCK_INVALID_OR_REVERSED");
+      if (counts.exhausted > 0) reasons.push("EXHAUSTED_JOBS");
+      if (expiredLeases > 0) reasons.push("EXPIRED_LEASES");
+      if (oldestReadyDelayMs !== null && oldestReadyDelayMs >= maxReadyDelayMs && readyPending > 0) reasons.push("OVERDUE_READY_JOBS");
+      if (total >= CAPACITY) reasons.push("RETENTION_FULL");
+      this.#db.exec("COMMIT");
+      return Object.freeze({ scope: "local-observation-queue", ...counts, readyPending, expiredLeases, oldestReadyDelayMs,
+        capacityRemaining: Math.max(0, CAPACITY - total), clockValid, healthy: reasons.length === 0, reasons: Object.freeze(reasons),
+        readinessAttested: false, executionAuthorized: false, profitAllocated: false });
+    } catch (e) { try { this.#db.exec("ROLLBACK"); } catch {} throw e; }
   }
   close() { this.#db.close(); }
 }

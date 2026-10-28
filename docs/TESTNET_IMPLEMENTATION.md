@@ -51,6 +51,15 @@ STRATEGY_NATIVE_GAS_BUDGET.md and BUDGET_RECEIPT_RECONCILIATION.md.
 
 ## Owner-operated dependencies
 
+`CREATOR_CANON_REGISTRY.md` adds default-disabled operator-only EIP-712 character
+imports and append-only SQLite version history for one reviewed Standard testnet
+project. Two clients check pinned factory/creator/block bindings; replay and racing
+revisions fail closed. It supports EOAs only and records historical authorization,
+not current login, onchain metadata changes, public canon or publication authority.
+Tests use signature/provider fixtures and actual files/processes/HTTP, not a real
+creator's approval. Public Studio/MCP integration, smart-account support, live
+creator evidence, revalidation and durable hosted operations remain outstanding.
+
 `PROJECT_SNAPSHOT.md` adds a same-block Standard testnet metadata/curve API and
 the MCP get_project_snapshot tool/resource. It binds creator/factory/token/block,
 preserves exact supply and curve-accounting strings and hides retired curve prices.

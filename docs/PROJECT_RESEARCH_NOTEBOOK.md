@@ -86,3 +86,50 @@ build/runtime smoke and the unchanged frozen63-file fingerprint. An isolated
 MCP SDK1.32.2 client initialized the actual stdio subprocess, discovered the
 optional tool and read identical tool/resource results from a temporary notebook.
 That drill used local fixture research only: no network, model, signing or accounts.
+
+## Capturing an actual project API observation
+
+`capture-project-observation-cli.mjs` connects the existing bounded project API
+reader to an existing protected notebook. It is disabled by default. Initialize
+and inspect the notebook using the operator commands above, then supply its exact
+head and a unique 16–64 character capture ID:
+
+```bash
+FORTUNE_RESEARCH_CAPTURE_ENABLED=true node --import ./scripts/register-ts.mjs \
+  scripts/capture-project-observation-cli.mjs /protected/research.sqlite \
+  <chain97-token> <unique-capture-id> <expected-notebook-head>
+```
+
+The command validates the existing file/project/head before network access,
+fetches only the fixed official HTTPS project endpoint through `readProjectSnapshot`
+(30-second request deadline, no redirects/retries, 32KiB, API age/schema and shared
+metadata/market provenance checks), then reopens the notebook and atomically
+appends against the same expected head. A concurrent writer causes failure; its
+note is preserved. No unknown file is initialized and no existing note is changed.
+
+The generated observation contains only whitelisted addresses, phase, exact
+supply/curve-accounting decimal strings and block number/hash. Retired curve prices
+remain null; market cap, volume, holders, treasury balance and trade quote remain
+null. Creator text, images, links, prompts and unknown API properties are excluded.
+It records the official API source URL and the reader's limitations. Existing
+opt-in MCP notebook reads expose the appended note without any new MCP write tool.
+
+This remains an **API attestation recorded by a local operator**, not independent
+RPC verification, current canonicality, finality, a prediction, creator identity,
+moderation, public publication or authority. Curve-accounted USD reserve is not
+cash, treasury, LP TVL or a payout. The host clock/hash-chain limitations above
+still apply. There is no scheduler, service, automatic scoring or model call.
+The command does not read arbitrary source URLs or follow creator links.
+
+A new attempt needs a reviewed ID and head. After a crash or uncertain outcome,
+inspect notebook history before retrying: a later API response may report another
+block, and the original head may already be consumed. This command does not
+silently refresh a predecessor, overwrite observations or promise automatic
+capture recovery. Existing notebook append deduplication is unchanged.
+
+Tests cover the actual API reader over local HTTP/JSON into real SQLite
+and the existing MCP handler, malformed/stale/foreign data, missing files, a writer
+advancing the head while the read waits, and the real disabled CLI. These are local
+fixtures, not a hosted agent or independent-provider drill. Enabling capture for
+real project data and disclosing the notebook to an MCP client remain separate
+operator/privacy decisions.

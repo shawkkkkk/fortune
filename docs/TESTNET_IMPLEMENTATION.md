@@ -79,7 +79,8 @@ and state-override fixtures exercise the actual reader, without broadcasts.
 `CHARACTER_PROVENANCE_RECHECK.md` adds an explicit default-disabled operator
 read-only recheck of stored character history against current factory/creator
 and recorded block hashes through two configured RPC clients. It detects changed
-local revision/policy after reads, never renews signatures or persists trust,
+local revision/policy after reads, requires matching checked-block timestamps,
+and fences late client completions after any outcome. It never renews signatures or persists trust,
 and retains null current authorization/false execution authority. Fixture
 SQLite/provider/CLI tests are not live creator approval or hosted integration.
 

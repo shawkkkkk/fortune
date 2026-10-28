@@ -15,12 +15,16 @@ and block age at most 120 seconds. Chain97, reviewed factory code, launch index,
 token and stored creator must match; contract/delegated creators remain unsupported.
 The recorded historical block must not be newer than that checked block, and
 both clients must still report its recorded hash. Current and historical block
-hashes and chain IDs are reread. Malformed or unavailable evidence fails closed.
+hashes and chain IDs are reread. Both providers must report the same checked-block
+timestamp as well as number/hash. Malformed or unavailable evidence fails closed.
 
 After awaited reads, the local record and policy must still match the initial
 snapshot. A concurrent new revision is preserved and makes the recheck fail.
 The operation has a 20-second wall deadline, monotonic host-clock checks and no
-internal retry. Outstanding timed-out reads have no mutation capability. It never
+internal retry. After any result, including an early provider failure, outstanding
+reads cannot start another RPC action when they complete. In-flight requests are
+not cancelled by the library; the CLI transport retains its request timeout.
+Outstanding reads have no mutation capability. It never
 writes registry versions, evidence, clock, a trust flag or quarantine state.
 
 ## Explicit invocation
@@ -60,12 +64,13 @@ disclosure permission, wallet or financial authority. Existing Studio, public
 canon/API and optional MCP history reader are unchanged and do not invoke it.
 No real store, profile, provider configuration, account or service was enabled.
 
-Seven focused test groups use the prior arbitrary r/s/v tuple and assigned
+Nine focused test groups use the prior arbitrary r/s/v tuple and assigned
 factory/provider fixtures, with real SQLite files and actual disabled CLI process.
 They cover expired history, unchanged MAIN database bytes (not all filesystem
 metadata), missing/empty/project preflight, disagreement/reorg/stale/code/creator/
 token/delegation/chain/head failures, clock rollback, a genuinely hung-client
-deadline, and a new revision committed during reads.
+deadline, a new revision committed during reads, matching-hash/different-timestamp
+provider replies, and a delayed client completing after the other client fails.
 Actual viem HTTP clients also decode ABI responses from a local HTTP fixture
 while checking both historical and current block heights against real SQLite.
 These are not successful public RPC/creator-wallet/independent-provider evidence.

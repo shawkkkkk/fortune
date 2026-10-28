@@ -34,7 +34,7 @@ export async function revalidateCharacterRecord(config,clients,{now=Date.now}={}
    if(creatorCode!==undefined&&creatorCode!=='0x')throw Error('Contract/delegated creator unsupported');
    const after=await call(c,'getBlock',{blockNumber}),oldAfter=await call(c,'getBlock',{blockNumber:oldNumber});
    if(after.number!==blockNumber||after.hash!==block.hash||after.timestamp!==block.timestamp||oldAfter.number!==oldNumber||oldAfter.hash!==old.hash||await call(c,'getChainId')!==97)throw Error('Snapshot changed');
-   return {number:blockNumber.toString(),hash:block.hash};
+   return {number:blockNumber.toString(),hash:block.hash,timestamp:block.timestamp.toString()};
   }));
   if(JSON.stringify(observations[0])!==JSON.stringify(observations[1]))throw Error('Providers disagree');
   const second=await reader(p.token);
@@ -47,5 +47,5 @@ export async function revalidateCharacterRecord(config,clients,{now=Date.now}={}
     'Protected host/files/clock remain trusted; no persisted trust, revalidation service or recovery.']});
  };
  try{return await Promise.race([work(),new Promise((_,reject)=>{timer=setTimeout(()=>{expired=true;reject(Error('Recheck timed out'));},20000);})]);}
- finally{clearTimeout(timer);}
+ finally{expired=true;clearTimeout(timer);}
 }

@@ -86,3 +86,50 @@ fixtures. They cover ordering, stale-window holds, failed/conflicting evidence,
 partial-write errors, process death, fences, schema rejection and CLI privacy.
 They are not public RPC, public deployment or live two-provider evidence. Existing
 Standard fingerprint, root dependencies and launch catalog gates are unchanged.
+
+## Actual local-RPC integration rehearsal
+
+`contracts-omnichain/scripts/strategy-vault-runtime.mjs` now invokes the actual
+coordinator over two mined local vault swaps, in addition to its existing queue
+and journal path. Both client objects forward to the same zero-account Anvil
+BSC Testnet fork. Each forwarded RPC action checks that a committed budget hold
+already blocks reservations; each coordinator journal commit is reopened read-only
+while that hold is still present. Exact receipt gas (`gasUsed * effectiveGasPrice`)
+must equal the two charged entries. Reopening and rechecking a successful hash
+must preserve charge time, cost and evidence without duplication.
+
+The rehearsal also restores the reviewed #75 aged-revalidation/history-rollback
+drill, which was absent from main's runtime script despite the PR's merged status.
+An actual local `evm_revert` removes the swaps. Revalidation must quarantine both
+journal rows; coordinator rechecks must then freeze both budget entries and retain
+both holds across reopening. Done queue jobs remain idle and cannot clear either
+store's quarantine. The JSON artifact records these assertions only after they
+all pass; engine CI retains it and the log, and fails on missing RPC evidence.
+
+These are fixture-only limits and temporary stores, not existing operator books
+or proposed live budgets. Reservations occur over known mined hashes; this does
+not bind an unsigned order to a signer or prevent a wallet from overspending.
+Only the two successful swap gas charges are accounted here: deployment, approval,
+reverted/revoked calls and other gas are excluded, not free capacity for a service.
+There is no hold recovery, independent-provider/public coordinator evidence,
+public deployment, host provisioning, profit allocation or execution authority.
+Local VM impersonation uses no private keys, generated accounts or public broadcasts.
+
+Run the existing engine CI command after compiling its pinned artifacts:
+
+```bash
+FORTUNE_ANVIL_BIN=<pinned-local-anvil-1.7.1> \
+FORTUNE_STRATEGY_FORK_RPC_URL=https://bsc-testnet-dataseed.bnbchain.org \
+node --import ./scripts/register-ts.mjs contracts-omnichain/scripts/strategy-vault-runtime.mjs
+```
+
+An unavailable upstream/fork or failed assertion is a failed rehearsal. The
+source alone is not a passing run; inspect the exact-head CI report and logs.
+
+The October 28, 2026 local run at source block **139449642** passed two swaps,
+120 forwarded client actions with visible persisted holds, three journal commits
+while held (including replay), and exact combined swap gas of
+**652322000000000 native wei**. Replay preserved both charge rows; rollback
+quarantined both journal rows and retained two frozen budget holds after reopen.
+This is a point-in-time local fork observation, not retained CI evidence or a
+public coordinator deployment. Its temporary stores were removed after the run.

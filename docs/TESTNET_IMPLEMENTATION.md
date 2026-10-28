@@ -49,6 +49,22 @@ public services, constrained signer integration and global settlement are not
 made ready by those merges. See CREATOR_COPILOT.md, MANAGED_LIQUIDITY_READER.md,
 STRATEGY_NATIVE_GAS_BUDGET.md and BUDGET_RECEIPT_RECONCILIATION.md.
 
+## Coordinator local-RPC and rollback rehearsal
+
+The strategy runtime now calls the real budget coordinator over actual local
+Pancake fork swap receipts: durable holds before RPC, journal commits before
+charge, exact swap gas, reopen/replay without changing charge time, and permanent
+holds/freezes after an actual local history rollback. It also restores #75's
+reviewed revalidation/rollback drill, previously absent from main's runtime
+despite merged PR metadata. Engine CI now follows the coordinator, budget and
+revalidator source paths and retains the existing report/log. A source change
+does not count as a passing rehearsal; inspect exact-head results.
+
+See BUDGET_RECEIPT_RECONCILIATION.md. Both read clients use one local fixture;
+temporary post-mining reservations are not signer enforcement or independent
+providers. Other gas, hold recovery, durable operations and public deployment
+remain outside this rehearsal. No operator book, wallet or release gate changes.
+
 ## Pair-inspection provenance hardening
 
 The existing public custom-pair inspector now reports a rechecked block hash and

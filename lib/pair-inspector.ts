@@ -204,6 +204,8 @@ export type Finding = { code: string; level: FindingLevel; value?: number };
 export type PairInspection = {
   chainId: number;
   blockNumber: string;
+  blockHash: Hex;
+  blockTimestamp: string;
   address: Address;
   token: { name: string | null; symbol: string | null; decimals: number | null; totalSupply: string | null };
   contract: {
@@ -367,25 +369,46 @@ function verdictFor(findings: Finding[]): PairInspection["verdict"] {
   return "clear";
 }
 
-export async function inspectPairToken(input: { address: string; chainId?: number; holder?: string | null }): Promise<PairInspection> {
+type InspectionInput = { address: string; chainId?: number; holder?: string | null };
+export async function inspectPairToken(input: InspectionInput): Promise<PairInspection> {
+  return inspectPairTokenWithClient(input, clientFor(input.chainId ?? FORTUNE_NETWORK.chainId));
+}
+
+/** Read-client seam for integration tests; never accepted from HTTP input. */
+export async function inspectPairTokenWithClient(input: InspectionInput, rpc: PublicClient): Promise<PairInspection> {
   if (!isAddress(input.address)) throw new Error("invalid address");
   const address = getAddress(input.address);
   const chainId = input.chainId ?? FORTUNE_NETWORK.chainId;
   const hint = input.holder && isAddress(input.holder) ? getAddress(input.holder) : null;
-  const rpc = clientFor(chainId);
+  if (chainId !== 56 && chainId !== 97) throw new Error("unsupported chain");
   if ((await rpc.getChainId()) !== chainId) throw new Error("rpc chain mismatch");
-  const blockNumber = await rpc.getBlockNumber();
+  const blockNumber = await rpc.getBlockNumber({ cacheTime: 0 });
+  const block = await rpc.getBlock({ blockNumber });
+  if (typeof blockNumber !== "bigint" || blockNumber < 0n || block.number !== blockNumber
+    || !block.hash || !/^0x[0-9a-fA-F]{64}$/.test(block.hash) || /^0x0{64}$/.test(block.hash)
+    || typeof block.timestamp !== "bigint" || block.timestamp < 0n) throw new Error("invalid inspection block");
+  const provenance = { blockNumber: blockNumber.toString(), blockHash: block.hash, blockTimestamp: block.timestamp.toString() };
+  const checkSnapshot = async () => {
+    const [after, chain] = await Promise.all([rpc.getBlock({ blockNumber }), rpc.getChainId()]);
+    if (chain !== chainId || after.number !== blockNumber || after.hash !== block.hash || after.timestamp !== block.timestamp)
+      throw new Error("inspection snapshot changed");
+  };
+  const validCode = (value: unknown): value is Hex => typeof value === "string" && /^0x(?:[0-9a-fA-F]{2})*$/.test(value) && value.length <= 262146;
   const findings: Finding[] = [];
 
-  const code = (await rpc.getCode({ address, blockNumber })) ?? "0x";
+  // viem represents a successful eth_getCode("0x") result as undefined. RPC failures still throw.
+  const rawCode = await rpc.getCode({ address, blockNumber });
+  const code = rawCode === undefined ? "0x" : rawCode;
+  if (!validCode(code)) throw new Error("contract code unavailable");
   const empty = {
     controls: { pause: false, blacklist: false, mint: false, feeChange: false, limits: false, rebasing: false },
   };
   if (code === "0x") {
     findings.push({ code: "NO_CONTRACT", level: "block" });
+    await checkSnapshot();
     return {
       chainId,
-      blockNumber: blockNumber.toString(),
+      ...provenance,
       address,
       token: { name: null, symbol: null, decimals: null, totalSupply: null },
       contract: { codeSize: 0, implementation: null, owner: null, controls: empty.controls },
@@ -406,20 +429,28 @@ export async function inspectPairToken(input: { address: string; chainId?: numbe
     read<bigint>("totalSupply"),
     read<Address>("owner"),
     read<Address>("getOwner"),
-    rpc.getStorageAt({ address, slot: SLOT_1967_IMPLEMENTATION, blockNumber }).catch(() => undefined),
-    rpc.getStorageAt({ address, slot: SLOT_1967_BEACON, blockNumber }).catch(() => undefined),
-    rpc.getStorageAt({ address, slot: SLOT_ZEPPELINOS, blockNumber }).catch(() => undefined),
+    rpc.getStorageAt({ address, slot: SLOT_1967_IMPLEMENTATION, blockNumber }),
+    rpc.getStorageAt({ address, slot: SLOT_1967_BEACON, blockNumber }),
+    rpc.getStorageAt({ address, slot: SLOT_ZEPPELINOS, blockNumber }),
   ]);
+
+  if ([implSlot, beaconSlot, legacySlot].some(value => typeof value !== "string" || !/^0x0{24}[0-9a-fA-F]{40}$/.test(value)))
+    throw new Error("proxy storage unavailable");
 
   let implementation = slotAddress(implSlot) ?? slotAddress(legacySlot) ?? minimalProxyTarget(code);
   const beacon = slotAddress(beaconSlot);
   if (!implementation && beacon) {
     implementation = await rpc
       .readContract({ address: beacon, abi: BEACON, functionName: "implementation", blockNumber })
-      .then((value) => getAddress(value))
-      .catch(() => null);
+      .then((value) => {
+        const resolved = getAddress(value);
+        if (/^0x0{40}$/i.test(resolved)) throw new Error("beacon implementation unavailable");
+        return resolved;
+      });
   }
-  const implementationCode = implementation ? ((await rpc.getCode({ address: implementation, blockNumber }).catch(() => "0x")) ?? "0x") : "0x";
+  const implementationCode = implementation ? await rpc.getCode({ address: implementation, blockNumber }) : "0x";
+  if (!validCode(implementationCode) || (implementation && implementationCode === "0x"))
+    throw new Error("implementation code unavailable");
   const controls = controlsInCode([code, implementationCode]);
   const ownerAddress = [owner, getOwner].find((value) => value && isAddress(value) && !/^0x0{40}$/.test(value)) ?? null;
 
@@ -507,9 +538,10 @@ export async function inspectPairToken(input: { address: string; chainId?: numbe
     }
   }
 
+  await checkSnapshot();
   return {
     chainId,
-    blockNumber: blockNumber.toString(),
+    ...provenance,
     address,
     token: {
       name: name?.slice(0, 128) ?? null,

@@ -73,3 +73,44 @@ Launch rules need a factory deployed this way. Launches on an older factory keep
 ## Before mainnet
 
 Independent audit of `contracts-custom-pairs/`; economic review of the fixed curve shape and fee caps; owner key on a multisig and a decision on pause scope; monitoring for impaired curves; a separate release gate and fingerprint. Until then the site keeps custom pairs on BSC Testnet only.
+
+## Pair-inspection snapshot and incomplete controls
+
+The public `/api/public/v1/pairs/inspect` read now includes `blockHash` and
+`blockTimestamp` alongside the exact `blockNumber`. Metadata, proxy slots,
+implementation code and state-override transfer probes use that height. The
+reader checks the block number/hash/timestamp and RPC chain again before either
+an empty-code or simulated-transfer result is returned. Changed or unavailable
+snapshot evidence stops the result; the API returns its existing generic 503.
+
+The three existing proxy-slot probes (EIP-1967 implementation/beacon and legacy
+Zeppelinos) must all return complete, address-padded 32-byte words. Failed or
+malformed slot reads, failed beacon resolution, and missing/failed/malformed
+implementation code no longer become an empty control scan. These cases stop
+inspection. Unsupported metadata/owner calls still remain unavailable, and a
+failed transfer simulation still blocks custom-pair compatibility.
+
+This is a bounded single-client RPC observation, including the existing configured
+fallback behavior. Before/after height/hash checks detect observed changes;
+they are not EIP-1898 hash-bound calls, independent-provider consensus, finality
+or a proof against inconsistent provider responses or a change away and back
+between checks. Cached API responses describe the reported snapshot, not current
+chain state. Compatibility labels now say what this simulation detected rather
+than guaranteeing future behavior.
+
+The bytecode scan checks known selector patterns and one resolved implementation.
+It cannot enumerate every admin/role, hidden or nested proxy, blacklist, custom
+storage layout or callable power. A detected selector does not prove who can
+call it. No selector found does not prove a control absent. Recognized proxy targets do
+not by themselves establish upgradeability (a minimal clone may have a fixed
+target). Finding text distinguishes these observations from verified powers. Missing owner data
+is not renounced ownership. The inspector neither audits a token nor establishes
+Fortune approval, issuer identity, legal eligibility or protection from loss.
+
+Regression coverage exercises successful state-override transfers, changed chain
+and block hashes, missing-code snapshots, malformed/unavailable slots, beacon and
+implementation failures, plus an actual viem HTTP/ABI path against a local RPC
+fixture. These tests are not a live venue or independent-provider drill. No
+contract, Standard dependency pin or launch economics is changed.
+
+Protocol references: [Ethereum JSON-RPC block parameters](https://ethereum.org/developers/docs/apis/json-rpc/) and [EIP-1898 hash-bound block identifiers](https://eips.ethereum.org/EIPS/eip-1898). The latter is a stronger mechanism this reader does not claim to implement.

@@ -49,6 +49,15 @@ public services, constrained signer integration and global settlement are not
 made ready by those merges. See CREATOR_COPILOT.md, MANAGED_LIQUIDITY_READER.md,
 STRATEGY_NATIVE_GAS_BUDGET.md and BUDGET_RECEIPT_RECONCILIATION.md.
 
+## Pair-inspection provenance hardening
+
+The existing public custom-pair inspector now reports a rechecked block hash and
+timestamp, rejects incomplete proxy-slot/implementation reads, and qualifies its
+simulation labels. See CUSTOM_PAIRS.md. This strengthens part of P08's existing
+contract-intelligence foundation; it does not complete exhaustive admin/claim
+analysis, independent-provider verification or a safety verdict. Local RPC/ABI
+and state-override fixtures exercise the actual reader, without broadcasts.
+
 ## Owner-operated dependencies
 
 `PROJECT_RESEARCH_NOTEBOOK.md` adds a default-disabled local operator notebook:

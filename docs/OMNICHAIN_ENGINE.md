@@ -32,6 +32,12 @@ Tests exercise actual OFT calls through local LayerZero endpoint/message-library
 
 ## Still required before public testnet readiness
 
+The additive operator reader in `OMNICHAIN_ROUTE_OBSERVATION.md` now checks paused
+route identities and explicit library/ULN/executor configuration against supplied
+reviewed pins. Its actual two-local-EVM RPC rehearsal is component evidence only;
+synthetic workers and EndpointV2Mock do not verify public security or delivery.
+The full requirements below remain open.
+
 1. A deployment/factory manifest and resumable orchestration proving global allocations, unique chain instances, peer pairs and exact bytecode/configuration. Persist receipt checks and refund/recovery rules; do not accept payment on the strength of this token alone.
 2. Verified endpoint/chain IDs, message libraries, DVNs/executors, confirmation policy and tested bidirectional routes for each selected network. Do not copy endpoint fixtures or infer support from a chain name.
 3. Pool adapters, pricing/seed-funding economics, fee vaults, liquidity custody and coordinated opening/recovery drills. Add Solana and any further chains through separately tested adapters.

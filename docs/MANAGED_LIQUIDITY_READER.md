@@ -18,7 +18,11 @@ manager/pool factory, canonical factory getPool, ordered pool/position tokens,
 fee, tick bounds/spacing, ownership and position-specific approval consistency.
 All returned fields must agree, and both clients recheck the snapshot block hash
 and chain. An observation exceeding thirty seconds or a host-clock rollback is
-rejected. CLI RPC calls have five-second timeouts and no automatic retries.
+rejected. A real thirty-second wall timer also rejects a hung client. After any
+result, including one provider failing, delayed completions cannot start further
+RPC actions. In-flight transport calls are not cancelled; CLI request timeouts
+remain in force. No background observer or recovery service is started.
+CLI RPC calls have five-second timeouts and no automatic retries.
 Twenty blocks are a bounded observation offset, not an economic finality promise.
 The two endpoints must be reviewed separately; different origins alone do not
 prove independent provider operation.
@@ -54,9 +58,12 @@ No launch-token fee handling or holder allocation is changed.
 
 ## Reproducible verification
 
-Four fixture regressions check pinned reads, exact fields/unknown totals, owner,
+Six fixture regressions check pinned reads, exact fields/unknown totals, owner,
 pool, token, runtime, tick, integer, approval, chain, reorg and provider failures,
-policy bounds, mutation isolation and CLI privacy. These are provider fixtures.
+policy bounds, mutation isolation and CLI privacy. A real thirty-second hung-head
+test and a failed-peer/late-completion regression cover lifecycle fencing. The
+failed-peer regression reproduced a follow-on read before the fix. These are
+provider fixtures, not public-provider liveness evidence.
 
 The separate `Testnet LP Position Reader` workflow compiles the existing isolated
 test workspace and runs `contracts-omnichain/scripts/lp-position-runtime.mjs`.

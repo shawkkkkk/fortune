@@ -8,6 +8,8 @@ import { createServer } from 'node:net';
 import { createPublicClient, createWalletClient, http, keccak256, pad, toHex, encodeAbiParameters, decodeAbiParameters } from 'viem';
 import { inspectOmnichainRoute, encodeRouteUln, ULN_PARAMETERS, EXECUTOR_PARAMETERS } from '../../lib/omnichain-route.ts';
 
+import { inspectPermanentBurn } from '../../lib/omnichain-burn-receipt.ts';
+
 const GOV = '0x0000000000000000000000000000000000001111', WORKER = '0x0000000000000000000000000000000000002222';
 const reportPath = resolve('.tmp/omnichain-route-runtime.json'); rmSync(reportPath, { force: true });
 const artifact = path => JSON.parse(readFileSync(new URL(path, import.meta.url), 'utf8'));
@@ -71,6 +73,14 @@ try {
   stage = 'actual dual-chain configuration read'; const observed = await inspectOmnichainRoute(readers, policy);
   assert.equal(observed.configurationMatches, true); assert.equal(observed.executionAuthorized, false);
   const n = networks[0], p = n.policy, remote = networks[1].policy;
+  stage = 'actual permanent burn receipt';
+  const burnReceipt = await n.write(p.token.address, token, 'burn', [10n ** 18n]); await confirm();
+  const burnPolicy = { chainId: p.chainId, token: p.token.address, runtimeHash: p.token.codeHash, manifestHash: policy.manifestHash,
+    holder: GOV, amount: String(10n ** 18n), transactionHash: burnReceipt.transactionHash };
+  const burn = await inspectPermanentBurn(n.readers, burnPolicy);
+  assert.equal(burn.amount, String(10n ** 18n)); assert.equal(burn.transportBurn, false); assert.equal(burn.executionAuthorized, false);
+  assert.equal((await inspectPermanentBurn(n.readers, burnPolicy)).evidenceId, burn.evidenceId);
+  await assert.rejects(inspectPermanentBurn(n.readers, { ...burnPolicy, amount: String(2n * 10n ** 18n) }));
   stage = 'changed peer rejection';
   await n.write(p.token.address, token, 'setPeer', [remote.eid, pad(GOV)]); await confirm();
   await assert.rejects(inspectOmnichainRoute(readers, policy), /identity/);
@@ -85,7 +95,7 @@ try {
   ]]); await confirm();
   await assert.rejects(inspectOmnichainRoute(readers, policy), /application ULN/);
   const result = { localChainIds: [97, 84532], fixtureEndpointIds: [40001, 40002], actualOftAndUlnConfigurationRead: true,
-    changedPeerRejected: true, changedExecutorRejected: true, inheritedApplicationUlnRejected: true, snapshot: observed,
+    changedPeerRejected: true, changedExecutorRejected: true, inheritedApplicationUlnRejected: true, snapshot: observed, permanentBurn: burn, wrongBurnAmountRejected: true,
     twoLocalEvmInstances: true, independentPublicProviders: false, endpointIsUpstreamMock: true, workersAreSynthetic: true,
     generatedAccounts: 0, privateKeysUsed: false, publicBroadcasts: false, messageDeliveryTested: false, securityReadiness: false, executionAuthorized: false };
   mkdirSync(resolve('.tmp'), { recursive: true }); writeFileSync(reportPath, JSON.stringify(result, null, 2) + '\n'); console.log(JSON.stringify(result, null, 2));

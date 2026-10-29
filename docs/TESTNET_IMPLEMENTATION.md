@@ -85,6 +85,14 @@ and state-override fixtures exercise the actual reader, without broadcasts.
 
 ## Owner-operated dependencies
 
+`OMNICHAIN_PERMANENT_BURN.md` adds an explicit default-disabled receipt reader
+for the isolated OFT's direct voluntary burn: pinned runtime/manifest, exact
+transaction and matching Transfer/PermanentBurn events, rechecked receipt blocks
+and two read-client observations. The local engine runtime exercises the actual
+burn and wrong-amount rejection. Stable evidence IDs support deduplication but do
+not provide a durable ledger or public badge/totals; buyback, fee funding,
+independent providers, finality, global supply and spending remain unverified.
+
 `OMNICHAIN_ROUTE_OBSERVATION.md` adds a default-disabled actual RPC reader for a
 paused two-network OFT route: reciprocal identities/runtime pins, explicit message
 libraries, raw/effective ULN and executor configuration, and bounded rechecked

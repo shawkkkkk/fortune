@@ -131,8 +131,10 @@ export async function inspectOmnichainRoute(clients: readonly [readonly [PublicC
       if (JSON.stringify(reads[0]) !== JSON.stringify(reads[1])) throw Error("Route providers disagree");
       return reads[0];
     }));
+    const observedAtMs = time();
+    if (results.some(n => BigInt(observedAtMs) - BigInt(n.blockTimestamp) * 1000n > 120_000n)) throw Error("Route snapshot expired before completion");
     return Object.freeze({ source: "reviewed-paused-testnet-route-rpc-observation", policyHash: keccak256(toHex(JSON.stringify(p))), manifestHash: p.manifestHash,
-      networks: results, observedAtMs: time(), configurationMatches: true, independentProvidersVerified: false, routeDeliveryVerified: false,
+      networks: results, observedAtMs, configurationMatches: true, independentProvidersVerified: false, routeDeliveryVerified: false,
       globalSupplyReconciled: false, securityReadiness: false, executionAuthorized: false });
   };
   try { return await Promise.race([work(), new Promise<never>((_, reject) => { timer = setTimeout(() => { finished = true; reject(Error("Route observation timed out")); }, 30_000); })]); }

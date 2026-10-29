@@ -99,3 +99,26 @@ test('operator CLI is disabled and errors disclose no path, URL or credentials',
   });
   assert.equal(r.status, 1); assert.equal(r.stdout, ''); assert.doesNotMatch(r.stderr, /route-policy|credential.invalid|\/private/);
 });
+
+for(const delayedNetwork of [false,true]) test(`route freshness at completion: ${delayedNetwork ? 'waiting for the other network' : 'finishing local reads'}`, async () => {
+  const realNow=Date.now;
+  try {
+    {
+      let clock=Number(snapshotTime)*1000+119000;
+      Date.now=()=>clock;
+      const p=policy(),c=clients(p);let completed=0;
+      for(const pair of c)for(const client of pair){
+        const get=client.getBlock;let count=0;
+        client.getBlock=async args=>{
+          const b=await get(args);
+          if(++count===2 && (!delayedNetwork || pair===c[1])){
+            if(++completed===2)clock+=2000;
+          }
+          if(delayedNetwork && pair===c[1])b.timestamp=snapshotTime+100n;
+          return b;
+        };
+      }
+      await assert.rejects(inspectOmnichainRoute(c,p),/fresh|expired/i);
+    }
+  }finally{Date.now=realNow;}
+});

@@ -67,6 +67,11 @@ remain outside this rehearsal. No operator book, wallet or release gate changes.
 
 ## LP reader request lifecycle
 
+The separate paused omnichain route reader also rechecks both snapshots' age at
+the combined result's completion time. Reads that age out while awaiting either
+network fail closed; this does not enable transport or attest route readiness.
+See OMNICHAIN_ROUTE_OBSERVATION.md.
+
 The isolated position reader now enforces its thirty-second observation limit
 with a real wall timer, including hung head reads. Every awaited RPC action is
 fenced before and after it completes; after any result, delayed peer completions

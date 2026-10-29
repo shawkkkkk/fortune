@@ -20,8 +20,11 @@ common minimum head minus twenty, with a head gap at most ten. All contract/code
 reads use that height. Block number/hash/timestamp must match across each pair;
 the timestamp must be no more than 120 seconds old and not in the future. Chain
 and block are checked again at the end. The networks have separate snapshots,
-not one atomic cross-chain state. Thirty seconds bounds the whole operation;
-before/after action guards reject host-clock rollback and prevent subsequent
+not one atomic cross-chain state. Thirty seconds bounds the whole operation.
+Both snapshots must still satisfy the 120-second age bound at the single reported
+completion time. A snapshot that ages out during its own reads or while waiting
+for the other network is rejected; no successful stale result is returned.
+Before/after action guards reject host-clock rollback and prevent subsequent
 reads after timeout, success or peer failure. In-flight transport calls are not cancelled.
 
 At each end it checks token deployment chain, cap, initial allocation, manifest,

@@ -85,6 +85,15 @@ and state-override fixtures exercise the actual reader, without broadcasts.
 
 ## Owner-operated dependencies
 
+`OMNICHAIN_ROUTE_OBSERVATION.md` adds a default-disabled actual RPC reader for a
+paused two-network OFT route: reciprocal identities/runtime pins, explicit message
+libraries, raw/effective ULN and executor configuration, and bounded rechecked
+per-network snapshots. The engine runtime uses the real OFT and pinned upstream
+libraries on two separate zero-account local EVMs, with synthetic workers; it
+does not send messages or verify public endpoints/providers/worker security.
+Configuration matching always retains false execution/security/delivery/supply
+readiness. No deployment, opening, payment, policy, root pin or release gate changes.
+
 `CHARACTER_PROVENANCE_MCP.md` connects the actual provenance engine to a separately
 enabled local MCP tool/resource, preserving offline history/canon readers. It pins
 startup policy bytes, shares the existing read quota, returns no profile text and

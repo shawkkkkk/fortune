@@ -59,11 +59,32 @@ async function observe(c: PublicClient, p: LPReadPolicy, blockNumber: bigint) {
 export async function inspectLiquidityPosition(clients: readonly [PublicClient,PublicClient], policy: LPReadPolicy) {
   const p=structuredClone(policy);validate(p);
   if (clients.length !== 2 || clients[0] === clients[1]) throw Error("Two distinct read clients required");
-  const start=Date.now();
-  const heads=await Promise.all(clients.map(c=>c.getBlockNumber({cacheTime:0})));
-  if (heads.some(h=>typeof h !== "bigint" || h < 20n)) throw Error("Confirmed snapshot unavailable");
-  const block=(heads[0]<heads[1]?heads[0]:heads[1])-20n;
-  const results=await Promise.all(clients.map(c=>observe(c,p,block)));
-  if (Date.now()<start || Date.now()-start>30_000 || JSON.stringify(results[0])!==JSON.stringify(results[1])) throw Error("Position providers disagree or read expired");
-  return Object.freeze({...results[0],observedAtMs:Date.now()});
+  const start=Date.now();let last=start,finished=false,timer:ReturnType<typeof setTimeout>|undefined;
+  const time=()=>{
+    const now=Date.now();
+    if(finished || now<last || now-start>30_000)throw Error("LP read expired or clock moved backward");
+    last=now;return now;
+  };
+  // Preserve the original method receiver. Bound each awaited action, including
+  // late results from a client whose peer already failed. No transport is replaced.
+  const guarded=clients.map(c=>new Proxy(c,{
+    get(target,key,receiver){
+      const value=Reflect.get(target,key,receiver);
+      if(!["getBlockNumber","getChainId","getBlock","getCode","readContract"].includes(String(key)))return value;
+      return async(...args:unknown[])=>{time();const result=await Reflect.apply(value,target,args);time();return result;};
+    },
+  }));
+  const work=async()=>{
+    const heads=await Promise.all(guarded.map(c=>c.getBlockNumber({cacheTime:0})));
+    if (heads.some(h=>typeof h !== "bigint" || h < 20n)) throw Error("Confirmed snapshot unavailable");
+    const block=(heads[0]<heads[1]?heads[0]:heads[1])-20n;
+    const results=await Promise.all(guarded.map(c=>observe(c,p,block)));
+    if (JSON.stringify(results[0])!==JSON.stringify(results[1])) throw Error("Position providers disagree or read expired");
+    return Object.freeze({...results[0],observedAtMs:time()});
+  };
+  try{
+    return await Promise.race([work(),new Promise<never>((_,reject)=>{
+      timer=setTimeout(()=>{finished=true;reject(Error("LP observation timed out"));},30_000);
+    })]);
+  }finally{finished=true;clearTimeout(timer);}
 }

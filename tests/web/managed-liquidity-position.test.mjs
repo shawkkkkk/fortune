@@ -47,3 +47,23 @@ test('operator CLI fails without printing credentials or private paths',()=>{
   const r=spawnSync(process.execPath,['--import','./scripts/register-ts.mjs','scripts/inspect-liquidity-position.mjs','private-policy.json'],{encoding:'utf8',env:{...process.env,FORTUNE_LP_READ_RPC_URL:'https://secret.invalid/key'}});
   assert.equal(r.status,1);assert.equal(r.stdout,'');assert.doesNotMatch(r.stderr,/private-policy|secret.invalid|\/key/);
 });
+
+test('a failed LP observation fences delayed client completions before further reads',async()=>{
+  let release,reads=0;
+  const failed={...client(),async getChainId(){throw Error('Fixture provider stopped');}};
+  const delayed={...client(),getChainId:()=>new Promise(resolve=>{release=resolve;}),async getBlock(){reads++;throw Error('Late read');}};
+  await assert.rejects(inspectLiquidityPosition([failed,delayed],policy()),/Fixture provider stopped/);
+  assert.equal(typeof release,'function');release(97);
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(reads,0,'A returned failure cannot allow follow-on RPC actions');
+});
+test('a hung LP head request has a real wall deadline and cannot resume observation afterward',{timeout:40000},async()=>{
+  const releases=[];let reads=0;
+  const delayed={getBlockNumber:()=>new Promise(resolve=>releases.push(resolve)),async getChainId(){reads++;return 97;}};
+  const started=Date.now();
+  await assert.rejects(inspectLiquidityPosition([delayed,{...delayed}],policy()),/timed out/);
+  assert.ok(Date.now()-started>=29000,'The real 30-second timer must run');
+  releases.forEach(resolve=>resolve(130n));
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(reads,0);
+});

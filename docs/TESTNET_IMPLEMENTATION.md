@@ -65,6 +65,15 @@ temporary post-mining reservations are not signer enforcement or independent
 providers. Other gas, hold recovery, durable operations and public deployment
 remain outside this rehearsal. No operator book, wallet or release gate changes.
 
+## LP reader request lifecycle
+
+The isolated position reader now enforces its thirty-second observation limit
+with a real wall timer, including hung head reads. Every awaited RPC action is
+fenced before and after it completes; after any result, delayed peer completions
+cannot start more reads. Already in-flight calls are not cancelled. Ownership,
+venue/runtime pins, unknown values, authority flags and release gates are unchanged.
+See MANAGED_LIQUIDITY_READER.md for fixture tests and remaining operations limits.
+
 ## Pair-inspection provenance hardening
 
 The existing public custom-pair inspector now reports a rechecked block hash and

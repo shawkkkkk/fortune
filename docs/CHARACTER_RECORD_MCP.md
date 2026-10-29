@@ -69,3 +69,8 @@ production build. An isolated official MCP SDK 1.32.2 client initialized the act
 stdio subprocess, discovered three tools and read matching tool/resource records
 from a real temporary SQLite file. That fixture uses no network or real creator
 signature and is not hosted-service or named desktop-app verification.
+
+A separately enabled `get_character_provenance` tool/resource can now invoke the
+read-only RPC recheck engine; see CHARACTER_PROVENANCE_MCP.md. This does not change
+this history tool's offline semantics, renew its signatures, merge current canon
+or grant authority. The recheck requires its own disclosure/configuration opt-in.

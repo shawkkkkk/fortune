@@ -113,3 +113,18 @@ The **Custom Pairs Beta Testnet Deploy + Drill** workflow deploys the factory an
 ## Before mainnet
 
 Independent audit of the vault together with `contracts-custom-pairs/`; the attestor key in managed key storage with monitoring that alerts on bindings the server did not sign; a guardian able to respond within the 1-hour window; the owner on a multisig; and a regional access decision.
+
+## Token units in claim details
+
+The identity reader requires a successful uint8 `decimals()` result for every
+reported vault token and uncollected curve pair asset. Failed or malformed unit
+reads make the detail request unavailable through the existing generic 503 path;
+Fortune never substitutes 18 decimals. Exact raw `owed`, `claimable` and
+`uncollected` amounts and successful token units are unchanged. A symbol fallback
+is only a display label and does not supply missing units.
+
+Regression tests exercise both vault and curve paths, including missing/invalid
+metadata and valid 0/6/18/255 decimals. A loopback HTTP/ABI fixture runs the actual
+viem reader with a six-decimal token and failed metadata. This is not a public
+vault, attestor, ownership or claim lifecycle drill. Activation, custody, identity,
+recovery and independent audit requirements remain unchanged.

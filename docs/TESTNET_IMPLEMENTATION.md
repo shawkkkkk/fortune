@@ -85,6 +85,13 @@ and state-override fixtures exercise the actual reader, without broadcasts.
 
 ## Owner-operated dependencies
 
+`CHARACTER_PROVENANCE_MCP.md` connects the actual provenance engine to a separately
+enabled local MCP tool/resource, preserving offline history/canon readers. It pins
+startup policy bytes, shares the existing read quota, returns no profile text and
+always reports null current authorization/false execution authority. Actual child
+stdio -> viem HTTP/ABI -> real SQLite fixtures are not public creator approval or
+independent-provider/hosted-service evidence. No real config/profile is enabled.
+
 `CHARACTER_PROVENANCE_RECHECK.md` adds an explicit default-disabled operator
 read-only recheck of stored character history against current factory/creator
 and recorded block hashes through two configured RPC clients. It detects changed

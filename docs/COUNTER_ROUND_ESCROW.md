@@ -171,3 +171,49 @@ Fixed fixture addresses and VM impersonation require no account generation,
 private keys or signatures. Local mocks establish transfer/accounting behavior,
 not independent public providers, real holder eligibility, production assets,
 signer custody or publicly funded claims.
+
+## Optional round and snapshot binding
+
+New isolated escrow builds also expose `fundSnapshotRound`. This retains every
+`fundRound` validation and exact-transfer/liability rule, and additionally requires:
+
+- the supplied expected round equals `nextRound` at execution;
+- a nonzero snapshot hash equals the EVM's `blockhash` at the supplied height,
+  between 20 and 255 blocks behind the executing block;
+- a fixed deadline has not passed and is no more than 120 seconds ahead of the
+  executing block's timestamp.
+
+Successful funding stores the reference in `roundSnapshots(id)` and emits
+`SnapshotBound`; failed funding reverts that reference, transfers and rights
+atomically. Exact successful calldata cannot fund another round because its
+expected round has been consumed. Funding against a different round requires
+newly reviewed bytes. This does not deduplicate intentionally rebuilt allocations
+or stop a governor from using the preserved legacy `fundRound` method.
+
+`buildCounterSnapshotFunding` calls the existing bounded two-client allocation
+engine and encodes this optional method, with expiry fixed at the observed
+block timestamp plus 120 seconds. It never extends that deadline on retry. Its
+`roundAndSnapshotBound` field describes the encoded method, not a transaction
+receipt, publication approval or permission to send. The original
+`buildCounterAllocation` still emits the original `fundRound` bytes; its observed
+round remains informational. Its new `blockTimestamp` field is additive.
+
+The EVM checks a recent block reference, not historical balances or eligibility.
+It cannot prove that a supplied timestamp equals that block's timestamp, that
+allocations were derived from its balances, or that the funding has legitimate
+fee provenance. The helper derives those fields from its bounded observations;
+a governor can construct different bytes. Block references are local-chain
+observations, not independent-provider consensus or finality. Deep reorgs,
+provider/host/policy trust, token/proxy behavior and wallet review remain separate.
+Requests outside the 20–255-block window fail rather than substituting a newer
+snapshot; rebuild and review explicitly. New contract source/runtime hashes need
+fresh exact-source deployment, audit and operational evidence. Old deployments
+and historical reports do not acquire this method or its guarantees.
+
+The zero-account local HTTP/ABI rehearsal now sends the actual optional encoded
+bytes, checks the stored reference, and rejects wrong-round/hash/expired inputs
+and replay even with sufficient allowance. Its legacy second-asset funding and
+four-claim/failed-transfer recovery checks remain. Unit/fuzz cases cover window
+and expiry boundaries, authorization, pause/chain restrictions and atomic failed
+funding. These are component tests, not a public deployment, complete Counter,
+independent holder index, approved eligibility/asset policy or financial authority.

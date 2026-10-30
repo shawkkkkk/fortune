@@ -1,5 +1,20 @@
 import { fillMarketHash, readVerifiedFill } from '../lib/arbitrage-receipts.ts';
 
+/** One queued observation, never a signer. Completion follows both durable commits.
+ * On uncertainty leave the lease/hold intact; do not turn a failed write into a retry.
+ */
+export async function observeNextBudgetedReceipt(queue, book, journal, clients, reviewedMarket) {
+  const market=structuredClone(reviewedMarket), digest=fillMarketHash(market);
+  if(!Array.isArray(clients)||clients.length!==2||clients[0]===clients[1])throw Error('Two distinct read clients required');
+  if(queue.marketHash!==digest||journal.marketHash!==digest)throw Error('Queue and journal receipt policy differ');
+  if(book.status().blocked)return Object.freeze({state:'blocked',executionAuthorized:false,profitAllocated:false});
+  const lease=queue.claim();
+  if(!lease)return Object.freeze({state:'idle',executionAuthorized:false,profitAllocated:false});
+  const result=await reconcileBudgetedReceipt(book,journal,clients,market,lease.tx);
+  if(result.state!=='reconciled-observation')return result;
+  return queue.complete(lease);
+}
+
 /** One explicit read-only-chain operation; no timer, signer or execution authority. */
 export async function reconcileBudgetedReceipt(book, journal, clients, reviewedMarket, txHash) {
   const market=structuredClone(reviewedMarket);

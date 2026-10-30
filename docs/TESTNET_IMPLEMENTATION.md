@@ -51,6 +51,14 @@ STRATEGY_NATIVE_GAS_BUDGET.md and BUDGET_RECEIPT_RECONCILIATION.md.
 
 ## Coordinator local-RPC and rollback rehearsal
 
+The queued budget observer now connects an existing job lease to the actual
+coordinator: hold before RPC, journal then gas charge before queue completion.
+Blocked books do not claim work; quarantine and uncertain writes never mark a
+job done or clear a hold. Expired completion can replay already committed evidence
+without resetting gas charge time. The local venue-fork runtime calls this path
+for its two swaps. Three SQLite stores remain non-atomic; no signer, automatic
+hold recovery, hosted worker or complete strategy settlement is established.
+
 The strategy runtime now calls the real budget coordinator over actual local
 Pancake fork swap receipts: durable holds before RPC, journal commits before
 charge, exact swap gas, reopen/replay without changing charge time, and permanent

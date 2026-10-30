@@ -15,7 +15,7 @@ import { fillMarketHash, readVerifiedFill } from "../../lib/arbitrage-receipts.t
 import { ArbitrageFillJournal } from "../../scripts/arbitrage-fill-journal.mjs";
 import { ReceiptObservationQueue, observeNextReceipt } from "../../scripts/arbitrage-observer-queue.mjs";
 import { StrategyNativeGasBudget } from "../../scripts/strategy-native-gas-budget.mjs";
-import { reconcileBudgetedReceipt } from "../../scripts/reconcile-budgeted-receipt.mjs";
+import { reconcileBudgetedReceipt, observeNextBudgetedReceipt } from "../../scripts/reconcile-budgeted-receipt.mjs";
 
 const FACTORY = "0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865";
 const ROUTER = "0x1b81D678ffb9C0263b24A97847620C99d213eB14";
@@ -166,11 +166,10 @@ try {
   for (const r of [first, second]) {
     const verified = await readVerifiedFill(readers, market, r.transactionHash);
     assert.equal(verified.nativeGasCost, (r.gasUsed * r.effectiveGasPrice).toString());
-    stage = "budget hold, local RPC receipt and journal-before-charge";
-    assert.equal((await reconcileBudgetedReceipt(book, heldJournal, heldReaders, market, r.transactionHash)).state, "reconciled-observation");
-    assert.equal(book.status().pendingRechecks, 0); assert.equal(book.status().blocked, false);
+    stage = "queued budget hold, local RPC receipt and journal-before-charge-before-done";
     assert.equal(verified.gasPayer, AGENT.toLowerCase()); assert.equal(queue.enqueue(r.transactionHash).inserted, true);
-    assert.equal((await observeNextReceipt(queue, journal, readers)).state, "done");
+    assert.equal((await observeNextBudgetedReceipt(queue, book, heldJournal, heldReaders, market)).state, "done");
+    assert.equal(book.status().pendingRechecks, 0); assert.equal(book.status().blocked, false);
     assert.equal(journal.record(await readVerifiedFill(readers, market, r.transactionHash)).inserted, false);
   }
   journal.close(); journal = new ArbitrageFillJournal(join(folder, "fills.sqlite"), market); assert.equal(journal.list().length, 2);
@@ -232,7 +231,7 @@ try {
   const result = { agedReceiptsRefreshed: refreshed.refreshed, rollbackReceiptsQuarantined: invalidated.quarantined,
     quarantineSurvivesReopen: true, completedQueueNotFreshnessAuthority: true, sourceForkBlock: forkBlock.toString(), chainId: 97, successfulSwaps: 2, journalRows: 2, durableObservationJobs: 2, observerQueueReopened: true, noRunnableDuplicateJobs: true, receiptVerification: "passed",
     minedBadFillRollback: "passed", revocation: "passed", treasuryRecovery: "passed", nativeGasReconciled: true,
-    budgetedReceiptReconciliation: { reconciledSwapReceipts: 2, exactSwapGasWei, heldRpcCalls,
+    budgetedReceiptReconciliation: { reconciledSwapReceipts: 2, queuedCompletionAfterJournalAndCharge: true, exactSwapGasWei, heldRpcCalls,
       journalCommitsWhileHeld, replayPreservedChargeTimeAndEvidence: true, reopenedAfterCharge: true,
       rollbackFrozenEntries: 2, rollbackPendingHolds: frozen.pendingRechecks, rollbackReservedWei: frozen.reservedWei,
       freezeSurvivesReopen: true, fixtureOnlyPolicy: true, nonSwapGasAccounted: false, executionAuthorized: false },

@@ -8,11 +8,58 @@ import { DatabaseSync } from 'node:sqlite';
 import { StrategyNativeGasBudget as Book } from '../../scripts/strategy-native-gas-budget.mjs';
 import { ArbitrageFillJournal as Journal } from '../../scripts/arbitrage-fill-journal.mjs';
 import { reconcileBudgetedReceipt as reconcile } from '../../scripts/reconcile-budgeted-receipt.mjs';
+import { observeNextBudgetedReceipt as observe } from '../../scripts/reconcile-budgeted-receipt.mjs';
+import { ReceiptObservationQueue as Queue } from '../../scripts/arbitrage-observer-queue.mjs';
 import { fillMarketHash,readVerifiedFill } from '../../lib/arbitrage-receipts.ts';
 import { market,receiptClient,TX,h,a } from '../fixtures/arbitrage-receipts.mjs';
 const policy=()=>({chainId:97,fundingScope:'strategy-native-gas',payer:a(1),marketHashes:[fillMarketHash(market())],perTransactionWei:'100000',rollingDayWei:'150000'});
 const clients=o=>[receiptClient(o),receiptClient(o)];
 function setup(){const dir=mkdtempSync(join(tmpdir(),'fortune-reconcile-'));let now=100000;const path=join(dir,'gas.sqlite'),jp=join(dir,'fills.sqlite');return {dir,path,jp,clock:()=>now,set:n=>{now=n;},clean:()=>rmSync(dir,{recursive:true,force:true})};}
+test('queued budget observer commits journal and gas before completion and survives reopen',async()=>{
+ const f=setup();let b,j,q;
+ try{b=new Book(f.path,policy(),f.clock);j=new Journal(f.jp,market());q=new Queue(join(f.dir,'jobs.sqlite'),market(),f.clock);
+ b.reserve(TX,'100000');q.enqueue(TX);
+ const readers=clients().map(c=>({...c,async getChainId(){assert.equal(q.stats().leased,1);assert.equal(q.stats().done,0);assert.equal(b.status().pendingRechecks,1);return c.getChainId();}}));
+ const complete=q.complete.bind(q);q.complete=lease=>{assert.equal(j.list().length,1);assert.equal(b.status().pendingRechecks,0);assert.equal(b.status().chargedRollingDayWei,'50000');return complete(lease);};
+ assert.equal((await observe(q,b,j,readers,market())).state,'done');
+ q.close();b.close();j.close();q=new Queue(join(f.dir,'jobs.sqlite'),market(),f.clock);b=new Book(f.path,policy(),f.clock);j=new Journal(f.jp,market());
+ assert.equal(q.enqueue(TX).inserted,false);assert.equal((await observe(q,b,j,clients(),market())).state,'idle');assert.equal(j.list().length,1);assert.equal(b.status().chargedRollingDayWei,'50000');
+ }finally{q?.close();j?.close();b?.close();f.clean();}
+});
+test('queued observer rejects mismatched configuration before claiming or querying providers',async()=>{
+ const f=setup();let b,j,q,bad;
+ try{b=new Book(f.path,policy(),f.clock);j=new Journal(f.jp,market());q=new Queue(join(f.dir,'jobs.sqlite'),market(),f.clock);q.enqueue(TX);
+ const same=receiptClient();await assert.rejects(observe(q,b,j,[same,same],market()));
+ bad=new Queue(join(f.dir,'other.sqlite'),{...market(),confirmations:21},f.clock);bad.enqueue(TX);
+ await assert.rejects(observe(bad,b,j,clients(),market()),/policy/);assert.equal(q.stats().pending,1);assert.equal(bad.stats().pending,1);assert.equal(b.status().pendingRechecks,0);
+ }finally{bad?.close();q?.close();j?.close();b?.close();f.clean();}
+});
+test('failed queued verification never marks done and blocked restart does not reclaim or read',async()=>{
+ const f=setup();let b,j,q;
+ try{b=new Book(f.path,policy(),f.clock);j=new Journal(f.jp,market());q=new Queue(join(f.dir,'jobs.sqlite'),market(),f.clock);b.reserve(TX,'100000');q.enqueue(TX);
+ assert.equal((await observe(q,b,j,clients({unavailable:true}),market())).state,'quarantined');assert.equal(q.stats().done,0);assert.equal(q.stats().leased,1);
+ q.close();b.close();j.close();f.set(300001);q=new Queue(join(f.dir,'jobs.sqlite'),market(),f.clock);b=new Book(f.path,policy(),f.clock);j=new Journal(f.jp,market());
+ const noReads=clients().map(c=>new Proxy(c,{get(){throw Error('unexpected read');}}));
+ assert.equal((await observe(q,b,j,noReads,market())).state,'blocked');assert.equal(q.stats().leased,1);assert.equal(b.status().pendingRechecks,1);
+ }finally{q?.close();j?.close();b?.close();f.clean();}
+});
+test('expired queue completion preserves accounting and replay retains original charge time',async()=>{
+ const f=setup();let b,j,q;
+ try{b=new Book(f.path,policy(),f.clock);j=new Journal(f.jp,market());q=new Queue(join(f.dir,'jobs.sqlite'),market(),f.clock);b.reserve(TX,'100000');q.enqueue(TX);
+ const complete=q.complete.bind(q);q.complete=lease=>{f.set(220001);return complete(lease);};
+ await assert.rejects(observe(q,b,j,clients(),market()),/Lease/);assert.equal(q.stats().done,0);assert.equal(j.list().length,1);assert.equal(b.status().chargedRollingDayWei,'50000');
+ const db=new DatabaseSync(f.path,{readOnly:true});const before=db.prepare('SELECT cost,charged_at,evidence FROM gas_entries WHERE tx=?').get(TX);db.close();
+ q.complete=complete;assert.equal((await observe(q,b,j,clients(),market())).state,'done');assert.equal(j.list().length,1);
+ const reopened=new DatabaseSync(f.path,{readOnly:true});assert.deepEqual(reopened.prepare('SELECT cost,charged_at,evidence FROM gas_entries WHERE tx=?').get(TX),before);reopened.close();
+ }finally{q?.close();j?.close();b?.close();f.clean();}
+});
+test('uncertain journal persistence leaves queued work unfinished and durable hold retained',async()=>{
+ const f=setup();let b,q;
+ try{b=new Book(f.path,policy(),f.clock);q=new Queue(join(f.dir,'jobs.sqlite'),market(),f.clock);b.reserve(TX,'100000');q.enqueue(TX);
+ const broken={marketHash:fillMarketHash(market()),record(){throw Error('private storage');},quarantineKnown(){throw Error('private storage');}};
+ await assert.rejects(observe(q,b,broken,clients(),market()),/operator investigation/);assert.equal(q.stats().done,0);assert.equal(q.stats().leased,1);assert.equal(b.status().pendingRechecks,1);assert.equal(b.status().blocked,true);
+ }finally{q?.close();b?.close();f.clean();}
+});
 test('hold exists before provider reads; journal commits before headroom release; replay retains original window',async()=>{
  const f=setup();let b,j;
  try{b=new Book(f.path,policy(),f.clock);j=new Journal(f.jp,market());b.reserve(TX,'100000');const c=clients().map(r=>({...r,async getChainId(){assert.equal(b.status().pendingRechecks,1);assert.equal(b.status().blocked,true);return r.getChainId();}}));

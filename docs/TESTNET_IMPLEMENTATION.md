@@ -49,6 +49,18 @@ public services, constrained signer integration and global settlement are not
 made ready by those merges. See CREATOR_COPILOT.md, MANAGED_LIQUIDITY_READER.md,
 STRATEGY_NATIVE_GAS_BUDGET.md and BUDGET_RECEIPT_RECONCILIATION.md.
 
+## One-shot queued operator integration
+
+The budget reconciliation CLI now explicitly accepts `--next <existing-queue>`
+to run the actual queue-to-budget coordinator for at most one existing job.
+Read-only matching-store preflight precedes writers, missing/aliased/foreign
+stores fail, and no reservation or job is invented. Blocked restarts do not
+claim or read RPC; done/idle report false execution/profit authority and a
+point-in-time book status. Legacy single-hash reconciliation is preserved.
+Actual child-process HTTP/ABI and temporary SQLite tests are component evidence,
+not independent providers, a hosted supervisor, hold recovery, signer enforcement
+or complete M01/M07 settlement. See BUDGET_RECEIPT_RECONCILIATION.md.
+
 ## Coordinator local-RPC and rollback rehearsal
 
 The queued budget observer now connects an existing job lease to the actual

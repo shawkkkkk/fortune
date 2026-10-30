@@ -94,6 +94,40 @@ node --import ./scripts/register-ts.mjs scripts/run-budget-reconciliation.mjs \
   /durable/fills.sqlite /durable/gas-v2.sqlite <known-transaction-hash>
 ```
 
+### One queued job per invocation
+
+The same CLI can explicitly select the integrated queued observer instead of a
+single hash. It requires an **existing initialized queue** matching the market,
+as well as the existing journal and schema2 budget. All selected stores are
+checked read-only before any writer opens; symlinks and hard links cannot alias
+two store roles. This is a trusted-host preflight, not protection against a
+privileged host replacing files after the check.
+
+```bash
+FORTUNE_ARBITRAGE_READ_RPC_URL=https://<reviewed-provider-one> \
+FORTUNE_ARBITRAGE_SECONDARY_RPC_URL=https://<reviewed-provider-two> \
+node --import ./scripts/register-ts.mjs scripts/run-budget-reconciliation.mjs \
+  /protected/market.json /protected/gas-policy.json \
+  /durable/fills.sqlite /durable/gas-v2.sqlite --next /durable/jobs.sqlite
+```
+
+Each invocation attempts at most one lease. It never initializes a store,
+enqueues a job, creates a reservation, loops, schedules a retry or recovers a
+pending hold. A queued hash without a matching reservation leaves its lease
+unfinished and fails before RPC. A blocked book leaves the queue untouched.
+`done` and `idle` exit zero only when the subsequent point-in-time book status is
+unblocked; `blocked`, quarantine and unavailable operations exit nonzero.
+Output contains only `state`, false execution/profit flags and `bookBlocked`,
+without transaction hashes, paths, fences or provider errors. The original
+single-hash invocation remains available.
+
+Child-process tests exercise the actual CLI through viem HTTP/ABI reads and real
+temporary SQLite files: one-job ordering, durable charge/replay, idle/blocked
+zero-RPC paths, provider failure and preflight rejection. Test-only HTTPS-origin
+rewriting routes both synthetic origins to one loopback fixture; this is not
+independent-provider, public testnet, signer or deployed-worker evidence. No
+real operator files or service configuration are changed.
+
 The count-free result contains a fixed state and false execution/profit flags.
 The CLI also reports a separate point-in-time `bookBlocked` snapshot; another
 pending hold or permanent freeze makes its exit nonzero even if this receipt

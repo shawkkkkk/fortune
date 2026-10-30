@@ -81,7 +81,36 @@ async function verify(clients: readonly [PublicClient, PublicClient], policy: Ca
 /** A wall-clock deadline also rejects hung injected clients; outstanding reads are never writes. */
 export async function verifyCreatorCanon(...args: Parameters<typeof verify>) {
   let timer: ReturnType<typeof setTimeout> | undefined;
-  try { return await Promise.race([verify(...args), new Promise<never>((_, reject) => {
+  let finished = false;
+  const [clients, policy, registryId, update, signature, now = Date.now] = args;
+  const start = now();
+  let previous = start;
+  const clock = () => {
+    const n = now();
+    if (finished || !Number.isSafeInteger(n) || !Number.isSafeInteger(start) || n < previous || n - start > 20000) {
+      throw Error("Authorization observation ended or clock changed");
+    }
+    previous = n;
+    return n;
+  };
+  // Preserve original client identity (including duplicate-client rejection) and
+  // method receivers. Every RPC is fenced before and after its awaited result.
+  const guarded = new Map<PublicClient, PublicClient>();
+  const methods = new Set(["getBlockNumber", "getChainId", "getBlock", "getCode", "readContract"]);
+  const readers = clients.map(c => {
+    if (!guarded.has(c)) guarded.set(c, new Proxy(c, { get(target, key) {
+      const value = Reflect.get(target, key, target);
+      if (typeof key !== "string" || !methods.has(key) || typeof value !== "function") return value;
+      return async (...parameters: unknown[]) => {
+        clock();
+        const result = await value.apply(target, parameters);
+        clock();
+        return result;
+      };
+    } }));
+    return guarded.get(c)!;
+  }) as unknown as readonly [PublicClient, PublicClient];
+  try { return await Promise.race([verify(readers, policy, registryId, update, signature, clock), new Promise<never>((_, reject) => {
     timer = setTimeout(() => reject(Error("Authorization observation timed out")), 20000);
-  })]); } finally { clearTimeout(timer); }
+  })]); } finally { finished = true; clearTimeout(timer); }
 }

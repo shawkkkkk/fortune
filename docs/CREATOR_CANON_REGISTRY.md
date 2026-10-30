@@ -8,6 +8,20 @@ project profile is imported, published or substituted automatically.
 
 ## What is accepted
 
+Each import attempt now has one shared RPC lifetime. Every awaited head, chain,
+block, code or factory read is checked before and after it completes. After
+success, failure or the existing real 20-second wall timeout, a delayed completion
+cannot start additional reads or reach a registry commit. Already in-flight RPC
+calls are not cancelled. The host clock must not move backwards between checks,
+even if it remains later than the request's start. Original method receivers and
+duplicate-client rejection are preserved.
+
+Actual SQLite regressions release delayed reads after a peer code-read failure
+and after the real wall timer, checking no follow-on calls and no new record.
+Clock-rollback and receiver/identity regressions accompany the existing viem
+HTTP/ABI import tests. These remain local fixture evidence, not a live creator
+signature, independent providers, public login or deployment evidence.
+
 New imports require both read clients to agree on the checked block's timestamp
 as well as its number and hash. Each client's final block read must match all
 three fields. Both snapshots must still be within the existing 120-second age

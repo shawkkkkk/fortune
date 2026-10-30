@@ -49,6 +49,19 @@ public services, constrained signer integration and global settlement are not
 made ready by those merges. See CREATOR_COPILOT.md, MANAGED_LIQUIDITY_READER.md,
 STRATEGY_NATIVE_GAS_BUDGET.md and BUDGET_RECEIPT_RECONCILIATION.md.
 
+## Receipt observation lifetime
+
+The actual swap-receipt verifier now fences every awaited RPC action and enforces
+its existing sixty-second limit with a real wall timer, including hung reads.
+Failure/timeout ends both readers' shared lifetime; delayed responses cannot start
+more reads or acquire a verified-fill marker. Host-clock rollback is rejected and
+method receivers/duplicate-client identity checks are preserved. In-flight calls
+are not cancelled. Real SQLite queued-coordinator timeout tests retain a blocked
+budget hold and unfinished job, without a journal commit or automatic recovery.
+Evidence/digest/schema/gas/economic and release gates remain unchanged. See
+ARBITRAGE_RECEIPT_JOURNAL.md; this is a component safety fix, not full M01/M07
+or public-service readiness.
+
 ## One-shot queued operator integration
 
 The budget reconciliation CLI now explicitly accepts `--next <existing-queue>`

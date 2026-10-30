@@ -85,6 +85,70 @@ Audit alone does not satisfy other release gates.
 
 ## Executable verification
 
+### Bounded balance snapshot to unsigned allocation
+
+`lib/counter-allocation.ts` now connects supplied holder addresses to the actual
+escrow's funding ABI. It is a read-only library, not a public route, signer or
+automatic allocation service. The caller supplies an explicit chain-97 policy:
+escrow/governor/guardian/launch token, three runtime hashes, payout asset, a
+sorted unique nonzero account list (1–128), positive minimum holding and payout
+budget. Amounts are exact uint256 base units, with no decimals/price inference,
+adopted fee rate, token percentage or default threshold.
+
+Two distinct read-client objects must agree at the lower head minus twenty
+blocks, with head gap at most ten and matching block number/hash/timestamp.
+Runtime pins, governor/guardian/launch-token identity, paused state, next round,
+allowed payout runtime hash, launch-token total supply, every supplied balance
+and each escrow exclusion are read at that same height. The balances must sum
+to total supply exactly, including excluded and below-threshold balances.
+Missing supply coverage, zero supply, malformed data, policy mismatch or
+provider disagreement rejects the result. Under honest conventional ERC20
+semantics, this detects omitted positive balances; an agreed RPC response or
+malicious token can still misreport balances/supply. No transfer-history index,
+deployment/factory authentication, Merkle proof, independent-provider operation
+or holder-eligibility approval follows from arithmetic agreement.
+
+Only non-excluded balances meeting the supplied minimum enter the denominator.
+Each entitlement is `floor(budget * balance / eligibleUnits)` using bigint
+arithmetic, including intermediate products wider than uint256. Zero payouts
+are omitted. The returned `fundedAmount` is the sum of positive entitlements;
+`unallocatedDust` is the budget less that sum. No zero-funded round is produced.
+The builder never assigns dust to a recipient, another round, platform revenue
+or a creator/LP allocation. It does not consume a budget or persist carry-forward.
+
+The output includes the snapshot block/hash, observed next-round ID, exact
+allocations and encoded `fundRound` calldata. The next-round ID is observational:
+the existing contract function does **not** bind an expected ID, snapshot hash,
+manifest, allocation expiry or replay nonce. Repeated observation/call generation
+does not reserve funds or prevent a governor from funding another round. Wallet
+review and a fresh check of policy, canonical snapshot, round, exact allowance,
+actual funding balance/origin and liabilities remain mandatory before any future
+execution integration. This library does not simulate funding or establish those
+conditions. Sending its data is not authorized by the observation.
+
+Every awaited client action is fenced before and after completion within a
+shared real twenty-second wall timer and nondecreasing safe host clock. The
+checked block and chain are reread; snapshots must be no more than 120 seconds
+old, including at shared completion. A failed peer/timeout closes the lifetime,
+preventing late responses from starting follow-on reads or producing calldata.
+Already in-flight calls are not cancelled. Trusted host/clock/policy/providers,
+height-based reads, deeper reorgs, finality and ABA limitations remain.
+
+All output flags for complete holder index verification, independent providers,
+approved eligibility policy, fee funding, execution authority and full Counter
+readiness remain false. Runtime hashes do not verify proxy implementation safety
+or issuer behavior. No launch-token fees are spent, sold or converted; holder
+funding and platform recirculation remain separate obligations.
+
+The local runtime now mints synthetic launch-token balances 10/30, observes both
+at a shared confirmed block, generates 8/25 entitlements from a 34-unit budget
+with one unit of unallocated dust, and submits those **actual encoded bytes**
+to the compiled escrow using only local VM impersonation. It rejects an omitted
+holder list, checks stored entitlements, and preserves the prior second-asset,
+claim, pause, relayer, duplicate and transfer-failure/retry checks. It uses two
+clients of one zero-account local EVM, not independent public providers, real
+holders, approved funding or a publicly deployed reward service.
+
 The existing `Omnichain Testnet Engine` workflow compiles/tests this isolated
 contract, applies the same formatting and EIP-170/EIP-3860 size gates, and runs
 `contracts-omnichain/scripts/counter-escrow-runtime.mjs`. The new runtime starts

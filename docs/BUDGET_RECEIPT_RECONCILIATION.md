@@ -52,6 +52,32 @@ A crash during a failed recheck can leave an observed journal row plus a budget
 hold. Downstream services must honor both stores and never trust a journal row
 or queue-done flag alone as spend permission.
 
+## Queued budgeted observations
+
+`observeNextBudgetedReceipt` connects the existing queue lease to this coordinator.
+It requires matching queue/journal market hashes and distinct clients before
+claiming work. A blocked gas book leaves the queue untouched. For a claimed known
+reservation, the durable hold precedes RPC, journal evidence commits before the
+gas charge, and only a reconciled result can complete the queue lease. It never
+reserves for or submits a transaction. The existing journal-only observer remains
+available for callers without this explicitly selected budgeted path.
+
+A quarantine result leaves the job leased and the book blocked; a persistence
+error is surfaced without automatically retrying or clearing the hold. Expired
+or failed queue completion cannot undo the two earlier commits. If those commits
+completed and no hold/freeze remains, a later lease can replay the receipt without
+duplicating its charge or resetting its charge time. A crashed pending hold still
+requires separate operator investigation. These are three independent SQLite
+stores, not atomic settlement, automatic hold recovery or a deployed supervisor.
+Queue completion does not attest ongoing receipt freshness or spending authority.
+
+Real-file tests cover ordering, reopen/deduplication, preflight rejection,
+quarantine/blocked restart, completion expiry/replay and uncertain persistence.
+The local Pancake fork rehearsal now uses this queue-to-coordinator operation for
+both actual swaps, rather than calling the coordinator and journal-only observer
+as separate steps. Both clients still use one local fixture; a passing exact-head
+runtime report is required evidence, not implied by this source change.
+
 ## Operator invocation
 
 The CLI requires both existing initialized matching files; it does not initialize,
@@ -90,8 +116,8 @@ Standard fingerprint, root dependencies and launch catalog gates are unchanged.
 ## Actual local-RPC integration rehearsal
 
 `contracts-omnichain/scripts/strategy-vault-runtime.mjs` now invokes the actual
-coordinator over two mined local vault swaps, in addition to its existing queue
-and journal path. Both client objects forward to the same zero-account Anvil
+coordinator over two mined local vault swaps through the budgeted queue observer.
+Both client objects forward to the same zero-account Anvil
 BSC Testnet fork. Each forwarded RPC action checks that a committed budget hold
 already blocks reservations; each coordinator journal commit is reopened read-only
 while that hold is still present. Exact receipt gas (`gasUsed * effectiveGasPrice`)

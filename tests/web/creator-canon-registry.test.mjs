@@ -16,6 +16,44 @@ const clients=(creator,o)=>[client(creator,o),client(creator,o)];
 function setup(){const dir=mkdtempSync(join(tmpdir(),'fortune-canon-')),path=join(dir,'canon.sqlite');CreatorCanonRegistry.initialize(path,policy,now);return{dir,path,book:new CreatorCanonRegistry(path,policy,{now:()=>now}),cleanup(){rmSync(dir,{recursive:true,force:true});}};}
 function envelope(prepared){return {update:prepared.update,signature};}
 
+test('creator verification fences a delayed peer after another code read fails',async()=>{
+  const s=setup();try{const p=s.book.prepare(fields),creator=await creatorFor(p);let release,followups=0;
+    const gate=new Promise(r=>release=r),delayed=client(creator),failed=client(creator);
+    const read=delayed.getCode,contract=delayed.readContract;
+    delayed.getCode=async o=>{await gate;return read(o);};
+    delayed.readContract=async o=>{followups++;return contract(o);};
+    failed.getCode=async()=>{throw Error('fixture failure');};
+    await assert.rejects(s.book.accept(envelope(p),[failed,delayed]));release();
+    await new Promise(r=>setTimeout(r,20));assert.equal(followups,0);assert.equal(s.book.latest(),null);
+  }finally{s.book.close();s.cleanup();}
+});
+test('creator verification rejects a host clock rollback even when it stays above request start',async()=>{
+  const s=setup();try{let time=now;s.book.close();s.book=new CreatorCanonRegistry(s.path,policy,{now:()=>time});
+    const p=s.book.prepare(fields),creator=await creatorFor(p),c=client(creator),read=c.getCode;let reads=0;
+    c.getCode=async o=>{time=++reads===1?now+100:now+50;return read(o);};
+    await assert.rejects(s.book.accept(envelope(p),[c,client(creator)]));time=now;assert.equal(s.book.latest(),null);
+  }finally{s.book.close();s.cleanup();}
+});
+test('creator verification wall timeout fences delayed RPC completion without committing',async()=>{
+  const s=setup();let release;try{const p=s.book.prepare(fields),creator=await creatorFor(p);let followups=0;
+    const gate=new Promise(r=>release=r),delayed=client(creator);
+    delayed.getBlockNumber=async()=>{await gate;return 130n;};
+    delayed.getChainId=async()=>{followups++;return 97;};
+    const start=Date.now();await assert.rejects(s.book.accept(envelope(p),[delayed,client(creator)]),/timed out/);
+    assert.ok(Date.now()-start>=19000);release();await new Promise(r=>setTimeout(r,20));
+    assert.equal(followups,0);assert.equal(s.book.latest(),null);
+  }finally{release?.();s.book.close();s.cleanup();}
+});
+test('creator RPC fencing preserves method receivers and duplicate-client rejection',async()=>{
+  const s=setup();try{const p=s.book.prepare(fields),creator=await creatorFor(p);
+    const readers=clients(creator);for(const c of readers)for(const method of Object.keys(c)){
+      const original=c[method];c[method]=async function(...args){assert.equal(this,c);return original.apply(this,args);};
+    }
+    await assert.rejects(s.book.accept(envelope(p),[readers[0],readers[0]]),/distinct/);
+    await s.book.accept(envelope(p),readers);assert.equal(s.book.latest().update.revision,1);
+  }finally{s.book.close();s.cleanup();}
+});
+
 test('creator imports reject equal hashes with different provider timestamps without committing',async()=>{
   const s=setup();try{const p=s.book.prepare(fields),creator=await creatorFor(p),secondary=client(creator),read=secondary.getBlock;
     secondary.getBlock=async o=>({...await read(o),timestamp:BigInt(now/1000)-9n});

@@ -8,6 +8,22 @@ project profile is imported, published or substituted automatically.
 
 ## What is accepted
 
+New imports require both read clients to agree on the checked block's timestamp
+as well as its number and hash. Each client's final block read must match all
+three fields. Both snapshots must still be within the existing 120-second age
+limit at the single reported observation-completion time; a snapshot that expires
+while the other client finishes cannot authorize a stored revision.
+
+This strengthens the existing import verifier without changing the signed text,
+EIP-712 domain, database/evidence schema, 20-second deadline, five-minute signature
+expiry or historical readers. Existing records are not reverified or renewed.
+Regressions first reproduced accepted mismatched/changed timestamps and an age
+transition from 119 to 121 seconds. They now leave no committed revision. The
+actual viem HTTP/ABI-to-SQLite fixture also rejects a second revision when client
+timestamps disagree, preserving the first record. The two clients use one local
+fixture, with arbitrary signature tuples and a fixture factory assigned the
+recovered address; this is not independent-provider or real-creator approval.
+
 One protected SQLite file binds one chain-97 Standard project to the exact public
 Fortune factory, a reviewed factory runtime hash and a launch index (0–9999).
 `CreatorCanonRegistry.initialize` exclusively creates that file, generating a

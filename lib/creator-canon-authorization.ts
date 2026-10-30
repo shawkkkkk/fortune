@@ -64,11 +64,18 @@ async function verify(clients: readonly [PublicClient, PublicClient], policy: Ca
       || row[0].toLowerCase() !== recovered || row[9] === 0n) throw Error("Factory creator differs");
     const creatorCode = await c.getCode({ address: row[0], blockNumber });
     if (creatorCode && creatorCode !== "0x") throw Error("Contract/delegated creators unsupported");
-    if ((await c.getBlock({ blockNumber })).hash !== block.hash || await c.getChainId() !== 97) throw Error("Snapshot changed");
-    return { creator: recovered, blockNumber: blockNumber.toString(), blockHash: block.hash, factoryCodeHash: p.factoryCodeHash };
+    const rechecked = await c.getBlock({ blockNumber });
+    if (rechecked.number !== blockNumber || rechecked.hash !== block.hash || rechecked.timestamp !== block.timestamp
+      || await c.getChainId() !== 97) throw Error("Snapshot changed");
+    return { creator: recovered, blockNumber: blockNumber.toString(), blockHash: block.hash, factoryCodeHash: p.factoryCodeHash,
+      blockTimestamp: block.timestamp.toString() };
   }));
   if (JSON.stringify(results[0]) !== JSON.stringify(results[1])) throw Error("Provider observations differ");
-  return Object.freeze({ ...results[0], digest: hashTypedData(typed), observedAtMs: time(), kind: "eoa-factory-rpc-observation" as const });
+  const observedAtMs = time();
+  if (results.some(r => BigInt(observedAtMs) - BigInt(r.blockTimestamp) * 1000n > 120000n)) throw Error("Stale block");
+  // Timestamp is checked internally without changing the stored evidence schema.
+  const { blockTimestamp: _checkedTimestamp, ...evidence } = results[0];
+  return Object.freeze({ ...evidence, digest: hashTypedData(typed), observedAtMs, kind: "eoa-factory-rpc-observation" as const });
 }
 
 /** A wall-clock deadline also rejects hung injected clients; outstanding reads are never writes. */

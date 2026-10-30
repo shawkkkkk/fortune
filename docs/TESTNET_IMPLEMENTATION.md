@@ -184,6 +184,15 @@ preserved. Tests cover both detail paths and actual viem HTTP/ABI fixture reads;
 this does not enable social routing, provision an attestor or establish public
 claim/recovery readiness. See SOCIAL_FEES.md.
 
+## Creator import snapshot consistency
+
+Creator-character imports additionally require matching provider timestamps,
+number/hash/timestamp rechecks, and final snapshot age within 120 seconds before
+the existing SQLite transaction can commit. Real-file and viem HTTP/ABI fixture
+regressions cover rejection/preserved history; no signed-message, schema, expiry,
+historical authorization, public login or release authority changes. This applies
+to new imports, not renewed verification of old records. See CREATOR_CANON_REGISTRY.md.
+
 ## Known protected-launch rules disclosure
 
 The existing custom-pair detail reader rejects failed or undecodable reads from

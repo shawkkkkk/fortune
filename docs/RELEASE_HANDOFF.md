@@ -39,7 +39,7 @@ The Brew/LESGO comparison is recorded in `BREW_REVIEW.md`. The owner's GO revenu
 - Fail closed before market signatures unless the curve is registered by the configured mode-specific Fortune factory. For graduated Standard launches, resolve the pool from PancakeSwap V3 Factory, require the API and factory addresses to match, and verify the pool's two tokens are exactly the launch token and quote asset.
 - Check every mined approval, wrap, swap, rescue and unwrap receipt before reporting success or submitting a dependent transaction.
 - Keep signing controls keyed to the exact curve and launch type so an in-flight read from another route cannot reattach a verified market. Creator outflow scans pin a chain head, detect pruned history, report bounded coverage and reject a changed head.
-- Add transaction/catalog regression tests to CI and a scheduled public-site monitor. GitHub scheduling is best-effort; a configured workflow is not evidence of delivered production incident alerts.
+- Add transaction/catalog regression tests to CI and a scheduled public-site monitor. GitHub scheduling is best-effort; a configured workflow is not evidence of delivered production incident alerts. Public-site monitor concurrency is separated by trigger type so scheduled, push and manual probes cannot cancel each other. Newer probes of the same trigger type still supersede older ones; queued or cancelled runs are not passing post-merge evidence. This prevents a scheduled probe from cancelling the longer post-merge retry window, but does not guarantee runner availability, execution or alert delivery.
 
 ## Data boundary
 

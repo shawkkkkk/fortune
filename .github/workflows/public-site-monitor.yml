@@ -9,7 +9,9 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: fortune-public-site-monitor
+  # Keep scheduled probes from superseding the post-merge retry window.
+  # Newer runs still supersede older runs of the same event type.
+  group: fortune-public-site-monitor-${{ github.event_name }}
   cancel-in-progress: true
 
 permissions:

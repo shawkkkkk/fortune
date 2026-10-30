@@ -16,6 +16,30 @@ const clients=(creator,o)=>[client(creator,o),client(creator,o)];
 function setup(){const dir=mkdtempSync(join(tmpdir(),'fortune-canon-')),path=join(dir,'canon.sqlite');CreatorCanonRegistry.initialize(path,policy,now);return{dir,path,book:new CreatorCanonRegistry(path,policy,{now:()=>now}),cleanup(){rmSync(dir,{recursive:true,force:true});}};}
 function envelope(prepared){return {update:prepared.update,signature};}
 
+test('creator imports reject equal hashes with different provider timestamps without committing',async()=>{
+  const s=setup();try{const p=s.book.prepare(fields),creator=await creatorFor(p),secondary=client(creator),read=secondary.getBlock;
+    secondary.getBlock=async o=>({...await read(o),timestamp:BigInt(now/1000)-9n});
+    await assert.rejects(s.book.accept(envelope(p),[client(creator),secondary]));assert.equal(s.book.latest(),null);
+  }finally{s.book.close();s.cleanup();}
+});
+test('creator imports recheck block number and timestamp as well as hash before committing',async()=>{
+  for(const changed of ['number','timestamp']){
+    const s=setup();try{const p=s.book.prepare(fields),creator=await creatorFor(p),primary=client(creator),read=primary.getBlock;let reads=0;
+      primary.getBlock=async o=>{const b=await read(o);return ++reads===1?b:{...b,[changed]:b[changed]+1n};};
+      await assert.rejects(s.book.accept(envelope(p),[primary,client(creator)]));assert.equal(s.book.latest(),null);
+    }finally{s.book.close();s.cleanup();}
+  }
+});
+test('creator imports reject a snapshot aging from 119 to 121 seconds during verification',async()=>{
+  const s=setup();try{let time=now;s.book.close();s.book=new CreatorCanonRegistry(s.path,policy,{now:()=>time});
+    const p=s.book.prepare(fields),creator=await creatorFor(p);
+    const readers=[0,1].map(()=>{const c=client(creator),read=c.getBlock,chain=c.getChainId;let chains=0;
+      c.getBlock=async o=>({...await read(o),timestamp:BigInt(now/1000)-119n});
+      c.getChainId=async()=>{if(++chains===2)time=now+2000;return chain();};return c;});
+    await assert.rejects(s.book.accept(envelope(p),readers));time=now;assert.equal(s.book.latest(),null);
+  }finally{s.book.close();s.cleanup();}
+});
+
 test('EOA recovery binds exact text, origin, registry, project, revision and expiry without using a signing key',async()=>{
   const s=setup();try{const prepared=s.book.prepare(fields),creator=await creatorFor(prepared),c=clients(creator);
     const id=prepared.typedData.domain.salt;
@@ -82,16 +106,18 @@ test('two real CLI-independent worker processes race one revision and retain exa
   }finally{s.book.close();s.cleanup();}
 });
 test('actual viem HTTP transport decodes pinned factory ABI and persists recovered authorization',async()=>{
-  const s=setup();let server;try{const p=s.book.prepare(fields),creator=await creatorFor(p),seen=[];
+  const s=setup();let server;try{const p=s.book.prepare(fields),seen=[];let creator=await creatorFor(p),mismatched=false;
     server=createServer(async(req,res)=>{let raw='';for await(const b of req)raw+=b;const rpc=JSON.parse(raw);seen.push(rpc.method);let result;
       if(rpc.method==='eth_chainId')result='0x61';else if(rpc.method==='eth_blockNumber')result='0x82';
-      else if(rpc.method==='eth_getBlockByNumber'){assert.equal(rpc.params[0],'0x6e');result={number:'0x6e',hash:h(110),timestamp:'0x'+(BigInt(now/1000)-10n).toString(16),transactions:[]};}
+      else if(rpc.method==='eth_getBlockByNumber'){assert.equal(rpc.params[0],'0x6e');result={number:'0x6e',hash:h(110),timestamp:'0x'+(BigInt(now/1000)-10n+(mismatched&&req.headers['x-fixture-reader']==='secondary'?1n:0n)).toString(16),transactions:[]};}
       else if(rpc.method==='eth_getCode'){assert.equal(rpc.params[1],'0x6e');result=rpc.params[0].toLowerCase()===policy.factory?code:'0x';}
       else if(rpc.method==='eth_call'){assert.equal(rpc.params[1],'0x6e');result=encodeAbiParameters(parseAbiParameters('address,address,address,address,address,address,address,bytes32,bytes32,uint64'),[creator,policy.token,a(3),a(4),a(5),a(6),a(7),h(8),h(9),1n]);}
       else throw Error('Unexpected RPC');res.setHeader('Content-Type','application/json');res.end(JSON.stringify({jsonrpc:'2.0',id:rpc.id,result}));});
     await new Promise(r=>server.listen(0,'127.0.0.1',r));const url='http://127.0.0.1:'+server.address().port;
-    const readers=[0,1].map(()=>createPublicClient({transport:http(url,{retryCount:0,timeout:2000})}));
+    const readers=[0,1].map(i=>createPublicClient({transport:http(url,{retryCount:0,timeout:2000,fetchOptions:{headers:{'x-fixture-reader':i?'secondary':'primary'}}})}));
     await s.book.accept(envelope(p),readers);assert.equal(s.book.latest().evidence.creator,creator);assert.equal(seen.filter(x=>x==='eth_call').length,2);
+    const next=s.book.prepare({...fields,voice:'Next fixture revision'});creator=await creatorFor(next);mismatched=true;
+    await assert.rejects(s.book.accept(envelope(next),readers),/differ/);assert.equal(s.book.latest().update.revision,1);
     assert.ok(seen.every(x=>!['eth_sendTransaction','eth_sign','personal_sign','eth_sendRawTransaction'].includes(x)));
   }finally{server?.closeAllConnections();await new Promise(r=>server?server.close(r):r());s.book.close();s.cleanup();}
 });

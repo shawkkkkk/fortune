@@ -142,7 +142,8 @@ type StoredTradeRules = {
   walletVestPeriod: number;
 };
 
-async function readLaunchRules(rpc: PublicClient, token: Address, contract: Address, blockNumber: bigint): Promise<LaunchRulesView | null> {
+/** Read a known rules contract; unavailable controls must reject the launch detail. */
+export async function readLaunchRules(rpc: PublicClient, token: Address, contract: Address, blockNumber: bigint): Promise<LaunchRulesView> {
   try {
     const [stored, caps, active, trade, flow] = await Promise.all([
       rpc.readContract({ address: contract, abi: LAUNCH_RULES_ABI, functionName: "rulesOf", args: [token], blockNumber }) as Promise<StoredRules>,
@@ -161,9 +162,12 @@ async function readLaunchRules(rpc: PublicClient, token: Address, contract: Addr
     if (gateToken) {
       const [symbol, decimals] = await Promise.all([
         rpc.readContract({ address: gateToken, abi: ERC20, functionName: "symbol", blockNumber }).catch(() => "TOKEN"),
-        rpc.readContract({ address: gateToken, abi: ERC20, functionName: "decimals", blockNumber }).catch(() => 18),
+        rpc.readContract({ address: gateToken, abi: ERC20, functionName: "decimals", blockNumber }),
       ]);
-      gate = { symbol: String(symbol).slice(0, 16), decimals: Number(decimals) };
+      if (typeof decimals !== "number" || !Number.isInteger(decimals) || decimals < 0 || decimals > 255) {
+        throw new Error("Holder-gate token units unavailable");
+      }
+      gate = { symbol: String(symbol).slice(0, 16), decimals };
     }
     return {
       address: contract,
@@ -210,7 +214,7 @@ async function readLaunchRules(rpc: PublicClient, token: Address, contract: Addr
       level: Number(flow[3]),
     };
   } catch {
-    return null;
+    throw new Error("Launch rules unavailable");
   }
 }
 

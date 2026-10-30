@@ -51,6 +51,17 @@ STRATEGY_NATIVE_GAS_BUDGET.md and BUDGET_RECEIPT_RECONCILIATION.md.
 
 ## Isolated holder-round settlement (M06)
 
+The bounded Counter allocation library now reads two supplied clients at a common
+confirmed block, checks escrow/runtime policy and supplied balances against total
+supply, applies explicit exclusions/minimum holdings, and generates exact pro-rata
+`fundRound` calldata with unallocated dust separate. The actual local zero-account
+escrow runtime consumes those bytes and verifies stored entitlements/claims.
+Coverage arithmetic is not independent holder-index/eligibility approval; the
+calldata has no snapshot/expected-round/replay binding and authorizes no execution.
+No fee origin, wallet/signer, public service, automatic rotation/carry-forward or
+full Counter readiness is established. See COUNTER_ROUND_ESCROW.md for the real
+wall timer, failure fences, asset/provider/finality and wallet-review boundaries.
+
 `FortuneTestnetCounterEscrow` now implements actual separately funded payout
 rounds, immutable explicit allocations, per-asset reserved liabilities and direct
 recipient-bound claims. It starts paused on chain 97, rejects launched-token

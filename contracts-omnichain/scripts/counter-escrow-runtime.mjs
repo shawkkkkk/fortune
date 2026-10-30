@@ -8,6 +8,7 @@ import {once} from 'node:events';
 import {createServer} from 'node:net';
 import {createPublicClient,createWalletClient,http,keccak256,toHex,decodeEventLog} from 'viem';
 import {bscTestnet} from 'viem/chains';
+import {buildCounterAllocation} from '../../lib/counter-allocation.ts';
 
 const GOV='0x0000000000000000000000000000000000009001',GUARD='0x0000000000000000000000000000000000009002';
 const ALICE='0x0000000000000000000000000000000000001001',BOB='0x0000000000000000000000000000000000001002';
@@ -20,7 +21,7 @@ try{
  const binary=process.env.FORTUNE_ANVIL_BIN;assert.ok(binary);
  const version=spawnSync(binary,['--version'],{encoding:'utf8'});assert.equal(version.status,0);assert.match(version.stdout,/Version: 1\.7\.1/);
  const lease=createServer();lease.listen(0,'127.0.0.1');await once(lease,'listening');const port=lease.address().port;await new Promise(r=>lease.close(r));
- node=spawn(binary,['--host','127.0.0.1','--port',String(port),'--chain-id','97','--accounts','0','--quiet'],{stdio:'ignore'});
+ node=spawn(binary,['--timestamp',String(Math.floor(Date.now()/1000)-60),'--host','127.0.0.1','--port',String(port),'--chain-id','97','--accounts','0','--quiet'],{stdio:'ignore'});
  let failed=false;node.on('error',()=>{failed=true;});
  const transport=()=>http(`http://127.0.0.1:${port}`,{timeout:5000,retryCount:0});
  const rpc=createPublicClient({transport:transport(),chain:bscTestnet});let ready=false;
@@ -45,7 +46,20 @@ try{
   await write(GOV,token,assetArtifact,'mint',[GOV,total]);await write(GOV,token,assetArtifact,'approve',[escrow,total]);
   return write(GOV,escrow,escrowArtifact,'fundRound',[token,[ALICE,BOB],amounts]);
  };
- await fund(first,[11n,23n]);await fund(second,[37n,41n]);
+ stage='balance snapshot allocation to actual escrow funding';
+ await write(GOV,launch,assetArtifact,'mint',[ALICE,10n]);await write(GOV,launch,assetArtifact,'mint',[BOB,30n]);
+ await write(GOV,first,assetArtifact,'mint',[GOV,34n]);await write(GOV,first,assetArtifact,'approve',[escrow,33n]);
+ await rpc.request({method:'anvil_mine',params:['0x14','0x0']});
+ const allocationPolicy={chainId:97,escrow:escrow.toLowerCase(),escrowCodeHash:keccak256(await rpc.getCode({address:escrow})),
+  governor:GOV,guardian:GUARD,launchToken:launch.toLowerCase(),launchTokenCodeHash:keccak256(await rpc.getCode({address:launch})),
+  payoutAsset:first.toLowerCase(),payoutAssetCodeHash:keccak256(await rpc.getCode({address:first})),accounts:[ALICE,BOB],minimumHolding:'1',payoutBudget:'34'};
+ const clients=[createPublicClient({transport:transport()}),createPublicClient({transport:transport()})];
+ const allocation=await buildCounterAllocation(clients,allocationPolicy);
+ assert.equal(allocation.fundedAmount,'33');assert.equal(allocation.unallocatedDust,'1');assert.equal(allocation.executionAuthorized,false);
+ await assert.rejects(buildCounterAllocation(clients,{...allocationPolicy,accounts:[ALICE]}),/cover/);
+ await receipt(await wallet(GOV).sendTransaction({to:escrow,data:allocation.data,gas:5000000n}));
+ assert.equal(await read(escrow,escrowArtifact,'claimable',[1n,ALICE]),8n);assert.equal(await read(escrow,escrowArtifact,'claimable',[1n,BOB]),25n);
+ await fund(second,[37n,41n]);
  await write(GOV,escrow,escrowArtifact,'claim',[1n,ALICE],false);
  await write(GUARD,escrow,escrowArtifact,'setPaused',[false],false);
  await write(GOV,escrow,escrowArtifact,'setPaused',[false]);
@@ -53,10 +67,10 @@ try{
  const claimed=await write(GUARD,escrow,escrowArtifact,'claim',[1n,ALICE]);
  const logs=claimed.logs.filter(l=>l.address.toLowerCase()===escrow.toLowerCase()).map(l=>decodeEventLog({abi:escrowArtifact.abi,data:l.data,topics:l.topics}));
  assert.equal(logs.length,1);assert.equal(logs[0].eventName,'Claimed');assert.equal(logs[0].args.round,1n);
- assert.equal(logs[0].args.recipient.toLowerCase(),ALICE.toLowerCase());assert.equal(logs[0].args.amount,11n);
- assert.equal(await read(first,assetArtifact,'balanceOf',[ALICE]),11n);assert.equal(await read(first,assetArtifact,'balanceOf',[GUARD]),0n);
+ assert.equal(logs[0].args.recipient.toLowerCase(),ALICE.toLowerCase());assert.equal(logs[0].args.amount,8n);
+ assert.equal(await read(first,assetArtifact,'balanceOf',[ALICE]),8n);assert.equal(await read(first,assetArtifact,'balanceOf',[GUARD]),0n);
  await write(GOV,escrow,escrowArtifact,'claim',[1n,ALICE],false);
- assert.equal(await read(escrow,escrowArtifact,'reserved',[first]),23n);
+ assert.equal(await read(escrow,escrowArtifact,'reserved',[first]),25n);
  stage='failed transfer preserves entitlement then explicit retry succeeds';
  await write(GOV,second,assetArtifact,'configure',[true,false,'0x0000000000000000000000000000000000000000']);
  await write(GOV,escrow,escrowArtifact,'claim',[2n,BOB],false);
@@ -67,9 +81,9 @@ try{
  await write(GOV,escrow,escrowArtifact,'claim',[2n,ALICE]);
  assert.equal(await read(escrow,escrowArtifact,'reserved',[first]),0n);assert.equal(await read(escrow,escrowArtifact,'reserved',[second]),0n);
  assert.equal(await read(first,assetArtifact,'balanceOf',[escrow]),0n);assert.equal(await read(second,assetArtifact,'balanceOf',[escrow]),0n);
- assert.equal(await read(first,assetArtifact,'balanceOf',[BOB]),23n);assert.equal(await read(second,assetArtifact,'balanceOf',[BOB]),41n);
+ assert.equal(await read(first,assetArtifact,'balanceOf',[BOB]),25n);assert.equal(await read(second,assetArtifact,'balanceOf',[BOB]),41n);
  const result={chainId:97,localOnly:true,compiledEscrowDeployed:true,fundedRounds:2,payoutAssets:2,claimsDelivered:4,
-  receiptRecipientAndAmountMatched:true,relayerReceivedNothing:true,duplicateClaimRejected:true,pausedClaimRejected:true,
+  snapshotAllocationFunded:true,allocationBlock:allocation.blockNumber,allocationDust:allocation.unallocatedDust,incompleteAccountListRejected:true,receiptRecipientAndAmountMatched:true,relayerReceivedNothing:true,duplicateClaimRejected:true,pausedClaimRejected:true,
   guardianCannotOpen:true,inexactTransferRejected:true,failedClaimLiabilityPreserved:true,explicitRetrySucceeded:true,
   finalReserved:['0','0'],generatedAccounts:0,privateKeysUsed:false,publicBroadcasts:false,independentProvidersVerified:false,
   holderEligibilityVerified:false,feeFundingVerified:false,deployedToPublicNetwork:false,fullCounterReadiness:false,executionAuthorized:false};

@@ -183,3 +183,14 @@ mis-scaling displayed amounts. Successful raw amounts and uint8 units are
 preserved. Tests cover both detail paths and actual viem HTTP/ABI fixture reads;
 this does not enable social routing, provision an attestor or establish public
 claim/recovery readiness. See SOCIAL_FEES.md.
+
+## Known protected-launch rules disclosure
+
+The existing custom-pair detail reader rejects failed or undecodable reads from
+an already discovered rules contract instead of returning null rules. Holder-gate
+units must be read successfully, while valid inactive settings and raw thresholds
+remain disclosed. Actual viem HTTP/ABI fixture regressions cover all required
+rule reads and gate metadata. Legacy getter-discovery fallbacks remain a separate
+limitation; this does not complete M03/P16 enforcement, deployment or full lifecycle
+readiness. No contracts, configured factories, signing or release gates change.
+See LAUNCH_RULES.md.

@@ -236,6 +236,33 @@ Fortune offers HookedPad's rules that make sense on BNB Chain. The rest are left
   - a 4% bag was shown, and held to, its 0.1% sell cap, before signing and onchain (`RulesMaxSell`);
   - Chinese, dark mode and a phone-width screen showed no overflow, axe reported no violations on the editor or the panel, Explore showed the badge, and there were no page errors.
 
+## Known-rule read failures
+
+Once a custom-pair token reports a nonzero rules contract, every required rules
+read must succeed before the public launch detail is returned. An unavailable or
+undecodable `rulesOf`, `capsOf`, `active`, `tradeRulesOf` or `flowOf` response
+rejects the detail through the existing generic API 503; it is not reported as
+`rules: null`. Inactive rules still retain their disclosed settings. A holder
+gate also requires successfully read uint8 decimals (0–255); the display never
+assumes 18. Its raw minimum balance is unchanged. A missing symbol can still use
+the label `TOKEN`, and rules without a holder gate need no gate-token metadata.
+
+This change covers an already discovered rules contract. Existing legacy
+`rules()` / `launchRules()` discovery fallbacks remain: a discovery read failure
+can still be indistinguishable from a generation without those getters. This
+does not establish exhaustive rules discovery, factory/runtime verification,
+independent providers, finality, or new enforcement/deployment evidence.
+
+Regressions reproduce the previous null/decimal fallbacks, then exercise the
+actual viem HTTP/ABI reader with block-pinned successful, failed and malformed
+responses from one loopback fixture. These are read-path tests, not a public
+protected-launch lifecycle or a custody, signing or audit approval.
+The public GET handler is also exercised in a child process through its actual
+configured read client, including Multicall3 ABI batches: valid rules return 200,
+and unavailable rules or gate decimals return generic 503 without upstream text.
+Only Node's `next/server` extension resolution is adapted for this test; no
+production response or RPC client is replaced.
+
 ## Before mainnet
 
 These are part of the custom-pairs audit scope: an independent audit of `FortuneLaunchRules` and the token hook, and a review of the rule bounds. Custom pairs stay on BSC Testnet until their own release gate passes.

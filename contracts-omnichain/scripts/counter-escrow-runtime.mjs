@@ -1,0 +1,78 @@
+// Actual compiled escrow -> zero-account LOCAL EVM -> viem HTTP/ABI -> receipts/state.
+// All writes use a fresh loopback URL and local VM impersonation. No fork or keys.
+import assert from 'node:assert/strict';
+import {readFileSync,writeFileSync,mkdirSync,rmSync} from 'node:fs';
+import {resolve} from 'node:path';
+import {spawn,spawnSync} from 'node:child_process';
+import {once} from 'node:events';
+import {createServer} from 'node:net';
+import {createPublicClient,createWalletClient,http,keccak256,toHex,decodeEventLog} from 'viem';
+import {bscTestnet} from 'viem/chains';
+
+const GOV='0x0000000000000000000000000000000000009001',GUARD='0x0000000000000000000000000000000000009002';
+const ALICE='0x0000000000000000000000000000000000001001',BOB='0x0000000000000000000000000000000000001002';
+const artifact=(file,name)=>JSON.parse(readFileSync(new URL(`../out/${file}/${name}.json`,import.meta.url),'utf8'));
+const escrowArtifact=artifact('FortuneTestnetCounterEscrow.sol','FortuneTestnetCounterEscrow');
+const assetArtifact=artifact('FortuneTestnetCounterEscrow.t.sol','CounterAssetMock');
+const report=resolve('.tmp/counter-escrow-runtime.json');rmSync(report,{force:true});
+let node,stage='startup';
+try{
+ const binary=process.env.FORTUNE_ANVIL_BIN;assert.ok(binary);
+ const version=spawnSync(binary,['--version'],{encoding:'utf8'});assert.equal(version.status,0);assert.match(version.stdout,/Version: 1\.7\.1/);
+ const lease=createServer();lease.listen(0,'127.0.0.1');await once(lease,'listening');const port=lease.address().port;await new Promise(r=>lease.close(r));
+ node=spawn(binary,['--host','127.0.0.1','--port',String(port),'--chain-id','97','--accounts','0','--quiet'],{stdio:'ignore'});
+ let failed=false;node.on('error',()=>{failed=true;});
+ const transport=()=>http(`http://127.0.0.1:${port}`,{timeout:5000,retryCount:0});
+ const rpc=createPublicClient({transport:transport(),chain:bscTestnet});let ready=false;
+ for(let attempt=0;attempt<100;attempt++){
+  try{if(await rpc.getChainId()===97){ready=true;break;}}catch{}
+  if(failed||node.exitCode!==null)break;await new Promise(r=>setTimeout(r,50));
+ }
+ assert.ok(ready);assert.deepEqual(await rpc.request({method:'eth_accounts'}),[]);
+ for(const who of [GOV,GUARD]){await rpc.request({method:'anvil_impersonateAccount',params:[who]});await rpc.request({method:'anvil_setBalance',params:[who,toHex(100n*10n**18n)]});}
+ const wallet=who=>createWalletClient({account:who,transport:transport(),chain:bscTestnet});
+ const receipt=async(hash,success=true)=>{const r=await rpc.waitForTransactionReceipt({hash,pollingInterval:20,timeout:15000});assert.equal(r.status,success?'success':'reverted');return r;};
+ const deploy=async(a,args=[])=>{const r=await receipt(await wallet(GOV).deployContract({abi:a.abi,bytecode:a.bytecode.object,args,gas:10000000n}));assert.ok(r.contractAddress);return r.contractAddress;};
+ const write=(who,address,a,functionName,args=[],success=true)=>wallet(who).writeContract({address,abi:a.abi,functionName,args,gas:5000000n}).then(hash=>receipt(hash,success));
+ const read=(address,a,functionName,args=[])=>rpc.readContract({address,abi:a.abi,functionName,args});
+ stage='deploy isolated escrow and synthetic assets';
+ const launch=await deploy(assetArtifact),first=await deploy(assetArtifact),second=await deploy(assetArtifact);
+ const assets=await Promise.all([first,second].sort((a,b)=>a.toLowerCase().localeCompare(b.toLowerCase())).map(async token=>({token,codeHash:keccak256(await rpc.getCode({address:token}))})));
+ const escrow=await deploy(escrowArtifact,[GOV,GUARD,launch,assets,[]]);
+ assert.equal(await read(escrow,escrowArtifact,'paused'),true);
+ const fund=async(token,amounts)=>{
+  const total=amounts.reduce((a,b)=>a+b,0n);
+  await write(GOV,token,assetArtifact,'mint',[GOV,total]);await write(GOV,token,assetArtifact,'approve',[escrow,total]);
+  return write(GOV,escrow,escrowArtifact,'fundRound',[token,[ALICE,BOB],amounts]);
+ };
+ await fund(first,[11n,23n]);await fund(second,[37n,41n]);
+ await write(GOV,escrow,escrowArtifact,'claim',[1n,ALICE],false);
+ await write(GUARD,escrow,escrowArtifact,'setPaused',[false],false);
+ await write(GOV,escrow,escrowArtifact,'setPaused',[false]);
+ stage='actual relayed claims and immutable receipt fields';
+ const claimed=await write(GUARD,escrow,escrowArtifact,'claim',[1n,ALICE]);
+ const logs=claimed.logs.filter(l=>l.address.toLowerCase()===escrow.toLowerCase()).map(l=>decodeEventLog({abi:escrowArtifact.abi,data:l.data,topics:l.topics}));
+ assert.equal(logs.length,1);assert.equal(logs[0].eventName,'Claimed');assert.equal(logs[0].args.round,1n);
+ assert.equal(logs[0].args.recipient.toLowerCase(),ALICE.toLowerCase());assert.equal(logs[0].args.amount,11n);
+ assert.equal(await read(first,assetArtifact,'balanceOf',[ALICE]),11n);assert.equal(await read(first,assetArtifact,'balanceOf',[GUARD]),0n);
+ await write(GOV,escrow,escrowArtifact,'claim',[1n,ALICE],false);
+ assert.equal(await read(escrow,escrowArtifact,'reserved',[first]),23n);
+ stage='failed transfer preserves entitlement then explicit retry succeeds';
+ await write(GOV,second,assetArtifact,'configure',[true,false,'0x0000000000000000000000000000000000000000']);
+ await write(GOV,escrow,escrowArtifact,'claim',[2n,BOB],false);
+ assert.equal(await read(escrow,escrowArtifact,'claimable',[2n,BOB]),41n);assert.equal(await read(escrow,escrowArtifact,'reserved',[second]),78n);
+ await write(GOV,second,assetArtifact,'configure',[false,false,'0x0000000000000000000000000000000000000000']);
+ await write(GOV,escrow,escrowArtifact,'claim',[2n,BOB]);
+ await write(GOV,escrow,escrowArtifact,'claim',[1n,BOB]);
+ await write(GOV,escrow,escrowArtifact,'claim',[2n,ALICE]);
+ assert.equal(await read(escrow,escrowArtifact,'reserved',[first]),0n);assert.equal(await read(escrow,escrowArtifact,'reserved',[second]),0n);
+ assert.equal(await read(first,assetArtifact,'balanceOf',[escrow]),0n);assert.equal(await read(second,assetArtifact,'balanceOf',[escrow]),0n);
+ assert.equal(await read(first,assetArtifact,'balanceOf',[BOB]),23n);assert.equal(await read(second,assetArtifact,'balanceOf',[BOB]),41n);
+ const result={chainId:97,localOnly:true,compiledEscrowDeployed:true,fundedRounds:2,payoutAssets:2,claimsDelivered:4,
+  receiptRecipientAndAmountMatched:true,relayerReceivedNothing:true,duplicateClaimRejected:true,pausedClaimRejected:true,
+  guardianCannotOpen:true,inexactTransferRejected:true,failedClaimLiabilityPreserved:true,explicitRetrySucceeded:true,
+  finalReserved:['0','0'],generatedAccounts:0,privateKeysUsed:false,publicBroadcasts:false,independentProvidersVerified:false,
+  holderEligibilityVerified:false,feeFundingVerified:false,deployedToPublicNetwork:false,fullCounterReadiness:false,executionAuthorized:false};
+ mkdirSync(resolve('.tmp'),{recursive:true});writeFileSync(report,JSON.stringify(result,null,2)+'\n');console.log(JSON.stringify(result,null,2));
+}catch{console.error(`Local counter escrow verification failed at ${stage}; no public transaction was submitted.`);process.exitCode=1;}
+finally{if(node&&node.exitCode===null){node.kill('SIGTERM');const force=setTimeout(()=>node.kill('SIGKILL'),3000);await once(node,'exit').catch(()=>{});clearTimeout(force);}}

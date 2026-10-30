@@ -54,6 +54,25 @@ jobs:
           set -o pipefail
           mkdir -p .tmp
           node --import ./scripts/register-ts.mjs contracts-omnichain/scripts/route-observation-runtime.mjs 2>&1 | tee .tmp/omnichain-route-runtime.log
+      - name: Verify funded holder rounds through local zero-account RPC
+        timeout-minutes: 3
+        working-directory: .
+        env:
+          FORTUNE_ANVIL_BIN: /tmp/fortune-strategy-anvil/node_modules/@foundry-rs/anvil-linux-amd64/bin/anvil
+        run: |
+          set -o pipefail
+          mkdir -p .tmp
+          node contracts-omnichain/scripts/counter-escrow-runtime.mjs 2>&1 | tee .tmp/counter-escrow-runtime.log
+      - name: Preserve local holder-round settlement verification
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: testnet-counter-escrow
+          path: |
+            .tmp/counter-escrow-runtime.log
+            .tmp/counter-escrow-runtime.json
+          if-no-files-found: warn
+          retention-days: 14
       - name: Preserve local route configuration verification
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

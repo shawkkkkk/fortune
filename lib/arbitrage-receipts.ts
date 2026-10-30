@@ -162,11 +162,40 @@ async function observe(client: PublicClient, m: FillMarket, txHash: Hex) {
  */
 export async function readVerifiedFill(clients: readonly [PublicClient, PublicClient], market: FillMarket, txHash: Hex): Promise<VerifiedFill> {
   const m = structuredClone(market), marketHash = fillMarketHash(m);
-  if (!hash(txHash) || clients[0] === clients[1]) throw new Error("Transaction hash and two distinct RPC clients required");
+  if (!hash(txHash) || !Array.isArray(clients) || clients.length !== 2 || clients[0] === clients[1]) throw new Error("Transaction hash and two distinct RPC clients required");
   const start = Date.now();
-  const observations = await Promise.all(clients.map(c => observe(c, m, txHash)));
-  if (Date.now() - start > 60_000 || digest(observations[0]) !== digest(observations[1])) throw new Error("Receipt providers disagree or observation expired");
-  const fill = Object.freeze({ ...observations[0], marketHash, observedAtMs: Date.now(), executionAuthorized: false as const });
-  approved.add(fill);
-  return fill;
+  let previous = start, finished = false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const clock = () => {
+    const now = Date.now();
+    if (finished || !Number.isSafeInteger(start) || start < 0 || !Number.isSafeInteger(now) || now < previous || now - start > 60_000) {
+      throw Error("Receipt observation ended, expired or clock moved backwards");
+    }
+    previous = now;
+    return now;
+  };
+  const methods = new Set(["getChainId", "getTransactionReceipt", "getTransaction", "getBlockNumber", "getBlock", "getCode", "readContract"]);
+  const readers = clients.map(client => new Proxy(client, { get(target, key) {
+    const value = Reflect.get(target, key, target);
+    if (typeof key !== "string" || !methods.has(key) || typeof value !== "function") return value;
+    return async (...parameters: unknown[]) => {
+      clock();
+      const result = await value.apply(target, parameters);
+      clock();
+      return result;
+    };
+  } }));
+  try {
+    clock();
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(Error("Receipt observation timed out")), 60_000);
+    });
+    return await Promise.race([(async () => {
+      const observations = await Promise.all(readers.map(c => observe(c, m, txHash)));
+      if (digest(observations[0]) !== digest(observations[1])) throw new Error("Receipt providers disagree");
+      const fill = Object.freeze({ ...observations[0], marketHash, observedAtMs: clock(), executionAuthorized: false as const });
+      approved.add(fill);
+      return fill;
+    })(), timeout]);
+  } finally { finished = true; clearTimeout(timer); }
 }

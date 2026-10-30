@@ -14,6 +14,34 @@ Current receipt accounting supports BSC Testnet (97) and Ethereum Sepolia (11155
 
 These checks depend on trusted RPC responses, pinned configuration and the chain's finality assumptions. They are not Merkle proofs or proof that two provider accounts are independently operated. The CLI requires different HTTPS origins; the operator must separately verify provider independence. Confirmation depth is not a guarantee against deeper reorgs. The library grants an in-process, immutable verification marker only to completed observations; deserialized or caller-constructed JSON is not accepted as a fresh verified fill.
 
+## Receipt request lifetime
+
+Each observation now has a real sixty-second wall timer, including a hung chain
+or receipt read. Every awaited chain, transaction, receipt, head, block, code and
+contract action is fenced before and after completion. Success, peer failure or
+timeout closes the shared lifetime; delayed completions cannot begin follow-on
+RPC reads or receive the in-process verified-fill marker. Already in-flight calls
+are not cancelled. Original client receivers and duplicate-client rejection are
+preserved. Host time must be nonnegative, safe and nondecreasing between checks;
+a rollback is rejected even if it remains later than the initial start.
+
+Previously the elapsed-time check ran only after both clients finished. A hung
+client could prevent settlement of the observation indefinitely; a failed peer
+could leave the delayed peer starting more reads. Regressions reproduce five late
+code reads after peer failure and an accepted clock rollback on the old source.
+A real sixty-second timeout test runs the actual queued budget coordinator with
+temporary SQLite files: no job completes or journal row commits, and the existing
+quarantine path retains a blocked budget hold across reopening. Releasing the
+hung read afterward starts no additional transaction/head reads.
+
+The timeout does not clear capacity, retry a lease, recover an old hold or renew
+historical receipt trust. Budget/journal/queue stores remain non-atomic. Trusted
+host/clock/policy/RPC, height-based reads, reorg/finality and provider-independence
+limits remain. Receipt/digest/evidence schemas, gas accounting, supported chains,
+confirmation policy, sixty-second observation bound and false execution authority
+are unchanged. Fixture and local-fork evidence do not establish a public worker,
+signer enforcement, complete strategy settlement or full testnet readiness.
+
 ## Durable storage and retry behavior
 
 `ArbitrageFillJournal` uses Node's built-in SQLite on a **single durable host**. It uses WAL, FULL synchronization, bounded lock waits, `BEGIN IMMEDIATE`, prepared statements and a receipt primary key. Configuration is fingerprinted and bound to the database. Reopening it with a different chain/wallet/contracts/fee/depth policy fails. A verified retry with identical evidence returns `inserted: false`; it never creates another row. Decimal strings preserve exact amounts.

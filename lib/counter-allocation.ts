@@ -6,6 +6,7 @@ export const COUNTER_ALLOCATION_ABI = parseAbi([
   "function nextRound() view returns(uint256)", "function assetCodeHash(address) view returns(bytes32)",
   "function excluded(address) view returns(bool)",
   "function fundRound(address,address[],uint256[]) returns(uint256)",
+  "function fundSnapshotRound(address,address[],uint256[],(uint256 expectedRound,uint256 blockNumber,bytes32 blockHash,uint256 deadline)) returns(uint256)",
 ]);
 const TOKEN = parseAbi(["function totalSupply() view returns(uint256)", "function balanceOf(address) view returns(uint256)"]);
 const UINT = (1n << 256n) - 1n;
@@ -99,7 +100,7 @@ export async function buildCounterAllocation(clients: readonly [PublicClient, Pu
       const fundedAmount = allocations.reduce((sum, r) => sum + BigInt(r.amount), 0n);
       if (fundedAmount === 0n) throw Error("Payout rounds to zero");
       return { schemaVersion: 1, chainId: 97, escrow: p.escrow, payoutAsset: p.payoutAsset, launchToken: p.launchToken,
-        blockNumber: blockNumber.toString(), blockHash: observation.blockHash, observedAtMs, expectedNextRound: observation.nextRound,
+        blockNumber: blockNumber.toString(), blockHash: observation.blockHash, blockTimestamp: observation.timestamp, observedAtMs, expectedNextRound: observation.nextRound,
         totalSupply: observation.supply, eligibleUnits: eligibleUnits.toString(), minimumHolding: p.minimumHolding,
         payoutBudget: p.payoutBudget, fundedAmount: fundedAmount.toString(), unallocatedDust: (budget - fundedAmount).toString(), allocations,
         data: encodeFunctionData({ abi: COUNTER_ALLOCATION_ABI, functionName: "fundRound", args: [p.payoutAsset, allocations.map(r => r.recipient), allocations.map(r => BigInt(r.amount))] }),
@@ -108,4 +109,15 @@ export async function buildCounterAllocation(clients: readonly [PublicClient, Pu
       };
     })(), timeout]);
   } finally { finished = true; clearTimeout(timer); }
+}
+
+/** Optional binding for newly compiled escrows; preserves the legacy allocation builder. */
+export async function buildCounterSnapshotFunding(clients: readonly [PublicClient, PublicClient], input: CounterAllocationPolicy) {
+  const allocation = await buildCounterAllocation(clients, input);
+  // Fixed expiry follows the observed block, never a later retry or client clock refresh.
+  const snapshot = { expectedRound: BigInt(allocation.expectedNextRound), blockNumber: BigInt(allocation.blockNumber),
+    blockHash: allocation.blockHash, deadline: BigInt(allocation.blockTimestamp) + 120n };
+  return { ...allocation, schemaVersion: 2, fundingMethod: "fundSnapshotRound", deadline: snapshot.deadline.toString(),
+    roundAndSnapshotBound: true, data: encodeFunctionData({ abi: COUNTER_ALLOCATION_ABI, functionName: "fundSnapshotRound",
+      args: [allocation.payoutAsset, allocation.allocations.map(r => r.recipient), allocation.allocations.map(r => BigInt(r.amount)), snapshot] }) };
 }

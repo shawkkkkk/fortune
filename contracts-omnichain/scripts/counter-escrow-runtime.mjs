@@ -6,9 +6,9 @@ import {resolve} from 'node:path';
 import {spawn,spawnSync} from 'node:child_process';
 import {once} from 'node:events';
 import {createServer} from 'node:net';
-import {createPublicClient,createWalletClient,http,keccak256,toHex,decodeEventLog} from 'viem';
+import {createPublicClient,createWalletClient,http,keccak256,toHex,decodeEventLog,decodeFunctionData} from 'viem';
 import {bscTestnet} from 'viem/chains';
-import {buildCounterAllocation} from '../../lib/counter-allocation.ts';
+import {buildCounterAllocation,buildCounterSnapshotFunding} from '../../lib/counter-allocation.ts';
 
 const GOV='0x0000000000000000000000000000000000009001',GUARD='0x0000000000000000000000000000000000009002';
 const ALICE='0x0000000000000000000000000000000000001001',BOB='0x0000000000000000000000000000000000001002';
@@ -54,11 +54,24 @@ try{
   governor:GOV,guardian:GUARD,launchToken:launch.toLowerCase(),launchTokenCodeHash:keccak256(await rpc.getCode({address:launch})),
   payoutAsset:first.toLowerCase(),payoutAssetCodeHash:keccak256(await rpc.getCode({address:first})),accounts:[ALICE,BOB],minimumHolding:'1',payoutBudget:'34'};
  const clients=[createPublicClient({transport:transport()}),createPublicClient({transport:transport()})];
- const allocation=await buildCounterAllocation(clients,allocationPolicy);
+ const allocation=await buildCounterSnapshotFunding(clients,allocationPolicy);
+ const bound=decodeFunctionData({abi:escrowArtifact.abi,data:allocation.data});
+ assert.equal(bound.functionName,'fundSnapshotRound');
+ for(const patch of [{expectedRound:2n},{blockHash:'0x'+'11'.repeat(32)},{deadline:0n}]){
+  await write(GOV,escrow,escrowArtifact,'fundSnapshotRound',[...bound.args.slice(0,3),{...bound.args[3],...patch}],false);
+ }
+ assert.equal(await read(escrow,escrowArtifact,'nextRound'),1n);
+ assert.equal(await read(first,assetArtifact,'allowance',[GOV,escrow]),33n);
  assert.equal(allocation.fundedAmount,'33');assert.equal(allocation.unallocatedDust,'1');assert.equal(allocation.executionAuthorized,false);
  await assert.rejects(buildCounterAllocation(clients,{...allocationPolicy,accounts:[ALICE]}),/cover/);
  await receipt(await wallet(GOV).sendTransaction({to:escrow,data:allocation.data,gas:5000000n}));
  assert.equal(await read(escrow,escrowArtifact,'claimable',[1n,ALICE]),8n);assert.equal(await read(escrow,escrowArtifact,'claimable',[1n,BOB]),25n);
+ const snapshot=await read(escrow,escrowArtifact,'roundSnapshots',[1n]);
+ assert.equal(snapshot[0],1n);assert.equal(snapshot[1],BigInt(allocation.blockNumber));assert.equal(snapshot[2],allocation.blockHash);
+ assert.equal(snapshot[3],BigInt(allocation.deadline));
+ await write(GOV,first,assetArtifact,'mint',[GOV,33n]);await write(GOV,first,assetArtifact,'approve',[escrow,33n]);
+ await receipt(await wallet(GOV).sendTransaction({to:escrow,data:allocation.data,gas:5000000n}),false);
+ assert.equal(await read(escrow,escrowArtifact,'nextRound'),2n);assert.equal(await read(first,assetArtifact,'allowance',[GOV,escrow]),33n);
  await fund(second,[37n,41n]);
  await write(GOV,escrow,escrowArtifact,'claim',[1n,ALICE],false);
  await write(GUARD,escrow,escrowArtifact,'setPaused',[false],false);
@@ -83,7 +96,7 @@ try{
  assert.equal(await read(first,assetArtifact,'balanceOf',[escrow]),0n);assert.equal(await read(second,assetArtifact,'balanceOf',[escrow]),0n);
  assert.equal(await read(first,assetArtifact,'balanceOf',[BOB]),25n);assert.equal(await read(second,assetArtifact,'balanceOf',[BOB]),41n);
  const result={chainId:97,localOnly:true,compiledEscrowDeployed:true,fundedRounds:2,payoutAssets:2,claimsDelivered:4,
-  snapshotAllocationFunded:true,allocationBlock:allocation.blockNumber,allocationDust:allocation.unallocatedDust,incompleteAccountListRejected:true,receiptRecipientAndAmountMatched:true,relayerReceivedNothing:true,duplicateClaimRejected:true,pausedClaimRejected:true,
+  snapshotAllocationFunded:true,roundSnapshotAndDeadlineBound:true,staleRoundHashAndExpiryRejected:true,exactFundingReplayRejected:true,allocationBlock:allocation.blockNumber,allocationDust:allocation.unallocatedDust,incompleteAccountListRejected:true,receiptRecipientAndAmountMatched:true,relayerReceivedNothing:true,duplicateClaimRejected:true,pausedClaimRejected:true,
   guardianCannotOpen:true,inexactTransferRejected:true,failedClaimLiabilityPreserved:true,explicitRetrySucceeded:true,
   finalReserved:['0','0'],generatedAccounts:0,privateKeysUsed:false,publicBroadcasts:false,independentProvidersVerified:false,
   holderEligibilityVerified:false,feeFundingVerified:false,deployedToPublicNetwork:false,fullCounterReadiness:false,executionAuthorized:false};

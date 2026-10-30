@@ -51,13 +51,24 @@ STRATEGY_NATIVE_GAS_BUDGET.md and BUDGET_RECEIPT_RECONCILIATION.md.
 
 ## Isolated holder-round settlement (M06)
 
+An optional `fundSnapshotRound` path now binds newly built calldata to the actual
+next round, a recent EVM block hash (20–255 blocks behind execution), and a fixed
+expiry. The snapshot builder and actual local RPC rehearsal use that path;
+legacy `fundRound` and its builder are preserved. Exact successful bytes cannot
+fund another round, but rebuilt allocations and the governor's legacy method
+are not deduplicated. Hash binding does not prove historical holder balances,
+eligibility, source of funds, independent providers or finality. New isolated
+contract source requires fresh evidence; no old deployment or audit is upgraded.
+See COUNTER_ROUND_ESCROW.md for bounds, tests and remaining wallet/release gates.
+
+
 The bounded Counter allocation library now reads two supplied clients at a common
 confirmed block, checks escrow/runtime policy and supplied balances against total
 supply, applies explicit exclusions/minimum holdings, and generates exact pro-rata
 `fundRound` calldata with unallocated dust separate. The actual local zero-account
 escrow runtime consumes those bytes and verifies stored entitlements/claims.
 Coverage arithmetic is not independent holder-index/eligibility approval; the
-calldata has no snapshot/expected-round/replay binding and authorizes no execution.
+legacy calldata has no snapshot/expected-round/replay binding and authorizes no execution.
 No fee origin, wallet/signer, public service, automatic rotation/carry-forward or
 full Counter readiness is established. See COUNTER_ROUND_ESCROW.md for the real
 wall timer, failure fences, asset/provider/finality and wallet-review boundaries.

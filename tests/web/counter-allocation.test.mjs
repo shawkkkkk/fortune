@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {decodeFunctionData,keccak256} from 'viem';
-import {buildCounterAllocation,COUNTER_ALLOCATION_ABI} from '../../lib/counter-allocation.ts';
+import {buildCounterAllocation,buildCounterSnapshotFunding,COUNTER_ALLOCATION_ABI} from '../../lib/counter-allocation.ts';
 const a=n=>'0x'+n.toString(16).padStart(40,'0'),h=n=>'0x'+n.toString(16).padStart(64,'0');
 const code='0x60006000f3',pin=keccak256(code),tick=()=>new Promise(r=>setImmediate(r));
 function policy(){return {chainId:97,escrow:a(1),escrowCodeHash:pin,governor:a(2),guardian:a(3),launchToken:a(4),launchTokenCodeHash:pin,
@@ -100,4 +100,16 @@ test('clock rollback above the start is rejected',async()=>{
  try{const cs=readers();for(const c of cs){c.getChainId=async()=>{now=++calls===1?100100:100050;return 97;};}
   await assert.rejects(buildCounterAllocation(cs,policy()),/clock|backwards/);
  }finally{Date.now=real;}
+});
+
+
+test('optional funding bytes bind the observed round, block hash and fixed snapshot expiry',async()=>{
+ const cs=readers(),result=await buildCounterSnapshotFunding(cs,policy());
+ const call=decodeFunctionData({abi:COUNTER_ALLOCATION_ABI,data:result.data});
+ assert.equal(call.functionName,'fundSnapshotRound');
+ assert.deepEqual(call.args[3],{expectedRound:1n,blockNumber:80n,blockHash:h(80),deadline:BigInt(result.blockTimestamp)+120n});
+ assert.equal(result.deadline,String(BigInt(result.blockTimestamp)+120n));assert.equal(result.roundAndSnapshotBound,true);
+ assert.deepEqual(call.args[2],[8n,25n]);assert.equal(result.unallocatedDust,'1');
+ for(const key of ['executionAuthorized','holderEligibilityPolicyApproved','independentProvidersVerified','feeFundingVerified','completeHolderIndexVerified','fullCounterReadiness'])assert.equal(result[key],false);
+ await assert.rejects(buildCounterSnapshotFunding(readers({supply:41n}),policy()),/cover/);
 });

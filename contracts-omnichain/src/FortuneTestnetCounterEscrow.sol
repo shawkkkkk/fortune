@@ -22,6 +22,13 @@ contract FortuneTestnetCounterEscrow is ReentrancyGuard {
         bytes32 allocationHash;
     }
 
+    struct Snapshot {
+        uint256 expectedRound;
+        uint256 blockNumber;
+        bytes32 blockHash;
+        uint256 deadline;
+    }
+
     address public immutable governor;
     address public immutable guardian;
     address public immutable launchToken;
@@ -33,6 +40,9 @@ contract FortuneTestnetCounterEscrow is ReentrancyGuard {
     mapping(uint256 => Round) public rounds;
     mapping(uint256 => mapping(address => uint256)) public claimable;
 
+    mapping(uint256 => Snapshot) public roundSnapshots;
+
+    error InvalidSnapshot();
     error InvalidConfiguration();
     error WrongChain();
     error Unauthorized();
@@ -43,6 +53,7 @@ contract FortuneTestnetCounterEscrow is ReentrancyGuard {
     error Insolvent();
     error NothingToClaim();
 
+    event SnapshotBound(uint256 indexed round, uint256 blockNumber, bytes32 blockHash, uint256 deadline);
     event PauseChanged(bool paused);
     event RoundFunded(
         uint256 indexed round, address indexed asset, uint256 amount, uint256 recipients, bytes32 allocationHash
@@ -111,6 +122,34 @@ contract FortuneTestnetCounterEscrow is ReentrancyGuard {
         external
         onTestnet
         nonReentrant
+        returns (uint256 id)
+    {
+        return _fundRound(token, recipients, amounts);
+    }
+
+    /// @notice Optional funding bound to an expected round, recent canonical block and fixed expiry.
+    /// @dev A block hash binds a reference, not the truth of holder eligibility or fee provenance.
+    function fundSnapshotRound(
+        address token,
+        address[] calldata recipients,
+        uint256[] calldata amounts,
+        Snapshot calldata snapshot
+    ) external onTestnet nonReentrant returns (uint256 id) {
+        if (msg.sender != governor) revert Unauthorized();
+        if (!paused) revert WrongPauseState();
+        if (
+            snapshot.expectedRound != nextRound || snapshot.blockNumber >= block.number
+                || block.number - snapshot.blockNumber < 20 || block.number - snapshot.blockNumber > 255
+                || snapshot.blockHash == bytes32(0) || blockhash(snapshot.blockNumber) != snapshot.blockHash
+                || block.timestamp > snapshot.deadline || snapshot.deadline > block.timestamp + 120
+        ) revert InvalidSnapshot();
+        id = _fundRound(token, recipients, amounts);
+        roundSnapshots[id] = snapshot;
+        emit SnapshotBound(id, snapshot.blockNumber, snapshot.blockHash, snapshot.deadline);
+    }
+
+    function _fundRound(address token, address[] calldata recipients, uint256[] calldata amounts)
+        private
         returns (uint256 id)
     {
         if (msg.sender != governor) revert Unauthorized();

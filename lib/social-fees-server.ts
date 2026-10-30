@@ -55,9 +55,14 @@ export async function readIdentity(vault: Address, identityId: Hex, fallback?: {
 async function tokenMeta(rpc: PublicClient, token: Address) {
   const [symbol, decimals] = await Promise.all([
     rpc.readContract({ address: token, abi: ERC20, functionName: "symbol" }).catch(() => "TOKEN"),
-    rpc.readContract({ address: token, abi: ERC20, functionName: "decimals" }).catch(() => 18),
+    rpc.readContract({ address: token, abi: ERC20, functionName: "decimals" }),
   ]);
-  return { symbol: String(symbol).slice(0, 32), decimals: Number(decimals) };
+  // Missing units must make the detail unavailable, never turn raw balances
+  // into plausible but incorrectly scaled claim amounts. uint8 decodes to number.
+  if (typeof decimals !== "number" || !Number.isInteger(decimals) || decimals < 0 || decimals > 255) {
+    throw new Error("Social fee token units unavailable");
+  }
+  return { symbol: String(symbol).slice(0, 32), decimals };
 }
 
 /** Everything the claims page shows for one identity. */

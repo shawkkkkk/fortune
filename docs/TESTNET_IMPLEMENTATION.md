@@ -174,3 +174,12 @@ Creator-authenticated character editing, broader tools and hosted auth/quotas re
 Use protected service/CI configuration for RPC, durable storage, holder cron, uploads and attestor provisioning. Do not share private keys in chat. Existing owner workflows need faucet tBNB and their explicit confirmation inputs, as documented in RELEASE_HANDOFF.md. Local fixtures are not provider, incident-alert or live cross-chain evidence.
 
 Audit readiness additionally requires reproducible pinned builds, scoped contract inventory, lifecycle/invariant/fork evidence and retained deployment artifacts for each engine. Mainnet also needs independent audit remediation, legal/asset review, governance acceptance/signatures, funding, production operations and activation evidence. An audit alone does not establish mainnet readiness.
+
+## Social claim amount units
+
+The existing social-fee identity reader now fails closed if vault-token or curve
+pair-token decimals are unavailable or malformed, instead of assuming 18 and
+mis-scaling displayed amounts. Successful raw amounts and uint8 units are
+preserved. Tests cover both detail paths and actual viem HTTP/ABI fixture reads;
+this does not enable social routing, provision an attestor or establish public
+claim/recovery readiness. See SOCIAL_FEES.md.

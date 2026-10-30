@@ -49,6 +49,21 @@ public services, constrained signer integration and global settlement are not
 made ready by those merges. See CREATOR_COPILOT.md, MANAGED_LIQUIDITY_READER.md,
 STRATEGY_NATIVE_GAS_BUDGET.md and BUDGET_RECEIPT_RECONCILIATION.md.
 
+## Isolated holder-round settlement (M06)
+
+`FortuneTestnetCounterEscrow` now implements actual separately funded payout
+rounds, immutable explicit allocations, per-asset reserved liabilities and direct
+recipient-bound claims. It starts paused on chain 97, rejects launched-token
+payouts, requires fresh exact governor funding, preserves older entitlements
+across payout-asset changes, and has no sweep/amendment/expiry/fee conversion.
+Eligibility is supplied by the governor, not verified by this escrow. Bounded
+1–128-recipient rounds are not a complete holder index or rotating-basket engine.
+The existing isolated contract workflow includes unit/fuzz/invariant tests and a
+zero-account local-EVM HTTP/ABI funding/claim/failure rehearsal with retained CI
+reports. See COUNTER_ROUND_ESCROW.md for authority, asset and stranded-claim
+risks. No public deployment, fee provenance, holder eligibility, full Counter
+readiness, audit, mainnet activation or financial/release-gate approval follows.
+
 ## Receipt observation lifetime
 
 The actual swap-receipt verifier now fences every awaited RPC action and enforces

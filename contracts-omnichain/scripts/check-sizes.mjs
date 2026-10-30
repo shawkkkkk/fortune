@@ -9,6 +9,8 @@ for (const [name, maxConstructorBytes] of [
   ["FortuneOmnichainToken", 8 * 32 + (32 + 64) + (32 + 32)],
   // Three governance addresses, seven infrastructure fields, and two five-field asset tuples.
   ["FortuneTestnetStrategyVault", 20 * 32],
+  // Five heads, two dynamic lengths, ten asset tuples and 32 exclusions.
+  ["FortuneTestnetCounterEscrow", (5 + 2 + 10 * 2 + 32) * 32],
 ]) {
   const artifact = JSON.parse(readFileSync(new URL(`../out/${name}.sol/${name}.json`, import.meta.url), "utf8"));
   const runtimeBytes = size(artifact.deployedBytecode.object);

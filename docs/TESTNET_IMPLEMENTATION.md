@@ -186,6 +186,13 @@ claim/recovery readiness. See SOCIAL_FEES.md.
 
 ## Creator import snapshot consistency
 
+The same import engine also fences each awaited RPC before and after completion,
+ends its shared lifetime on every outcome, and rejects inter-check host-clock
+rollback. Late responses cannot start further reads after failure or the real
+20-second timeout; in-flight calls are not cancelled. SQLite/actual-timer fixtures
+preserve no-commit behavior, method receivers and client identity checks. This
+does not enable a public identity service or change signed/stored evidence.
+
 Creator-character imports additionally require matching provider timestamps,
 number/hash/timestamp rechecks, and final snapshot age within 120 seconds before
 the existing SQLite transaction can commit. Real-file and viem HTTP/ABI fixture

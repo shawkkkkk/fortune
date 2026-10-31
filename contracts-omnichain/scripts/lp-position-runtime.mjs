@@ -94,14 +94,36 @@ try {
   const first = await inspectLiquidityPosition(readers, policy);
   assert.ok(BigInt(first.liquidityUnits) > 0n); assert.equal(first.claimableFees, null);
   assert.equal(first.owner, GOV.toLowerCase()); assert.equal(first.executionAuthorized, false);
-  stage = "ownership change rejection";
-  await write(GOV, POSITIONS, nftAbi, "transferFrom", [GOV, TREASURY, tokenId]);
+  stage = "actual pinned position custody";
+  const custodyArtifact = artifact("FortuneTestnetPositionCustody.sol", "FortuneTestnetPositionCustody");
+  const custodyPin = p => ({ target: p.address, codeHash: p.codeHash });
+  const custody = await deploy(custodyArtifact, [GOV, "0x0000000000000000000000000000000000002222", TREASURY, {
+    manager: custodyPin(policy.manager), factory: custodyPin(policy.factory), pool: custodyPin(policy.pool),
+    token0: custodyPin(policy.token0), token1: custodyPin(policy.token1), positionId: tokenId, fee: 500,
+    tickLower: -887270, tickUpper: 887270, expectedLiquidity: BigInt(first.liquidityUnits),
+  }]);
+  await write(GOV, POSITIONS, parseAbi(["function approve(address,uint256)"]), "approve", [custody, tokenId]);
+  await write(GOV, custody, custodyArtifact.abi, "setPaused", [false]);
+  await write(GOV, custody, custodyArtifact.abi, "deposit");
+  assert.equal(await read(custody, custodyArtifact.abi, "held"), true);
+  await rpc.request({method: "anvil_mine", params: ["0x14"]});
+  await assert.rejects(inspectLiquidityPosition(readers, policy));
+  const held = await inspectLiquidityPosition(readers, {...policy, owner: custody});
+  assert.equal(held.owner, custody.toLowerCase()); assert.equal(held.liquidityUnits, first.liquidityUnits);
+  stage = "paused fixed-treasury release";
+  await write(GOV, custody, custodyArtifact.abi, "releaseToTreasury", [], false);
+  await write(GOV, custody, custodyArtifact.abi, "setPaused", [true]);
+  await write(GOV, custody, custodyArtifact.abi, "releaseToTreasury");
+  assert.equal(await read(custody, custodyArtifact.abi, "released"), true);
+  assert.equal(await read(custody, custodyArtifact.abi, "held"), false);
+  await write(GOV, custody, custodyArtifact.abi, "releaseToTreasury", [], false);
   await rpc.request({method: "anvil_mine", params: ["0x14"]});
   await assert.rejects(inspectLiquidityPosition(readers, policy));
   const transferred = await inspectLiquidityPosition(readers, {...policy, owner: TREASURY});
   assert.equal(transferred.owner, TREASURY.toLowerCase());
   assert.equal(transferred.liquidityUnits, first.liquidityUnits);
-  const result = { sourceForkBlock: forkBlock.toString(), positionObserved: true, transferredOwnerRejected: true,
+  const result = { sourceForkBlock: forkBlock.toString(), positionObserved: true, custodyDepositObserved: true, formerGovernorRejectedAfterDeposit: true,
+    activeReleaseRejected: true, fixedTreasuryReleaseObserved: true, duplicateReleaseRejected: true, fullManagedLiquidityReadiness: false, transferredOwnerRejected: true,
     reviewedNewOwnerObserved: true, liquidityUnchanged: true, readClientsUseOneLocalFixture: true,
     generatedAccounts: 0, privateKeysUsed: false, publicBroadcasts: false, executionAuthorized: false, deployedToPublicNetwork: false };
   mkdirSync(resolve(".tmp"), {recursive: true});

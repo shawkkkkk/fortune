@@ -135,6 +135,17 @@ temporary post-mining reservations are not signer enforcement or independent
 providers. Other gas, hold recovery, durable operations and public deployment
 remain outside this rehearsal. No operator book, wallet or release gate changes.
 
+## Client-scoped work funding IDs (P19)
+
+The isolated work escrow adds optional `fundWithId` funding with permanent
+client-scoped successful-ID binding, replay rejection before transfer and atomic
+binding rollback on failed funding. Legacy funding and settlement remain intact.
+Unit and actual local HTTP/ABI rehearsals cover funded/approved replay before
+and after settlement, explicit failure retry and separate client namespaces.
+Changing IDs or using legacy funding still creates new jobs; no signer, identity,
+public deployment or complete Syndicate readiness is established. Changed source
+requires fresh evidence. See SYNDICATE_WORK_ESCROW.md.
+
 ## Scoped-work settlement foundation (P19)
 
 An isolated paused chain97 work escrow now implements exact client funding,

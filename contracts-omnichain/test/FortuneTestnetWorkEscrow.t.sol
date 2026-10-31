@@ -51,6 +51,72 @@ contract WorkBase is Test {
 }
 
 contract FortuneTestnetWorkEscrowTest is WorkBase {
+    function testFundingIdReplayAndChangedTermsAfterCancelReject() public {
+        bytes32 key = bytes32(uint256(1));
+        uint64 a = uint64(block.timestamp + 100);
+        uint64 d = uint64(block.timestamp + 200);
+        vm.startPrank(CLIENT);
+        asset.approve(address(escrow), 1000);
+        uint256 id = escrow.fundWithId(key, WORKER, address(asset), 100, key, a, d);
+        assertEq(escrow.fundingJobs(CLIENT, key), id);
+        vm.expectRevert(E.FundingIdUsed.selector);
+        escrow.fundWithId(key, WORKER, address(asset), 100, key, a, d);
+        escrow.cancel(id);
+        vm.expectRevert(E.FundingIdUsed.selector);
+        escrow.fundWithId(key, OTHER, address(asset), 50, bytes32(uint256(2)), a, d);
+        assertEq(asset.allowance(CLIENT, address(escrow)), 900);
+        assertEq(escrow.nextJob(), 2);
+        assertEq(escrow.reserved(address(asset)), 0);
+        vm.stopPrank();
+    }
+
+    function testFundingIdClientNamespaceAndLegacy() public {
+        bytes32 key = bytes32(uint256(1));
+        asset.mint(OTHER, 1000);
+        vm.startPrank(CLIENT);
+        asset.approve(address(escrow), 100);
+        escrow.fundWithId(
+            key, WORKER, address(asset), 100, key, uint64(block.timestamp + 100), uint64(block.timestamp + 200)
+        );
+        vm.stopPrank();
+        vm.startPrank(OTHER);
+        asset.approve(address(escrow), 100);
+        escrow.fundWithId(
+            key, WORKER, address(asset), 100, key, uint64(block.timestamp + 100), uint64(block.timestamp + 200)
+        );
+        vm.stopPrank();
+        assertEq(escrow.fundingJobs(CLIENT, key), 1);
+        assertEq(escrow.fundingJobs(OTHER, key), 2);
+        assertEq(fund(30), 3);
+        assertEq(escrow.reserved(address(asset)), 230);
+    }
+
+    function testFundingIdAtomicFailureRetryZeroPauseChain() public {
+        bytes32 key = bytes32(uint256(1));
+        uint64 a = uint64(block.timestamp + 100);
+        uint64 d = uint64(block.timestamp + 200);
+        vm.startPrank(CLIENT);
+        asset.approve(address(escrow), 1000);
+        vm.expectRevert(E.InvalidJob.selector);
+        escrow.fundWithId(bytes32(0), WORKER, address(asset), 100, key, a, d);
+        asset.configure(true, false, address(0));
+        vm.expectRevert(E.InexactTransfer.selector);
+        escrow.fundWithId(key, WORKER, address(asset), 100, key, a, d);
+        assertEq(escrow.fundingJobs(CLIENT, key), 0);
+        assertEq(escrow.nextJob(), 1);
+        assertEq(asset.allowance(CLIENT, address(escrow)), 1000);
+        asset.configure(false, false, address(0));
+        escrow.fundWithId(key, WORKER, address(asset), 100, key, a, d);
+        vm.stopPrank();
+        vm.prank(GUARD);
+        escrow.setPaused(true);
+        vm.expectRevert(E.Paused.selector);
+        escrow.fundWithId(key, WORKER, address(asset), 100, key, a, d);
+        vm.chainId(1);
+        vm.expectRevert(E.WrongChain.selector);
+        escrow.fundWithId(key, WORKER, address(asset), 100, key, a, d);
+    }
+
     function testClientApprovalPaysOnlyAcceptedWorkerOnce() public {
         uint256 id = accepted(100);
         vm.prank(CLIENT);

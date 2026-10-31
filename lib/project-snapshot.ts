@@ -1,5 +1,5 @@
+import { readProjectApi } from "@/lib/project-api-read";
 import { projectCanon, projectToken } from "@/lib/project-canon";
-import { readLimitedBytes } from "@/lib/creator-metadata";
 
 function object(v: unknown): Record<string, unknown> {
   if (!v || typeof v !== "object" || Array.isArray(v)) throw Error("Invalid snapshot");
@@ -38,13 +38,6 @@ export function projectSnapshot(value: unknown, token: string, now = Date.now())
 
 export async function readProjectSnapshot(token: string, options: { fetch?: typeof fetch; now?: () => number } = {}) {
   token = projectToken(token);
-  const controller = new AbortController(), timeout = setTimeout(() => controller.abort(), 30000);
-  try {
-    const response = await (options.fetch ?? fetch)(`https://fortunepad.fun/api/public/v1/tokens/${token}/project`, {
-      method: "GET", redirect: "error", credentials: "omit", cache: "no-store", signal: controller.signal, headers: { Accept: "application/json" },
-    });
-    if (response.status !== 200 || !/^application\/json(?:\s*;|$)/i.test(response.headers.get("content-type") ?? "")) throw Error("Snapshot unavailable");
-    const bytes = await readLimitedBytes(response, 32768);
-    return projectSnapshot(JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes)), token, (options.now ?? Date.now)());
-  } finally { clearTimeout(timeout); }
+  return readProjectApi(`https://fortunepad.fun/api/public/v1/tokens/${token}/project`, 30000, options,
+    (value, now) => projectSnapshot(value, token, now));
 }

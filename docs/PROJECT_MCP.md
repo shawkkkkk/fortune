@@ -116,3 +116,19 @@ Protocol references (primary specification, read October 27):
 [stdio transport](https://modelcontextprotocol.io/specification/2025-06-18/basic/transports),
 [lifecycle](https://modelcontextprotocol.io/specification/2025-06-18/basic/lifecycle),
 [tools](https://modelcontextprotocol.io/specification/2025-06-18/server/tools).
+
+## Public read lifetime
+
+The actual canon and project-snapshot HTTP readers share a bounded streaming
+reader with their unchanged 10/30-second budgets, 32KiB limit, fixed official
+URLs, no redirects/retries/credentials and strict JSON/UTF-8 projection. A real
+wall timer rejects even a fetch/body implementation that ignores abort. Each
+awaited response/chunk is fenced before and after; late completions cannot read
+another chunk or project a result. Every outcome ends the lifetime, clears the
+timer and requests abort/cancellation without waiting for a stuck cancellation.
+Cancellation is best effort: already in-flight work may continue and JavaScript
+timer scheduling depends on the host event loop. This does not certify transport
+termination, independent providers, block finality or any execution authority.
+Nonnegative safe host clocks must not move backwards between checks. Existing
+API timestamp freshness, schemas, quotas and privacy boundaries remain unchanged.
+The generic metadata-upload reader and other network paths are not changed.

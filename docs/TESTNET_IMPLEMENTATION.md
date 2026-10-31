@@ -193,6 +193,18 @@ contract-intelligence foundation; it does not complete exhaustive admin/claim
 analysis, independent-provider verification or a safety verdict. Local RPC/ABI
 and state-override fixtures exercise the actual reader, without broadcasts.
 
+## Public project read lifetime
+
+The actual canon/snapshot readers now enforce existing 10/30-second budgets with
+a real rejecting timer and before/after response/chunk fences, even if transport
+ignores abort. Failure/timeout/success closes the shared lifetime; best-effort
+abort/cancellation never waits for stuck cancellation. Late results cannot start
+new reads or return projected data. Safe nonnegative monotonic host clocks are
+required. Fixed origin, 32KiB byte bounds, strict parsing, freshness/provenance and
+shared MCP quotas remain unchanged. This strengthens existing MCP, research capture
+and co-pilot consumers without authorizing models, publication, wallets or new
+services. See PROJECT_MCP.md for event-loop and in-flight cancellation limits.
+
 ## Creator co-pilot public-project grounding
 
 An explicit separately disabled `creator-copilot.mjs --brief <token>` mode now

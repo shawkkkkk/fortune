@@ -80,3 +80,28 @@ Exact-source deployment/audit/legal, capital and asset policy, signer/governance
 identity/privacy, durable auth/quotas, disputes/recovery, public receipt/indexing
 and operations gates remain separate and fail closed. No real stores, keys,
 accounts, signatures, funded workflows or public transactions are needed here.
+
+## Optional worker result revisions
+
+While Accepted and through the delivery-review deadline (inclusive), the named
+worker may submit a nonzero result hash with the exact expected previous revision.
+Up to 32 append-only revisions are stored; identical consecutive hashes, stale
+revision writers and writes after dispute/settlement reject. Earlier commitments
+are never overwritten. ResultSubmitted binds job, worker wallet, revision and hash.
+No content, URL, identity, author, IP/license, quality or delivery is verified or
+fetched. Avoid commitments to sensitive/low-entropy data without privacy review;
+a hash onchain is public and permanent, not an anonymity guarantee.
+
+The optional approveResult method requires the original client, Accepted state
+and exact current revision/hash before whole-amount settlement. A worker update
+invalidates a prepared older approval. ResultApproved plus JobSettled bind the
+consented revision and actual recipient-bound transfer. An inexact transfer
+reverts both events/payment/state; revision history and liability remain for
+explicit review/retry. No submission automatically pays, approves work, changes
+deadlines or prevents existing dispute/arbitration. Legacy approvePayment still
+permits explicit unbound client consent, including jobs with no result. This is
+not identity/authenticated creator integration or complete Syndicate delivery.
+New isolated source/runtime needs fresh evidence; old deployments/audits are not
+upgraded. The local runtime preserves the original four settlements and adds a
+fifth job with two revisions, stale/wrong approval and taxed-transfer rejection,
+explicit retry and revision/payment receipt binding.

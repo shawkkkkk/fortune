@@ -43,6 +43,11 @@ contract FortuneTestnetWorkEscrow is ReentrancyGuard {
     mapping(address => mapping(bytes32 => uint256)) public fundingJobs;
     error FundingIdUsed();
     event FundingBound(uint256 indexed id, address indexed client, bytes32 indexed fundingId);
+    mapping(uint256 => uint256) public latestResultRevision;
+    mapping(uint256 => mapping(uint256 => bytes32)) public resultHashes;
+    error InvalidResult();
+    event ResultSubmitted(uint256 indexed id, address indexed worker, uint256 indexed revision, bytes32 resultHash);
+    event ResultApproved(uint256 indexed id, uint256 indexed revision, bytes32 resultHash);
     error WrongChain();
     error Unauthorized();
     error Paused();
@@ -186,6 +191,36 @@ contract FortuneTestnetWorkEscrow is ReentrancyGuard {
         if (msg.sender != j.client) revert Unauthorized();
         if (j.state != State.Accepted) revert WrongState();
         _settle(id, j.amount);
+    }
+
+    /// @notice Worker-supplied commitment only: not proof of delivery, identity, IP or quality.
+    function submitResult(uint256 id, uint256 expectedRevision, bytes32 resultHash) external chain97 open nonReentrant {
+        Job storage j = jobs[id];
+        if (msg.sender != j.worker) revert Unauthorized();
+        if (j.state != State.Accepted || block.timestamp > j.deliverBy) revert WrongState();
+        uint256 previous = latestResultRevision[id];
+        if (
+            expectedRevision != previous || previous >= 32 || resultHash == bytes32(0)
+                || resultHash == resultHashes[id][previous]
+        ) revert InvalidResult();
+        _asset(j.asset);
+        uint256 revision = previous + 1;
+        latestResultRevision[id] = revision;
+        resultHashes[id][revision] = resultHash;
+        emit ResultSubmitted(id, msg.sender, revision, resultHash);
+    }
+
+    /// @notice Optional payment consent bound to the exact latest worker revision.
+    function approveResult(uint256 id, uint256 revision, bytes32 resultHash) external chain97 open nonReentrant {
+        Job storage j = jobs[id];
+        if (msg.sender != j.client) revert Unauthorized();
+        if (j.state != State.Accepted) revert WrongState();
+        if (
+            revision == 0 || revision != latestResultRevision[id] || resultHash == bytes32(0)
+                || resultHashes[id][revision] != resultHash
+        ) revert InvalidResult();
+        _settle(id, j.amount);
+        emit ResultApproved(id, revision, resultHash);
     }
 
     function dispute(uint256 id) external chain97 open nonReentrant {

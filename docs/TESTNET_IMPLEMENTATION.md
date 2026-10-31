@@ -219,6 +219,16 @@ contract-intelligence foundation; it does not complete exhaustive admin/claim
 analysis, independent-provider verification or a safety verdict. Local RPC/ABI
 and state-override fixtures exercise the actual reader, without broadcasts.
 
+## Share-card artwork deadline
+
+The production share-card artwork reader now enforces its existing three-second
+budget with a real fallback timer and late-read fences. Hung fetch/body reads or
+cancellation cannot keep the artwork promise pending. Host-clock rollback fails
+to the existing monogram fallback; trusted gateway/raster/byte/chunk restrictions
+remain. Real and simulated timeout tests and loopback HTTP exercise the reader,
+not public IPFS availability or full image decoding. No new service, credentials,
+financial engine or release approval follows. See CREATOR_FLOW.md.
+
 ## Public project read lifetime
 
 The actual canon/snapshot readers now enforce existing 10/30-second budgets with

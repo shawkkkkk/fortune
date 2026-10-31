@@ -460,3 +460,18 @@ The production API/RPC/MCP rehearsal exercises attachment headers, checksum,
 provenance, unknowns and invalid/unregistered-token errors. This is a data/export
 component, not API-key/durable-quota/hosted-auth/indexer or full P23 readiness.
 See PROJECT_DATA_EXPORT.md. No financial or frozen release gates change.
+
+## Offline Bitcoin header / transaction Merkle integration (M05)
+
+A separately disabled local-file CLI now consumes the actual serialized
+transaction/Runestone engines and checks a supplied txid path against a supplied
+80-byte header's root and expected header hash. Exact depth, index/count bounds,
+odd-width duplication and visible equal-pair checks fail closed. Count and index
+remain claims; opaque subtree mutation and SegWit witness commitments are not
+verified. Matching caller-supplied bytes does not establish trusted headers,
+proof of work, canonical-chain inclusion, network, finality, valid transactions,
+Rune issuance, custody or bridge backing; all those authority/readiness flags
+remain false. Historical genesis and synthetic full-tree/child-CLI tests are
+component evidence, not public-provider or Bitcoin Core differential evidence.
+See BITCOIN_MERKLE_OBSERVATION.md. No network, signing, broadcasts, financial
+activation, dependency or frozen Standard/release-gate changes are introduced.

@@ -40,6 +40,9 @@ contract FortuneTestnetWorkEscrow is ReentrancyGuard {
     mapping(address => uint128) public maxPerJob;
     mapping(address => uint256) public reserved;
     mapping(uint256 => Job) public jobs;
+    mapping(address => mapping(bytes32 => uint256)) public fundingJobs;
+    error FundingIdUsed();
+    event FundingBound(uint256 indexed id, address indexed client, bytes32 indexed fundingId);
     error WrongChain();
     error Unauthorized();
     error Paused();
@@ -113,6 +116,30 @@ contract FortuneTestnetWorkEscrow is ReentrancyGuard {
         chain97
         open
         nonReentrant
+        returns (uint256 id)
+    {
+        return _fund(worker, token, amount, termsHash, acceptBy, deliverBy);
+    }
+
+    /// @notice Optional permanent client-scoped ID; all successful-ID reuse rejects.
+    function fundWithId(
+        bytes32 fundingId,
+        address worker,
+        address token,
+        uint128 amount,
+        bytes32 termsHash,
+        uint64 acceptBy,
+        uint64 deliverBy
+    ) external chain97 open nonReentrant returns (uint256 id) {
+        if (fundingId == bytes32(0)) revert InvalidJob();
+        if (fundingJobs[msg.sender][fundingId] != 0) revert FundingIdUsed();
+        fundingJobs[msg.sender][fundingId] = nextJob;
+        id = _fund(worker, token, amount, termsHash, acceptBy, deliverBy);
+        emit FundingBound(id, msg.sender, fundingId);
+    }
+
+    function _fund(address worker, address token, uint128 amount, bytes32 termsHash, uint64 acceptBy, uint64 deliverBy)
+        private
         returns (uint256 id)
     {
         if (

@@ -46,8 +46,18 @@ changes fail closed. No amendment, expiry sweep, arbitrary destination, fee,
 protocol revenue allocation, arbitrary call, native handling or admin withdrawal
 exists. Blacklisting, rebasing/proxy changes and pause can strand funds; no
 insurance or generic recovery bypass is provided. Code hashes are not token,
-issuer or proxy safety certification. Duplicate intentional funding creates a
-new job, not retry deduplication: inspect receipts/state after uncertain outcomes.
+issuer or proxy safety certification. Legacy `fund` creates a new job each time. The optional `fundWithId` method
+requires a nonzero public client-scoped ID and permanently binds successful IDs
+to job numbers through `fundingJobs` and `FundingBound`. Every reuse by that
+client rejects before another transfer, even with changed terms or after
+settlement. Failed funding rolls back the binding and permits explicit retry.
+The same ID under another client's wallet is a separate namespace. IDs carry no
+identity or financial authority, are not secret, and cannot be reset/pruned.
+Changing IDs or using legacy funding can still intentionally duplicate a job;
+this is not cross-wallet intent recognition. Preserve the original ID, inspect
+receipts/state after uncertain outcomes, and never silently generate a new ID.
+New contract source/runtime requires fresh evidence; old deployments do not
+acquire this method or audit approval.
 
 Client custody of funding is not proof of legitimate capital origin. Never use
 creator/holder/LP liabilities or launch reserves as agent capital. This contract

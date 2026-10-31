@@ -42,9 +42,16 @@ try{
  await write(GUARD,escrow,escrowArtifact,'setPaused',[false],false);
  await write(GOV,escrow,escrowArtifact,'setPaused',[false]);
  await write(GOV,token,assetArtifact,'mint',[CLIENT,2000n]);
+ const fundingId='0x'+'22'.repeat(32);let firstFundingArgs;
  const fund=async amount=>{const id=await read(escrow,escrowArtifact,'nextJob');const at=(await rpc.getBlock()).timestamp;
   await write(CLIENT,token,assetArtifact,'approve',[escrow,amount]);
-  await write(CLIENT,escrow,escrowArtifact,'fund',[WORKER,token,amount,'0x'+'11'.repeat(32),at+100n,at+200n]);return id;};
+  const args=[WORKER,token,amount,'0x'+'11'.repeat(32),at+100n,at+200n];
+  if(id===1n){firstFundingArgs=[fundingId,...args];await write(CLIENT,escrow,escrowArtifact,'fundWithId',firstFundingArgs);
+   assert.equal(await read(escrow,escrowArtifact,'fundingJobs',[CLIENT,fundingId]),id);
+   await write(CLIENT,token,assetArtifact,'approve',[escrow,1000n]);
+   await write(CLIENT,escrow,escrowArtifact,'fundWithId',firstFundingArgs,false);
+   assert.equal(await read(escrow,escrowArtifact,'nextJob'),2n);assert.equal(await read(escrow,escrowArtifact,'reserved',[token]),amount);
+  }else await write(CLIENT,escrow,escrowArtifact,'fund',args);return id;};
  stage='client payment after explicit worker acceptance';
  const one=await fund(100n);await write(WORKER,escrow,escrowArtifact,'accept',[one]);
  await write(GUARD,escrow,escrowArtifact,'setPaused',[true]);
@@ -54,6 +61,10 @@ try{
  const events=paid.logs.filter(l=>l.address.toLowerCase()===escrow.toLowerCase()).map(l=>decodeEventLog({abi:escrowArtifact.abi,data:l.data,topics:l.topics}));
  assert.equal(events.length,1);assert.equal(events[0].eventName,'JobSettled');assert.equal(events[0].args.id,one);assert.equal(events[0].args.workerAmount,100n);assert.equal(events[0].args.clientRefund,0n);assert.equal(events[0].args.settledBy.toLowerCase(),CLIENT);
  await write(CLIENT,escrow,escrowArtifact,'approvePayment',[one],false);
+ await write(CLIENT,escrow,escrowArtifact,'fundWithId',firstFundingArgs,false);
+ assert.equal(await read(token,assetArtifact,'allowance',[CLIENT,escrow]),1000n);
+ assert.equal(await read(escrow,escrowArtifact,'fundingJobs',[CLIENT,fundingId]),one);
+ assert.equal(await read(escrow,escrowArtifact,'nextJob'),2n);
  stage='unaccepted cancellation and arbitrated dispute';
  const two=await fund(50n);await write(CLIENT,escrow,escrowArtifact,'cancel',[two]);
  const three=await fund(100n);await write(WORKER,escrow,escrowArtifact,'accept',[three]);await write(WORKER,escrow,escrowArtifact,'dispute',[three]);
@@ -69,7 +80,7 @@ try{
  await write(WORKER,escrow,escrowArtifact,'accept',[four],false);await write(GOV,escrow,escrowArtifact,'cancel',[four]);
  assert.equal(await read(escrow,escrowArtifact,'reserved',[token]),0n);
  assert.equal(await read(token,assetArtifact,'balanceOf',[escrow]),0n);assert.equal(await read(token,assetArtifact,'balanceOf',[CLIENT]),1840n);assert.equal(await read(token,assetArtifact,'balanceOf',[WORKER]),160n);
- const result={chainId:97,localOnly:true,compiledWorkEscrowDeployed:true,fundedJobs:4,settledJobs:4,clientApprovalReceiptBound:true,
+ const result={chainId:97,localOnly:true,clientScopedFundingIdObserved:true,fundedApprovedReplayRejectedBeforeAndAfterSettlement:true,compiledWorkEscrowDeployed:true,fundedJobs:4,settledJobs:4,clientApprovalReceiptBound:true,
   workerPaidUnits:'160',clientFinalUnits:'1840',finalReserved:'0',cancellationAndExpiryRefundedClient:true,disputeSplitSettled:true,
   governorCannotArbitrate:true,guardianCannotOpen:true,pausedPaymentRejected:true,duplicatePaymentRejected:true,inexactSplitRetainsLiability:true,explicitRetrySucceeded:true,
   generatedAccounts:0,privateKeysUsed:false,publicBroadcasts:false,independentProvidersVerified:false,workDeliveryVerified:false,

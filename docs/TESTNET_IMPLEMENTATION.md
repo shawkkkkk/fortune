@@ -135,6 +135,18 @@ temporary post-mining reservations are not signer enforcement or independent
 providers. Other gas, hold recovery, durable operations and public deployment
 remain outside this rehearsal. No operator book, wallet or release gate changes.
 
+## Bitcoin Rune index observation (M05)
+
+A separately disabled operator CLI now calls an actual fixed-origin ord Rune-ID
+JSON adapter with lossless u128 integer parsing, strict requested-ID/block/schema
+binding, bounded streaming and a real ten-second fenced read lifetime. It emits
+whitelisted raw index labels/counts, unknown supply/market/backing fields and
+false network/transaction/Runestone/finality/custody/bridge/execution readiness.
+CLI/HTTP and timeout tests exercise the runtime; one fixture is not independent
+Bitcoin/index verification or live deployment. No etching, wallet, bridge, fees,
+public service or full M05 readiness is enabled. See BITCOIN_RUNE_INDEX.md for
+pinned upstream schema, source-context runtime support and remaining gates.
+
 ## Worker result revision integration (P19)
 
 The isolated escrow now stores up to 32 append-only worker result commitments

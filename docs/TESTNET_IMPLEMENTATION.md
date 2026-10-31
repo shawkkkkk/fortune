@@ -410,3 +410,17 @@ budgets, not a global verification deadline. Real-timer and HTTP projection test
 are component evidence, not live identity/attestor/claim/recovery or full Social
 Escrow readiness. No contracts, credentials, public activation or gates change.
 See SOCIAL_FEES.md.
+
+
+## Project LP-position MCP integration (P03/M07)
+
+A separate default-disabled local tool/resource now invokes the actual pinned LP
+reader over two configured read clients. A bounded literal startup policy must
+include the fixed project token as a position asset; identical policy bytes are
+required before/after reads. All readers share the existing four-read quota.
+Raw liquidity/last-computed owed fields retain null value/claimable fees and false
+project-custody, provider-independence, full-readiness and execution authority.
+Actual child stdio/viem HTTP/ABI tests exercise this path, not public providers
+or creator/custody approval. Existing reader logic is unchanged apart from an
+export of its validation function. No fee collection, management, signer or
+public service is enabled. See PROJECT_LIQUIDITY_MCP.md.

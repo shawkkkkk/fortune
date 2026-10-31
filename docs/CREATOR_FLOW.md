@@ -124,3 +124,20 @@ contract suite and live fork rehearsal remain necessary.
 The owner's screenshots/documentation establish UX targets, not audited
 competitor behavior or evidence of Fortune feature parity. No speculative
 valuation, guaranteed returns, official Fortune CA or "rug-proof" claim.
+
+## Share-card artwork read lifetime
+
+The existing trusted-IPFS-gateway raster reader now returns its null/monogram
+fallback at a real three-second deadline, including noncooperating fetch/body
+reads. Before/after read fences prevent late responses from accessing the body,
+late chunks from starting further reads, and completed reads from returning after
+expiry. Unsafe, negative or backwards host clocks also fall back. All outcomes
+clear the timer and request abort/cancellation without awaiting cancellation;
+in-flight transport may continue and host event-loop scheduling limits timers.
+
+The fixed gateway, refusal of arbitrary creator HTTP hosts/redirects, PNG/JPEG
+MIME and signature checks, 1.5 MB byte limit and 4,096-chunk bound remain. These
+checks are not full image-codec validation or a gateway availability guarantee.
+Tests include an actual loopback HTTP byte read plus simulated/noncooperating
+transports; they do not certify the public gateway. No upload hosting, credentials,
+model/media generation, public publishing or financial authority is enabled.

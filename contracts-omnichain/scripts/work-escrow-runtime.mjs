@@ -104,7 +104,32 @@ try{
  assert.equal(await read(escrow,escrowArtifact,'resultHashes',[five,1n]),resultA);
  assert.equal(await read(escrow,escrowArtifact,'reserved',[token]),0n);
  assert.equal(await read(token,assetArtifact,'balanceOf',[escrow]),0n);assert.equal(await read(token,assetArtifact,'balanceOf',[CLIENT]),1820n);assert.equal(await read(token,assetArtifact,'balanceOf',[WORKER]),180n);
- const result={chainId:97,localOnly:true,clientScopedFundingIdObserved:true,fundedApprovedReplayRejectedBeforeAndAfterSettlement:true,compiledWorkEscrowDeployed:true,fundedJobs:5,settledJobs:5,clientApprovalReceiptBound:true,workerResultHistoryObserved:true,revisionBoundPaymentReceiptObserved:true,staleResultApprovalRejected:true,inexactResultPaymentRetainsLiability:true,
+ stage='worker waiver refunds only original client with current result revision';
+ const six=await fund(15n);await write(WORKER,escrow,escrowArtifact,'accept',[six]);
+ await write(WORKER,escrow,escrowArtifact,'submitResult',[six,0n,resultA]);
+ await write(CLIENT,escrow,escrowArtifact,'waivePayment',[six,1n],false);
+ await write(WORKER,escrow,escrowArtifact,'waivePayment',[six,0n],false);
+ await write(GOV,token,assetArtifact,'configure',[true,false,'0x0000000000000000000000000000000000000000']);
+ await write(WORKER,escrow,escrowArtifact,'waivePayment',[six,1n],false);
+ assert.equal((await read(escrow,escrowArtifact,'jobs',[six]))[7],2);
+ assert.equal(await read(escrow,escrowArtifact,'reserved',[token]),15n);
+ assert.equal(await read(token,assetArtifact,'balanceOf',[CLIENT]),1805n);
+ assert.equal(await read(escrow,escrowArtifact,'resultHashes',[six,1n]),resultA);
+ await write(GOV,token,assetArtifact,'configure',[false,false,'0x0000000000000000000000000000000000000000']);
+ const waived=await write(WORKER,escrow,escrowArtifact,'waivePayment',[six,1n]);
+ const waiverEvents=waived.logs.filter(l=>l.address.toLowerCase()===escrow.toLowerCase()).map(l=>decodeEventLog({abi:escrowArtifact.abi,data:l.data,topics:l.topics}));
+ assert.equal(waiverEvents.length,2);assert.equal(waiverEvents[0].eventName,'JobSettled');
+ assert.equal(waiverEvents[0].args.id,six);assert.equal(waiverEvents[0].args.workerAmount,0n);assert.equal(waiverEvents[0].args.clientRefund,15n);assert.equal(waiverEvents[0].args.settledBy.toLowerCase(),WORKER);
+ assert.equal(waiverEvents[1].eventName,'PaymentWaived');assert.equal(waiverEvents[1].args.id,six);assert.equal(waiverEvents[1].args.worker.toLowerCase(),WORKER);assert.equal(waiverEvents[1].args.resultRevision,1n);
+ const transfer=waived.logs.find(l=>l.address.toLowerCase()===token.toLowerCase());
+ const paidBack=decodeEventLog({abi:assetArtifact.abi,data:transfer.data,topics:transfer.topics});
+ assert.equal(paidBack.eventName,'Transfer');assert.equal(paidBack.args.from.toLowerCase(),escrow.toLowerCase());assert.equal(paidBack.args.to.toLowerCase(),CLIENT);assert.equal(paidBack.args.value,15n);
+ await write(WORKER,escrow,escrowArtifact,'waivePayment',[six,1n],false);
+ await write(CLIENT,escrow,escrowArtifact,'approvePayment',[six],false);
+ assert.equal(await read(escrow,escrowArtifact,'resultHashes',[six,1n]),resultA);
+ assert.equal(await read(escrow,escrowArtifact,'reserved',[token]),0n);
+ assert.equal(await read(token,assetArtifact,'balanceOf',[CLIENT]),1820n);assert.equal(await read(token,assetArtifact,'balanceOf',[WORKER]),180n);
+ const result={chainId:97,localOnly:true,clientScopedFundingIdObserved:true,fundedApprovedReplayRejectedBeforeAndAfterSettlement:true,compiledWorkEscrowDeployed:true,fundedJobs:6,settledJobs:6,workerWaiverRefundReceiptBound:true,staleWaiverRejected:true,inexactWaiverPreservesLiability:true,clientApprovalReceiptBound:true,workerResultHistoryObserved:true,revisionBoundPaymentReceiptObserved:true,staleResultApprovalRejected:true,inexactResultPaymentRetainsLiability:true,
   workerPaidUnits:'180',clientFinalUnits:'1820',finalReserved:'0',cancellationAndExpiryRefundedClient:true,disputeSplitSettled:true,
   governorCannotArbitrate:true,guardianCannotOpen:true,pausedPaymentRejected:true,duplicatePaymentRejected:true,inexactSplitRetainsLiability:true,explicitRetrySucceeded:true,
   generatedAccounts:0,privateKeysUsed:false,publicBroadcasts:false,independentProvidersVerified:false,workDeliveryVerified:false,

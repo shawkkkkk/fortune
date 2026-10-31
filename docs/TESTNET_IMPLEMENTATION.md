@@ -135,6 +135,18 @@ temporary post-mining reservations are not signer enforcement or independent
 providers. Other gas, hold recovery, durable operations and public deployment
 remain outside this rehearsal. No operator book, wallet or release gate changes.
 
+## Single-position custody integration (M07)
+
+An isolated chain97 custody component now locks one pinned V3 position policy,
+accepts an explicitly approved governor NFT while open, and permits one terminal
+fixed-treasury release while paused. It has no fee collection, liquidity mutation,
+approval, arbitrary execution or recovery drain. The existing local Pancake fork
+rehearsal connects actual NFT custody and treasury exit to the pinned LP reader;
+old-owner policies reject and raw liquidity stays exact. This is source and test
+integration, not a public deployment, legitimate capital proof, signer or complete
+LP manager. See MANAGED_LIQUIDITY_CUSTODY.md for authority, stranded-asset risks,
+local/independent-provider distinctions and separate readiness gates.
+
 ## LP reader request lifecycle
 
 The separate paused omnichain route reader also rechecks both snapshots' age at

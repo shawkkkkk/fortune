@@ -114,6 +114,25 @@ The **Custom Pairs Beta Testnet Deploy + Drill** workflow deploys the factory an
 
 Independent audit of the vault together with `contracts-custom-pairs/`; the attestor key in managed key storage with monitoring that alerts on bindings the server did not sign; a guardian able to respond within the 1-hour window; the owner on a multisig; and a regional access decision.
 
+## Ownership-source request lifetime
+
+Each ownership/profile HTTP attempt enforces its existing eight-second budget
+with a real rejecting timer, including non-cooperating fetch/stream reads.
+Safe, nonnegative, monotonic host-clock checks fence response and chunk reads;
+late completions cannot consume further evidence. Abort and body cancellation
+are best effort and never awaited, so stuck cancellation cannot delay failure.
+In-flight transport may continue; event-loop scheduling is not hard real time.
+
+The existing single retry after 300 ms is preserved with a fresh attempt budget.
+Platform fallbacks and multi-step account resolution can perform multiple
+attempts: this is **not** an eight-second whole-verification deadline. Existing
+fixed endpoints, manual-short-link handling, response-byte limits, status/author/
+code checks and private-link verification remain unchanged. Cleanup also aborts
+successful attempts. Tests exercise hung fetch/read/cancel, late fences, clock
+rollback, the real timer and actual loopback HTTP into the GitHub projection.
+Fixtures do not prove live platform ownership, attestor custody, public claim
+recovery or complete M04 readiness; no attestor or service is enabled here.
+
 ## Token units in claim details
 
 The identity reader requires a successful uint8 `decimals()` result for every

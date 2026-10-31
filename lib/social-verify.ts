@@ -86,8 +86,31 @@ async function fetchText(fetcher: FetchLike, url: string, init?: RequestInit, ma
 
 async function fetchOnce(fetcher: FetchLike, url: string, init?: RequestInit, maxBytes = MAX_BODY_BYTES, manualRedirect = false) {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 8_000);
-  try {
+  const started = Date.now();
+  let last = started, finished = false;
+  if (!Number.isSafeInteger(started) || started < 0) throw Error("Invalid social proof clock");
+  const check = () => {
+    const time = Date.now();
+    if (finished || !Number.isSafeInteger(time) || time < last || time - started >= 8_000) throw Error("Social proof attempt ended");
+    last = time;
+  };
+  let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
+  let responseBody: ReadableStream<Uint8Array> | null = null;
+  // Cancellation is best effort: neither a hung cancel nor a fetch ignoring
+  // abort may keep this attempt alive or turn a late body into ownership proof.
+  const cancel = () => {
+    try { void (reader ? reader.cancel() : responseBody?.cancel())?.catch(() => {}); } catch {}
+  };
+  let timer: ReturnType<typeof setTimeout>;
+  const deadline = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => {
+      finished = true;
+      reject(Error("Social proof attempt timed out"));
+      controller.abort(); cancel();
+    }, 8_000);
+  });
+  const work = async () => {
+    check();
     const response = await fetcher(url, {
       ...init,
       redirect: manualRedirect ? "manual" : "error",
@@ -95,37 +118,39 @@ async function fetchOnce(fetcher: FetchLike, url: string, init?: RequestInit, ma
       signal: controller.signal,
       headers: { "User-Agent": "fortunepad-social-verifier/1.0 (+https://fortunepad.fun)", ...(init?.headers || {}) },
     });
+    check();
+    responseBody = response.body;
     // Error/redirect bodies are never ownership evidence, even if they happen
     // to contain fields resembling a successful platform response.
     if (!response.ok) {
-      await response.body?.cancel();
       const location = manualRedirect && response.status >= 300 && response.status < 400 ? response.headers.get("location") : null;
+      check();
       return { status: response.status, body: "", location };
     }
-    const reader = response.body?.getReader();
+    reader = responseBody?.getReader();
     if (!reader) return { status: response.status, body: "", location: null };
     const decoder = new TextDecoder();
     let bytes = 0;
     let body = "";
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        bytes += value.byteLength;
-        if (bytes > maxBytes) {
-          controller.abort();
-          await reader.cancel();
-          throw new Error("Social proof response exceeded its byte limit");
-        }
-        body += decoder.decode(value, { stream: true });
-      }
-      body += decoder.decode();
-    } finally {
-      reader.releaseLock();
+    while (true) {
+      check();
+      const { done, value } = await reader.read();
+      check();
+      if (done) break;
+      bytes += value.byteLength;
+      if (bytes > maxBytes) throw Error("Social proof response exceeded its byte limit");
+      body += decoder.decode(value, { stream: true });
     }
+    body += decoder.decode();
+    check();
     return { status: response.status, body, location: null };
-  } finally {
-    clearTimeout(timer);
+  };
+  try { return await Promise.race([work(), deadline]); }
+  finally {
+    finished = true;
+    clearTimeout(timer!);
+    controller.abort(); cancel();
+    try { reader?.releaseLock(); } catch {}
   }
 }
 

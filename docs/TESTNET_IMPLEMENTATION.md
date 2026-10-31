@@ -398,3 +398,15 @@ rule reads and gate metadata. Legacy getter-discovery fallbacks remain a separat
 limitation; this does not complete M03/P16 enforcement, deployment or full lifecycle
 readiness. No contracts, configured factories, signing or release gates change.
 See LAUNCH_RULES.md.
+
+
+## Social ownership-source request lifetime (M04)
+
+Actual ownership/profile HTTP attempts now reject at their existing eight-second
+budget even when transport ignores abort or cancellation hangs. Before/after
+read fences reject late evidence and host-clock rollback; cleanup ends every
+attempt. Existing single retry and platform fallbacks retain separate attempt
+budgets, not a global verification deadline. Real-timer and HTTP projection tests
+are component evidence, not live identity/attestor/claim/recovery or full Social
+Escrow readiness. No contracts, credentials, public activation or gates change.
+See SOCIAL_FEES.md.

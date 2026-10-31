@@ -105,3 +105,37 @@ New isolated source/runtime needs fresh evidence; old deployments/audits are not
 upgraded. The local runtime preserves the original four settlements and adds a
 fifth job with two revisions, stale/wrong approval and taxed-transfer rejection,
 explicit retry and revision/payment receipt binding.
+
+## Voluntary worker payment waiver
+
+The optional `waivePayment(id, expectedRevision)` lets only the named worker of
+an Accepted job forgo the entire unpaid principal and return it to the original
+client. It works before or after the delivery deadline while the escrow is open
+on chain97. The exact current result revision, including zero when no result
+exists, must match; a concurrent result update invalidates prepared waiver bytes.
+Funded, Disputed, missing and settled jobs reject. Client/governor/guardian/
+arbitrator cannot invoke this worker power. Disputed jobs still use arbitration.
+
+Settlement reuses the existing exact refund/backing/runtime checks and reserved
+liability accounting. `JobSettled` and `PaymentWaived` identify the job, worker
+caller, complete client refund and consented revision. Failed/inexact transfers
+revert state, liabilities and both events; explicit retry is required. Existing
+result history and successful funding IDs are never erased. No partial waiver,
+arbitrary recipient, fee, sweep, pause bypass or new arbitrator power is added.
+Legacy payment, cancellation and dispute methods remain available.
+
+A worker waiver is a voluntary contract action, not proof of mutual legal
+agreement, cancelled work, delivery, fairness, identity or IP/license transfer.
+It relinquishes all payment on this job; wallet software must disclose that
+consequence and require fresh consent. Transaction ordering decides competing
+payment/dispute/waiver calls: the first valid state transition wins, and later
+calls reject. This does not undo an already paid job or add automatic refunds.
+Pause, incompatible assets and trusted arbitration can still strand funds.
+
+Unit/fuzz/invariant tests include the waiver in liability conservation. The
+zero-account local HTTP/ABI rehearsal preserves all five previous jobs and adds
+a sixth with current-revision/refund-receipt binding, stale/unauthorized calls,
+inexact refund rollback and explicit retry. One synthetic asset/EVM is not a
+public escrow, real worker/client identity, independent providers or full P19
+readiness. Changed bytecode requires fresh deployment/audit evidence; no earlier
+contract's deployment, signatures or approval transfer to this source.

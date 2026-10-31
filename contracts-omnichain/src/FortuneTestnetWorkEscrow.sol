@@ -185,6 +185,18 @@ contract FortuneTestnetWorkEscrow is ReentrancyGuard {
         _settle(id, 0);
     }
 
+    event PaymentWaived(uint256 indexed id, address indexed worker, uint256 resultRevision);
+
+    /// @notice Worker voluntarily returns all principal to the original client; no work/IP verdict.
+    function waivePayment(uint256 id, uint256 expectedRevision) external chain97 open nonReentrant {
+        Job storage j = jobs[id];
+        if (msg.sender != j.worker) revert Unauthorized();
+        if (j.state != State.Accepted) revert WrongState();
+        if (expectedRevision != latestResultRevision[id]) revert InvalidResult();
+        _settle(id, 0);
+        emit PaymentWaived(id, msg.sender, expectedRevision);
+    }
+
     /// @notice Explicit client approval after worker acceptance, never an inferred delivery verdict.
     function approvePayment(uint256 id) external chain97 open nonReentrant {
         Job storage j = jobs[id];

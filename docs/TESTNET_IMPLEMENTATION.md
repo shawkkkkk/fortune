@@ -147,6 +147,17 @@ Bitcoin/index verification or live deployment. No etching, wallet, bridge, fees,
 public service or full M05 readiness is enabled. See BITCOIN_RUNE_INDEX.md for
 pinned upstream schema, source-context runtime support and remaining gates.
 
+## Voluntary worker waiver (P19)
+
+The isolated work escrow now permits an Accepted job's named worker to waive all
+payment and refund only the original client, bound to the exact current result
+revision. Existing exact settlement/backing/pause/runtime checks and permanent
+funding/result history remain. Disputed jobs still require arbitration; failed
+refunds preserve liabilities for explicit retry. Unit/fuzz/invariant and actual
+local HTTP/ABI settlement tests cover this additional path. This is voluntary
+contract consent, not delivery/IP/identity/fairness or public service readiness.
+See SYNDICATE_WORK_ESCROW.md for ordering, forfeiture and separate review gates.
+
 ## Worker result revision integration (P19)
 
 The isolated escrow now stores up to 32 append-only worker result commitments

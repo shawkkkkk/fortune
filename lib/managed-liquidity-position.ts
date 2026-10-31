@@ -88,3 +88,6 @@ export async function inspectLiquidityPosition(clients: readonly [PublicClient,P
     })]);
   }finally{finished=true;clearTimeout(timer);}
 }
+
+// Reuse the exact engine policy checks for offline operator-adapter preflight.
+export { validate as validateLiquidityPositionPolicy };

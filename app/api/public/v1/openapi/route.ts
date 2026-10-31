@@ -198,6 +198,14 @@ export async function GET(request: Request) {
           responses: { "200": { description: "Creator-supplied metadata, filtered public links, registry/factory/creator binding, frozen flag and block evidence" }, "404": { description: "Not a verified Standard launch" }, "503": { description: "Onchain metadata unavailable" } },
         },
       },
+      "/tokens/{id}/project/export": {
+        get: {
+          tags: ["Markets"], summary: "Download bounded public Standard testnet project data as JSON",
+          description: "Attachment containing payloadUtf8 and SHA-256 of its exact UTF-8 bytes. Checksum is not a signature or source authentication. Reuses the same-block project reader; excludes creator prose/links, preserves exact decimal strings and unknown analytics. No financial authority or independent RPC/finality verification.",
+          parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+          responses: { "200": { description: "JSON attachment; no-store, nosniff; schema1 payload string and lowercase SHA-256" }, "400": { description: "Invalid token" }, "403": { description: "Unsupported network" }, "404": { description: "Unsupported launch" }, "503": { description: "Consistent project data unavailable" } },
+        },
+      },
       "/tokens/{id}/project": {
         get: {
           tags: ["Markets"], summary: "Same-block Standard testnet metadata and curve-accounting snapshot",

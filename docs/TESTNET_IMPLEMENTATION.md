@@ -149,6 +149,17 @@ remain outside this rehearsal. No operator book, wallet or release gate changes.
 
 ## Bitcoin Rune index observation (M05)
 
+An additional offline output-script decoder now interprets real Runestone binary
+payloads against a pinned ord source: pushdata, exact u128 varints, fields/flags,
+delta edicts and cenotaphs. A separately disabled bounded local-file CLI calls the
+actual decoder, with literal upstream-derived vectors and adversarial component
+tests. Supplied output lists are not verified transactions or complete chain
+data; etching/mint acceptance, balances, network/finality, custody/bridge backing,
+execution and full M05 readiness always remain false. No wallet, network service,
+transaction construction or financial activation is added. See
+BITCOIN_RUNESTONE_DECODER.md for protocol pin, supported bounds and missing
+Bitcoin validation/issuance/bridge lifecycle.
+
 A separately disabled operator CLI now calls an actual fixed-origin ord Rune-ID
 JSON adapter with lossless u128 integer parsing, strict requested-ID/block/schema
 binding, bounded streaming and a real ten-second fenced read lifetime. It emits

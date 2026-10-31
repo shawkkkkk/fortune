@@ -435,3 +435,16 @@ Actual child stdio/viem HTTP/ABI tests exercise this path, not public providers
 or creator/custody approval. Existing reader logic is unchanged apart from an
 export of its validation function. No fee collection, management, signer or
 public service is enabled. See PROJECT_LIQUIDITY_MCP.md.
+
+## Serialized Bitcoin transaction / Runestone integration (M05)
+
+A separately disabled offline CLI now parses bounded supplied legacy/SegWit
+transactions, checks an expected txid, computes wtxid and passes every serialized
+output script in order to the actual Runestone decoder. Canonical CompactSize,
+byte/count/value bounds and witness framing fail closed. Matching hashes bind
+supplied bytes, not signatures, chain inclusion, UTXO/Rune balances, issuance,
+custody or bridge backing; those verification/readiness flags remain false.
+Known historical bytes, adversarial synthetic serialization and actual child CLI
+tests are component evidence, not a public Bitcoin provider or full M05 lifecycle.
+See BITCOIN_TRANSACTION_INSPECTION.md. No network, signing, broadcasts, financial
+activation, dependency or frozen Standard changes are introduced.

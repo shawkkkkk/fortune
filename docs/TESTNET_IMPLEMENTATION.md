@@ -135,6 +135,20 @@ temporary post-mining reservations are not signer enforcement or independent
 providers. Other gas, hold recovery, durable operations and public deployment
 remain outside this rehearsal. No operator book, wallet or release gate changes.
 
+## Worker result revision integration (P19)
+
+The isolated escrow now stores up to 32 append-only worker result commitments
+for Accepted jobs before their existing deadline. Expected revision fences
+concurrent updates. Optional client approval binds the exact latest revision/hash
+to existing whole-payment settlement; stale approvals and failed transfers retain
+liabilities/history. Legacy unbound approval and all previous settlements remain.
+The actual local HTTP/ABI rehearsal preserves four jobs and adds a fifth with
+result/payment receipt bindings, stale and taxed-payment rejection and explicit
+retry. Hashes are public supplied commitments, not verified delivery, identity,
+authorship, IP/license, quality or complete P19 readiness. No public deployment,
+signer, new fees, custody recovery or release authority follows. See
+SYNDICATE_WORK_ESCROW.md for privacy and separate audit/operational gates.
+
 ## Client-scoped work funding IDs (P19)
 
 The isolated work escrow adds optional `fundWithId` funding with permanent

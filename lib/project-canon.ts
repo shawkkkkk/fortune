@@ -1,4 +1,5 @@
-import { boundedText, publicMetadataUrl, readLimitedBytes } from "@/lib/creator-metadata";
+import { readProjectApi } from "@/lib/project-api-read";
+import { boundedText, publicMetadataUrl } from "@/lib/creator-metadata";
 import { PUBLIC_TESTNET } from "@/lib/public-testnet";
 
 const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
@@ -51,15 +52,6 @@ export function projectCanon(value: unknown, token: string, now = Date.now()) {
 
 export async function readProjectCanon(token: string, options: { fetch?: typeof fetch; now?: () => number } = {}) {
   token = projectToken(token);
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 10000);
-  try {
-    const response = await (options.fetch ?? fetch)(`https://fortunepad.fun/api/public/v1/tokens/${token}/metadata`, {
-      method: "GET", redirect: "error", credentials: "omit", cache: "no-store", signal: controller.signal,
-      headers: { Accept: "application/json" },
-    });
-    if (response.status !== 200 || !/^application\/json(?:\s*;|$)/i.test(response.headers.get("content-type") ?? "")) throw Error("Unavailable API");
-    const bytes = await readLimitedBytes(response, 32768);
-    return projectCanon(JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes)), token, (options.now ?? Date.now)());
-  } finally { clearTimeout(timeout); }
+  return readProjectApi(`https://fortunepad.fun/api/public/v1/tokens/${token}/metadata`, 10000, options,
+    (value, now) => projectCanon(value, token, now));
 }

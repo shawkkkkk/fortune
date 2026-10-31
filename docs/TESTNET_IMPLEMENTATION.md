@@ -135,6 +135,18 @@ temporary post-mining reservations are not signer enforcement or independent
 providers. Other gas, hold recovery, durable operations and public deployment
 remain outside this rehearsal. No operator book, wallet or release gate changes.
 
+## Scoped-work settlement foundation (P19)
+
+An isolated paused chain97 work escrow now implements exact client funding,
+worker acceptance, explicit client payment approval, pre-acceptance cancellation,
+expired unaccepted refunds and fixed-arbitrator dispute splits. Per-asset reserved
+liabilities stay backed; final payment destinations are immutable and inexact
+transfers revert all settlement state. Unit/fuzz/invariant and actual zero-account
+HTTP/ABI rehearsals exercise this source. It is not an agent marketplace, identity,
+work-delivery/fairness verification, public custody service or P19 readiness.
+See SYNDICATE_WORK_ESCROW.md for trusted arbitration, stranded-fund/pause risks,
+asset/capital review and independent audit/legal/operations gates.
+
 ## Single-position custody integration (M07)
 
 An isolated chain97 custody component now locks one pinned V3 position policy,

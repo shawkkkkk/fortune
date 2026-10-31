@@ -10,6 +10,7 @@ for (const [name, maxConstructorBytes] of [
   // Three governance addresses, seven infrastructure fields, and two five-field asset tuples.
   ["FortuneTestnetStrategyVault", 20 * 32],
   ["FortuneTestnetPositionCustody", 18 * 32],
+  ["FortuneTestnetWorkEscrow", (4 + 1 + 10 * 3) * 32],
   // Five heads, two dynamic lengths, ten asset tuples and 32 exclusions.
   ["FortuneTestnetCounterEscrow", (5 + 2 + 10 * 2 + 32) * 32],
 ]) {

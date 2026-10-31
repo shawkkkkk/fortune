@@ -5,7 +5,7 @@ import { resolve } from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { once } from 'node:events';
 import { createServer } from 'node:net';
-import { createPublicClient, createWalletClient, http, keccak256, pad, toHex, encodeAbiParameters, decodeAbiParameters } from 'viem';
+import { createPublicClient, createWalletClient, http, keccak256, pad, toHex, encodeAbiParameters, decodeAbiParameters, decodeEventLog } from 'viem';
 import { inspectOmnichainRoute, encodeRouteUln, ULN_PARAMETERS, EXECUTOR_PARAMETERS } from '../../lib/omnichain-route.ts';
 
 import { inspectPermanentBurn } from '../../lib/omnichain-burn-receipt.ts';
@@ -13,6 +13,7 @@ import { inspectPermanentBurn } from '../../lib/omnichain-burn-receipt.ts';
 const GOV = '0x0000000000000000000000000000000000001111', WORKER = '0x0000000000000000000000000000000000002222';
 const reportPath = resolve('.tmp/omnichain-route-runtime.json'); rmSync(reportPath, { force: true });
 const artifact = path => JSON.parse(readFileSync(new URL(path, import.meta.url), 'utf8'));
+const burnVault = artifact('../out/FortuneTestnetBurnVault.sol/FortuneTestnetBurnVault.json');
 const token = artifact('../out/FortuneOmnichainToken.sol/FortuneOmnichainToken.json');
 const endpoint = artifact('../node_modules/@layerzerolabs/oapp-evm/artifacts/EndpointV2Mock.sol/EndpointV2Mock.json');
 const send = artifact('../node_modules/@layerzerolabs/lz-evm-messagelib-v2/artifacts/contracts/uln/uln302/SendUln302.sol/SendUln302.json');
@@ -47,7 +48,7 @@ try {
     const eid = 40001 + i, ep = await deploy(endpoint, [eid, GOV]), sl = await deploy(send, [ep, 100000n, 0n]), rl = await deploy(receive, [ep]);
     const t = await deploy(token, ['Fortune local route', 'FLR', ep, GOV, GOV, 300n * 10n ** 18n, BigInt(i + 1) * 100n * 10n ** 18n, pad('0x01')]);
     const worker = await pin(WORKER), uln = { confirmations: '20', required: [worker], optional: [], threshold: 0 };
-    networks.push({ rpc, write, readers: [createPublicClient({ transport: transport() }), createPublicClient({ transport: transport() })],
+    networks.push({ rpc, write, deploy, readers: [createPublicClient({ transport: transport() }), createPublicClient({ transport: transport() })],
       policy: { chainId, eid, token: await pin(t), endpoint: await pin(ep), sendLibrary: await pin(sl), receiveLibrary: await pin(rl), owner: GOV, delegate: GOV,
         initialAllocation: String(BigInt(i + 1) * 100n * 10n ** 18n), executor: worker, maxMessageSize: 10000, send: uln, receive: uln } });
   }
@@ -94,7 +95,32 @@ try {
     { eid: remote.eid, configType: 2, config: encodeAbiParameters(ULN_PARAMETERS, [{ confirmations: 0n, requiredDVNCount: 0, optionalDVNCount: 0, optionalDVNThreshold: 0, requiredDVNs: [], optionalDVNs: [] }]) },
   ]]); await confirm();
   await assert.rejects(inspectOmnichainRoute(readers, policy), /application ULN/);
+  stage = 'burn-only vault with actual compiled OFT inventory';
+  const vault = await n.deploy(burnVault, [GOV, '0x0000000000000000000000000000000000003333', p.token.address, p.token.codeHash, policy.manifestHash, 2n * 10n ** 18n]);
+  const readToken = (functionName, args = []) => n.rpc.readContract({ address: p.token.address, abi: token.abi, functionName, args });
+  const readVault = (functionName) => n.rpc.readContract({ address: vault, abi: burnVault.abi, functionName });
+  assert.equal(await readVault('paused'), true);
+  await n.write(p.token.address, token, 'transfer', [vault, 3n * 10n ** 18n]);
+  const supplyBefore = await readToken('totalSupply'), permanentBefore = await readToken('permanentlyBurned');
+  const simulateBurn = amount => n.rpc.simulateContract({ address: vault, abi: burnVault.abi, functionName: 'burn', args: [amount], account: GOV });
+  await assert.rejects(simulateBurn(10n ** 18n));
+  await n.write(vault, burnVault, 'setPaused', [false]);
+  await assert.rejects(simulateBurn(0n)); await assert.rejects(simulateBurn(3n * 10n ** 18n));
+  const burnedInventory = await n.write(vault, burnVault, 'burn', [2n * 10n ** 18n]);
+  assert.equal(burnedInventory.logs.length, 3);
+  const tokenEvents = burnedInventory.logs.slice(0, 2).map(l => { assert.equal(l.address.toLowerCase(), p.token.address.toLowerCase()); return decodeEventLog({ abi: token.abi, data: l.data, topics: l.topics }); });
+  assert.equal(tokenEvents[0].eventName, 'Transfer'); assert.equal(tokenEvents[0].args.from.toLowerCase(), vault.toLowerCase()); assert.equal(tokenEvents[0].args.to, '0x0000000000000000000000000000000000000000'); assert.equal(tokenEvents[0].args.value, 2n * 10n ** 18n);
+  assert.equal(tokenEvents[1].eventName, 'PermanentBurn'); assert.equal(tokenEvents[1].args.holder.toLowerCase(), vault.toLowerCase()); assert.equal(tokenEvents[1].args.amount, 2n * 10n ** 18n);
+  const event = decodeEventLog({ abi: burnVault.abi, data: burnedInventory.logs[2].data, topics: burnedInventory.logs[2].topics });
+  assert.equal(burnedInventory.logs[2].address.toLowerCase(), vault.toLowerCase()); assert.equal(event.eventName, 'InventoryBurned'); assert.equal(event.args.sequence, 1n); assert.equal(event.args.caller.toLowerCase(), GOV); assert.equal(event.args.amount, 2n * 10n ** 18n); assert.equal(event.args.cumulative, 2n * 10n ** 18n);
+  assert.equal(await readToken('balanceOf', [vault]), 10n ** 18n); assert.equal(await readToken('totalSupply'), supplyBefore - 2n * 10n ** 18n); assert.equal(await readToken('permanentlyBurned'), permanentBefore + 2n * 10n ** 18n);
+  await assert.rejects(simulateBurn(2n * 10n ** 18n));
+  await n.write(vault, burnVault, 'burn', [10n ** 18n]);
+  assert.equal(await readVault('totalBurned'), 3n * 10n ** 18n); assert.equal(await readVault('burnCount'), 2n); assert.equal(await readToken('balanceOf', [vault]), 0n);
+  assert.equal(await readToken('totalSupply'), supplyBefore - 3n * 10n ** 18n); assert.equal(await readToken('permanentlyBurned'), permanentBefore + 3n * 10n ** 18n);
+  await n.write(vault, burnVault, 'setPaused', [true]); await assert.rejects(simulateBurn(1n));
   const result = { localChainIds: [97, 84532], fixtureEndpointIds: [40001, 40002], actualOftAndUlnConfigurationRead: true,
+    burnOnlyInventoryVault: { compiledOftUsed: true, pausedAndAmountBoundsRejected: true, nestedBurnReceiptBound: true, balanceSupplyCounterReconciled: true, vaultTotalBurned: String(3n * 10n ** 18n), burnCount: 2, finalVaultBalance: '0', feeFundingVerified: false, buybackVerified: false, globalSupplyReconciled: false, publicDeployment: false, fullAgentReadiness: false, executionAuthorized: false },
     changedPeerRejected: true, changedExecutorRejected: true, inheritedApplicationUlnRejected: true, snapshot: observed, permanentBurn: burn, wrongBurnAmountRejected: true,
     twoLocalEvmInstances: true, independentPublicProviders: false, endpointIsUpstreamMock: true, workersAreSynthetic: true,
     generatedAccounts: 0, privateKeysUsed: false, publicBroadcasts: false, messageDeliveryTested: false, securityReadiness: false, executionAuthorized: false };

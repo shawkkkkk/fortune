@@ -49,6 +49,18 @@ public services, constrained signer integration and global settlement are not
 made ready by those merges. See CREATOR_COPILOT.md, MANAGED_LIQUIDITY_READER.md,
 STRATEGY_NATIVE_GAS_BUDGET.md and BUDGET_RECEIPT_RECONCILIATION.md.
 
+## Burn-only inventory settlement (M01/M08)
+
+A separate paused chain97 vault now permits only a pinned token's permanent burn
+of existing inventory, with exact vault-balance/local-supply/permanent-counter
+deltas and no transfer/approval/swap/sweep path. Unit/fuzz/invariant tests and the
+actual local compiled-OFT route rehearsal cover this component. Anyone may burn
+while governor-open; per-call caps are not daily limits. Received inventory has
+no refund/recovery route, and donations do not prove fee origin or allocation.
+Nested vault burns are outside the existing direct-burn receipt reader. No fee
+collection, buyback/reward/recirculation, public deployment, full agent/omnichain
+readiness or release approval follows. See BURN_ONLY_INVENTORY_VAULT.md.
+
 ## Isolated holder-round settlement (M06)
 
 An optional `fundSnapshotRound` path now binds newly built calldata to the actual

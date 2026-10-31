@@ -1,0 +1,43 @@
+# Public project-data download (P23)
+
+`GET /api/public/v1/tokens/<token>/project/export` downloads a JSON attachment
+through the existing actual Standard chain97 project snapshot reader. All its
+factory/token/creator/block binding and400/403/404/503 errors are preserved.
+No separate provider, caller URL, wallet, write, authentication session or model
+is added. Existing JSON snapshot responses are unchanged. See the public OpenAPI
+entry and PROJECT_MCP.md for the underlying reader's scope.
+
+The attachment filename uses only the validated lowercase token address, with
+application/json, no-store and nosniff headers. It contains schema1,
+kind fortune-project-data-export, payloadUtf8, SHA-256 and explicit authority
+limitations. Decode the outer JSON, then hash the exact UTF-8 bytes of its
+payloadUtf8 **string**, without parsing/reformatting that string first. This
+avoids reliance on object-key order or a particular JSON serializer for checksum
+verification. The string can then be parsed as JSON for inspection.
+
+The payload is limited to16KiB and includes the fixed official source URL,
+API timestamp, same-block market/provenance and static limitations. Addresses,
+block references and exact decimal values are preserved. No creator name, symbol,
+description, artwork, external links, character profile or unknown upstream
+fields are exported. Market cap, volume, holder count, treasury and executable
+quote remain null; retired curve reference prices remain null. Curve-accounted
+USD is not cash, LP TVL, market valuation or distributable treasury capital.
+The API timestamp is response age, not block freshness or finality. Download
+requests can observe a different block than a preceding snapshot request.
+
+SHA-256 identifies bytes only. Anyone can rewrite the payload and recompute it;
+it is not a signature, source authentication, an independent record or audit.
+sourceAuthenticated, independentRpcVerified, finalityVerified and
+executionAuthorized are always false; currentAuthorization is null. The fixed
+source URL is an attribution label, not proof that a downloaded file came from
+Fortune. Old downloads never renew authorization or become current evidence.
+
+Tests cover all phases, exact decimals, checksum reproducibility, prose omission,
+unknowns and malformed/stale/foreign source bindings. The existing actual
+production API/RPC/MCP runtime rehearsal now downloads the attachment, checks its
+headers/digest/whitelist and invalid/unregistered-token errors, and records the
+export's own block/hash/digest separately. That is component/API evidence, not
+independent provider consensus, a complete event ledger or full P23 readiness.
+API keys, durable quotas/plans, hosted auth, production indexing and incident
+operations retain their separate gates. Existing frozen Standard, root pins,
+economics, financial authority and all release gates remain unchanged.

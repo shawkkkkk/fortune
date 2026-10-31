@@ -448,3 +448,15 @@ Known historical bytes, adversarial synthetic serialization and actual child CLI
 tests are component evidence, not a public Bitcoin provider or full M05 lifecycle.
 See BITCOIN_TRANSACTION_INSPECTION.md. No network, signing, broadcasts, financial
 activation, dependency or frozen Standard changes are introduced.
+
+## Public project-data attachment (P23)
+
+The actual public project reader now has an additive JSON download endpoint with
+exact decimal strings and same-block provenance, excluding creator prose/links
+and retaining unknown analytics. A bounded UTF-8 payload string and SHA-256 make
+byte checks portable; they do not authenticate the source or grant authority.
+All existing reader errors and false verification/authorization flags remain.
+The production API/RPC/MCP rehearsal exercises attachment headers, checksum,
+provenance, unknowns and invalid/unregistered-token errors. This is a data/export
+component, not API-key/durable-quota/hosted-auth/indexer or full P23 readiness.
+See PROJECT_DATA_EXPORT.md. No financial or frozen release gates change.

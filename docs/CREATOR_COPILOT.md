@@ -35,3 +35,45 @@ There is no public HTTP endpoint or UI, so this does not introduce an unauthenti
 Tests cover actual HTTP request/response transport against a local provider fixture, request separation, reviewed source-only output, malicious question/prose/URL/tool payloads, unknown models and sources, streaming limits, hanging-call deadline and generic CLI error privacy. These establish adapter and rendering behavior, not live model relevance or provider compatibility. No real credential or paid inference is used. Existing launch flows, UI, dependencies and frozen Standard remain unchanged.
 
 Protocol references checked October 27, 2026: [Vercel compatible APIs](https://vercel.com/docs/ai-gateway/sdks-and-apis), [text generation quickstart](https://vercel.com/docs/ai-gateway/getting-started/text), [live model catalog](https://ai-gateway.vercel.sh/v1/models). Provider-neutral HTTP preserves the frozen dependency baseline.
+
+## Explicit public-project brief mode
+
+The same operator CLI now supports a separately disabled deterministic mode:
+
+```bash
+node --import ./scripts/register-ts.mjs scripts/creator-copilot.mjs --brief 0xPROJECT_TOKEN
+```
+
+Set `FORTUNE_COPILOT_PROJECT_BRIEF_ENABLED=true` only for an intentional public
+project read. The token must be an exact supported Standard testnet address;
+there is no caller-selected API origin. This mode does not read a question from
+stdin, call AI Gateway, use its credential or invoke a model. Existing no-argument
+source-card inference mode and its separate enablement remain unchanged.
+
+The actual `readProjectSnapshot` engine supplies a fixed-origin API attestation,
+using its existing 30-second abort budget, 32 KiB response limit, timestamp checks
+and matching token/factory/creator/block context. The new brief whitelists exact
+addresses, phase, supply and curve accounting; includes phase-specific review
+notes and three pinned historical policy cards; and rejects a backwards host
+clock at completion. Token name, symbol, description, artwork, links, character
+records and other creator prose are omitted. Unknown market cap, volume, holder
+count, treasury, quote and creator authorization stay null. A token supplied to
+this command is a requested project, never an announced Fortune platform CA.
+
+The response is a one-shot structured briefing, not a daily scheduler, generated
+post, investment recommendation, current release verdict or creator login.
+Curve-accounted USD is not cash, treasury or LP TVL; retired curve prices remain
+null. API attestations are not independent RPC or finality proof. Historical
+policy-card commit/links remain explicit and are not refreshed by a live project
+read. Execution, publication, creator authentication, independent verification,
+model invocation and full co-pilot readiness are always false. No output is
+stored, sent to a model, published or connected to a wallet by this command.
+
+Tests exercise phase-specific projection, injected metadata exclusion, provenance
+mismatch/invalid inputs/clock rollback, and the actual child CLI through real HTTP
+to one loopback API fixture. The test-only preload accepts only Fortune's fixed
+project path and is never loaded by production. It also proves disabled/invalid
+calls make no requests, the Gateway credential is not sent, and errors disclose
+no upstream details. This is not public authentication, provider independence,
+AI content quality or complete M02/P06 readiness. Model/privacy/budget/quality,
+creator authorization, publishing, durable quotas and operations reviews remain.

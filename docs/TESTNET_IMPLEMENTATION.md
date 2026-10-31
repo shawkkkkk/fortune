@@ -158,6 +158,18 @@ contract-intelligence foundation; it does not complete exhaustive admin/claim
 analysis, independent-provider verification or a safety verdict. Local RPC/ABI
 and state-override fixtures exercise the actual reader, without broadcasts.
 
+## Creator co-pilot public-project grounding
+
+An explicit separately disabled `creator-copilot.mjs --brief <token>` mode now
+runs the actual bounded public project snapshot reader and produces a whitelist
+of exact facts, phase-specific review notes and pinned historical policy cards.
+Creator prose is omitted, unknown analytics stay null and all creator/publication/
+execution/full-readiness authority stays false. The source-card inference mode is
+preserved; brief mode calls no model or Gateway. Real child-process HTTP tests
+exercise the data path and private-safe failures. This is a one-shot operator
+brief, not public authenticated AI, content publishing or complete M02/P06.
+See CREATOR_COPILOT.md for limits and separate review gates.
+
 ## Owner-operated dependencies
 
 `OMNICHAIN_PERMANENT_BURN.md` adds an explicit default-disabled receipt reader

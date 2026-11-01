@@ -127,3 +127,50 @@ direct-mode reinterpretation. Two clients of one synthetic local fixture are not
 public providers, legitimate fee inventory, deployment, audit or complete agent/
 omnichain readiness. No contract, dependency, real configuration or release gate
 changes are implied.
+
+## Opt-in local research capture
+
+`captureVaultBurn({path,token,expectedHead,policy}, clients, {enabled:true})`
+in `scripts/capture-vault-burn.mjs` connects the actual vault observer to an
+**existing** protected project research notebook. It defaults to disabled and
+adds no CLI, HTTP endpoint, scheduler, signer, public configuration or financial
+store. The strict chain97 policy must name the notebook's token label and the
+exact vault, caller, runtimes, manifest, positive uint128 amount and transaction.
+That token label is not factory/creator authentication or project consent.
+
+Before RPC it checks the existing notebook/schema/history, request policy,
+expected head and available capacity. After the actual two-client observer
+returns, it appends the observation and explicit limitations using the SAME
+expected head. A concurrent writer is preserved and capture fails; it never
+refreshes the head automatically. Safe monotonic host-clock checks span notebook
+operations and the observer. The observer's existing20-second RPC lifetime is
+unchanged; there is no new global filesystem/SQLite deadline.
+
+A deterministic ID binds chain/token/vault/transaction within this notebook.
+The normalized policy checksum also binds amount, caller and pins; it is not a
+signature or approval. An exact retry with the ORIGINAL predecessor head returns
+the original sequence/digest/recorded timestamp with `rpcReadPerformed:false`.
+It performs no RPC, even after more than ten later notes, and does not renew the
+stored observation time or revalidate its block. Changed policy or predecessor
+rejects. A first capture reports `rpcReadPerformed:true`; this describes a read,
+not canonicality or finality. Inspect history before retrying an uncertain commit.
+There is no automatic correction, reset, pruning or reorg recovery.
+
+The existing read-only MCP notebook tool/resource can read these notes under its
+existing opt-in and shared quota. No new MCP tool or change to public canon is
+added. Obtain permission before storing/sharing real observations with a chosen
+client/model; transaction/wallet provenance is identifiable. Plaintext host
+storage and operator notes remain untrusted: another local operator can insert
+similar text, and a privileged host can rewrite the entire store. Hash links,
+checksums and local deduplication do not authenticate source or ensure completeness.
+Never sum counters or use these notes as consumed financial settlement, burn
+totals, buyback/fee-funding evidence, badges, current authorization or authority.
+Execution and full-readiness flags remain false; authorization remains null.
+
+Tests use the actual observer/ABI and real temporary SQLite, including reopen,
+old-history retries without RPC, policy conflicts, failed observations,
+concurrent writes and actual stdio MCP tool/resource reads. The compiled OFT/vault
+zero-account local rehearsal records both burns through this path and retries the
+first without RPC. This is one synthetic fixture, not independent public
+providers, public custody, fee provenance, live operations, audit approval or full
+M01/M08/P10 readiness. Contracts, root pins, economics and release gates are unchanged.

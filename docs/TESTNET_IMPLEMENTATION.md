@@ -2,6 +2,19 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## Project API stream allocation bound
+
+The actual shared canon/snapshot HTTP reader rejects more than 4,096 non-final
+stream chunks, counting empty chunks too, before retaining another chunk or
+projecting JSON. The independent 32 KiB byte bound and existing real deadlines,
+clock/failure fences and non-awaited cancellation remain unchanged. Both empty
+and tiny over-fragmentation regressions failed old source; boundary and actual
+local HTTP tests cover the fix. Chunk boundaries are transport-dependent, so an
+over-fragmented valid response may be rejected. This bounds retained chunk-array
+entries, not upstream buffering or process-wide memory. No provider, service,
+authority, financial, dependency or frozen Standard/release gates change.
+
+
 ## Complete feature coverage
 
 The owner's full MEME OS reference is mapped in [MEME_OS_PARITY.md](MEME_OS_PARITY.md):

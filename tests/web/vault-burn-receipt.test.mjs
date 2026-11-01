@@ -39,3 +39,41 @@ test('provider disagreement, changed reread and invalid host clocks never return
 test('vault observer shares failure fences with direct mode and does not start late follow-on reads',async()=>{
  let release,reads=0;const c=clients();c[0].getBlockNumber=async()=>{throw Error('Peer stopped');};c[1].getBlockNumber=()=>new Promise(r=>release=r);c[1].getChainId=async()=>{reads++;return 97;};await assert.rejects(inspectVaultPermanentBurn(c,policy()),/Peer stopped/);release(30n);await new Promise(r=>setImmediate(r));assert.equal(reads,0);
 });
+
+import {mkdtempSync,rmSync,existsSync} from 'node:fs';
+import {join} from 'node:path';
+import {tmpdir} from 'node:os';
+import {spawnSync} from 'node:child_process';
+import {ProjectResearchNotebook as Book} from '../../scripts/project-research-notebook.mjs';
+import {captureVaultBurn} from '../../scripts/capture-vault-burn.mjs';
+function notebook(){const dir=mkdtempSync(join(tmpdir(),'fortune-burn-history-')),path=join(dir,'notes.sqlite'),token=policy().token;Book.initialize(path,token);const b=new Book(path,token);const expectedHead=b.read().head;b.close();return {path,token,expectedHead,policy:policy(),clean:()=>rmSync(dir,{recursive:true,force:true})};}
+const capture=(request,c=clients(),options={enabled:true})=>captureVaultBurn(request,c,options);
+test('burn capture is disabled by default; malformed policy and missing/foreign/stale notebooks reject before RPC',async()=>{
+ const s=notebook();let calls=0;const c=[{async getBlockNumber(){calls++;return 30n;}},{}];try{
+  await assert.rejects(captureVaultBurn(s,c));
+  for(const request of [{...s,token:a(9)},{...s,expectedHead:'0'.repeat(64)},{...s,path:join(s.path,'absent')},
+   {...s,policy:{...s.policy,amount:'01'}},{...s,policy:{...s.policy,chainId:84532}},{...s,policy:{...s.policy,token:a(9)}},{...s,policy:{...s.policy,extra:true}}])await assert.rejects(capture(request,c));
+  const missing=join(s.path+'-missing');await assert.rejects(capture({...s,path:missing},c));assert.equal(existsSync(missing),false);assert.equal(calls,0);
+ }finally{s.clean();}
+});
+test('actual vault reader persists one observation; reopen and old-history retry preserve time with zero RPC',async()=>{
+ const s=notebook();try{const first=await capture(s),b=new Book(s.path,s.token);assert.equal(first.replayed,false);assert.equal(first.rpcReadPerformed,true);
+  const original=b.read().notes[0],body=JSON.parse(original.body);assert.equal(body.observation.amount,'123');assert.equal(body.observation.vaultObservation.sequence,'1');assert.equal(body.observation.feeFundingVerified,false);
+  for(let i=0;i<12;i++)b.append({id:'later-note-'+String(i).padStart(8,'0'),expectedHead:b.read().head,document:{kind:'observation',title:'Later',body:'Untrusted note',sources:[],corrects:0}});
+  assert.equal(b.read().notes.some(x=>x.id===original.id),false);assert.deepEqual(b.readEntry(original.id),original);b.close();
+  const retry=await capture(s,[]);assert.deepEqual(retry,{...first,replayed:true,rpcReadPerformed:false});assert.equal(retry.currentAuthorization,null);assert.equal(retry.sourceAuthenticated,false);assert.equal(retry.executionAuthorized,false);
+  const reopened=new Book(s.path,s.token,{readOnly:true});assert.equal(reopened.read().total,13);assert.deepEqual(reopened.readEntry(original.id),original);assert.equal(JSON.parse(reopened.readEntry(original.id).body).observation.observedAtMs,body.observation.observedAtMs);reopened.close();
+  await assert.rejects(capture({...s,policy:{...s.policy,amount:'124'}},[]),/conflict/);await assert.rejects(capture({...s,expectedHead:first.digest},[]),/conflict/);
+ }finally{s.clean();}
+});
+test('provider failure and concurrent writer preserve history without partial capture or automatic head refresh',async()=>{
+ const s=notebook();try{await assert.rejects(capture(s,clients(({state})=>state.paused=true)));let b=new Book(s.path,s.token);assert.equal(b.read().total,0);b.close();
+  const c=clients(),head=c[0].getBlockNumber;let wrote=false;c[0].getBlockNumber=async()=>{if(!wrote){wrote=true;b=new Book(s.path,s.token);b.append({id:'concurrent-note-0001',expectedHead:s.expectedHead,document:{kind:'observation',title:'Concurrent',body:'Preserve me',sources:[],corrects:0}});b.close();}return head();};
+  await assert.rejects(capture(s,c),/Head/);b=new Book(s.path,s.token,{readOnly:true});assert.equal(b.read().total,1);assert.equal(b.read().notes[0].body,'Preserve me');b.close();
+ }finally{s.clean();}
+});
+test('actual existing stdio MCP exposes captured research as untrusted history only',async()=>{
+ const s=notebook();try{await capture(s);const messages=[{jsonrpc:'2.0',id:1,method:'initialize',params:{protocolVersion:'2025-06-18',capabilities:{},clientInfo:{name:'burn-history-test',version:'1'}}},{jsonrpc:'2.0',method:'notifications/initialized'},{jsonrpc:'2.0',id:2,method:'tools/call',params:{name:'get_research_notebook'}},{jsonrpc:'2.0',id:3,method:'resources/read',params:{uri:`fortune://97/${s.token}/research-notebook`}}].map(JSON.stringify).join('\n')+'\n';
+ const r=spawnSync(process.execPath,['--import','./scripts/register-ts.mjs','scripts/project-mcp.mjs'],{encoding:'utf8',input:messages,env:{...process.env,FORTUNE_PROJECT_MCP_ENABLED:'true',FORTUNE_PROJECT_TOKEN:s.token,FORTUNE_PROJECT_NOTEBOOK_ENABLED:'true',FORTUNE_PROJECT_NOTEBOOK_DB:s.path}});assert.equal(r.status,0,r.stderr);const rows=r.stdout.trim().split('\n').map(JSON.parse),tool=JSON.parse(rows[1].result.content[0].text),resource=JSON.parse(rows[2].result.contents[0].text);assert.deepEqual(tool,resource);assert.equal(tool.total,1);assert.equal(tool.executionAuthorized,false);assert.equal(tool.source,'local-unverified-operator-research');const body=JSON.parse(tool.notes[0].body);assert.equal(body.observation.permanentBurnObserved,true);assert.equal(body.observation.finalityVerified,false);assert.doesNotMatch(r.stdout,/notes.sqlite/);
+ }finally{s.clean();}
+});

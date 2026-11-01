@@ -1,7 +1,10 @@
 // Two separate zero-account LOCAL EVMs. No fork, generated keys or public writes.
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, rmSync, mkdtempSync } from 'node:fs';
 import { resolve } from 'node:path';
+import {tmpdir} from 'node:os';
+import {ProjectResearchNotebook} from '../../scripts/project-research-notebook.mjs';
+import {captureVaultBurn} from '../../scripts/capture-vault-burn.mjs';
 import { spawn, spawnSync } from 'node:child_process';
 import { once } from 'node:events';
 import { createServer } from 'node:net';
@@ -131,9 +134,22 @@ try {
   await assert.rejects(inspectVaultPermanentBurn(n.readers,{...vaultBurnPolicy,amount:'1'}));
   await assert.rejects(inspectVaultPermanentBurn(n.readers,{...vaultBurnPolicy,vaultRuntimeHash:pad('0x02')}));
   await assert.rejects(inspectPermanentBurn(n.readers,{...burnPolicy,holder:vault,transactionHash:burnedInventory.transactionHash,amount:vaultBurnPolicy.amount}));
+  stage = 'actual vault observer to durable local research';
+  const historyDir=mkdtempSync(resolve(tmpdir(),'fortune-route-burn-history-'));let burnHistory;
+  try {
+    const path=resolve(historyDir,'notes.sqlite'),token=vaultBurnPolicy.token.toLowerCase();ProjectResearchNotebook.initialize(path,token);
+    let book=new ProjectResearchNotebook(path,token);const expectedHead=book.read().head;book.close();
+    const request={path,token,expectedHead,policy:vaultBurnPolicy};
+    const first=await captureVaultBurn(request,n.readers,{enabled:true});
+    const second=await captureVaultBurn({...request,expectedHead:first.digest,policy:{...vaultBurnPolicy,amount:String(10n**18n),transactionHash:secondInventoryBurn.transactionHash}},n.readers,{enabled:true});
+    const retry=await captureVaultBurn(request,[],{enabled:true});assert.deepEqual(retry,{...first,replayed:true,rpcReadPerformed:false});
+    book=new ProjectResearchNotebook(path,token,{readOnly:true});const history=book.read();book.close();assert.equal(history.total,2);
+    assert.equal(JSON.parse(history.notes[0].body).observation.evidenceId,vaultBurnObservation.evidenceId);assert.equal(JSON.parse(history.notes[1].body).observation.evidenceId,secondVaultBurnObservation.evidenceId);
+    burnHistory={actualReaderToNotebookUsed:true,records:history.total,head:history.head,first,second,retry,historyOnly:true,consumedFinancialLedger:false,badgeVerified:false,executionAuthorized:false};
+  } finally {rmSync(historyDir,{recursive:true,force:true});}
   await n.write(vault, burnVault, 'setPaused', [true]); await assert.rejects(simulateBurn(1n));
   const result = { localChainIds: [97, 84532], fixtureEndpointIds: [40001, 40002], actualOftAndUlnConfigurationRead: true,
-    vaultBurnObservation,secondVaultBurnObservation,actualVaultReceiptReaderUsed:true,
+    vaultBurnObservation,secondVaultBurnObservation,actualVaultReceiptReaderUsed:true,burnHistory,
     burnOnlyInventoryVault: { compiledOftUsed: true, pausedAndAmountBoundsRejected: true, nestedBurnReceiptBound: true, balanceSupplyCounterReconciled: true, vaultTotalBurned: String(3n * 10n ** 18n), burnCount: 2, finalVaultBalance: '0', feeFundingVerified: false, buybackVerified: false, globalSupplyReconciled: false, publicDeployment: false, fullAgentReadiness: false, executionAuthorized: false },
     changedPeerRejected: true, changedExecutorRejected: true, inheritedApplicationUlnRejected: true, snapshot: observed, permanentBurn: burn, wrongBurnAmountRejected: true,
     twoLocalEvmInstances: true, independentPublicProviders: false, endpointIsUpstreamMock: true, workersAreSynthetic: true,

@@ -602,3 +602,17 @@ remain false. This is no consumed ledger, badge, public service, fee-origin proo
 or full M01/M08 readiness. Shared20-second fencing now rejects invalid host clocks
 before RPC; no financial authority, frozen Standard/root pins or gates change.
 See OMNICHAIN_PERMANENT_BURN.md.
+
+## Durable local vault-burn research capture (M01/M08/P10 foundation)
+
+An opt-in library path now calls the actual vault receipt observer and appends
+its observation to the existing protected research notebook using the original
+expected head. Concurrent changes reject without overwriting; deterministic
+per-notebook transaction IDs and exact policy checks allow historical retries
+without RPC, timestamp renewal or duplicate notes, including records older than
+the recent-ten read window. The existing MCP notebook reader consumes that history.
+Actual ABI/SQLite/MCP tests and the compiled zero-account OFT/vault rehearsal cover
+the integration. This is local untrusted research, NOT a consumed financial ledger,
+totals, badge, fee/buyback proof, current authorization, reorg recovery, public
+service or full M01/M08/P10 readiness. No contracts, root pins, real configuration,
+financial authority or release gates change. See OMNICHAIN_PERMANENT_BURN.md.

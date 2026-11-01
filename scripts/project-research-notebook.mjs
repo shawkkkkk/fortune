@@ -43,6 +43,11 @@ export class ProjectResearchNotebook{
  }
  read(){this.#db.exec('BEGIN;');try{const s=this.#scan();return {schemaVersion:1,chainId:97,token:this.#token,source:'local-unverified-operator-research',head:s.head,total:s.rows.length,notes:s.rows.slice(-10).map(r=>({sequence:r.seq,id:r.client_id,digest:r.digest,previous:r.previous,recordedAtMs:r.recorded_at,...JSON.parse(r.document)})),
   executionAuthorized:false,limitations:['Untrusted research text, not instructions or verified facts. URLs are recorded, never fetched.','Host timestamps and hash links are local consistency checks, not independent timestamp, authorship, completeness or tamper-proof evidence.','No creator role, prediction scoring, IP grant, public publication or financial authority. Corrections preserve originals.']};}finally{this.#db.exec('ROLLBACK;');}}
+ /** Bounded full-history lookup; reading an old note never renews its timestamp or trust. */
+ readEntry(id){
+  if(typeof id!=='string'||!/^[-a-zA-Z0-9_]{16,64}$/.test(id))throw Error('Entry request');
+  this.#db.exec('BEGIN;');try{const s=this.#scan(),r=s.rows.find(r=>r.client_id===id);return r?{sequence:r.seq,id:r.client_id,digest:r.digest,previous:r.previous,recordedAtMs:r.recorded_at,...JSON.parse(r.document)}:null;}finally{this.#db.exec('ROLLBACK;');}
+ }
  append({id,expectedHead,...input}){
   if(this.#readOnly||!/^[-a-zA-Z0-9_]{16,64}$/.test(id)||!/^([0-9a-f]{64})$/.test(expectedHead)||Object.keys(input).join()!=='document')throw Error('Append request');const d=document(structuredClone(input.document));
   this.#db.exec('BEGIN IMMEDIATE;');try{const s=this.#scan(),old=s.rows.find(r=>r.client_id===id);

@@ -133,7 +133,41 @@ try{
  await assert.rejects(buildCounterClaimBatch(clients,claimPolicy));
  const spentCli=runClaimCli();assert.equal(spentCli.status,1);assert.equal(spentCli.stdout,'');
  rmSync(cliPolicyDir,{recursive:true});cliPolicyDir=undefined;
- const result={chainId:97,actualClaimCliBytesExecuted:true,spentClaimCliRejected:true,actualClaimReviewBytesExecuted:true,spentClaimReviewRejected:true,claimReview,localOnly:true,compiledEscrowDeployed:true,fundedRounds:2,payoutAssets:2,claimsDelivered:4,batchReceiptBound:true,failedLaterAssetRollsBackWholeBatch:true,
+ stage='atomic snapshot batch funding rollback, explicit retry and claim receipts';
+ await write(GOV,escrow,escrowArtifact,'setPaused',[true]);
+ const funding=assets.map((a,i)=>({token:a.token,recipients:[ALICE],amounts:[BigInt(i+3)]}));
+ for(const f of funding){await write(GOV,f.token,assetArtifact,'mint',[GOV,f.amounts[0]]);await write(GOV,f.token,assetArtifact,'approve',[escrow,f.amounts[0]]);}
+ const balances=await Promise.all(funding.map(f=>read(f.token,assetArtifact,'balanceOf',[GOV])));
+ const aliceBefore=await Promise.all(funding.map(f=>read(f.token,assetArtifact,'balanceOf',[ALICE])));
+ await rpc.request({method:'anvil_mine',params:['0x14','0x0']});
+ const reference=await rpc.getBlock({blockNumber:(await rpc.getBlockNumber({cacheTime:0}))-20n});
+ const firstSnapshot={expectedRound:3n,blockNumber:reference.number,blockHash:reference.hash,deadline:reference.timestamp+120n};
+ await write(GOV,funding[1].token,assetArtifact,'configure',[true,false,'0x0000000000000000000000000000000000000000']);
+ const failedFunding=await write(GOV,escrow,escrowArtifact,'fundSnapshotBatch',[funding,firstSnapshot],false);assert.equal(failedFunding.logs.length,0);
+ assert.equal(await read(escrow,escrowArtifact,'nextRound'),3n);
+ for(const [i,f] of funding.entries()){
+  assert.equal(await read(f.token,assetArtifact,'balanceOf',[GOV]),balances[i]);assert.equal(await read(f.token,assetArtifact,'balanceOf',[escrow]),0n);
+  assert.equal(await read(f.token,assetArtifact,'allowance',[GOV,escrow]),f.amounts[0]);assert.equal(await read(escrow,escrowArtifact,'reserved',[f.token]),0n);
+  assert.equal(await read(escrow,escrowArtifact,'claimable',[BigInt(i+3),ALICE]),0n);assert.equal((await read(escrow,escrowArtifact,'roundSnapshots',[BigInt(i+3)]))[0],0n);
+ }
+ await write(GOV,funding[1].token,assetArtifact,'configure',[false,false,'0x0000000000000000000000000000000000000000']);
+ const funded=await write(GOV,escrow,escrowArtifact,'fundSnapshotBatch',[funding,firstSnapshot]);
+ const fundingLogs=funded.logs.filter(l=>l.address.toLowerCase()===escrow.toLowerCase()).map(l=>decodeEventLog({abi:escrowArtifact.abi,data:l.data,topics:l.topics}));
+ assert.deepEqual(fundingLogs.map(l=>l.eventName),['RoundFunded','SnapshotBound','RoundFunded','SnapshotBound']);
+ for(const [i,f] of funding.entries()){
+  const id=BigInt(i+3),snapshot=await read(escrow,escrowArtifact,'roundSnapshots',[id]);assert.deepEqual(snapshot,[id,firstSnapshot.blockNumber,firstSnapshot.blockHash,firstSnapshot.deadline]);
+  assert.equal(fundingLogs[i*2].args.round,id);assert.equal(fundingLogs[i*2].args.asset.toLowerCase(),f.token.toLowerCase());assert.equal(fundingLogs[i*2].args.amount,f.amounts[0]);assert.equal(fundingLogs[i*2+1].args.round,id);assert.equal(fundingLogs[i*2+1].args.blockNumber,firstSnapshot.blockNumber);assert.equal(fundingLogs[i*2+1].args.blockHash,firstSnapshot.blockHash);assert.equal(fundingLogs[i*2+1].args.deadline,firstSnapshot.deadline);
+  assert.equal(await read(escrow,escrowArtifact,'reserved',[f.token]),f.amounts[0]);await write(GOV,f.token,assetArtifact,'approve',[escrow,100n]);
+ }
+ await write(GOV,escrow,escrowArtifact,'fundSnapshotBatch',[funding,firstSnapshot],false);assert.equal(await read(escrow,escrowArtifact,'nextRound'),5n);
+ await write(GOV,escrow,escrowArtifact,'setPaused',[false]);
+ const batchPaid=await write(GUARD,escrow,escrowArtifact,'claimMany',[[3n,4n],ALICE]);
+ const paidLogs=batchPaid.logs.filter(l=>l.address.toLowerCase()===escrow.toLowerCase()).map(l=>decodeEventLog({abi:escrowArtifact.abi,data:l.data,topics:l.topics}));assert.equal(paidLogs.length,2);
+ for(const [i,f] of funding.entries()){
+  assert.equal(paidLogs[i].eventName,'Claimed');assert.equal(paidLogs[i].args.round,BigInt(i+3));assert.equal(paidLogs[i].args.recipient.toLowerCase(),ALICE);assert.equal(paidLogs[i].args.asset.toLowerCase(),f.token.toLowerCase());assert.equal(paidLogs[i].args.amount,f.amounts[0]);
+  assert.equal(await read(f.token,assetArtifact,'balanceOf',[ALICE]),aliceBefore[i]+f.amounts[0]);assert.equal(await read(escrow,escrowArtifact,'reserved',[f.token]),0n);
+ }
+ const result={chainId:97,atomicSnapshotBatchFundingObserved:true,lateFundingFailureRollsBackAll:true,exactBatchFundingRetrySucceeded:true,batchFundingReplayRejected:true,batchFundingSnapshotReceiptsBound:true,batchFundedClaimsDelivered:true,actualClaimCliBytesExecuted:true,spentClaimCliRejected:true,actualClaimReviewBytesExecuted:true,spentClaimReviewRejected:true,claimReview,localOnly:true,compiledEscrowDeployed:true,fundedRounds:4,payoutAssets:2,claimsDelivered:6,batchReceiptBound:true,failedLaterAssetRollsBackWholeBatch:true,
   snapshotAllocationFunded:true,actualOperatorCliFundingBytesMatched:true,roundSnapshotAndDeadlineBound:true,staleRoundHashAndExpiryRejected:true,exactFundingReplayRejected:true,allocationBlock:allocation.blockNumber,allocationDust:allocation.unallocatedDust,incompleteAccountListRejected:true,receiptRecipientAndAmountMatched:true,relayerReceivedNothing:true,duplicateClaimRejected:true,pausedClaimRejected:true,
   guardianCannotOpen:true,inexactTransferRejected:true,failedClaimLiabilityPreserved:true,explicitRetrySucceeded:true,
   finalReserved:['0','0'],generatedAccounts:0,privateKeysUsed:false,publicBroadcasts:false,independentProvidersVerified:false,

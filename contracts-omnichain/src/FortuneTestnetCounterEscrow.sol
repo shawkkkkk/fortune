@@ -29,6 +29,12 @@ contract FortuneTestnetCounterEscrow is ReentrancyGuard {
         uint256 deadline;
     }
 
+    struct Funding {
+        address token;
+        address[] recipients;
+        uint256[] amounts;
+    }
+
     address public immutable governor;
     address public immutable guardian;
     address public immutable launchToken;
@@ -146,6 +152,41 @@ contract FortuneTestnetCounterEscrow is ReentrancyGuard {
         id = _fundRound(token, recipients, amounts);
         roundSnapshots[id] = snapshot;
         emit SnapshotBound(id, snapshot.blockNumber, snapshot.blockHash, snapshot.deadline);
+    }
+
+    /// @notice Atomic staging of 2–10 distinct payout assets under one snapshot reference.
+    /// @dev Every transfer, entitlement and snapshot rolls back if any later item fails.
+    function fundSnapshotBatch(Funding[] calldata funding, Snapshot calldata firstSnapshot)
+        external
+        onTestnet
+        nonReentrant
+        returns (uint256[] memory ids)
+    {
+        if (msg.sender != governor) revert Unauthorized();
+        if (!paused) revert WrongPauseState();
+        uint256 count = funding.length;
+        if (count < 2 || count > 10) revert InvalidAllocation();
+        if (
+            firstSnapshot.expectedRound != nextRound || firstSnapshot.blockNumber >= block.number
+                || block.number - firstSnapshot.blockNumber < 20 || block.number - firstSnapshot.blockNumber > 255
+                || firstSnapshot.blockHash == bytes32(0)
+                || blockhash(firstSnapshot.blockNumber) != firstSnapshot.blockHash
+                || block.timestamp > firstSnapshot.deadline || firstSnapshot.deadline > block.timestamp + 120
+        ) revert InvalidSnapshot();
+        address previous;
+        for (uint256 i; i < count; ++i) {
+            if (funding[i].token <= previous) revert InvalidAllocation();
+            previous = funding[i].token;
+        }
+        ids = new uint256[](count);
+        for (uint256 i; i < count; ++i) {
+            Funding calldata f = funding[i];
+            uint256 id = _fundRound(f.token, f.recipients, f.amounts);
+            ids[i] = id;
+            roundSnapshots[id] =
+                Snapshot(id, firstSnapshot.blockNumber, firstSnapshot.blockHash, firstSnapshot.deadline);
+            emit SnapshotBound(id, firstSnapshot.blockNumber, firstSnapshot.blockHash, firstSnapshot.deadline);
+        }
     }
 
     function _fundRound(address token, address[] calldata recipients, uint256[] calldata amounts)

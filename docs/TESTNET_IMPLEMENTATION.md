@@ -2,6 +2,22 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## Counter atomic snapshot funding batch
+
+The isolated chain97 Counter escrow adds governor-only paused atomic funding
+of2–10 sorted distinct payout assets, each retaining its own exact newly funded
+round/rights/liability and SAME original block/hash/deadline reference with its
+actual round ID. Any later failure rolls back every earlier transfer, allowance,
+event, snapshot and entitlement; explicit retry and successful-batch replay
+rejection preserve the original reference. Legacy single-round/claim behavior
+is unchanged. Unit/boundary/conservation fuzz tests and actual compiled zero-
+account HTTP/ABI funding rollback/retry/receipt/claim integration cover the slice.
+No automatic basket selection/rotation, eligibility/fee/capital proof, gas-cost
+optimization, recovery, public custody or full M06/readiness/audit approval is
+established. Changed isolated runtime needs fresh deployment/audit evidence;
+Standard/root pins/economics/authority/configuration/release gates unchanged.
+See [COUNTER_ROUND_ESCROW.md](COUNTER_ROUND_ESCROW.md).
+
 ## Syndicate operator job-reader CLI
 
 Default-disabled `inspect-work-job.mjs` consumes the unchanged actual two-client

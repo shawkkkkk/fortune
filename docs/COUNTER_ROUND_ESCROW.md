@@ -366,3 +366,54 @@ bytes only through local VM impersonation, verifies rollback/retry and rejects
 the CLI after consumed entitlements. Zero generated accounts and ONE synthetic
 local fixture do not establish public custody, real-party consent, provider
 independence, full M06/P04 readiness, audit or mainnet approval.
+
+## Optional atomic snapshot batch funding
+
+`fundSnapshotBatch(Funding[] funding, Snapshot firstSnapshot)` stages 2–10
+strictly address-sorted, distinct allowed payout assets in one chain97 transaction.
+Only the governor, while paused, can call it; the existing non-reentrancy gate
+covers the entire batch. Each Funding contains its asset, 1–128 sorted recipients
+and positive amounts, and calls the unchanged exact new-governor-funding helper.
+Each asset creates its own consecutive round, allocation commitment, recipient
+rights and reserved liability. There is no combined pot or cross-asset offset.
+
+The shared reference must satisfy the existing snapshot conditions: expected
+first round equals nextRound, nonzero matching EVM block hash at age20–255 blocks,
+and an unexpired fixed deadline at most120 seconds ahead at execution. Each stored
+round snapshot records that round's actual ID with the SAME block/hash/deadline.
+RoundFunded and SnapshotBound receipts identify every asset/round. The method
+returns the ordered IDs. It does not validate balances/eligibility, make earlier
+read observations current, or bind a creator's consent to supplied allocations.
+
+Any later missing allowance, inexact/taxed transfer, unsupported/changed runtime,
+invalid recipient/allocation, insolvency or other failure reverts ALL earlier
+transfers, allowances, rounds, snapshots, events, entitlements and liabilities.
+Explicit retry uses the original first-round reference/deadline; no refresh or
+automatic retry occurs. After success the same first-round bytes cannot fund
+again, including after claims. Legacy funding that advances nextRound also
+invalidates a prepared batch. Intentionally rebuilt allocations with a new
+reference or legacy funding can still duplicate economic intent; no global
+intent/eligibility deduplication is claimed. Existing single-round and claim
+methods retain their behavior. No pause bypass, arbitrary recipient, fee,
+sweep/recovery, native handling, asset selection or new governance power exists.
+
+Tests cover successful separate rights/references/claims and replay, 0/1/11-count
+rejection, reversed/duplicate assets, ten-asset and128/129-recipient boundaries,
+roles/pause/chain and stale/future/hash/expiry errors, late transfer/allocation/
+allowance failures and exact retry, old-liability/donation separation, legacy
+advance and1000-case conservation
+fuzzing. The existing compiled zero-account local HTTP/ABI runtime preserves its
+first two rounds, then checks a failed later-asset batch with no retained logs or
+state, the exact retry, per-round funding/snapshot events, replay rejection and
+recipient-bound claims on both new rounds. ONE synthetic fixture is not public
+custody, providers, real holder eligibility or legitimate capital evidence.
+
+This is explicit atomic multi-asset staging, not automatic basket rotation,
+ranking/index/winner mode, gas-cost optimization, minimum pot/carry-forward,
+fee collection or full Counter/M06 readiness. Maximum-size real-network gas and
+asset behavior remain separate review/drill requirements. Never spend creator,
+holder or LP liabilities/launch reserves as strategy capital; launch-token fees
+remain burn-only and earned recirculation separate. Changed isolated bytecode
+requires fresh exact-source deployment/audit/configuration evidence; old
+runtime/deployment signatures or audit approval do not transfer. Frozen Standard,
+root dependencies and every public deployment/activation gate remain unchanged.

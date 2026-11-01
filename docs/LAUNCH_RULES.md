@@ -266,3 +266,22 @@ production response or RPC client is replaced.
 ## Before mainnet
 
 These are part of the custom-pairs audit scope: an independent audit of `FortuneLaunchRules` and the token hook, and a review of the rule bounds. Custom pairs stay on BSC Testnet until their own release gate passes.
+
+## Optional getter discovery failures
+
+The custom-pair token `rules()` and factory `launchRules()` discovery paths now
+propagate transport/RPC errors, malformed nonempty ABI data, invalid decoded
+addresses and explicit-reason/custom-error reverts. Public readers use their
+existing generic dependency-unavailable response rather than replacing failures
+with a zero address. A regression against unchanged source returned detail200
+with no rules after a successful multicall item contained malformed `0x01`;
+the actual HTTP/ABI/multicall/detail-API test now requires503 without upstream text.
+
+Only viem's typed empty-return-data and empty/unclassified EVM-revert cases retain
+the legacy zero-address fallback. Exception names/messages alone are not accepted.
+This compatibility heuristic is NOT verification of an old contract generation or
+absence of rules: an RPC can lie, a getter can revert without data, and a proxy can
+change. No new factory/runtime authentication, independent-provider agreement,
+finality, rule-enforcement or safety verdict is supplied. Known rules still require
+all existing state/holder-gate precision reads. No trading/signing gate, contract,
+root dependency, economics, real configuration or release approval changes.

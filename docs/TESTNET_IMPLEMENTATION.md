@@ -628,3 +628,14 @@ events and retained history/liabilities. No content/delivery/legal/fairness proo
 public custody, signer, deployment or full P19 readiness follows. Changed isolated
 runtime needs fresh deployment/audit evidence; frozen Standard/root pins and all
 release gates remain. See SYNDICATE_WORK_ESCROW.md.
+
+## Sentinel optional-rule discovery failures (M03/P16 component fix)
+
+Token/factory rule-address discovery now propagates transport and malformed ABI
+failures and explicit-reason reverts instead of silently reporting no rules.
+An actual multicall/detail-API malformed-getter regression failed old source200
+and now requires generic503; focused HTTP/ABI and typed legacy-error tests pass.
+Empty-data/empty-revert legacy compatibility remains explicitly unverified, not
+proof of no rules, contract generation, enforcement or safety. No contracts,
+root pins, configuration, signing authority or release gates change. Full M03/P16
+remains incomplete. See LAUNCH_RULES.md.

@@ -4,7 +4,7 @@ import { createServer } from 'node:http';
 import { once } from 'node:events';
 import { createPublicClient, http, parseAbi, decodeFunctionData, encodeFunctionResult } from 'viem';
 import { LAUNCH_RULES_ABI } from '../../lib/custom-pairs-artifacts.ts';
-import { readLaunchRules } from '../../lib/custom-pairs-read.ts';
+import { readOptionalRulesAddress, readLaunchRules } from '../../lib/custom-pairs-read.ts';
 
 const addr = n => '0x' + n.toString(16).padStart(40, '0');
 const blockNumber = 123n;
@@ -132,11 +132,12 @@ test('public detail API propagates known-rule failures as generic 503 through it
     launchTimestamp: 100n, virtualReserve: 10n, creatorFeeRecipient: addr(4), GRADUATION_RESCUE_DELAY: 604800n,
     graduationPairDelivered: 0n, graduationLaunchTokens: 0n, graduationLiquidity: 0n, rescueCirculating: 0n, rescueHolderClaims: 0n,
   });
-  let failed = '';
+  let failed = '', malformedRules = false;
   const seen = [];
   function call(data) {
     const { functionName, args } = decodeFunctionData({ abi, data });
     seen.push(functionName);
+    if (functionName === 'rules' && malformedRules) return '0x01';
     if (functionName === failed) throw Error('PRIVATE-UPSTREAM-SENTINEL');
     assert.ok(Object.hasOwn(values, functionName), functionName);
     return encodeFunctionResult({ abi, functionName, result: values[functionName] });
@@ -182,6 +183,11 @@ test('public detail API propagates known-rule failures as generic 503 through it
     assert.equal(success.status, 200, JSON.stringify(success));
     assert.equal(success.body.data.rules.maxWalletBps, 100);
     assert.equal(success.body.data.rules.gate.decimals, 6);
+    malformedRules = true;
+    const discoveryFailure = await run();
+    assert.equal(discoveryFailure.status, 503, 'malformed rules discovery must not become no-rules/200');
+    assert.ok(!JSON.stringify(discoveryFailure).includes('PRIVATE-UPSTREAM-SENTINEL'));
+    malformedRules = false;
     for (failed of ['tradeRulesOf', 'decimals']) {
       const failure = await run();
       assert.equal(failure.status, 503);
@@ -192,4 +198,20 @@ test('public detail API propagates known-rule failures as generic 503 through it
   } finally {
     server.closeAllConnections(); await new Promise(resolve => server.close(resolve));
   }
+});
+
+
+test('optional discovery preserves valid addresses and typed legacy cases but rejects transport, malformed data and explicit reverts', async()=>{
+ const {BaseError,ContractFunctionZeroDataError,ContractFunctionRevertedError,encodeErrorResult}=await import('viem');
+ for(const value of [addr(0),addr(2)])assert.equal(await readOptionalRulesAddress(async()=>value),value);
+ const absent=new ContractFunctionZeroDataError({functionName:'rules'}),empty=new ContractFunctionRevertedError({abi:[],functionName:'rules',data:'0x'});
+ for(const error of [absent,empty,new BaseError('outer',{cause:absent}),new BaseError('outer',{cause:empty})])assert.equal(await readOptionalRulesAddress(async()=>{throw error;}),addr(0));
+ for(const error of [new Error('transport'),new BaseError('outer',{cause:new Error('transport')}),new Error('ContractFunctionZeroDataError'),new ContractFunctionRevertedError({abi:[],functionName:'rules',data:encodeErrorResult({abi:parseAbi(['error Error(string)']),errorName:'Error',args:['blocked']})})])await assert.rejects(readOptionalRulesAddress(async()=>{throw error;}));
+ for(const value of [null,undefined,'0x','0x01',addr(1)+'00',true])await assert.rejects(readOptionalRulesAddress(async()=>value));
+});
+
+test('actual HTTP discovery rejects RPC and malformed ABI failures while preserving empty legacy replies', async()=>{
+ let mode='address';const abi=parseAbi(['function rules() view returns(address)']);
+ const server=createServer(async(req,res)=>{let b='';for await(const c of req)b+=c;const m=JSON.parse(b);assert.equal(m.method,'eth_call');res.end(JSON.stringify({jsonrpc:'2.0',id:m.id,...(mode==='rpc'?{error:{code:-32000,message:'PRIVATE-DISCOVERY'}}:{result:mode==='empty'?'0x':mode==='bad'?'0x01':encodeFunctionResult({abi,functionName:'rules',result:addr(2)})})}));});
+ server.listen(0,'127.0.0.1');await once(server,'listening');try{const rpc=createPublicClient({transport:http(`http://127.0.0.1:${server.address().port}`,{retryCount:0})});const read=()=>readOptionalRulesAddress(()=>rpc.readContract({address:addr(1),abi,functionName:'rules',blockNumber:123n}));assert.equal(await read(),addr(2));mode='empty';assert.equal(await read(),addr(0));for(mode of ['rpc','bad'])await assert.rejects(read());}finally{server.closeAllConnections();await new Promise(r=>server.close(r));}
 });

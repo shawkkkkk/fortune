@@ -1,4 +1,4 @@
-import { createPublicClient, fallback, getAddress, http, isAddress, parseAbi, type Address, type PublicClient } from "viem";
+import { BaseError, ContractFunctionRevertedError, ContractFunctionZeroDataError, createPublicClient, fallback, getAddress, http, isAddress, parseAbi, type Address, type PublicClient } from "viem";
 import { bsc, bscTestnet } from "viem/chains";
 import { configuredRpcUrls } from "@/lib/bsc-rpc";
 import { FORTUNE_NETWORK } from "@/lib/fortune-network";
@@ -99,6 +99,23 @@ async function readFeeSplit(rpc: PublicClient, curve: Address, recipient: Addres
 }
 
 const NO_ADDRESS = "0x0000000000000000000000000000000000000000";
+/** Legacy getter compatibility is limited to viem's empty-data/empty-revert cases.
+ * These cases are not proof of absent rules; transport/decode/explicit-reason errors must propagate.
+ */
+export async function readOptionalRulesAddress(read: () => Promise<unknown>): Promise<Address> {
+  try {
+    const value = await read();
+    if (typeof value !== "string" || !isAddress(value)) throw Error("Invalid rules address");
+    return value as Address;
+  } catch (error) {
+    const legacy = error instanceof BaseError && error.walk(cause =>
+      cause instanceof ContractFunctionZeroDataError || (cause instanceof ContractFunctionRevertedError
+        && (!cause.raw || cause.raw === "0x") && !cause.reason && !cause.data && !cause.signature));
+    if (legacy) return NO_ADDRESS as Address;
+    throw error;
+  }
+}
+
 
 type StoredRules = {
   launchTimestamp: bigint;
@@ -267,7 +284,7 @@ async function readRow(rpc: PublicClient, id: number, record: LaunchRecord, bloc
     rpc.readContract({ address: factory, abi: CUSTOM_PAIR_FACTORY_ABI, functionName: "metadataOf", args: [record.token], ...at }),
     rpc.readContract({ address: record.token, abi: ERC20, functionName: "totalSupply", ...at }),
     // Tokens from before launch rules have no rules() at all.
-    rpc.readContract({ address: record.token, abi: CUSTOM_PAIR_TOKEN_ABI, functionName: "rules", ...at }).catch(() => NO_ADDRESS as Address),
+    readOptionalRulesAddress(() => rpc.readContract({ address: record.token, abi: CUSTOM_PAIR_TOKEN_ABI, functionName: "rules", ...at })),
   ]);
   const phase = customPhase(state.phase);
   let spotPriceX18 = state.spotPriceX18;
@@ -334,7 +351,7 @@ export async function readCustomPairLaunches(offset = 0, limit = 24) {
     rpc.readContract({ address: factory, abi: CUSTOM_PAIR_FACTORY_ABI, functionName: "protocolFeeBps", blockNumber }),
     rpc.readContract({ address: factory, abi: CUSTOM_PAIR_FACTORY_ABI, functionName: "launchesPaused", blockNumber }),
     // Factories from before launch rules have no launchRules() at all.
-    rpc.readContract({ address: factory, abi: CUSTOM_PAIR_FACTORY_ABI, functionName: "launchRules", blockNumber }).catch(() => NO_ADDRESS as Address),
+    readOptionalRulesAddress(() => rpc.readContract({ address: factory, abi: CUSTOM_PAIR_FACTORY_ABI, functionName: "launchRules", blockNumber })),
   ]);
   const total = Number(count);
   const ids: number[] = [];

@@ -27,7 +27,11 @@ export function inspectBitcoinTransaction(raw: unknown, expectedTxid: unknown) {
   if (bytes[offset] === 0) { read(1); if (read(1)[0] !== 1) throw Error('Witness flags'); witness = true; }
   const baseStart = offset;
   const inputCount = compact(128); if (!inputCount) throw Error('Empty inputs');
-  for (let i = 0; i < inputCount; i++) { read(36); read(compact(10000)); read(4); }
+  const inputOutpoints: { txid: string; outputIndex: number }[] = [];
+  for (let i = 0; i < inputCount; i++) {
+    inputOutpoints.push({ txid: Buffer.from(read(32)).reverse().toString('hex'), outputIndex: read(4).readUInt32LE() });
+    read(compact(10000)); read(4);
+  }
   const outputCount = compact(128); if (!outputCount) throw Error('Empty outputs');
   const scripts: string[] = [], values: string[] = []; let total = 0n;
   for (let i = 0; i < outputCount; i++) {
@@ -52,7 +56,7 @@ export function inspectBitcoinTransaction(raw: unknown, expectedTxid: unknown) {
   return {
     schemaVersion: 1, source: 'local-supplied-bitcoin-transaction', txid, wtxid,
     serializedTxidMatches: true, outputScriptsBoundToSuppliedBytes: true,
-    version, lockTime, inputCount, outputCount, hasWitness: witness, byteLength: bytes.length,
+    version, lockTime, inputCount, inputOutpoints, outputCount, hasWitness: witness, byteLength: bytes.length,
     outputValuesSats: values, declaredOutputTotalSats: total.toString(),
     runestone: inspectRunestoneScripts(scripts),
     transactionVerified: false, networkVerified: false, inclusionVerified: false, finalityVerified: false,

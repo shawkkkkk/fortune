@@ -563,3 +563,17 @@ MCP/HTTP/fork integrations cover this path. Historical reads remain supported;
 this adds no freshness/finality/provider-independence or custody authority.
 Raw liquidity and null value/claimable fees/false readiness remain unchanged.
 See MANAGED_LIQUIDITY_READER.md. Frozen Standard and all gates are preserved.
+
+## Supplied Bitcoin previous-output accounting (M05)
+
+The existing offline transaction CLI has a separately disabled optional parent
+mode. Actual parsed child outpoints bind to hash-checked supplied parent bytes;
+unique required parents/outputs yield exact input/output totals and an implied
+fee, with duplicates, missing outputs, money bounds and negative fees rejecting.
+Original transaction/Runestone inspection remains available. Arithmetic does not
+verify unspent/mature inputs, signatures, chain inclusion or miner payment;
+feesSats remains null and authority/readiness flags remain false. Synthetic and
+actual child CLI tests are component evidence, not Bitcoin Core differential,
+public provider, issuance, custody or bridge proof. Full M05 and all release gates
+remain incomplete. See BITCOIN_TRANSACTION_INSPECTION.md. No financial authority,
+frozen Standard, root pins, real configuration or network actions change.

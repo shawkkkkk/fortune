@@ -51,3 +51,39 @@ independent chain/index context, confirmations/reorgs, custody and two-way bridg
 backing/recovery remain missing. Existing script-list and index adapters are
 preserved. Frozen Standard, dependencies, financial allocations and all release
 and audit/legal/governance/provider/custody gates remain unchanged.
+
+## Supplied parent-output accounting (M05)
+
+An optional third key, `previousTransactions`, invokes the actual transaction
+parser for each supplied parent and resolves the child parser's additive
+`inputOutpoints` (display-order txid and uint32 outputIndex). Also require
+`FORTUNE_BITCOIN_PREVOUT_READ_ENABLED=true`; the original two-key mode/output
+and its existing gate remain supported. Each parent has exactly `rawTransaction`
+and `expectedTxid`; the list has 1–128 unique, required parents, with at most
+200,256 aggregate raw hex characters including prefixes. Existing per-parser,
+Runestone and 256KiB file bounds still apply. No caller-supplied input value is
+accepted. Duplicate child outpoints, missing/out-of-range outputs, extra/duplicate
+parents, mismatched hashes, null/special outpoints, input totals above MAX_MONEY
+and negative implied fees reject. Multiple distinct outputs from one parent are
+counted separately exactly once. Parent ordering does not change the result.
+
+The result contains the original transaction/Runestone observation plus
+`suppliedPrevoutAccounting`: ordered input values, parent count, exact decimal
+input/output totals and `impliedFeeSats`. This is arithmetic over supplied bytes,
+not a live fee quote or verified miner payment. Top-level and nested `feesSats`
+remain null, and inputValuesVerified/transactionVerified and all chain, custody,
+bridge and execution flags stay false. Supplied parents need not be valid, mined,
+unspent or mature; the engine has no UTXO set, spend height, script checks,
+independent provider or network context. A changed SegWit parent witness can keep
+the same txid/outpoints/amounts. No parent script or witness prose is emitted.
+
+The boundary was checked against Bitcoin Core v30.0
+[Consensus::CheckTxInputs](https://github.com/bitcoin/bitcoin/blob/v30.0/src/consensus/tx_verify.cpp):
+Core additionally requires available unspent inputs and checks coinbase maturity;
+its fee is value-in minus value-out after money-range checks. This component
+performs only the supplied-byte arithmetic subset, not executed Core differential
+validation. Synthetic legacy/SegWit, all 64 parent output positions, missing/
+duplicate/extra parents, repeated inputs, overflow/negative fees and actual child
+CLI tests cover the component. They are not public Bitcoin, Rune issuance,
+UTXO/custody/backing or full M05 readiness evidence. No signing, transaction
+construction, broadcasts, service, dependency or release-gate changes.

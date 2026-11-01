@@ -61,3 +61,54 @@ fee processor, public custody service or complete M07 testnet readiness. Public
 activation still needs exact-source deployment, capital/custody/asset/venue review,
 signer/governance, independent audit/legal, provider/finality, failure/recovery,
 privacy and operations evidence. Other engines cannot inherit its evidence.
+
+## Read-only held-state integration
+
+`inspectLiquidityCustody` is an explicit library API for a supplied chain97
+custody/runtime/role/position policy. It calls the unchanged
+`inspectLiquidityPosition` engine with the custody address as owner, then reads
+that exact block's custody runtime, all three roles, stored policy and lifecycle
+flags through the same two clients. Both must report `held=true`,
+`released=false`, boolean pause state, zero token approval, exact ticks and exact
+positive raw liquidity. Every stored route address/runtime hash and position
+field must match the supplied policy. Equal pause state and number/hash/timestamp
+headers must agree; custody headers and chain identity are reread afterward.
+A physically held NFT without the contract's recorded held state is rejected.
+The reader supports held positions while open or paused. It rejects the initial
+not-deposited state and released positions; it does not reconstruct deposit or
+release receipts, or certify the full lifecycle history.
+
+The outer operation has one real 30-second wall deadline, including the nested
+LP reader, a safe nonnegative monotonic host clock and before/after RPC fences.
+Success, failure and timeout all close the fence, preserving original client
+method receivers and preventing late follow-on reads. Inflight requests are not
+cancelled; event-loop scheduling and trusted host/clock remain limitations. The
+existing LP reader selects the common minimum head minus twenty. Historical
+snapshots remain supported: there is no new snapshot-age or head-gap bound, no
+EIP-1898 hash calls, canonical-chain/finality/ABA proof or independent-provider
+verification. A changed release/pause/owner after the selected height is not
+current state. `observedAtMs` records observation time, not block freshness.
+
+Output includes the actual LP observation, stored held/pause state and reviewed
+role addresses. Raw liquidity is not value; TVL and claimable fees remain null.
+`currentAuthorization` is null; project consent, legitimate capital origin,
+provider independence, finality, execution and full managed-liquidity readiness
+remain explicitly false. A pinned runtime is not proof of safe proxies or venue
+administration. No project/factory consent, treasury control, funding origin,
+complete inventory, solvency, economic allocation or management permission is
+inferred. Never use creator/holder/LP liabilities or launch reserves as strategy
+capital. Launch-token-side fees remain burn-only; no fees are processed here.
+There is no CLI, HTTP/MCP exposure, stored trust, scheduler, signer or live
+configuration added. Privacy review is still needed before storing/sharing real
+wallet provenance. No prior deployment or audit evidence approves new source.
+
+The existing zero-account Pancake fork rehearsal now calls this actual reader
+against the compiled custody contract and real manager NFT: held/open and
+held/paused succeed, wrong fixed treasury rejects, and the reader rejects after
+the paused fixed-treasury release. Synthetic ABI fixtures cover every policy
+field, mismatched state/runtime/approval/liquidity/header, provider disagreement,
+clock rollback, receiver binding, peer failure and a real thirty-second hung
+custody read with fenced late completion. Two clients of ONE local fixture are
+not independent public providers, public deployment, legitimate-capital evidence
+or complete M07 readiness. Exact-source CI and retained runtime reports remain
+separate from public custody, audit and mainnet gates.

@@ -1,7 +1,7 @@
 // Actual compiled escrow -> zero-account LOCAL EVM -> viem HTTP/ABI -> receipts/state.
 // All writes use a fresh loopback URL and local VM impersonation. No fork or keys.
 import assert from 'node:assert/strict';
-import {readFileSync,writeFileSync,mkdirSync,rmSync} from 'node:fs';
+import {readFileSync,writeFileSync,mkdirSync,mkdtempSync,rmSync} from 'node:fs';
 import {resolve} from 'node:path';
 import {spawn,spawnSync} from 'node:child_process';
 import {once} from 'node:events';
@@ -16,7 +16,7 @@ const artifact=(file,name)=>JSON.parse(readFileSync(new URL(`../out/${file}/${na
 const escrowArtifact=artifact('FortuneTestnetCounterEscrow.sol','FortuneTestnetCounterEscrow');
 const assetArtifact=artifact('FortuneTestnetCounterEscrow.t.sol','CounterAssetMock');
 const report=resolve('.tmp/counter-escrow-runtime.json');rmSync(report,{force:true});
-let node,stage='startup';
+let node,stage='startup',cliPolicyDir;
 try{
  const binary=process.env.FORTUNE_ANVIL_BIN;assert.ok(binary);
  const version=spawnSync(binary,['--version'],{encoding:'utf8'});assert.equal(version.status,0);assert.match(version.stdout,/Version: 1\.7\.1/);
@@ -55,6 +55,13 @@ try{
   payoutAsset:first.toLowerCase(),payoutAssetCodeHash:keccak256(await rpc.getCode({address:first})),accounts:[ALICE,BOB],minimumHolding:'1',payoutBudget:'34'};
  const clients=[createPublicClient({transport:transport()}),createPublicClient({transport:transport()})];
  const allocation=await buildCounterSnapshotFunding(clients,allocationPolicy);
+ mkdirSync(resolve('.tmp'),{recursive:true});
+ cliPolicyDir=mkdtempSync(resolve('.tmp/counter-cli-'));const cliPolicyPath=resolve(cliPolicyDir,'policy.json');writeFileSync(cliPolicyPath,JSON.stringify(allocationPolicy),{mode:0o600,flag:'wx'});
+ const cli=spawnSync(process.execPath,['--import','./scripts/register-ts.mjs','--import','./tests/fixtures/counter-funding-http.mjs','scripts/prepare-counter-funding.mjs',cliPolicyPath],{
+  encoding:'utf8',timeout:25000,maxBuffer:65536,env:{...process.env,FORTUNE_COUNTER_FUNDING_READ_ENABLED:'true',FORTUNE_COUNTER_READ_RPC_URL:'https://counter-one.invalid/rpc',FORTUNE_COUNTER_SECONDARY_RPC_URL:'https://counter-two.invalid/rpc',FORTUNE_TEST_COUNTER_RPC:`http://127.0.0.1:${port}`}});
+ assert.equal(cli.status,0);const cliReview=JSON.parse(cli.stdout);
+ assert.equal(cliReview.allocation.data,allocation.data);assert.equal(cliReview.currentAuthorization,null);assert.equal(cliReview.executionAuthorized,false);
+ rmSync(cliPolicyDir,{recursive:true});cliPolicyDir=undefined;
  const bound=decodeFunctionData({abi:escrowArtifact.abi,data:allocation.data});
  assert.equal(bound.functionName,'fundSnapshotRound');
  for(const patch of [{expectedRound:2n},{blockHash:'0x'+'11'.repeat(32)},{deadline:0n}]){
@@ -64,13 +71,13 @@ try{
  assert.equal(await read(first,assetArtifact,'allowance',[GOV,escrow]),33n);
  assert.equal(allocation.fundedAmount,'33');assert.equal(allocation.unallocatedDust,'1');assert.equal(allocation.executionAuthorized,false);
  await assert.rejects(buildCounterAllocation(clients,{...allocationPolicy,accounts:[ALICE]}),/cover/);
- await receipt(await wallet(GOV).sendTransaction({to:escrow,data:allocation.data,gas:5000000n}));
+ await receipt(await wallet(GOV).sendTransaction({to:escrow,data:cliReview.allocation.data,gas:5000000n}));
  assert.equal(await read(escrow,escrowArtifact,'claimable',[1n,ALICE]),8n);assert.equal(await read(escrow,escrowArtifact,'claimable',[1n,BOB]),25n);
  const snapshot=await read(escrow,escrowArtifact,'roundSnapshots',[1n]);
  assert.equal(snapshot[0],1n);assert.equal(snapshot[1],BigInt(allocation.blockNumber));assert.equal(snapshot[2],allocation.blockHash);
  assert.equal(snapshot[3],BigInt(allocation.deadline));
  await write(GOV,first,assetArtifact,'mint',[GOV,33n]);await write(GOV,first,assetArtifact,'approve',[escrow,33n]);
- await receipt(await wallet(GOV).sendTransaction({to:escrow,data:allocation.data,gas:5000000n}),false);
+ await receipt(await wallet(GOV).sendTransaction({to:escrow,data:cliReview.allocation.data,gas:5000000n}),false);
  assert.equal(await read(escrow,escrowArtifact,'nextRound'),2n);assert.equal(await read(first,assetArtifact,'allowance',[GOV,escrow]),33n);
  await fund(second,[37n,41n]);
  await write(GOV,escrow,escrowArtifact,'claim',[1n,ALICE],false);
@@ -108,10 +115,10 @@ try{
  assert.equal(await read(second,assetArtifact,'balanceOf',[GUARD]),0n);
  assert.equal(await read(first,assetArtifact,'balanceOf',[BOB]),25n);assert.equal(await read(second,assetArtifact,'balanceOf',[BOB]),41n);
  const result={chainId:97,localOnly:true,compiledEscrowDeployed:true,fundedRounds:2,payoutAssets:2,claimsDelivered:4,batchReceiptBound:true,failedLaterAssetRollsBackWholeBatch:true,
-  snapshotAllocationFunded:true,roundSnapshotAndDeadlineBound:true,staleRoundHashAndExpiryRejected:true,exactFundingReplayRejected:true,allocationBlock:allocation.blockNumber,allocationDust:allocation.unallocatedDust,incompleteAccountListRejected:true,receiptRecipientAndAmountMatched:true,relayerReceivedNothing:true,duplicateClaimRejected:true,pausedClaimRejected:true,
+  snapshotAllocationFunded:true,actualOperatorCliFundingBytesMatched:true,roundSnapshotAndDeadlineBound:true,staleRoundHashAndExpiryRejected:true,exactFundingReplayRejected:true,allocationBlock:allocation.blockNumber,allocationDust:allocation.unallocatedDust,incompleteAccountListRejected:true,receiptRecipientAndAmountMatched:true,relayerReceivedNothing:true,duplicateClaimRejected:true,pausedClaimRejected:true,
   guardianCannotOpen:true,inexactTransferRejected:true,failedClaimLiabilityPreserved:true,explicitRetrySucceeded:true,
   finalReserved:['0','0'],generatedAccounts:0,privateKeysUsed:false,publicBroadcasts:false,independentProvidersVerified:false,
   holderEligibilityVerified:false,feeFundingVerified:false,deployedToPublicNetwork:false,fullCounterReadiness:false,executionAuthorized:false};
  mkdirSync(resolve('.tmp'),{recursive:true});writeFileSync(report,JSON.stringify(result,null,2)+'\n');console.log(JSON.stringify(result,null,2));
 }catch{console.error(`Local counter escrow verification failed at ${stage}; no public transaction was submitted.`);process.exitCode=1;}
-finally{if(node&&node.exitCode===null){node.kill('SIGTERM');const force=setTimeout(()=>node.kill('SIGKILL'),3000);await once(node,'exit').catch(()=>{});clearTimeout(force);}}
+finally{if(cliPolicyDir)rmSync(cliPolicyDir,{recursive:true,force:true});if(node&&node.exitCode===null){node.kill('SIGTERM');const force=setTimeout(()=>node.kill('SIGKILL'),3000);await once(node,'exit').catch(()=>{});clearTimeout(force);}}

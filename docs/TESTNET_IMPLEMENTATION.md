@@ -541,3 +541,15 @@ M06 readiness. Changed bytecode requires fresh deployment/audit evidence.
 Frozen Standard and all release gates remain; launch-token fees only burn,
 rewards and earned platform recirculation remain separate, and creator/holder/LP
 liabilities are never strategy capital.
+
+## Counter operator funding review integration (M06/P04)
+
+A default-disabled one-shot CLI now runs the actual two-client snapshot funding
+engine from an existing bounded strict policy file. It emits unsigned exact
+allocations, dust, block/deadline bindings and false authority, with pre/post
+policy-byte rechecks and restricted read transports. It cannot approve, fund,
+sign or submit. Actual child HTTP/ABI tests and the existing zero-account compiled
+escrow rehearsal consume its output. One local fixture is not independent public
+providers/eligibility/fee provenance/capital/custody or full Counter readiness.
+No real configuration, financial engine logic, frozen Standard/root pins or
+release gate changes. See COUNTER_ROUND_ESCROW.md.

@@ -553,3 +553,13 @@ escrow rehearsal consume its output. One local fixture is not independent public
 providers/eligibility/fee provenance/capital/custody or full Counter readiness.
 No real configuration, financial engine logic, frozen Standard/root pins or
 release gate changes. See COUNTER_ROUND_ESCROW.md.
+
+## LP observation header consistency (M07/P03)
+
+The actual LP reader now checks matching number/hash/timestamp across both clients
+and each final header reread, emits exact blockTimestamp and rejects invalid
+host clocks before RPC. Reproduced header/clock regressions and the existing
+MCP/HTTP/fork integrations cover this path. Historical reads remain supported;
+this adds no freshness/finality/provider-independence or custody authority.
+Raw liquidity and null value/claimable fees/false readiness remain unchanged.
+See MANAGED_LIQUIDITY_READER.md. Frozen Standard and all gates are preserved.

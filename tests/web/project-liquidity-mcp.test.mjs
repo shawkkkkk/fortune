@@ -19,7 +19,7 @@ const result = (name, p=policy()) => ({ positions:[0n,a(0),token,a(2),500,-10,10
   ownerOf:p.owner, getApproved:a(0), factory:LP_FACTORY, getPool:p.pool.address, token0:token, token1:a(2), fee:500, tickSpacing:10 })[name];
 function client(extra={}) { return {
   async getBlockNumber(){return 130n;}, async getChainId(){return 97;},
-  async getBlock({blockNumber}) { assert.equal(blockNumber,110n); return {number:blockNumber,hash:h(110)}; },
+  async getBlock({blockNumber}) { assert.equal(blockNumber,110n); return {number:blockNumber,hash:h(110),timestamp:1000n}; },
   async getCode(){return code;}, async readContract({functionName,blockNumber}) {assert.equal(blockNumber,110n);return result(functionName);}, ...extra,
 }; }
 function setup(p=policy()) {
@@ -46,7 +46,7 @@ test('LP MCP opt-in preserves defaults, all existing readers and the shared four
     const one=JSON.parse((await f(req(6,'tools/call',{name:'get_liquidity_position'}))).result.content[0].text);
     const two=JSON.parse((await f(req(7,'resources/read',{uri}))).result.contents[0].text);
     assert.deepEqual({...one.position,observedAtMs:0},{...two.position,observedAtMs:0});
-    assert.equal(one.position.liquidityUnits,'123');assert.equal(one.position.claimableFees,null);assert.equal(one.position.totalValue,null);
+    assert.equal(one.position.liquidityUnits,'123');assert.equal(one.position.blockTimestamp,'1000');assert.equal(one.position.claimableFees,null);assert.equal(one.position.totalValue,null);
     for(const k of ['projectCustodyVerified','independentProvidersVerified','fullManagedLiquidityReadiness','executionAuthorized'])assert.equal(one[k],false);
     assert.equal(one.currentAuthorization,null);assert.doesNotMatch(JSON.stringify(one),/policy.json|https:|codeHash/);
     assert.equal(JSON.parse((await f(req(8,'tools/call',{name:'get_project_canon'}))).result.content[0].text).source,'canon');
@@ -97,7 +97,7 @@ test('actual stdio CLI invokes the real LP engine through viem HTTP/ABI', {timeo
     child=spawn(process.execPath,['--import','./scripts/register-ts.mjs','--import','./tests/fixtures/project-liquidity-http.mjs','scripts/project-mcp.mjs'],{env});let out='',err='';child.stdout.on('data',d=>out+=d);child.stderr.on('data',d=>err+=d);timer=setTimeout(()=>child.kill(),15000);
     child.stdin.end([init,initialized,req(2,'tools/list'),req(3,'tools/call',{name:'get_liquidity_position'}),req(4,'resources/read',{uri})].map(JSON.stringify).join('\n')+'\n');
     const [status]=await once(child,'exit');assert.equal(status,0,err);const replies=out.trim().split('\n').map(JSON.parse);assert.equal(replies[1].result.tools.length,3);
-    const one=JSON.parse(replies[2].result.content[0].text),two=JSON.parse(replies[3].result.contents[0].text);assert.equal(one.position.blockNumber,'110');assert.equal(two.position.liquidityUnits,'123');assert.equal(two.projectCustodyVerified,false);assert.equal(two.executionAuthorized,false);assert.ok(calls>40);assert.deepEqual(readFileSync(s.policyPath),before);assert.doesNotMatch(out,/lp-one|policy.json|codeHash/);
+    const one=JSON.parse(replies[2].result.content[0].text),two=JSON.parse(replies[3].result.contents[0].text);assert.equal(one.position.blockNumber,'110');assert.equal(one.position.blockTimestamp,BigInt('0x6a000000').toString());assert.equal(two.position.liquidityUnits,'123');assert.equal(two.projectCustodyVerified,false);assert.equal(two.executionAuthorized,false);assert.ok(calls>40);assert.deepEqual(readFileSync(s.policyPath),before);assert.doesNotMatch(out,/lp-one|policy.json|codeHash/);
   }finally{clearTimeout(timer);child?.kill();server.closeAllConnections();await new Promise(r=>server.close(r));s.cleanup();}
 });
 

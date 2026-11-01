@@ -26,6 +26,7 @@ async function observe(c: PublicClient, p: LPReadPolicy, blockNumber: bigint) {
   if (await c.getChainId() !== 97) throw Error("Testnet only");
   const block = await c.getBlock({ blockNumber });
   if (block.number !== blockNumber || !hash(block.hash)) throw Error("Block unavailable");
+  const blockTimestamp = uint(block.timestamp,256);
   await Promise.all([p.manager,p.factory,p.pool,p.token0,p.token1].map(async pin => {
     const code = await c.getCode({ address: pin.address, blockNumber });
     if (!code || code === "0x" || !same(keccak256(code), pin.codeHash)) throw Error("Pinned runtime differs");
@@ -46,13 +47,15 @@ async function observe(c: PublicClient, p: LPReadPolicy, blockNumber: bigint) {
     || v[4] !== p.fee || fee !== p.fee || typeof spacing !== "number" || !Number.isInteger(spacing) || spacing <= 0
     || typeof v[5] !== "number" || typeof v[6] !== "number" || !Number.isInteger(v[5]) || !Number.isInteger(v[6])
     || v[5] < -887272 || v[6] > 887272 || v[5] >= v[6] || v[5] % spacing !== 0 || v[6] % spacing !== 0) throw Error("Position identity or custody differs");
-  const result = { chainId:97, blockNumber:blockNumber.toString(),blockHash:block.hash.toLowerCase(),positionId:p.positionId,
+  const result = { chainId:97, blockNumber:blockNumber.toString(),blockHash:block.hash.toLowerCase(),blockTimestamp,positionId:p.positionId,
     manager:p.manager.address.toLowerCase(),pool:p.pool.address.toLowerCase(),owner:owner.toLowerCase(),approved:approved.toLowerCase(),
     token0:p.token0.address.toLowerCase(),token1:p.token1.address.toLowerCase(),fee:p.fee,tickLower:v[5],tickUpper:v[6],
     permitNonce:uint(v[0],96),liquidityUnits:uint(v[7],128),feeGrowthInside0LastX128:uint(v[8],256),feeGrowthInside1LastX128:uint(v[9],256),
     lastComputedOwed0:uint(v[10],128),lastComputedOwed1:uint(v[11],128),
     globalOperatorApprovalsEnumerated:false,claimableFees:null,totalValue:null,executionAuthorized:false,readinessAttested:false };
-  if (!same((await c.getBlock({blockNumber})).hash || "",block.hash) || await c.getChainId() !== 97) throw Error("Snapshot changed");
+  const after = await c.getBlock({blockNumber});
+  if (after.number !== block.number || after.timestamp !== block.timestamp || !same(after.hash || "",block.hash)
+    || await c.getChainId() !== 97) throw Error("Snapshot changed");
   return result;
 }
 /** Point-in-time trusted RPC observation, not a proof, settlement or custody approval. */
@@ -62,7 +65,7 @@ export async function inspectLiquidityPosition(clients: readonly [PublicClient,P
   const start=Date.now();let last=start,finished=false,timer:ReturnType<typeof setTimeout>|undefined;
   const time=()=>{
     const now=Date.now();
-    if(finished || now<last || now-start>30_000)throw Error("LP read expired or clock moved backward");
+    if(finished || !Number.isSafeInteger(start) || start<0 || !Number.isSafeInteger(now) || now<last || now-start>30_000)throw Error("LP read expired or clock moved backward");
     last=now;return now;
   };
   // Preserve the original method receiver. Bound each awaited action, including

@@ -11,7 +11,7 @@ function client(options={}){
   return {
     async getChainId(){if(options.unavailable)throw Error('secret upstream');return options.chainId??97;},
     async getBlockNumber(){return options.head??130n;},
-    async getBlock({blockNumber}){assert.equal(blockNumber,110n);blockReads++;return {number:blockNumber,hash:options.reorg&&blockReads>1?h(9):options.blockHash??h(110)};},
+    async getBlock({blockNumber}){assert.equal(blockNumber,110n);blockReads++;return {number:blockNumber,timestamp:1000n,hash:options.reorg&&blockReads>1?h(9):options.blockHash??h(110)};},
     async getCode({blockNumber}){assert.equal(blockNumber,110n);return options.wrongCode?'0x00':code;},
     async readContract({address,functionName,blockNumber}){
       assert.equal(blockNumber,110n);
@@ -66,4 +66,34 @@ test('a hung LP head request has a real wall deadline and cannot resume observat
   releases.forEach(resolve=>resolve(130n));
   await new Promise(resolve=>setImmediate(resolve));
   assert.equal(reads,0);
+});
+
+
+test('LP header agreement rejects equal hashes with different initial timestamps',async()=>{
+  const cs=clients();const read=cs[1].getBlock;
+  cs[1].getBlock=async q=>({...await read(q),timestamp:1001n});
+  await assert.rejects(inspectLiquidityPosition(cs,policy()));
+});
+
+for(const [field,value] of [['number',111n],['timestamp',1001n]]) test(`LP header recheck rejects changed ${field} even when the hash is unchanged`,async()=>{
+  const cs=clients();let calls=0;const read=cs[1].getBlock;
+  cs[1].getBlock=async q=>({...await read(q),...(++calls===2?{[field]:value}:{})});
+  await assert.rejects(inspectLiquidityPosition(cs,policy()));
+});
+
+test('LP timestamps must be exact nonnegative uint256 values',async()=>{
+  for(const timestamp of [undefined,-1n,1n<<256n,1000,NaN,'1000']){
+    const cs=clients();for(const c of cs){const read=c.getBlock;c.getBlock=async q=>({...await read(q),timestamp});}
+    await assert.rejects(inspectLiquidityPosition(cs,policy()));
+  }
+  const r=await inspectLiquidityPosition(clients(),policy());
+  assert.equal(r.blockTimestamp,'1000');assert.equal(r.claimableFees,null);assert.equal(r.totalValue,null);assert.equal(r.executionAuthorized,false);
+});
+
+test('LP invalid initial clocks reject before RPC rather than emitting an invalid observation time',async()=>{
+  const real=Date.now;
+  try{for(const value of [NaN,-1,Number.MAX_SAFE_INTEGER+1,Infinity,1.5]){
+    Date.now=()=>value;let calls=0;const cs=clients();for(const c of cs)c.getBlockNumber=async()=>{calls++;return 130n;};
+    await assert.rejects(inspectLiquidityPosition(cs,policy()));assert.equal(calls,0);
+  }}finally{Date.now=real;}
 });

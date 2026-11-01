@@ -2,6 +2,22 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## Syndicate worker decline before acceptance
+
+The isolated chain97 WorkEscrow adds `decline(id)`: only the named worker can
+settle a still-Funded job with zero worker payment and a whole original-client
+refund, before or after the acceptance deadline. Existing exact transfer,
+runtime/backing/liability, pause and non-reentrancy gates apply. First valid
+accept/cancel/decline wins; inexact refunds roll back for explicit retry.
+Funding IDs and terms remain stored; Accepted payment/waiver/dispute paths are
+unchanged. Unit/fuzz/invariant tests and the existing zero-account HTTP/ABI
+runtime exercise decline and all six earlier jobs. One local synthetic fixture
+does not verify identities, legal cancellation, delivery, fairness, independent
+providers or public custody. New runtime requires fresh deployment/audit
+evidence; full P19 and release gates remain incomplete. No fee allocation,
+capital authority, dependency or frozen Standard baseline changes. See
+[SYNDICATE_WORK_ESCROW.md](SYNDICATE_WORK_ESCROW.md).
+
 ## Project API stream allocation bound
 
 The actual shared canon/snapshot HTTP reader rejects more than 4,096 non-final

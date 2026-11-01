@@ -129,7 +129,32 @@ try{
  assert.equal(await read(escrow,escrowArtifact,'resultHashes',[six,1n]),resultA);
  assert.equal(await read(escrow,escrowArtifact,'reserved',[token]),0n);
  assert.equal(await read(token,assetArtifact,'balanceOf',[CLIENT]),1820n);assert.equal(await read(token,assetArtifact,'balanceOf',[WORKER]),180n);
- const result={chainId:97,localOnly:true,clientScopedFundingIdObserved:true,fundedApprovedReplayRejectedBeforeAndAfterSettlement:true,compiledWorkEscrowDeployed:true,fundedJobs:6,settledJobs:6,workerWaiverRefundReceiptBound:true,staleWaiverRejected:true,inexactWaiverPreservesLiability:true,clientApprovalReceiptBound:true,workerResultHistoryObserved:true,revisionBoundPaymentReceiptObserved:true,staleResultApprovalRejected:true,inexactResultPaymentRetainsLiability:true,
+ stage='worker decline';
+ const seven=await fund(25n);
+ await write(CLIENT,escrow,escrowArtifact,'decline',[seven],false);
+ await write(GOV,token,assetArtifact,'configure',[true,false,'0x0000000000000000000000000000000000000000']);
+ await write(WORKER,escrow,escrowArtifact,'decline',[seven],false);
+ assert.equal((await read(escrow,escrowArtifact,'jobs',[seven]))[7],1);
+ assert.equal(await read(escrow,escrowArtifact,'reserved',[token]),25n);
+ assert.equal(await read(token,assetArtifact,'balanceOf',[CLIENT]),1795n);
+ await write(GOV,token,assetArtifact,'configure',[false,false,'0x0000000000000000000000000000000000000000']);
+ const declined=await write(WORKER,escrow,escrowArtifact,'decline',[seven]);
+ const declineEvents=declined.logs.filter(l=>l.address.toLowerCase()===escrow.toLowerCase()).map(l=>decodeEventLog({abi:escrowArtifact.abi,data:l.data,topics:l.topics}));
+ assert.equal(declineEvents.length,2);assert.equal(declineEvents[0].eventName,'JobSettled');
+ assert.equal(declineEvents[0].args.id,seven);assert.equal(declineEvents[0].args.workerAmount,0n);assert.equal(declineEvents[0].args.clientRefund,25n);assert.equal(declineEvents[0].args.settledBy.toLowerCase(),WORKER);
+ assert.equal(declineEvents[1].eventName,'JobDeclined');assert.equal(declineEvents[1].args.id,seven);assert.equal(declineEvents[1].args.worker.toLowerCase(),WORKER);
+ const declineTransfer=declined.logs.find(l=>l.address.toLowerCase()===token.toLowerCase());
+ const declinedRefund=decodeEventLog({abi:assetArtifact.abi,data:declineTransfer.data,topics:declineTransfer.topics});
+ assert.equal(declinedRefund.eventName,'Transfer');assert.equal(declinedRefund.args.from.toLowerCase(),escrow.toLowerCase());assert.equal(declinedRefund.args.to.toLowerCase(),CLIENT);assert.equal(declinedRefund.args.value,25n);
+ await write(WORKER,escrow,escrowArtifact,'decline',[seven],false);
+ await write(WORKER,escrow,escrowArtifact,'accept',[seven],false);
+ await write(CLIENT,escrow,escrowArtifact,'cancel',[seven],false);
+ assert.equal((await read(escrow,escrowArtifact,'jobs',[seven]))[7],4);
+ assert.equal(await read(escrow,escrowArtifact,'fundingJobs',[CLIENT,fundingId]),one);
+ assert.equal(await read(escrow,escrowArtifact,'nextJob'),8n);
+ assert.equal(await read(escrow,escrowArtifact,'reserved',[token]),0n);
+ assert.equal(await read(token,assetArtifact,'balanceOf',[CLIENT]),1820n);assert.equal(await read(token,assetArtifact,'balanceOf',[WORKER]),180n);
+ const result={chainId:97,localOnly:true,clientScopedFundingIdObserved:true,fundedApprovedReplayRejectedBeforeAndAfterSettlement:true,compiledWorkEscrowDeployed:true,fundedJobs:7,settledJobs:7,workerDeclineRefundReceiptBound:true,inexactDeclinePreservesFundedLiability:true,declinedJobCannotBeAcceptedOrCancelled:true,workerWaiverRefundReceiptBound:true,staleWaiverRejected:true,inexactWaiverPreservesLiability:true,clientApprovalReceiptBound:true,workerResultHistoryObserved:true,revisionBoundPaymentReceiptObserved:true,staleResultApprovalRejected:true,inexactResultPaymentRetainsLiability:true,
   workerPaidUnits:'180',clientFinalUnits:'1820',finalReserved:'0',cancellationAndExpiryRefundedClient:true,disputeSplitSettled:true,
   governorCannotArbitrate:true,guardianCannotOpen:true,pausedPaymentRejected:true,duplicatePaymentRejected:true,inexactSplitRetainsLiability:true,explicitRetrySucceeded:true,
   generatedAccounts:0,privateKeysUsed:false,publicBroadcasts:false,independentProvidersVerified:false,workDeliveryVerified:false,

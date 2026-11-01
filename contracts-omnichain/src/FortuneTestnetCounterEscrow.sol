@@ -186,6 +186,25 @@ contract FortuneTestnetCounterEscrow is ReentrancyGuard {
     /// @notice Anyone may deliver a recipient's whole entitlement, only to that recipient.
     function claim(uint256 id, address recipient) external onTestnet nonReentrant {
         if (paused) revert WrongPauseState();
+        _claim(id, recipient);
+    }
+
+    /// @notice Atomically deliver 1–32 sorted round entitlements to one fixed recipient.
+    /// @dev Any missing entitlement or failed transfer reverts the entire batch; no partial progress.
+    function claimMany(uint256[] calldata ids, address recipient) external onTestnet nonReentrant {
+        if (paused) revert WrongPauseState();
+        if (ids.length == 0 || ids.length > 32) revert InvalidAllocation();
+        uint256 previous;
+        for (uint256 i; i < ids.length; ++i) {
+            if (ids[i] <= previous) revert InvalidAllocation();
+            previous = ids[i];
+        }
+        for (uint256 i; i < ids.length; ++i) {
+            _claim(ids[i], recipient);
+        }
+    }
+
+    function _claim(uint256 id, address recipient) private {
         uint256 amount = claimable[id][recipient];
         if (amount == 0) revert NothingToClaim();
         Round storage round = rounds[id];

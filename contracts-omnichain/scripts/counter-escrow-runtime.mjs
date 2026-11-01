@@ -87,15 +87,27 @@ try{
  stage='failed transfer preserves entitlement then explicit retry succeeds';
  await write(GOV,second,assetArtifact,'configure',[true,false,'0x0000000000000000000000000000000000000000']);
  await write(GOV,escrow,escrowArtifact,'claim',[2n,BOB],false);
+ await write(GUARD,escrow,escrowArtifact,'claimMany',[[1n,2n],BOB],false);
+ assert.equal(await read(escrow,escrowArtifact,'claimable',[1n,BOB]),25n);
+ assert.equal(await read(first,assetArtifact,'balanceOf',[BOB]),0n);
+ assert.equal(await read(escrow,escrowArtifact,'reserved',[first]),25n);
  assert.equal(await read(escrow,escrowArtifact,'claimable',[2n,BOB]),41n);assert.equal(await read(escrow,escrowArtifact,'reserved',[second]),78n);
  await write(GOV,second,assetArtifact,'configure',[false,false,'0x0000000000000000000000000000000000000000']);
- await write(GOV,escrow,escrowArtifact,'claim',[2n,BOB]);
- await write(GOV,escrow,escrowArtifact,'claim',[1n,BOB]);
+ const batch=await write(GUARD,escrow,escrowArtifact,'claimMany',[[1n,2n],BOB]);
+ const batchLogs=batch.logs.filter(l=>l.address.toLowerCase()===escrow.toLowerCase()).map(l=>decodeEventLog({abi:escrowArtifact.abi,data:l.data,topics:l.topics}));
+ assert.equal(batchLogs.length,2);
+ for(const [i,amount] of [25n,41n].entries()){
+  assert.equal(batchLogs[i].eventName,'Claimed');assert.equal(batchLogs[i].args.round,BigInt(i+1));
+  assert.equal(batchLogs[i].args.recipient.toLowerCase(),BOB);assert.equal(batchLogs[i].args.amount,amount);
+  assert.equal(batchLogs[i].args.asset.toLowerCase(),[first,second][i].toLowerCase());
+ }
+ await write(GUARD,escrow,escrowArtifact,'claimMany',[[1n,2n],BOB],false);
  await write(GOV,escrow,escrowArtifact,'claim',[2n,ALICE]);
  assert.equal(await read(escrow,escrowArtifact,'reserved',[first]),0n);assert.equal(await read(escrow,escrowArtifact,'reserved',[second]),0n);
  assert.equal(await read(first,assetArtifact,'balanceOf',[escrow]),0n);assert.equal(await read(second,assetArtifact,'balanceOf',[escrow]),0n);
+ assert.equal(await read(second,assetArtifact,'balanceOf',[GUARD]),0n);
  assert.equal(await read(first,assetArtifact,'balanceOf',[BOB]),25n);assert.equal(await read(second,assetArtifact,'balanceOf',[BOB]),41n);
- const result={chainId:97,localOnly:true,compiledEscrowDeployed:true,fundedRounds:2,payoutAssets:2,claimsDelivered:4,
+ const result={chainId:97,localOnly:true,compiledEscrowDeployed:true,fundedRounds:2,payoutAssets:2,claimsDelivered:4,batchReceiptBound:true,failedLaterAssetRollsBackWholeBatch:true,
   snapshotAllocationFunded:true,roundSnapshotAndDeadlineBound:true,staleRoundHashAndExpiryRejected:true,exactFundingReplayRejected:true,allocationBlock:allocation.blockNumber,allocationDust:allocation.unallocatedDust,incompleteAccountListRejected:true,receiptRecipientAndAmountMatched:true,relayerReceivedNothing:true,duplicateClaimRejected:true,pausedClaimRejected:true,
   guardianCannotOpen:true,inexactTransferRejected:true,failedClaimLiabilityPreserved:true,explicitRetrySucceeded:true,
   finalReserved:['0','0'],generatedAccounts:0,privateKeysUsed:false,publicBroadcasts:false,independentProvidersVerified:false,

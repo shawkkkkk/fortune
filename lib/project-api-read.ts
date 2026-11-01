@@ -43,6 +43,7 @@ export async function readProjectApi<T>(url: string, budgetMs: 10000 | 30000,
       if (done) break;
       size += value.byteLength;
       if (size > 32768) throw Error("Project API response too large");
+      if (chunks.length >= 4096) throw Error("Project API response has too many chunks");
       chunks.push(value);
     }
     const bytes = new Uint8Array(size);

@@ -242,3 +242,45 @@ M06 readiness. Changed bytecode requires fresh deployment/audit evidence.
 Frozen Standard and all release gates remain; launch-token fees only burn,
 rewards and earned platform recirculation remain separate, and creator/holder/LP
 liabilities are never strategy capital.
+
+
+## Operator snapshot-funding CLI (M06/P04)
+
+This explicit read-only command runs the actual two-client snapshot allocation
+engine and emits unsigned `fundSnapshotRound` review bytes. It does not fund,
+approve, sign, submit or retry transactions. Default-disabled invocation:
+
+```bash
+FORTUNE_COUNTER_FUNDING_READ_ENABLED=true \
+FORTUNE_COUNTER_READ_RPC_URL=https://reviewed-primary.example/rpc \
+FORTUNE_COUNTER_SECONDARY_RPC_URL=https://reviewed-secondary.example/rpc \
+node --import ./scripts/register-ts.mjs scripts/prepare-counter-funding.mjs /protected/counter-policy.json
+```
+
+Use the exact existing `CounterAllocationPolicy` keys: chainId97, escrow and
+runtime hash, governor, guardian, launch token and runtime hash, payout asset and
+runtime hash, sorted complete supplied accounts (1–128), positive decimal-string
+minimumHolding and payoutBudget in base units. The existing engine validates
+policy before RPC and enforces its unchanged20-second wall deadline,20-confirmed
+common block,120-second freshness, role/runtime/paused/supply coverage and exact
+pro-rata/dust checks. This is not an independent holder index or eligibility,
+fee-funding, custody/capital-origin or finality approval.
+
+The CLI reads an existing regular file using a bounded16KiB+1 descriptor read,
+strict UTF-8/JSON and exact byte rechecks before/after awaits. Supply two distinct
+HTTPS origins without userinfo/fragments; transport uses5-second requests, no
+redirect/retry/credentials. One-shot output includes a policy byte checksum,
+original snapshot/deadline and null currentAuthorization/false execution and
+full-readiness flags. A checksum is not policy approval. It never refreshes expiry
+or writes files. Host/files/providers remain trusted; rechecks do not protect
+against a privileged host. Review privacy before exposing real wallet lists.
+Errors disclose no file path or provider credentials. No public API, scheduler,
+signer or real configuration is enabled.
+
+Child CLI/HTTP/ABI tests cover exact bytes, disabled/malformed preflight without
+RPC, incomplete coverage, private errors and changed-file rejection. The existing
+zero-account compiled escrow rehearsal additionally runs this CLI through a
+test-only two-HTTPS-origin→ONE-local-Anvil mapping, matches snapshot-funding bytes
+and exercises existing funding/claims/failure tests. It is not independent public
+providers, a public deployment or full M06 readiness. All earlier methods,
+economics, frozen Standard/dependency baseline and release gates are preserved.

@@ -51,3 +51,10 @@ test('actual CLI preserves legacy inspection and separately gates supplied-paren
  writeFileSync(file,JSON.stringify({rawTransaction:child,expectedTxid:digest(child)}));assert.equal(cli('false').status,0);
  }finally{rmSync(dir,{recursive:true,force:true});}
 });
+
+test('supplied-byte fee rate stays an exact rational over serialized virtual bytes, not a paid fee or quote',()=>{
+ const r=run(),ratio=r.suppliedPrevoutAccounting.impliedFeeRatePerSerializedVbyte;
+ assert.deepEqual(ratio,{numeratorSats:'299',denominatorVbytes:'153'});assert.equal(r.feeRateSatsPerVbyte,null);assert.equal(r.transaction.feeRateSatsPerVbyte,null);assert.equal(r.mempoolPolicyVerified,false);assert.equal(r.feesSats,null);
+ const zero=tx([[digest(p1),1]],[500]);const z=run(zero,[entry(p1)]);assert.deepEqual(z.suppliedPrevoutAccounting.impliedFeeRatePerSerializedVbyte,{numeratorSats:'0',denominatorVbytes:'61'});
+ const witnessed=tx([[digest(p1),1]],[499],true);const baseTx=tx([[digest(p1),1]],[499]);const w=run(witnessed,[entry(p1)],digest(baseTx));assert.deepEqual(w.suppliedPrevoutAccounting.impliedFeeRatePerSerializedVbyte,{numeratorSats:'1',denominatorVbytes:'63'});assert.equal(w.transaction.serializationSize.witnessRelatedBytes,5);
+});

@@ -53,14 +53,18 @@ export function inspectBitcoinTransaction(raw: unknown, expectedTxid: unknown) {
   const stripped = witness ? Buffer.concat([versionBytes, bytes.subarray(baseStart, baseEnd), lockBytes]) : bytes;
   const txid = hash(stripped), wtxid = hash(bytes);
   if (txid !== expectedTxid) throw Error('Transaction ID mismatch');
+  // Serialized BIP141 dimensions only; no script/sigop or relay-policy evaluation.
+  const weightUnits = stripped.length * 3 + bytes.length;
+  const serializationSize = { baseBytes: stripped.length, witnessRelatedBytes: bytes.length - stripped.length,
+    weightUnits, virtualBytes: Math.ceil(weightUnits / 4), sigopAdjustedVirtualBytes: null };
   return {
     schemaVersion: 1, source: 'local-supplied-bitcoin-transaction', txid, wtxid,
     serializedTxidMatches: true, outputScriptsBoundToSuppliedBytes: true,
-    version, lockTime, inputCount, inputOutpoints, outputCount, hasWitness: witness, byteLength: bytes.length,
+    version, lockTime, inputCount, inputOutpoints, outputCount, hasWitness: witness, byteLength: bytes.length, serializationSize,
     outputValuesSats: values, declaredOutputTotalSats: total.toString(),
     runestone: inspectRunestoneScripts(scripts),
     transactionVerified: false, networkVerified: false, inclusionVerified: false, finalityVerified: false,
-    inputValuesVerified: false, feesSats: null, signaturesVerified: false, runeBalancesVerified: false,
+    inputValuesVerified: false, feesSats: null, feeRateSatsPerVbyte: null, signaturesVerified: false, runeBalancesVerified: false,
     etchingAccepted: false, mintAccepted: false, custodyVerified: false, bridgeBackingVerified: false,
     executionAuthorized: false, fullBitcoinRunesReadiness: false,
   };

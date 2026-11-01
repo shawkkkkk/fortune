@@ -91,6 +91,13 @@ try{
   assets:await Promise.all([first,second].map(async token=>({token:token.toLowerCase(),codeHash:keccak256(await rpc.getCode({address:token}))})))};
  const claimReview=await buildCounterClaimBatch(clients,claimPolicy);
  assert.deepEqual(claimReview.claims.map(x=>x.amount),['25','41']);assert.equal(claimReview.executionAuthorized,false);assert.equal(claimReview.snapshotBoundCalldata,false);
+ cliPolicyDir=mkdtempSync(resolve('.tmp/counter-claim-cli-'));const claimPath=resolve(cliPolicyDir,'policy.json');writeFileSync(claimPath,JSON.stringify(claimPolicy),{mode:0o600,flag:'wx'});
+ const runClaimCli=()=>spawnSync(process.execPath,['--import','./scripts/register-ts.mjs','--import','./tests/fixtures/counter-funding-http.mjs','scripts/prepare-counter-claims.mjs',claimPath],{
+  encoding:'utf8',timeout:25000,maxBuffer:65536,env:{...process.env,FORTUNE_COUNTER_CLAIM_READ_ENABLED:'true',FORTUNE_COUNTER_READ_RPC_URL:'https://counter-one.invalid/rpc',FORTUNE_COUNTER_SECONDARY_RPC_URL:'https://counter-two.invalid/rpc',FORTUNE_TEST_COUNTER_RPC:`http://127.0.0.1:${port}`}});
+ const claimCli=runClaimCli();assert.equal(claimCli.status,0);const claimCliReview=JSON.parse(claimCli.stdout);
+ assert.equal(claimCliReview.review.data,claimReview.data);assert.equal(claimCliReview.review.blockHash,claimReview.blockHash);
+ assert.equal(claimCliReview.review.snapshotBoundCalldata,false);assert.equal(claimCliReview.currentAuthorization,null);assert.equal(claimCliReview.executionAuthorized,false);
+
  stage='actual relayed claims and immutable receipt fields';
  const claimed=await write(GUARD,escrow,escrowArtifact,'claim',[1n,ALICE]);
  const logs=claimed.logs.filter(l=>l.address.toLowerCase()===escrow.toLowerCase()).map(l=>decodeEventLog({abi:escrowArtifact.abi,data:l.data,topics:l.topics}));
@@ -108,7 +115,7 @@ try{
  assert.equal(await read(escrow,escrowArtifact,'reserved',[first]),25n);
  assert.equal(await read(escrow,escrowArtifact,'claimable',[2n,BOB]),41n);assert.equal(await read(escrow,escrowArtifact,'reserved',[second]),78n);
  await write(GOV,second,assetArtifact,'configure',[false,false,'0x0000000000000000000000000000000000000000']);
- const batch=await receipt(await wallet(GUARD).sendTransaction({to:escrow,data:claimReview.data,gas:5000000n}));
+ const batch=await receipt(await wallet(GUARD).sendTransaction({to:escrow,data:claimCliReview.review.data,gas:5000000n}));
  const batchLogs=batch.logs.filter(l=>l.address.toLowerCase()===escrow.toLowerCase()).map(l=>decodeEventLog({abi:escrowArtifact.abi,data:l.data,topics:l.topics}));
  assert.equal(batchLogs.length,2);
  for(const [i,amount] of [25n,41n].entries()){
@@ -124,7 +131,9 @@ try{
  assert.equal(await read(first,assetArtifact,'balanceOf',[BOB]),25n);assert.equal(await read(second,assetArtifact,'balanceOf',[BOB]),41n);
  await rpc.request({method:'anvil_mine',params:['0x14','0x0']});
  await assert.rejects(buildCounterClaimBatch(clients,claimPolicy));
- const result={chainId:97,actualClaimReviewBytesExecuted:true,spentClaimReviewRejected:true,claimReview,localOnly:true,compiledEscrowDeployed:true,fundedRounds:2,payoutAssets:2,claimsDelivered:4,batchReceiptBound:true,failedLaterAssetRollsBackWholeBatch:true,
+ const spentCli=runClaimCli();assert.equal(spentCli.status,1);assert.equal(spentCli.stdout,'');
+ rmSync(cliPolicyDir,{recursive:true});cliPolicyDir=undefined;
+ const result={chainId:97,actualClaimCliBytesExecuted:true,spentClaimCliRejected:true,actualClaimReviewBytesExecuted:true,spentClaimReviewRejected:true,claimReview,localOnly:true,compiledEscrowDeployed:true,fundedRounds:2,payoutAssets:2,claimsDelivered:4,batchReceiptBound:true,failedLaterAssetRollsBackWholeBatch:true,
   snapshotAllocationFunded:true,actualOperatorCliFundingBytesMatched:true,roundSnapshotAndDeadlineBound:true,staleRoundHashAndExpiryRejected:true,exactFundingReplayRejected:true,allocationBlock:allocation.blockNumber,allocationDust:allocation.unallocatedDust,incompleteAccountListRejected:true,receiptRecipientAndAmountMatched:true,relayerReceivedNothing:true,duplicateClaimRejected:true,pausedClaimRejected:true,
   guardianCannotOpen:true,inexactTransferRejected:true,failedClaimLiabilityPreserved:true,explicitRetrySucceeded:true,
   finalReserved:['0','0'],generatedAccounts:0,privateKeysUsed:false,publicBroadcasts:false,independentProvidersVerified:false,

@@ -2,6 +2,20 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## Counter unsigned claim-review CLI
+
+Default-disabled `prepare-counter-claims.mjs` calls the unchanged actual
+two-client `buildCounterClaimBatch` engine using an existing bounded literal
+policy and restricted HTTPS read providers. It returns original observation
+data and unsigned batch bytes; policy mutation discards output. Calldata stays
+unbound to amounts/snapshot/expiry, authorization null and execution/readiness
+false. No signing/submission/approval/retry/service/configuration added. Actual
+child-CLI HTTP/ABI tests and the compiled two-asset local escrow rehearsal
+exercise returned bytes and spent-claim rejection. ONE zero-account fixture
+is not public custody, legitimate funding, independent providers, consent or
+full M06/P04/audit/mainnet approval. Standard/root pins/contracts/economics and
+all gates unchanged. See [COUNTER_ROUND_ESCROW.md](COUNTER_ROUND_ESCROW.md).
+
 ## Rune index stream allocation bound
 
 The actual fixed-origin Rune index reader now caps retained non-final chunks

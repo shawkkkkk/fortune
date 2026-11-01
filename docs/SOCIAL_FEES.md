@@ -147,3 +147,24 @@ metadata and valid 0/6/18/255 decimals. A loopback HTTP/ABI fixture runs the act
 viem reader with a six-decimal token and failed metadata. This is not a public
 vault, attestor, ownership or claim lifecycle drill. Activation, custody, identity,
 recovery and independent audit requirements remain unchanged.
+
+## Social proof stream work bound
+
+Each successful HTTP attempt now accepts at most 4,096 non-final stream fragments,
+including empty fragments, before byte counting, decoding or ownership projection.
+The final done read is not a fragment. This bounds read/decode iterations per
+attempt; it does not bound upstream buffering, process memory or guarantee a
+wall-clock scheduling deadline. Legitimate highly fragmented responses can be
+rejected, and transport chunk boundaries are not source-document boundaries.
+
+The existing 1MB/6MB body limits, real eight-second per-attempt deadline, monotonic
+clock/failure fences, non-awaited cancellation, one retry after 300ms and platform
+fallbacks remain unchanged. This is not a whole-verification fragment or time
+budget: a retry and separate platform fallback each retain their own bounds.
+Existing endpoint/status/author/code/wallet rules and private claim links are
+unchanged; no attestor credentials, bindings, claims, fees or public activation
+are enabled. Empty/tiny over-fragmentation regressions rejected the old source's
+acceptance; boundary tests include proof as fragment4,096 and assert bounded reads,
+original retry count and cleanup despite hung cancellation. Existing real HTTP
+and eight-second deadline tests exercise the same shared reader. This component
+is not full Social Escrow, provider availability or audit/mainnet approval.

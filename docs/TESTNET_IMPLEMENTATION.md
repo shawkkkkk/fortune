@@ -2,6 +2,20 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## Syndicate operator job-reader CLI
+
+Default-disabled `inspect-work-job.mjs` consumes the unchanged actual two-client
+job reader using a bounded literal16KiB policy and restricted HTTPS transports.
+Policy mutation discards output; checksum is only a byte binding, snapshot times
+remain original and all authorization/payment/readiness limits are preserved.
+No signer, calldata, financial action, persistence, service or real configuration
+is added. Actual child HTTP/ABI tests and the compiled eight-job local runtime
+compare Funded/Accepted/paused/Disputed/Settled data and result history with the
+library, while retaining all earlier settlement/rollback/retry checks. ONE local
+zero-account fixture is not independent providers, public custody, verified
+parties/capital or full P19/audit/mainnet readiness. Contracts/Standard/root pins,
+economics and all gates unchanged. See [SYNDICATE_WORK_ESCROW.md](SYNDICATE_WORK_ESCROW.md).
+
 ## Social ownership stream work bound
 
 The actual shared social ownership HTTP reader now caps non-final fragments at

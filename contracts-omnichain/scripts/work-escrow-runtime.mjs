@@ -1,8 +1,10 @@
 // Actual compiled escrow -> zero-account LOCAL EVM -> viem HTTP/ABI -> receipts/state.
 // All writes use a fresh loopback URL and local VM impersonation. No fork or keys.
 import assert from 'node:assert/strict';
-import {readFileSync,writeFileSync,mkdirSync,rmSync} from 'node:fs';
-import {resolve} from 'node:path';
+import {readFileSync,writeFileSync,mkdirSync,rmSync,mkdtempSync} from 'node:fs';
+import {resolve,join} from 'node:path';
+import {tmpdir} from 'node:os';
+import {createHash} from 'node:crypto';
 import {spawn,spawnSync} from 'node:child_process';
 import {once} from 'node:events';
 import {createServer} from 'node:net';
@@ -41,7 +43,21 @@ try{
  const token=await deploy(assetArtifact),escrow=await deploy(escrowArtifact,[GOV,GUARD,ARB,[{token,codeHash:keccak256(await rpc.getCode({address:token})),maxPerJob:1000n}]]);
  const observers=[rpc,createPublicClient({transport:transport(),chain:bscTestnet})];
  const policyFor=async(id,amount)=>({chainId:97,escrow:escrow.toLowerCase(),escrowCodeHash:keccak256(await rpc.getCode({address:escrow})),governor:GOV,guardian:GUARD,arbitrator:ARB,jobId:id.toString(),client:CLIENT,worker:WORKER,asset:token.toLowerCase(),assetCodeHash:keccak256(await rpc.getCode({address:token})),maxPerJob:'1000',amount:amount.toString(),termsHash:'0x'+'11'.repeat(32)});
- const observe=async(id,amount,state)=>{await rpc.request({method:'anvil_mine',params:['0x14','0x0']});const observation=await inspectWorkEscrowJob(observers,await policyFor(id,amount));assert.equal(observation.job.state,state);assert.equal(observation.workerPaid,null);assert.equal(observation.settlementReceiptVerified,false);assert.equal(observation.executionAuthorized,false);return observation;};
+ const observe=async(id,amount,state)=>{
+  await rpc.request({method:'anvil_mine',params:['0x14','0x0']});
+  const policy=await policyFor(id,amount),observation=await inspectWorkEscrowJob(observers,policy);
+  assert.equal(observation.job.state,state);assert.equal(observation.workerPaid,null);assert.equal(observation.settlementReceiptVerified,false);assert.equal(observation.executionAuthorized,false);
+  const dir=mkdtempSync(join(tmpdir(),'fortune-work-job-')),path=join(dir,'policy.json'),bytes=JSON.stringify(policy);writeFileSync(path,bytes);
+  try{
+   const child=spawn(process.execPath,['--import','./scripts/register-ts.mjs','--import','./tests/fixtures/work-job-http.mjs','scripts/inspect-work-job.mjs',path],{env:{...process.env,FORTUNE_WORK_JOB_READ_ENABLED:'true',FORTUNE_WORK_READ_RPC_URL:'https://work-one.invalid',FORTUNE_WORK_SECONDARY_RPC_URL:'https://work-two.invalid',FORTUNE_TEST_WORK_RPC:`http://127.0.0.1:${port}`}});
+   let out='',err='';child.stdout.on('data',d=>out+=d);child.stderr.on('data',d=>err+=d);const timer=setTimeout(()=>child.kill('SIGKILL'),30000);
+   try{const [status]=await once(child,'exit');assert.equal(status,0,err);}finally{clearTimeout(timer);}
+   const result=JSON.parse(out);assert.equal(result.policySha256,createHash('sha256').update(bytes).digest('hex'));assert.equal(result.executionAuthorized,false);assert.equal(result.fullSyndicateReadiness,false);assert.equal(result.currentAuthorization,null);
+   // Separate calls have their own original observation times; all same-block data must match.
+   assert.deepEqual({...result.observation,observedAtMs:0},{...observation,observedAtMs:0});
+  }finally{rmSync(dir,{recursive:true,force:true});}
+  return observation;
+ };
  assert.equal(await read(escrow,escrowArtifact,'paused'),true);
  await write(GUARD,escrow,escrowArtifact,'setPaused',[false],false);
  await write(GOV,escrow,escrowArtifact,'setPaused',[false]);
@@ -183,7 +199,7 @@ try{
  assert.equal(await read(escrow,escrowArtifact,'resultHashes',[eight,2n]),hashB);
  assert.equal(await read(escrow,escrowArtifact,'reserved',[token]),0n);
  assert.equal(await read(token,assetArtifact,'balanceOf',[CLIENT]),1816n);assert.equal(await read(token,assetArtifact,'balanceOf',[WORKER]),184n);
- const result={chainId:97,actualPinnedJobStatesObserved:true,pausedJobObserved:true,actualResultHistoryObserved:true,foreignTermsObservationRejected:true,settledStorageDoesNotInferPayment:true,revisionBoundDisputeReceiptObserved:true,staleResultDisputeRejected:true,disputedRevisionSurvivesSettlement:true,localOnly:true,clientScopedFundingIdObserved:true,fundedApprovedReplayRejectedBeforeAndAfterSettlement:true,compiledWorkEscrowDeployed:true,fundedJobs:8,settledJobs:8,workerDeclineRefundReceiptBound:true,inexactDeclinePreservesFundedLiability:true,declinedJobCannotBeAcceptedOrCancelled:true,workerWaiverRefundReceiptBound:true,staleWaiverRejected:true,inexactWaiverPreservesLiability:true,clientApprovalReceiptBound:true,workerResultHistoryObserved:true,revisionBoundPaymentReceiptObserved:true,staleResultApprovalRejected:true,inexactResultPaymentRetainsLiability:true,
+ const result={chainId:97,actualWorkJobCliStatesMatched:true,actualWorkJobCliResultHistoryMatched:true,settledCliDoesNotInferPayment:true,actualPinnedJobStatesObserved:true,pausedJobObserved:true,actualResultHistoryObserved:true,foreignTermsObservationRejected:true,settledStorageDoesNotInferPayment:true,revisionBoundDisputeReceiptObserved:true,staleResultDisputeRejected:true,disputedRevisionSurvivesSettlement:true,localOnly:true,clientScopedFundingIdObserved:true,fundedApprovedReplayRejectedBeforeAndAfterSettlement:true,compiledWorkEscrowDeployed:true,fundedJobs:8,settledJobs:8,workerDeclineRefundReceiptBound:true,inexactDeclinePreservesFundedLiability:true,declinedJobCannotBeAcceptedOrCancelled:true,workerWaiverRefundReceiptBound:true,staleWaiverRejected:true,inexactWaiverPreservesLiability:true,clientApprovalReceiptBound:true,workerResultHistoryObserved:true,revisionBoundPaymentReceiptObserved:true,staleResultApprovalRejected:true,inexactResultPaymentRetainsLiability:true,
   workerPaidUnits:'184',clientFinalUnits:'1816',finalReserved:'0',cancellationAndExpiryRefundedClient:true,disputeSplitSettled:true,
   governorCannotArbitrate:true,guardianCannotOpen:true,pausedPaymentRejected:true,duplicatePaymentRejected:true,inexactSplitRetainsLiability:true,explicitRetrySucceeded:true,
   generatedAccounts:0,privateKeysUsed:false,publicBroadcasts:false,independentProvidersVerified:false,workDeliveryVerified:false,

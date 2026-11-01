@@ -251,3 +251,43 @@ parties, legitimate funding, public custody or full P19 readiness. No contract,
 root dependency, Standard fingerprint, economic allocation, authority or release
 gate changes. Exact-source audit/legal/governance, public receipt/service,
 provider/finality, privacy, custody/failure/recovery and operations gates remain.
+
+## Default-disabled operator job CLI
+
+`node --import ./scripts/register-ts.mjs scripts/inspect-work-job.mjs <policy.json>`
+requires `FORTUNE_WORK_JOB_READ_ENABLED=true`, `FORTUNE_WORK_READ_RPC_URL` and
+`FORTUNE_WORK_SECONDARY_RPC_URL`. Supply the exact `WorkJobPolicy` described above
+and in the library type, using an already existing regular file. The CLI calls
+that unchanged actual `inspectWorkEscrowJob` engine, not a separate projection or
+mock. No provider, policy or project configuration is enabled by this source.
+
+Policy reads open a nonblocking read-only file descriptor, require a regular
+file and read at most16KiB+1 before enforcing16KiB and strict UTF-8 JSON. Missing,
+malformed and foreign policies reject without RPC or file creation. Literal
+policy bytes are pinned before and after awaited RPC; mutation discards the
+observation. This is not a global filesystem deadline or privileged-host/path-swap
+ABA defense. HTTPS providers must have distinct origins and no userinfo/fragment;
+each transport has a five-second timeout, zero retries and no redirects or
+credentials forwarding. Distinct origins are not independent-provider evidence.
+Errors are generic with no policy path, RPC credential or upstream exception.
+
+Output contains the original engine observation and policy SHA-256 byte checksum
+(not authentication). Snapshot time is not renewed by formatting. Paused escrow
+and Settled storage retain the library semantics: paid/refund/settlement tx stay
+null, current authorization null and execution/full-readiness false. No signing,
+transaction preparation/submission, writes, automatic retry, trust persistence,
+HTTP/MCP, hosted service, model or financial authority is added. Obtain privacy
+review before storing or sharing real identifiable wallet/commitment metadata.
+
+Actual child CLI → viem HTTP/ABI tests cover observation/result history, pause,
+Settled unknown payments, disabled/preflight failures, unsafe providers, foreign
+terms, insufficient reported backing, provider failure, policy mutation, exact
+16KiB boundary and Linux writerless FIFO rejection. The compiled eight-job local
+rehearsal also calls the actual child CLI for Funded/Accepted/paused/Disputed/
+Settled snapshots and compares all same-block engine data including history;
+only the independent call timestamps differ. All previous settlement/rollback/
+retry checks remain. The synthetic HTTPS test-only preload maps two origins to
+ONE zero-account local EVM; it is never loaded by the production CLI and proves
+neither public service, real parties/funding nor independent providers. All
+contract, Standard/root dependency, economic, audit/legal/privacy/custody/
+provider/finality/recovery/operations and full P19 release gates remain separate.

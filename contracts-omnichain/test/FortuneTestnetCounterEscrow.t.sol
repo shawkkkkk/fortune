@@ -346,6 +346,29 @@ contract CounterEscrowHandler is Test {
         funded += amounts[0] + amounts[1];
     }
 
+    function batch(bool bob) external {
+        address account = bob ? address(0x1002) : address(0x1001);
+        uint256 count;
+        for (uint256 id = 1; id < escrow.nextRound() && count < 32; ++id) {
+            if (escrow.claimable(id, account) != 0) ++count;
+        }
+        if (count == 0) return;
+        uint256[] memory ids = new uint256[](count);
+        uint256 at;
+        uint256 amount;
+        for (uint256 id = 1; id < escrow.nextRound() && at < count; ++id) {
+            uint256 owed = escrow.claimable(id, account);
+            if (owed != 0) {
+                ids[at++] = id;
+                amount += owed;
+            }
+        }
+        vm.prank(address(0x9001));
+        escrow.setPaused(false);
+        escrow.claimMany(ids, account);
+        paid += amount;
+    }
+
     function claim(uint256 raw, bool bob) external {
         if (escrow.nextRound() == 1) return;
         uint256 id = bound(raw, 1, escrow.nextRound() - 1);
@@ -366,7 +389,8 @@ contract FortuneTestnetCounterEscrowInvariantTest is CounterEscrowBase {
     function setUp() public override {
         super.setUp();
         handler = new CounterEscrowHandler(escrow, asset);
-        bytes4[] memory selectors = new bytes4[](2);
+        bytes4[] memory selectors = new bytes4[](3);
+        selectors[2] = handler.batch.selector;
         selectors[0] = handler.fund.selector;
         selectors[1] = handler.claim.selector;
         targetSelector(FuzzSelector(address(handler), selectors));

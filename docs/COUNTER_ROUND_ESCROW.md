@@ -217,3 +217,28 @@ four-claim/failed-transfer recovery checks remain. Unit/fuzz cases cover window
 and expiry boundaries, authorization, pause/chain restrictions and atomic failed
 funding. These are component tests, not a public deployment, complete Counter,
 independent holder index, approved eligibility/asset policy or financial authority.
+
+
+## Atomic recipient claim batches (M06)
+
+`claimMany(ids, recipient)` delivers existing whole entitlements from 1–32
+strictly increasing, nonzero round IDs to the same recorded recipient. Anyone
+may relay it across payout assets; the relayer receives nothing. Duplicate,
+unsorted, oversized lists and missing/already-claimed entitlements reject.
+All IDs are validated before transfers. Each claim reuses runtime, solvency,
+exact-transfer and liability checks under one chain97, unpaused, non-reentrant
+call. Any later failure reverts every earlier transfer, event and accounting
+change. Explicit retry or separate legacy claims remain available. No partial
+progress, automatic retry, allocation change, fee, recipient override, sweep or
+pause bypass is added; existing single claims are preserved.
+
+Unit/fuzz tests cover two assets, the 32-round boundary, reentry and rollback;
+the liability invariant includes batch actions. The zero-account local HTTP/ABI
+rehearsal binds two round/recipient/amount receipts and checks that a taxed
+second payout rolls back the first. One synthetic fixture is not independent
+providers or public custody. This is a bounded settlement component, not cost-
+aware scheduling, pot/carry-forward accounting, eligibility, fee funding or full
+M06 readiness. Changed bytecode requires fresh deployment/audit evidence.
+Frozen Standard and all release gates remain; launch-token fees only burn,
+rewards and earned platform recirculation remain separate, and creator/holder/LP
+liabilities are never strategy capital.

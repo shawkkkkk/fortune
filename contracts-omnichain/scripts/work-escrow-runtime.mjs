@@ -8,6 +8,7 @@ import {once} from 'node:events';
 import {createServer} from 'node:net';
 import {createPublicClient,createWalletClient,http,keccak256,toHex,decodeEventLog,decodeFunctionData} from 'viem';
 import {bscTestnet} from 'viem/chains';
+import {inspectWorkEscrowJob} from '../../lib/work-escrow-observation.ts';
 
 
 const GOV='0x0000000000000000000000000000000000009001',GUARD='0x0000000000000000000000000000000000009002',ARB='0x0000000000000000000000000000000000009003';
@@ -38,6 +39,9 @@ try{
  const read=(address,a,functionName,args=[])=>rpc.readContract({address,abi:a.abi,functionName,args});
  stage='deploy isolated work escrow and synthetic asset';
  const token=await deploy(assetArtifact),escrow=await deploy(escrowArtifact,[GOV,GUARD,ARB,[{token,codeHash:keccak256(await rpc.getCode({address:token})),maxPerJob:1000n}]]);
+ const observers=[rpc,createPublicClient({transport:transport(),chain:bscTestnet})];
+ const policyFor=async(id,amount)=>({chainId:97,escrow:escrow.toLowerCase(),escrowCodeHash:keccak256(await rpc.getCode({address:escrow})),governor:GOV,guardian:GUARD,arbitrator:ARB,jobId:id.toString(),client:CLIENT,worker:WORKER,asset:token.toLowerCase(),assetCodeHash:keccak256(await rpc.getCode({address:token})),maxPerJob:'1000',amount:amount.toString(),termsHash:'0x'+'11'.repeat(32)});
+ const observe=async(id,amount,state)=>{await rpc.request({method:'anvil_mine',params:['0x14','0x0']});const observation=await inspectWorkEscrowJob(observers,await policyFor(id,amount));assert.equal(observation.job.state,state);assert.equal(observation.workerPaid,null);assert.equal(observation.settlementReceiptVerified,false);assert.equal(observation.executionAuthorized,false);return observation;};
  assert.equal(await read(escrow,escrowArtifact,'paused'),true);
  await write(GUARD,escrow,escrowArtifact,'setPaused',[false],false);
  await write(GOV,escrow,escrowArtifact,'setPaused',[false]);
@@ -53,13 +57,17 @@ try{
    assert.equal(await read(escrow,escrowArtifact,'nextJob'),2n);assert.equal(await read(escrow,escrowArtifact,'reserved',[token]),amount);
   }else await write(CLIENT,escrow,escrowArtifact,'fund',args);return id;};
  stage='client payment after explicit worker acceptance';
- const one=await fund(100n);await write(WORKER,escrow,escrowArtifact,'accept',[one]);
+ const one=await fund(100n);await observe(one,100n,'Funded');await write(WORKER,escrow,escrowArtifact,'accept',[one]);
+ await observe(one,100n,'Accepted');
  await write(GUARD,escrow,escrowArtifact,'setPaused',[true]);
+ assert.equal((await observe(one,100n,'Accepted')).paused,true);
  await write(CLIENT,escrow,escrowArtifact,'approvePayment',[one],false);
  await write(GOV,escrow,escrowArtifact,'setPaused',[false]);
  const paid=await write(CLIENT,escrow,escrowArtifact,'approvePayment',[one]);
  const events=paid.logs.filter(l=>l.address.toLowerCase()===escrow.toLowerCase()).map(l=>decodeEventLog({abi:escrowArtifact.abi,data:l.data,topics:l.topics}));
  assert.equal(events.length,1);assert.equal(events[0].eventName,'JobSettled');assert.equal(events[0].args.id,one);assert.equal(events[0].args.workerAmount,100n);assert.equal(events[0].args.clientRefund,0n);assert.equal(events[0].args.settledBy.toLowerCase(),CLIENT);
+ const settledObservation=await observe(one,100n,'Settled');assert.equal(settledObservation.backing.selectedOutstanding,'0');
+ await assert.rejects(inspectWorkEscrowJob(observers,{...await policyFor(one,100n),termsHash:'0x'+'99'.repeat(32)}));
  await write(CLIENT,escrow,escrowArtifact,'approvePayment',[one],false);
  await write(CLIENT,escrow,escrowArtifact,'fundWithId',firstFundingArgs,false);
  assert.equal(await read(token,assetArtifact,'allowance',[CLIENT,escrow]),1000n);
@@ -67,7 +75,11 @@ try{
  assert.equal(await read(escrow,escrowArtifact,'nextJob'),2n);
  stage='unaccepted cancellation and arbitrated dispute';
  const two=await fund(50n);await write(CLIENT,escrow,escrowArtifact,'cancel',[two]);
- const three=await fund(100n);await write(WORKER,escrow,escrowArtifact,'accept',[three]);await write(WORKER,escrow,escrowArtifact,'dispute',[three]);
+ const three=await fund(100n);await write(WORKER,escrow,escrowArtifact,'accept',[three]);
+ await write(WORKER,escrow,escrowArtifact,'submitResult',[three,0n,'0x'+'55'.repeat(32)]);
+ await write(WORKER,escrow,escrowArtifact,'submitResult',[three,1n,'0x'+'66'.repeat(32)]);
+ await write(WORKER,escrow,escrowArtifact,'dispute',[three]);
+ const disputedObservation=await observe(three,100n,'Disputed');assert.equal(disputedObservation.results.length,2);assert.equal(disputedObservation.disputedResultRevision,'0');
  await write(GOV,escrow,escrowArtifact,'resolve',[three,60n],false);
  await write(GOV,token,assetArtifact,'configure',[true,false,'0x0000000000000000000000000000000000000000']);
  await write(ARB,escrow,escrowArtifact,'resolve',[three,60n],false);
@@ -171,7 +183,7 @@ try{
  assert.equal(await read(escrow,escrowArtifact,'resultHashes',[eight,2n]),hashB);
  assert.equal(await read(escrow,escrowArtifact,'reserved',[token]),0n);
  assert.equal(await read(token,assetArtifact,'balanceOf',[CLIENT]),1816n);assert.equal(await read(token,assetArtifact,'balanceOf',[WORKER]),184n);
- const result={chainId:97,revisionBoundDisputeReceiptObserved:true,staleResultDisputeRejected:true,disputedRevisionSurvivesSettlement:true,localOnly:true,clientScopedFundingIdObserved:true,fundedApprovedReplayRejectedBeforeAndAfterSettlement:true,compiledWorkEscrowDeployed:true,fundedJobs:8,settledJobs:8,workerDeclineRefundReceiptBound:true,inexactDeclinePreservesFundedLiability:true,declinedJobCannotBeAcceptedOrCancelled:true,workerWaiverRefundReceiptBound:true,staleWaiverRejected:true,inexactWaiverPreservesLiability:true,clientApprovalReceiptBound:true,workerResultHistoryObserved:true,revisionBoundPaymentReceiptObserved:true,staleResultApprovalRejected:true,inexactResultPaymentRetainsLiability:true,
+ const result={chainId:97,actualPinnedJobStatesObserved:true,pausedJobObserved:true,actualResultHistoryObserved:true,foreignTermsObservationRejected:true,settledStorageDoesNotInferPayment:true,revisionBoundDisputeReceiptObserved:true,staleResultDisputeRejected:true,disputedRevisionSurvivesSettlement:true,localOnly:true,clientScopedFundingIdObserved:true,fundedApprovedReplayRejectedBeforeAndAfterSettlement:true,compiledWorkEscrowDeployed:true,fundedJobs:8,settledJobs:8,workerDeclineRefundReceiptBound:true,inexactDeclinePreservesFundedLiability:true,declinedJobCannotBeAcceptedOrCancelled:true,workerWaiverRefundReceiptBound:true,staleWaiverRejected:true,inexactWaiverPreservesLiability:true,clientApprovalReceiptBound:true,workerResultHistoryObserved:true,revisionBoundPaymentReceiptObserved:true,staleResultApprovalRejected:true,inexactResultPaymentRetainsLiability:true,
   workerPaidUnits:'184',clientFinalUnits:'1816',finalReserved:'0',cancellationAndExpiryRefundedClient:true,disputeSplitSettled:true,
   governorCannotArbitrate:true,guardianCannotOpen:true,pausedPaymentRejected:true,duplicatePaymentRejected:true,inexactSplitRetainsLiability:true,explicitRetrySucceeded:true,
   generatedAccounts:0,privateKeysUsed:false,publicBroadcasts:false,independentProvidersVerified:false,workDeliveryVerified:false,

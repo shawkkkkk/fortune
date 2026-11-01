@@ -41,3 +41,40 @@ independent provider consensus, a complete event ledger or full P23 readiness.
 API keys, durable quotas/plans, hosted auth, production indexing and incident
 operations retain their separate gates. Existing frozen Standard, root pins,
 economics, financial authority and all release gates remain unchanged.
+
+## Inspect a downloaded attachment locally
+
+The separately disabled `scripts/inspect-project-export.mjs` consumes one existing
+regular local JSON file and an expected project token address:
+
+```bash
+FORTUNE_PROJECT_EXPORT_INSPECT_ENABLED=true node --import ./scripts/register-ts.mjs scripts/inspect-project-export.mjs /path/to/download.json 0x1111111111111111111111111111111111111111
+```
+
+The example address is a placeholder, not a Fortune CA. Use the exact project
+address requested for the download. No URLs, network calls, file writes, keys,
+signatures, wallet actions, posting, model calls or new public service are added.
+The file reader stops at64KiB plus one byte and requires strict UTF-8 JSON;
+errors are generic and disclose neither paths nor file contents. The inspector
+requires the existing schema/version/kind/encoding/hash algorithm, a maximum16KiB
+payload string with lossless UTF-8 representation, and an exact SHA-256 match.
+Unknown envelope/payload/market keys reject. Fixed chain97/factory/expected token,
+nonzero hash, uint64 block number, phase/status, Standard18-decimal uint256 values,
+retired null price and unavailable analytics/treasury fields are checked.
+
+Only whitelisted typed values and the inspector's own limitations are emitted.
+Input integrity/limitations prose is never copied or followed; source URLs must
+match the fixed project API label and are not fetched. An attacker can still
+rewrite supported values and recompute the checksum. This is byte/schema
+consistency, never source authentication or verification of those values.
+
+Historical exports are allowed. `storedApiTimestamp` is preserved; inspection
+never refreshes it. `apiResponseAgeMs` uses the local host clock and may be up to
+five seconds negative for allowed clock skew. Invalid/negative/future timestamps
+outside that skew reject. Neither response age nor a timestamp label proves
+block freshness, canonicality, finality, source identity or historical completeness.
+`sourceAuthenticated`, `independentRpcVerified`, `finalityVerified`,
+`currentCanonicalityVerified`, `executionAuthorized` and `fullApiReadiness` remain
+false; `currentAuthorization` remains null. No eligibility or financial decision
+should be authorized from a checksum match. JSON parsing is not a consensus or
+canonical JSON implementation. Existing exporter/endpoints remain unchanged.

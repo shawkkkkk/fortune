@@ -5,6 +5,7 @@ import { writeFileSync, mkdirSync } from "node:fs";
 import { PUBLIC_TESTNET } from "../lib/public-testnet.ts";
 import { readProjectSnapshot } from "../lib/project-snapshot.ts";
 import { createProjectMcp } from "./project-mcp-server.mjs";
+import { inspectProjectDataExport } from "../lib/project-export-inspector.ts";
 const base = new URL(process.env.FORTUNE_BASE_URL || "http://127.0.0.1:3000");
 assert.ok(["127.0.0.1", "localhost"].includes(base.hostname) && base.protocol === "http:" && !base.username && !base.password);
 const token = PUBLIC_TESTNET.contracts.referenceToken.toLowerCase();
@@ -42,6 +43,13 @@ assert.equal(exportedPayload.treasuryBalance, null);
 assert.equal(Object.hasOwn(exportedPayload, 'canon'), false);
 assert.equal(exported.sourceAuthenticated, false);
 assert.equal(exported.executionAuthorized, false);
+const inspected = inspectProjectDataExport(exported, token);
+assert.deepEqual(inspected.market, exportedPayload.market);
+assert.equal(inspected.checksumMatches, true);
+assert.equal(inspected.storedApiTimestamp, exportedPayload.apiTimestamp);
+for (const key of ['sourceAuthenticated','independentRpcVerified','finalityVerified','currentCanonicalityVerified','executionAuthorized','fullApiReadiness']) assert.equal(inspected[key], false);
+assert.equal(inspected.currentAuthorization, null);
+console.log('PASS actual downloaded project export through typed inspector; checksum is not authentication or current authority');
 // Separate reads may legitimately observe different blocks; do not claim equality.
 assert.equal((await fetch(`${base.origin}/api/public/v1/tokens/invalid/project/export`, { signal: AbortSignal.timeout(30000) })).status, 400);
 assert.equal((await fetch(`${base.origin}/api/public/v1/tokens/0x1111111111111111111111111111111111111111/project/export`, { signal: AbortSignal.timeout(30000) })).status, 404);
@@ -49,6 +57,6 @@ console.log('PASS actual project JSON attachment / SHA-256 / exact typed values 
 mkdirSync(".tmp", { recursive: true });
 writeFileSync(".tmp/project-snapshot-runtime.json", JSON.stringify({ kind: "local-api-real-rpc-mcp-transport-fixture", chainId: 97,
   token, blockNumber: snapshot.market.provenance.blockNumber, blockHash: snapshot.market.provenance.blockHash,
-  exportBlockNumber: exportedPayload.market.provenance.blockNumber, exportBlockHash: exportedPayload.market.provenance.blockHash, exportSha256: exported.sha256, exportPassed: true, sourceAuthenticated: false,
+  exportBlockNumber: exportedPayload.market.provenance.blockNumber, exportBlockHash: exportedPayload.market.provenance.blockHash, exportSha256: exported.sha256, exportPassed: true, exportInspectorPassed: true, sourceAuthenticated: false,
   phase: snapshot.market.phase, curvePriceHiddenWhenRetired: true, toolAndResourcePassed: true, writeAuthority: false }, null, 2) + "\n");
 console.log("PASS actual local project API / same-block metadata+curve / MCP tool+resource; real upstream RPC, local transport fixture, no write authority");

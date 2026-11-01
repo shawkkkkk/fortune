@@ -57,6 +57,7 @@ jobs:
 
       # Keep browser tooling outside the frozen Standard dependency manifests.
       - name: Install isolated creator-flow browser runner
+        timeout-minutes: 10
         run: |
           npm install --prefix /tmp/fortune-browser --no-package-lock --ignore-scripts --no-audit playwright@1.63.0
           /tmp/fortune-browser/node_modules/.bin/playwright install --with-deps chromium

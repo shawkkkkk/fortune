@@ -80,6 +80,12 @@ The output includes the chain, block/hash, every included factory record and a S
 
 ## Observed verification
 
+The isolated browser-runner installation step has a ten-minute execution budget.
+Exceeding it fails CI before browser acceptance; the pinned install commands and
+all subsequent browser checks remain required. This is a future execution bound,
+not a diagnosis or passing result for an older stalled run, and does not guarantee
+runner/control-plane availability. No automatic rerun or success fallback is added.
+
 - [Public-site monitor run 37194373435](https://github.com/shawkkkkk/fortune/actions/runs/37194373435) passed on October 4 at exact main `facdfd72eb638d70f436dd7508ed4490e9b178b9` against `https://fortunepad.fun`. On its first attempt it passed health, readiness, public metadata, testnet and launch pages, robots, sitemap, canonical root, release, stats, launch catalog and launchable-asset checks. The first post-fix scheduled [monitor run 37196828596](https://github.com/shawkkkkk/fortune/actions/runs/37196828596) then passed the same twelve checks on its single attempt at exact main `d3fc721f4c2d882648d9c4c2dfcf3af4fdab4f23`; artifact `11301372742` is retained through October 18, 2026. PR #56 also invokes this fail-closed monitor after every push to `main`, with bounded retries only for post-deploy propagation. These are point-in-time production checks, not an uptime SLA or delivered incident-alert drill.
 - [Domain cutover PR #12 CI run 37184274899](https://github.com/shawkkkkk/fortune/actions/runs/37184274899) passed the production build/runtime/browser checks and frozen Standard contract suite with 1,000 fuzz runs at exact head `97a632d640331df0d6bf33ad3f084c713ddaa41b`; its Vercel preview reached READY. PR #12 then merged as main `6cbdf3124deb1f5014611cce07a5776b2caf71dc`, and production deployment `dpl_GeJmXwfF4h6AwdDEAViXRnc3Psi9` reached READY. This verifies the web cutover only; it changes no contract or mainnet release gate.
 - [Pair-market-data PR #23 CI run 36204534985](https://github.com/shawkkkkk/fortune/actions/runs/36204534985) passed its web build/runtime/browser checks and contract suite with 1,000 fuzz runs. PR #23 is now merged into main `dec346088c573ae88fc9db705804338f77738f99`; Vercel production deployment `dpl_Dw77tGFrkdLixdAPp3LVeZtMyonN` reached READY.

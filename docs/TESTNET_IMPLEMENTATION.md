@@ -2,6 +2,25 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## Managed-liquidity held custody observation
+
+An explicit chain97 `inspectLiquidityCustody` library API integrates the actual
+unchanged LP reader with same-block custody runtime, immutable roles, stored
+route/position policy, held/released/pause state and zero token approval. Exact
+raw liquidity/ticks and two-client header/state agreement fail closed. One
+outer real30sec monotonic-clock lifetime includes the nested reader and fences
+late work on every outcome. Historical snapshots are supported; no fresh-state,
+independent-provider, finality, project-consent, legitimate-capital, treasury
+control or execution approval follows. Raw liquidity/owed values remain separate
+from null TVL/claimable fees. Initial/unrecorded/released custody is rejected;
+this does not reconstruct lifecycle receipts. No contract, Standard/root pin,
+economics, authority, service, CLI, MCP or real configuration changes. Existing
+zero-account Pancake runtime exercises actual held/open, held/paused, wrong
+fixed-treasury rejection and rejection after release. Local fixtures/fork are
+not public custody or complete M07 readiness; exact CI/runtime evidence and
+all audit/legal/privacy/capital/provider/failure/recovery/ops gates remain
+separate. See [MANAGED_LIQUIDITY_CUSTODY.md](MANAGED_LIQUIDITY_CUSTODY.md).
+
 ## Syndicate worker decline before acceptance
 
 The isolated chain97 WorkEscrow adds `decline(id)`: only the named worker can

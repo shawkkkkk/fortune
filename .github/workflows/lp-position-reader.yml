@@ -1,10 +1,10 @@
 name: Testnet LP Position Reader
 on:
   pull_request:
-    paths: ["contracts-omnichain/**", "lib/managed-liquidity-position.ts", "scripts/inspect-liquidity-position.mjs", "tests/web/managed-liquidity-position.test.mjs", "scripts/register-ts.mjs", "package.json", "package-lock.json", ".github/workflows/lp-position-reader.yml"]
+    paths: ["contracts-omnichain/**", "lib/managed-liquidity-position.ts", "lib/managed-liquidity-custody.ts", "tests/web/managed-liquidity-custody.test.mjs", "scripts/inspect-liquidity-position.mjs", "tests/web/managed-liquidity-position.test.mjs", "scripts/register-ts.mjs", "package.json", "package-lock.json", ".github/workflows/lp-position-reader.yml"]
   push:
     branches: [main]
-    paths: ["contracts-omnichain/**", "lib/managed-liquidity-position.ts", "scripts/inspect-liquidity-position.mjs", "tests/web/managed-liquidity-position.test.mjs", "scripts/register-ts.mjs", "package.json", "package-lock.json", ".github/workflows/lp-position-reader.yml"]
+    paths: ["contracts-omnichain/**", "lib/managed-liquidity-position.ts", "lib/managed-liquidity-custody.ts", "tests/web/managed-liquidity-custody.test.mjs", "scripts/inspect-liquidity-position.mjs", "tests/web/managed-liquidity-position.test.mjs", "scripts/register-ts.mjs", "package.json", "package-lock.json", ".github/workflows/lp-position-reader.yml"]
 permissions:
   contents: read
 jobs:

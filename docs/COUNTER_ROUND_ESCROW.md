@@ -284,3 +284,41 @@ test-only two-HTTPS-origin→ONE-local-Anvil mapping, matches snapshot-funding b
 and exercises existing funding/claims/failure tests. It is not independent public
 providers, a public deployment or full M06 readiness. All earlier methods,
 economics, frozen Standard/dependency baseline and release gates are preserved.
+
+## Unsigned fixed-recipient claim review
+
+`buildCounterClaimBatch` in `lib/counter-claims.ts` reads1–32 strictly increasing
+round IDs for one fixed nonzero recipient. Its strict chain97 policy pins the
+escrow, governor/guardian, launch token/runtime and exact1–10 sorted payout assets.
+Every supplied asset must be used; launch token and escrow cannot be payout assets.
+Two distinct supplied clients must agree at common min(head)−20 with head gap≤10,
+matching block number/hash/timestamp, snapshot age≤120seconds at completion,
+runtime hashes, roles and open state. All reads use that height, then reread chain
+and block. A20-second wall deadline, safe monotonic clock and before/after RPC
+fences stop late follow-on reads; in-flight requests are not cancelled.
+
+For each round it checks positive funded/claimable units, remaining≤funded,
+claimable≤remaining and the recorded allocation hash. For each payout asset it
+checks the escrow's asset pin, the sum of SELECTED round remaining liabilities
+≤ reported reserved, and reported balance≥reserved, with exact uint256 bounds.
+It does not enumerate every round or independently reconstruct global liabilities;
+`globalSolvencyVerified:false` is always returned. Runtime pins and matching RPC
+answers are not issuer/proxy, capital-origin, holder-eligibility or independent
+provider/finality proof. Height calls are not EIP-1898 hash calls or ABA protection.
+
+The result preserves raw decimal units and block provenance and produces ONLY
+unsigned existing `claimMany(ids, recipient)` bytes. No approvals, signing,
+submission, storage, scheduler, UI/API/CLI service or real configuration is added.
+The bytes are NOT snapshot/amount/expiry bound; consumed rights or changed state
+can cause execution to fail, and no price/transfer/gas guarantee is made. Review
+current state and exact recipients in the wallet before any independently
+authorized action. No automatic rebuild, retry, partial batch or recipient change.
+Current authorization is null; execution/full readiness flags stay false.
+
+Tests cover policy/ABI, liabilities, consumed rights, disagreement, changed headers,
+completion age, late fences and a real20-second hung-provider timeout. The existing
+zero-account compiled Counter HTTP/ABI rehearsal now consumes the builder's bytes
+for two assets, preserving the transfer-failure rollback/retry drill, and rejects
+fresh review after the claims are consumed. Two clients of ONE synthetic local VM
+are not independent public providers or public custody. Contracts/root pins,
+economics and release gates are unchanged; full M06 readiness remains incomplete.

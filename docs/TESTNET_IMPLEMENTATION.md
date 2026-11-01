@@ -639,3 +639,15 @@ Empty-data/empty-revert legacy compatibility remains explicitly unverified, not
 proof of no rules, contract generation, enforcement or safety. No contracts,
 root pins, configuration, signing authority or release gates change. Full M03/P16
 remains incomplete. See LAUNCH_RULES.md.
+
+## Counter unsigned claim-batch runtime integration (M06)
+
+An isolated read-only builder now checks selected round entitlements, exact
+recipient, payout/runtime/role pins, open state and selected reported liabilities/
+backing through two clients at a fresh common block. It produces unsigned existing
+claimMany bytes with explicit false snapshot-binding/authority/eligibility/global
+solvency/finality-readiness claims. The actual compiled two-asset Counter runtime
+consumes those bytes, preserves batch transfer rollback/retry and rejects consumed
+claims on a new snapshot. No signer, service, public deployment or full M06
+readiness follows; no contracts/root pins/economics/gates change. See
+COUNTER_ROUND_ESCROW.md.

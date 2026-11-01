@@ -2,6 +2,18 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## Rune index stream allocation bound
+
+The actual fixed-origin Rune index reader now caps retained non-final chunks
+at 4,096, counting empty chunks before push/projection. Empty/tiny response
+regressions failed unchanged source; boundary/cleanup and existing actual
+child-CLI HTTP tests cover the fix. The independent 32 KiB limit and ten-second
+clock/failure fences remain unchanged. Valid fragmented responses may reject;
+this is not an upstream/process-memory bound or successful public index proof.
+No new Bitcoin issuance/custody/bridge authority, configuration, contract,
+dependency or frozen Standard change. Full M05 and all release gates remain
+incomplete. See [BITCOIN_RUNE_INDEX.md](BITCOIN_RUNE_INDEX.md).
+
 ## Managed-liquidity held custody observation
 
 An explicit chain97 `inspectLiquidityCustody` library API integrates the actual

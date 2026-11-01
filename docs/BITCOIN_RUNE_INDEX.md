@@ -73,3 +73,20 @@ Bitcoin transaction/header/Runestone verification, reorg/finality handling,
 name/fee/commit/reveal rules, real etching, signer/custody, bridge liabilities,
 asset/legal/governance/security/recovery/operations and audit remain separate.
 Nothing here completes M05 or authorizes deployment, custody, bridge or mainnet.
+
+## Stream allocation bound
+
+The actual index reader retains at most 4,096 non-final response chunks,
+including empty chunks, and rejects before retaining chunk 4,097 or projecting
+its JSON. This independently bounds array entries alongside the existing
+32 KiB declared/actual byte limit. Transport fragmentation can therefore make
+an otherwise small, valid response unavailable. This does not bound upstream
+buffering, total process memory or event-loop latency. The fixed origin, request
+guards, exact integer parsing, ten-second wall deadline, monotonic clock, late
+work fences and best-effort non-awaited cancellation remain unchanged.
+
+Empty/tiny over-fragmented regressions accepted on unchanged source, then reject
+with cleanup after the bound. Exactly 4,096 non-final chunks remain supported;
+existing actual child-CLI/loopback HTTP tests still exercise the adapter. These
+are local transport tests, not a successful public index observation or Bitcoin
+network, issuance, custody, bridge or full M05 readiness evidence.

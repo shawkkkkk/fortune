@@ -24,8 +24,7 @@ export type CounterAllocationPolicy = {
   accounts: Address[]; minimumHolding: string; payoutBudget: string;
 };
 
-/** Read-only bounded allocation builder, not a holder index, signer or fee-funding proof. */
-export async function buildCounterAllocation(clients: readonly [PublicClient, PublicClient], input: CounterAllocationPolicy) {
+export function validateCounterAllocationPolicy(input: CounterAllocationPolicy) {
   const p = structuredClone(input);
   if (!p || Object.keys(p).sort().join() !== "accounts,chainId,escrow,escrowCodeHash,governor,guardian,launchToken,launchTokenCodeHash,minimumHolding,payoutAsset,payoutAssetCodeHash,payoutBudget"
     || p.chainId !== 97 || ![p.escrow, p.governor, p.guardian, p.launchToken, p.payoutAsset].every(address)
@@ -33,6 +32,13 @@ export async function buildCounterAllocation(clients: readonly [PublicClient, Pu
     || ![p.escrowCodeHash, p.launchTokenCodeHash, p.payoutAssetCodeHash].every(hash)
     || !Array.isArray(p.accounts) || p.accounts.length < 1 || p.accounts.length > 128
     || p.accounts.some((a, i) => !address(a) || (i > 0 && a <= p.accounts[i - 1]))) throw Error("Invalid bounded allocation policy");
+  units(p.minimumHolding); units(p.payoutBudget);
+  return p;
+}
+
+/** Read-only bounded allocation builder, not a holder index, signer or fee-funding proof. */
+export async function buildCounterAllocation(clients: readonly [PublicClient, PublicClient], input: CounterAllocationPolicy) {
+  const p = validateCounterAllocationPolicy(input);
   const minimum = units(p.minimumHolding), budget = units(p.payoutBudget);
   if (!Array.isArray(clients) || clients.length !== 2 || clients[0] === clients[1]) throw Error("Two distinct read clients required");
   const start = Date.now(); let previous = start, finished = false;

@@ -8,7 +8,7 @@ import { createServer } from 'node:net';
 import { createPublicClient, createWalletClient, http, keccak256, pad, toHex, encodeAbiParameters, decodeAbiParameters, decodeEventLog } from 'viem';
 import { inspectOmnichainRoute, encodeRouteUln, ULN_PARAMETERS, EXECUTOR_PARAMETERS } from '../../lib/omnichain-route.ts';
 
-import { inspectPermanentBurn } from '../../lib/omnichain-burn-receipt.ts';
+import { inspectPermanentBurn, inspectVaultPermanentBurn } from '../../lib/omnichain-burn-receipt.ts';
 
 const GOV = '0x0000000000000000000000000000000000001111', WORKER = '0x0000000000000000000000000000000000002222';
 const reportPath = resolve('.tmp/omnichain-route-runtime.json'); rmSync(reportPath, { force: true });
@@ -115,11 +115,25 @@ try {
   assert.equal(burnedInventory.logs[2].address.toLowerCase(), vault.toLowerCase()); assert.equal(event.eventName, 'InventoryBurned'); assert.equal(event.args.sequence, 1n); assert.equal(event.args.caller.toLowerCase(), GOV); assert.equal(event.args.amount, 2n * 10n ** 18n); assert.equal(event.args.cumulative, 2n * 10n ** 18n);
   assert.equal(await readToken('balanceOf', [vault]), 10n ** 18n); assert.equal(await readToken('totalSupply'), supplyBefore - 2n * 10n ** 18n); assert.equal(await readToken('permanentlyBurned'), permanentBefore + 2n * 10n ** 18n);
   await assert.rejects(simulateBurn(2n * 10n ** 18n));
-  await n.write(vault, burnVault, 'burn', [10n ** 18n]);
+  const secondInventoryBurn = await n.write(vault, burnVault, 'burn', [10n ** 18n]);
   assert.equal(await readVault('totalBurned'), 3n * 10n ** 18n); assert.equal(await readVault('burnCount'), 2n); assert.equal(await readToken('balanceOf', [vault]), 0n);
   assert.equal(await readToken('totalSupply'), supplyBefore - 3n * 10n ** 18n); assert.equal(await readToken('permanentlyBurned'), permanentBefore + 3n * 10n ** 18n);
+  await confirm();
+  stage = 'actual nested vault receipt observer';
+  const vaultBurnPolicy = {chainId:97,token:p.token.address,runtimeHash:p.token.codeHash,manifestHash:policy.manifestHash,
+    vault,vaultRuntimeHash:keccak256(await n.rpc.getCode({address:vault})),caller:GOV,amount:String(2n*10n**18n),transactionHash:burnedInventory.transactionHash};
+  const vaultBurnObservation = await inspectVaultPermanentBurn(n.readers,vaultBurnPolicy);
+  assert.equal(vaultBurnObservation.vaultObservation.sequence,'1'); assert.equal(vaultBurnObservation.vaultObservation.vaultCumulativeAtEvent,String(2n*10n**18n));
+  assert.equal(vaultBurnObservation.feeFundingVerified,false); assert.equal(vaultBurnObservation.executionAuthorized,false);
+  assert.equal((await inspectVaultPermanentBurn(n.readers,vaultBurnPolicy)).evidenceId,vaultBurnObservation.evidenceId);
+  const secondVaultBurnObservation = await inspectVaultPermanentBurn(n.readers,{...vaultBurnPolicy,amount:String(10n**18n),transactionHash:secondInventoryBurn.transactionHash});
+  assert.equal(secondVaultBurnObservation.vaultObservation.sequence,'2'); assert.notEqual(secondVaultBurnObservation.evidenceId,vaultBurnObservation.evidenceId);
+  await assert.rejects(inspectVaultPermanentBurn(n.readers,{...vaultBurnPolicy,amount:'1'}));
+  await assert.rejects(inspectVaultPermanentBurn(n.readers,{...vaultBurnPolicy,vaultRuntimeHash:pad('0x02')}));
+  await assert.rejects(inspectPermanentBurn(n.readers,{...burnPolicy,holder:vault,transactionHash:burnedInventory.transactionHash,amount:vaultBurnPolicy.amount}));
   await n.write(vault, burnVault, 'setPaused', [true]); await assert.rejects(simulateBurn(1n));
   const result = { localChainIds: [97, 84532], fixtureEndpointIds: [40001, 40002], actualOftAndUlnConfigurationRead: true,
+    vaultBurnObservation,secondVaultBurnObservation,actualVaultReceiptReaderUsed:true,
     burnOnlyInventoryVault: { compiledOftUsed: true, pausedAndAmountBoundsRejected: true, nestedBurnReceiptBound: true, balanceSupplyCounterReconciled: true, vaultTotalBurned: String(3n * 10n ** 18n), burnCount: 2, finalVaultBalance: '0', feeFundingVerified: false, buybackVerified: false, globalSupplyReconciled: false, publicDeployment: false, fullAgentReadiness: false, executionAuthorized: false },
     changedPeerRejected: true, changedExecutorRejected: true, inheritedApplicationUlnRejected: true, snapshot: observed, permanentBurn: burn, wrongBurnAmountRejected: true,
     twoLocalEvmInstances: true, independentPublicProviders: false, endpointIsUpstreamMock: true, workersAreSynthetic: true,

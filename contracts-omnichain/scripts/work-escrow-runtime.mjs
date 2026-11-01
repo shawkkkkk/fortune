@@ -40,7 +40,9 @@ try{
  const write=(who,address,a,functionName,args=[],success=true)=>wallet(who).writeContract({address,abi:a.abi,functionName,args,gas:5000000n}).then(hash=>receipt(hash,success));
  const read=(address,a,functionName,args=[])=>rpc.readContract({address,abi:a.abi,functionName,args});
  stage='deploy isolated work escrow and synthetic asset';
- const token=await deploy(assetArtifact),escrow=await deploy(escrowArtifact,[GOV,GUARD,ARB,[{token,codeHash:keccak256(await rpc.getCode({address:token})),maxPerJob:1000n}]]);
+ const token=await deploy(assetArtifact),secondToken=await deploy(assetArtifact);
+ const assets=await Promise.all([token,secondToken].sort((a,b)=>a.toLowerCase().localeCompare(b.toLowerCase())).map(async token=>({token,codeHash:keccak256(await rpc.getCode({address:token})),maxPerJob:1000n})));
+ const escrow=await deploy(escrowArtifact,[GOV,GUARD,ARB,assets]);
  const observers=[rpc,createPublicClient({transport:transport(),chain:bscTestnet})];
  const policyFor=async(id,amount)=>({chainId:97,escrow:escrow.toLowerCase(),escrowCodeHash:keccak256(await rpc.getCode({address:escrow})),governor:GOV,guardian:GUARD,arbitrator:ARB,jobId:id.toString(),client:CLIENT,worker:WORKER,asset:token.toLowerCase(),assetCodeHash:keccak256(await rpc.getCode({address:token})),maxPerJob:'1000',amount:amount.toString(),termsHash:'0x'+'11'.repeat(32)});
  const observe=async(id,amount,state)=>{
@@ -63,9 +65,9 @@ try{
  await write(GOV,escrow,escrowArtifact,'setPaused',[false]);
  await write(GOV,token,assetArtifact,'mint',[CLIENT,2000n]);
  const fundingId='0x'+'22'.repeat(32);let firstFundingArgs;
- const fund=async amount=>{const id=await read(escrow,escrowArtifact,'nextJob');const at=(await rpc.getBlock()).timestamp;
-  await write(CLIENT,token,assetArtifact,'approve',[escrow,amount]);
-  const args=[WORKER,token,amount,'0x'+'11'.repeat(32),at+100n,at+200n];
+ const fund=async(amount,paymentToken=token)=>{const id=await read(escrow,escrowArtifact,'nextJob');const at=(await rpc.getBlock()).timestamp;
+  await write(CLIENT,paymentToken,assetArtifact,'approve',[escrow,amount]);
+  const args=[WORKER,paymentToken,amount,'0x'+'11'.repeat(32),at+100n,at+200n];
   if(id===1n){firstFundingArgs=[fundingId,...args];await write(CLIENT,escrow,escrowArtifact,'fundWithId',firstFundingArgs);
    assert.equal(await read(escrow,escrowArtifact,'fundingJobs',[CLIENT,fundingId]),id);
    await write(CLIENT,token,assetArtifact,'approve',[escrow,1000n]);
@@ -199,8 +201,43 @@ try{
  assert.equal(await read(escrow,escrowArtifact,'resultHashes',[eight,2n]),hashB);
  assert.equal(await read(escrow,escrowArtifact,'reserved',[token]),0n);
  assert.equal(await read(token,assetArtifact,'balanceOf',[CLIENT]),1816n);assert.equal(await read(token,assetArtifact,'balanceOf',[WORKER]),184n);
- const result={chainId:97,actualWorkJobCliStatesMatched:true,actualWorkJobCliResultHistoryMatched:true,settledCliDoesNotInferPayment:true,actualPinnedJobStatesObserved:true,pausedJobObserved:true,actualResultHistoryObserved:true,foreignTermsObservationRejected:true,settledStorageDoesNotInferPayment:true,revisionBoundDisputeReceiptObserved:true,staleResultDisputeRejected:true,disputedRevisionSurvivesSettlement:true,localOnly:true,clientScopedFundingIdObserved:true,fundedApprovedReplayRejectedBeforeAndAfterSettlement:true,compiledWorkEscrowDeployed:true,fundedJobs:8,settledJobs:8,workerDeclineRefundReceiptBound:true,inexactDeclinePreservesFundedLiability:true,declinedJobCannotBeAcceptedOrCancelled:true,workerWaiverRefundReceiptBound:true,staleWaiverRejected:true,inexactWaiverPreservesLiability:true,clientApprovalReceiptBound:true,workerResultHistoryObserved:true,revisionBoundPaymentReceiptObserved:true,staleResultApprovalRejected:true,inexactResultPaymentRetainsLiability:true,
-  workerPaidUnits:'184',clientFinalUnits:'1816',finalReserved:'0',cancellationAndExpiryRefundedClient:true,disputeSplitSettled:true,
+ stage='atomic revision-bound client approvals across two assets';
+ await write(GOV,secondToken,assetArtifact,'mint',[CLIENT,1000n]);
+ const nine=await fund(100n),ten=await fund(80n,secondToken);
+ for(const id of [nine,ten]){await write(WORKER,escrow,escrowArtifact,'accept',[id]);await write(WORKER,escrow,escrowArtifact,'submitResult',[id,0n,hashA]);}
+ const approvals=[{id:nine,revision:1n,resultHash:hashA},{id:ten,revision:1n,resultHash:hashA}];
+ await write(WORKER,escrow,escrowArtifact,'submitResult',[ten,1n,hashB]);
+ const staleBatch=await write(CLIENT,escrow,escrowArtifact,'approveResultsMany',[approvals],false);assert.equal(staleBatch.logs.length,0);
+ assert.equal((await read(escrow,escrowArtifact,'jobs',[nine]))[7],2);assert.equal(await read(token,assetArtifact,'balanceOf',[WORKER]),184n);
+ approvals[1]={id:ten,revision:2n,resultHash:hashB};
+ await write(GOV,secondToken,assetArtifact,'configure',[true,false,'0x0000000000000000000000000000000000000000']);
+ const failedBatch=await write(CLIENT,escrow,escrowArtifact,'approveResultsMany',[approvals],false);assert.equal(failedBatch.logs.length,0);
+ for(const [id,asset,amount] of [[nine,token,100n],[ten,secondToken,80n]]){
+  assert.equal((await read(escrow,escrowArtifact,'jobs',[id]))[7],2);assert.equal(await read(escrow,escrowArtifact,'reserved',[asset]),amount);assert.equal(await read(asset,assetArtifact,'balanceOf',[escrow]),amount);
+ }
+ assert.equal(await read(token,assetArtifact,'balanceOf',[WORKER]),184n);assert.equal(await read(secondToken,assetArtifact,'balanceOf',[WORKER]),0n);
+ await write(GOV,secondToken,assetArtifact,'configure',[false,false,'0x0000000000000000000000000000000000000000']);
+ const batchPaid=await write(CLIENT,escrow,escrowArtifact,'approveResultsMany',[approvals]);
+ const batchEvents=batchPaid.logs.filter(l=>l.address.toLowerCase()===escrow.toLowerCase()).map(l=>decodeEventLog({abi:escrowArtifact.abi,data:l.data,topics:l.topics}));
+ assert.deepEqual(batchEvents.map(l=>l.eventName),['JobSettled','ResultApproved','JobSettled','ResultApproved']);
+ for(const [i,a] of approvals.entries()){
+  const settlement=batchEvents[i*2].args,approval=batchEvents[i*2+1].args;
+  assert.equal(settlement.id,a.id);assert.equal(settlement.workerAmount,i===0?100n:80n);assert.equal(settlement.clientRefund,0n);assert.equal(settlement.settledBy.toLowerCase(),CLIENT);
+  assert.equal(approval.id,a.id);assert.equal(approval.revision,a.revision);assert.equal(approval.resultHash,a.resultHash);
+  assert.equal((await read(escrow,escrowArtifact,'jobs',[a.id]))[7],4);
+ }
+ const batchTransfers=batchPaid.logs.filter(l=>[token.toLowerCase(),secondToken.toLowerCase()].includes(l.address.toLowerCase())).map(l=>({...decodeEventLog({abi:assetArtifact.abi,data:l.data,topics:l.topics}),asset:l.address.toLowerCase()}));assert.equal(batchTransfers.length,2);
+ for(const [i,t] of batchTransfers.entries()){assert.equal(t.eventName,'Transfer');assert.equal(t.asset,(i===0?token:secondToken).toLowerCase());assert.equal(t.args.from.toLowerCase(),escrow.toLowerCase());assert.equal(t.args.to.toLowerCase(),WORKER);assert.equal(t.args.value,i===0?100n:80n);}
+ await write(CLIENT,escrow,escrowArtifact,'approveResultsMany',[approvals],false);
+ assert.equal(await read(escrow,escrowArtifact,'resultHashes',[nine,1n]),hashA);assert.equal(await read(escrow,escrowArtifact,'resultHashes',[ten,2n]),hashB);
+ assert.equal(await read(escrow,escrowArtifact,'reserved',[token]),0n);assert.equal(await read(escrow,escrowArtifact,'reserved',[secondToken]),0n);
+ assert.equal(await read(token,assetArtifact,'balanceOf',[WORKER]),284n);assert.equal(await read(secondToken,assetArtifact,'balanceOf',[WORKER]),80n);
+ assert.equal(await read(token,assetArtifact,'balanceOf',[CLIENT]),1716n);assert.equal(await read(secondToken,assetArtifact,'balanceOf',[CLIENT]),920n);
+ // The earlier expiry drill advanced VM time by101sec; keep the fresh-state
+ // observer's original checks before that jump. Batch evidence here is exact
+ // transaction receipts and stored state/history, not a fresh-state observation.
+ const result={chainId:97,atomicResultBatchReceiptsBound:true,staleLaterResultBatchRejected:true,lateBatchPaymentFailureRollsBackAll:true,exactResultBatchRetrySucceeded:true,resultBatchReplayRejected:true,actualWorkJobCliStatesMatched:true,actualWorkJobCliResultHistoryMatched:true,settledCliDoesNotInferPayment:true,actualPinnedJobStatesObserved:true,pausedJobObserved:true,actualResultHistoryObserved:true,foreignTermsObservationRejected:true,settledStorageDoesNotInferPayment:true,revisionBoundDisputeReceiptObserved:true,staleResultDisputeRejected:true,disputedRevisionSurvivesSettlement:true,localOnly:true,clientScopedFundingIdObserved:true,fundedApprovedReplayRejectedBeforeAndAfterSettlement:true,compiledWorkEscrowDeployed:true,fundedJobs:10,settledJobs:10,workerDeclineRefundReceiptBound:true,inexactDeclinePreservesFundedLiability:true,declinedJobCannotBeAcceptedOrCancelled:true,workerWaiverRefundReceiptBound:true,staleWaiverRejected:true,inexactWaiverPreservesLiability:true,clientApprovalReceiptBound:true,workerResultHistoryObserved:true,revisionBoundPaymentReceiptObserved:true,staleResultApprovalRejected:true,inexactResultPaymentRetainsLiability:true,
+  workerPaidUnits:'284',workerSecondAssetPaidUnits:'80',clientFinalUnits:'1716',clientSecondAssetFinalUnits:'920',finalReserved:'0',cancellationAndExpiryRefundedClient:true,disputeSplitSettled:true,
   governorCannotArbitrate:true,guardianCannotOpen:true,pausedPaymentRejected:true,duplicatePaymentRejected:true,inexactSplitRetainsLiability:true,explicitRetrySucceeded:true,
   generatedAccounts:0,privateKeysUsed:false,publicBroadcasts:false,independentProvidersVerified:false,workDeliveryVerified:false,
   workerIdentityVerified:false,disputeFairnessVerified:false,deployedToPublicNetwork:false,fullSyndicateReadiness:false,executionAuthorized:false};

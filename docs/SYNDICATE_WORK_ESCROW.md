@@ -291,3 +291,50 @@ ONE zero-account local EVM; it is never loaded by the production CLI and proves
 neither public service, real parties/funding nor independent providers. All
 contract, Standard/root dependency, economic, audit/legal/privacy/custody/
 provider/finality/recovery/operations and full P19 release gates remain separate.
+
+## Atomic client approval of exact results (P19 component)
+
+`approveResultsMany(ResultApproval[] approvals)` is an additive chain97, open,
+non-reentrant whole-payment path. It accepts1–16 strictly increasing nonzero job
+IDs with explicit revision/hash tuples. The caller must be the original client
+of EVERY job; each job must still be Accepted and each tuple must match its
+exact latest nonzero submitted revision/hash. All tuples are validated before
+any payment. A new result invalidates an older prepared batch; disputed, Funded,
+missing, settled, foreign-client and malformed jobs reject the whole call.
+
+Each payment uses the existing `_settle` path: exact recorded whole principal to
+the recorded worker, runtime/backing/liability checks and exact vault debit/
+worker credit, with existing JobSettled and ResultApproved receipts. There is no
+caller-selected amount/recipient, relayer/admin authority, fee, partial progress,
+allocation change, native handling, sweep, recovery or pause bypass. A later
+failed/taxed transfer, changed asset runtime or insufficient reported backing
+reverts ALL earlier transfers/events/states/liabilities. Retain the exact tuples
+for explicit retry after resolving the failure; there is no automatic retry or
+deadline refresh. Successful replay fails because the jobs are already Settled.
+
+Existing single `approveResult` and unbound `approvePayment`, funding IDs, result
+history, cancellation/decline/waiver/dispute/arbitration remain unchanged. As in
+the single approval path, a client can explicitly approve an Accepted result
+after the delivery deadline; no automatic payment/refund or new legal deadline
+rule follows. Separate legacy calls may still settle jobs individually.
+
+Unit/boundary/role/foreign-client/deadline-state tests, conservation fuzzing and an
+authorized-client reentry fixture cover the new path. Existing stateful handlers
+remain unchanged and do not prove all batch interleavings. The compiled local
+zero-account HTTP/ABI rehearsal preserves the earlier eight jobs and adds two
+assets/jobs: stale later-revision rejection, later-asset taxed-transfer rollback,
+exact retry, canonical settlement/result/transfer receipt fields, replay rejection
+and retained history. One synthetic fixture is not independent providers, public
+custody, real clients/workers, legitimate capital or operational recovery proof.
+
+Result hashes remain permanent public commitments, not verified content, delivery,
+authorship, identity, IP/license, quality, dispute fairness or legal agreement.
+Client consent to payment is a wallet role, not a statement that the work was
+independently checked. No service, signer, real configuration or financial agent
+authority is enabled. Changed isolated bytecode needs NEW exact-source deployment,
+configuration and independent audit evidence; old evidence does not transfer.
+Full P19/testnet/mainnet readiness remains incomplete. Frozen Standard/root pins,
+economics and all asset/custody/capital/privacy/provider/finality/legal/governance/
+funding/failure/recovery/ops gates remain. Launch-token-side fees only burn; pair-
+asset holder rewards and earned platform recirculation stay distinct; creator/
+holder/LP liabilities and launch reserves are never strategy capital.

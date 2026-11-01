@@ -49,3 +49,16 @@ test('runtimes without numeric source lexemes reject instead of rounding',()=>{
  const parse=JSON.parse;
  try{JSON.parse=(text,reviver)=>parse(text,(k,v)=>reviver(k,v));assert.throws(()=>runeIndexObservation(raw(),id,now),/Exact unsigned/);}finally{JSON.parse=parse;}
 });
+
+function fragmentedRune(prefixCount, tiny = false) {
+ let reads=0,cancels=0,releases=0;
+ const reader={async read(){reads++;return reads<=prefixCount?{done:false,value:new Uint8Array(tiny?[32]:[])}:reads===prefixCount+1?{done:false,value:new TextEncoder().encode(raw())}:{done:true};},async cancel(){cancels++;},releaseLock(){releases++;}};
+ return {fetch:async()=>({status:200,headers:new Headers({'content-type':'application/json'}),body:{getReader:()=>reader}}),counts:()=>({reads,cancels,releases})};
+}
+for(const tiny of [false,true])test(`Rune stream rejects too many ${tiny?'tiny':'empty'} chunks below the byte limit`,async()=>{
+ const f=fragmentedRune(4096,tiny);await assert.rejects(readRuneIndex(id,{now:()=>now,fetch:f.fetch}),/chunks/);
+ assert.deepEqual(f.counts(),{reads:4097,cancels:1,releases:1});
+});
+test('Rune stream accepts exactly 4096 non-final chunks and preserves exact values and request cleanup',async()=>{
+ for(const tiny of [false,true]){const f=fragmentedRune(4095,tiny);const result=await readRuneIndex(id,{now:()=>now,fetch:f.fetch});assert.equal(result.rune.terms.cap,max);assert.equal(result.bridgeBackingVerified,false);assert.deepEqual(f.counts(),{reads:4097,cancels:1,releases:1});}
+});

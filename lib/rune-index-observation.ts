@@ -83,7 +83,7 @@ export async function readRuneIndex(id: string, options: { fetch?: typeof fetch;
     if (declared && (!/^\d+$/.test(declared) || Number(declared) > 32768)) throw Error("Rune index response too large");
     if (!response.body) throw Error("Empty rune index response");
     reader = response.body.getReader(); const chunks: Uint8Array[] = []; let size = 0;
-    while (true) { check(); const { value, done } = await reader.read(); check(); if (done) break; size += value.byteLength; if (size > 32768) throw Error("Rune index response too large"); chunks.push(value); }
+    while (true) { check(); const { value, done } = await reader.read(); check(); if (done) break; if (chunks.length >= 4096) throw Error("Rune index response has too many chunks"); size += value.byteLength; if (size > 32768) throw Error("Rune index response too large"); chunks.push(value); }
     const bytes = new Uint8Array(size); let offset = 0; for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
     check(); const result = runeIndexObservation(new TextDecoder("utf-8", { fatal: true }).decode(bytes), id, check()); check(); return result;
   };

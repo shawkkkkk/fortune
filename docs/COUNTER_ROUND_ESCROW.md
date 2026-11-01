@@ -322,3 +322,47 @@ for two assets, preserving the transfer-failure rollback/retry drill, and reject
 fresh review after the claims are consumed. Two clients of ONE synthetic local VM
 are not independent public providers or public custody. Contracts/root pins,
 economics and release gates are unchanged; full M06 readiness remains incomplete.
+
+## Explicit operator claim-review CLI
+
+`FORTUNE_COUNTER_CLAIM_READ_ENABLED=true node --import ./scripts/register-ts.mjs
+scripts/prepare-counter-claims.mjs /protected/claim-policy.json` explicitly opts
+into the unchanged `buildCounterClaimBatch` engine. The old funding CLI and
+its separate enablement remain unchanged. Supply the engine's exact policy:
+chain97, escrow/launch-token runtime pins, governor/guardian, fixed recipient,
+1–32 strictly sorted round IDs and 1–10 sorted used payout-asset runtime pins.
+The file must already exist as a regular descriptor, at most 16 KiB of strict
+UTF-8 JSON; open is nonblocking before regular-file checks. Literal bytes are
+pinned before and after awaited RPC. A changed file discards the result. This
+is not a general filesystem deadline or privileged path-swap defense.
+
+Read providers use `FORTUNE_COUNTER_READ_RPC_URL` and
+`FORTUNE_COUNTER_SECONDARY_RPC_URL`: distinct HTTPS origins, no userinfo or
+fragment, five-second transport timeout, no redirects or application retries,
+and omitted credentials. Distinct origins are not independent providers. No
+provider URL/path or upstream error is printed. Errors exit nonzero without
+review output. The actual engine retains its twenty-second lifetime,
+monotonic-clock/failure fences, common twenty-confirmed block, 120-second age,
+role/open-state/runtime checks and selected entitlement/backing agreement.
+
+Output contains the engine's original block/time, exact raw claims/backing,
+unsigned `claimMany` bytes and a SHA-256 checksum of supplied policy bytes.
+The checksum is not policy authentication, identity, consent or capital proof.
+Calldata does not bind observed amounts, snapshot or expiry and can become
+stale, fail or encounter changed transfer restrictions. The wrapper adds no
+approval, signature, simulation, submission, state store, automatic retry,
+trust renewal, scheduler, HTTP/MCP/public claim service or live configuration.
+Current authorization remains null; execution/full readiness remain false.
+Selected reported backing is not global solvency, eligibility, legitimate
+fee funding, independent-provider or finality proof. Creator/holder/LP
+liabilities and launch reserves cannot be strategy capital; launch-token fees
+remain burn-only and holder rewards/earned recirculation remain distinct.
+
+Actual child-CLI HTTP/ABI tests cover valid output, exact byte bounds/FIFO,
+disabled/malformed/unsafe-provider preflight, spent/unbacked/paused claims,
+provider failure and policy mutation. The existing compiled two-asset Counter
+rehearsal compares CLI bytes with the actual library, executes those returned
+bytes only through local VM impersonation, verifies rollback/retry and rejects
+the CLI after consumed entitlements. Zero generated accounts and ONE synthetic
+local fixture do not establish public custody, real-party consent, provider
+independence, full M06/P04 readiness, audit or mainnet approval.

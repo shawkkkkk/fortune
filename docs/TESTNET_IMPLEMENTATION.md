@@ -2,6 +2,21 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## Bitcoin serialized size and supplied-byte rate accounting
+
+The actual legacy/SegWit transaction parser adds exact base/witness-related
+byte counts, BIP141 serialized weight and ceiling virtual bytes. The existing
+supplied-parent engine uses that actual child size as an exact rational
+denominator for its unverified input-minus-output arithmetic. No floating
+rounding or live fee/payment claim: fees/rate and sigop-adjusted policy size
+stay null; mempool policy and all earlier authority/readiness flags stay false.
+Tests include genesis, mixed witness, CompactSize boundaries, all ceiling
+residues, changed witness/unchanged txid, existing 100kB bound and actual gated
+CLI modes. Primary BIP141/Core v30 source was read; no executed Core differential,
+provider/UTXO/issuance/custody/bridge/fullM05/audit/mainnet approval follows.
+No contracts/rootpins/configuration/economics/authority/gates changed. See
+[BITCOIN_TRANSACTION_INSPECTION.md](BITCOIN_TRANSACTION_INSPECTION.md).
+
 ## Counter unsigned claim-review CLI
 
 Default-disabled `prepare-counter-claims.mjs` calls the unchanged actual

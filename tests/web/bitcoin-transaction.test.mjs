@@ -26,7 +26,7 @@ test('SegWit txid strips marker/flag/witness while wtxid commits to witness byte
 });
 test('Bitcoin genesis transaction independent published txid vector parses without network or signing',()=>{
  const raw='0100000001'+'00'.repeat(32)+'ffffffff4d04ffff001d0104455468652054696d65732030332f4a616e2f32303039204368616e63656c6c6f72206f6e206272696e6b206f66207365636f6e64206261696c6f757420666f722062616e6b73ffffffff0100f2052a01000000434104678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38c4f35504e51ec112de5c384df7ba0b8d578a4c702b6bf11d5fac00000000';
- const r=inspectBitcoinTransaction('0x'+raw,'4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b');assert.equal(r.declaredOutputTotalSats,'5000000000');assert.equal(r.runestone.artifact.kind,'none');assert.equal(r.inclusionVerified,false);
+ const r=inspectBitcoinTransaction('0x'+raw,'4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b');assert.deepEqual(r.serializationSize,{baseBytes:204,witnessRelatedBytes:0,weightUnits:816,virtualBytes:204,sigopAdjustedVirtualBytes:null});assert.equal(r.declaredOutputTotalSats,'5000000000');assert.equal(r.runestone.artifact.kind,'none');assert.equal(r.inclusionVerified,false);
 });
 test('serialized parser rejects every truncation, trailing bytes, witness flags/empty stacks and noncanonical CompactSize',()=>{
  for(let i=0;i<base.length;i+=2)assert.throws(()=>read(base.slice(0,i)));
@@ -42,7 +42,33 @@ test('output values and all counts remain bounded; no fees, Bitcoin validity or 
 test('actual disabled local CLI uses the transaction parser and expected txid, with private failures',()=>{
  const dir=mkdtempSync(join(tmpdir(),'fortune-btc-')),path=join(dir,'transaction.json');
  const run=enabled=>spawnSync(process.execPath,['--import','./scripts/register-ts.mjs','scripts/inspect-bitcoin-transaction.mjs',path],{encoding:'utf8',env:{...process.env,FORTUNE_BITCOIN_TRANSACTION_READ_ENABLED:enabled},timeout:5000});
- try{writeFileSync(path,JSON.stringify({rawTransaction:'0x'+base,expectedTxid:digest(base)}));const r=run('true');assert.equal(r.status,0,r.stderr);assert.equal(JSON.parse(r.stdout).runestone.artifact.kind,'runestone');assert.equal(run('false').status,1);
+ try{writeFileSync(path,JSON.stringify({rawTransaction:'0x'+base,expectedTxid:digest(base)}));const r=run('true');assert.equal(r.status,0,r.stderr);assert.equal(JSON.parse(r.stdout).serializationSize.weightUnits,308);assert.equal(JSON.parse(r.stdout).feeRateSatsPerVbyte,null);assert.equal(JSON.parse(r.stdout).runestone.artifact.kind,'runestone');assert.equal(run('false').status,1);
  for(const text of ['{}',JSON.stringify({rawTransaction:'0x'+base,expectedTxid:'00'.repeat(32)}),' '.repeat(262145)]){writeFileSync(path,text);const r=run('true');assert.equal(r.status,1);assert.equal(r.stdout,'');assert.equal(r.stderr,'Bitcoin transaction inspection unavailable.\n');}
  }finally{rmSync(dir,{recursive:true,force:true});}
+});
+
+test('legacy byte size and genesis sizing remain exact with no fee or sigop policy claims',()=>{
+ const r=read(base);assert.deepEqual(r.serializationSize,{baseBytes:77,witnessRelatedBytes:0,weightUnits:308,virtualBytes:77,sigopAdjustedVirtualBytes:null});
+ assert.equal(r.byteLength,77);assert.equal(r.feeRateSatsPerVbyte,null);assert.equal(r.feesSats,null);
+});
+test('witness sizes include marker/flag and CompactSize prefixes with ceiling across all four weight residues',()=>{
+ for(const length of [0,1,2,3,4,5,252,253,254,255,256,65535,65536]){
+  const prefix=length<253?length.toString(16).padStart(2,'0'):length<=65535?'fd'+Buffer.from([length&255,length>>8]).toString('hex'):'fe00000100';
+  const raw='020000000001'+input+outputs+'01'+prefix+'aa'.repeat(length)+'00000000';
+  const r=inspectBitcoinTransaction('0x'+raw,digest(base));const overhead=2+1+prefix.length/2+length,weight=308+overhead;
+  assert.equal(r.txid,digest(base));assert.equal(r.byteLength,77+overhead);assert.equal(r.serializationSize.baseBytes,77);assert.equal(r.serializationSize.witnessRelatedBytes,overhead);assert.equal(r.serializationSize.weightUnits,weight);assert.equal(r.serializationSize.virtualBytes,Math.floor((weight+3)/4));assert.equal(r.serializationSize.sigopAdjustedVirtualBytes,null);
+ }
+});
+test('mixed witness inputs count empty stacks; a witness-length mutation can preserve txid and change size',()=>{
+ const twoInputs='02'+input.slice(2)+input.slice(2),stripped='02000000'+twoInputs+outputs+'00000000';
+ const raw='020000000001'+twoInputs+outputs+'00'+'0101aa'+'00000000';const r=inspectBitcoinTransaction('0x'+raw,digest(stripped));
+ assert.equal(r.serializationSize.baseBytes,118);assert.equal(r.serializationSize.witnessRelatedBytes,6);assert.equal(r.serializationSize.weightUnits,478);assert.equal(r.serializationSize.virtualBytes,120);
+ const extended=raw.replace('0101aa','0105'+'ab'.repeat(5));const changed=inspectBitcoinTransaction('0x'+extended,digest(stripped));assert.equal(changed.txid,r.txid);assert.notEqual(changed.wtxid,r.wtxid);assert.equal(changed.serializationSize.virtualBytes,121);assert.equal(changed.signaturesVerified,false);
+});
+
+
+test('existing 100000-byte application bound remains enforced independently of serialized weight',()=>{
+ const prefix=Buffer.alloc(4);prefix.writeUInt32LE(99915);const raw='020000000001'+input+outputs+'01fe'+prefix.toString('hex')+'aa'.repeat(99915)+'00000000';
+ const r=inspectBitcoinTransaction('0x'+raw,digest(base));assert.equal(r.byteLength,100000);assert.equal(r.serializationSize.weightUnits,100231);assert.equal(r.serializationSize.virtualBytes,25058);assert.equal(r.transactionVerified,false);
+ prefix.writeUInt32LE(99916);const tooLarge='020000000001'+input+outputs+'01fe'+prefix.toString('hex')+'aa'.repeat(99916)+'00000000';assert.throws(()=>inspectBitcoinTransaction('0x'+tooLarge,digest(base)));
 });

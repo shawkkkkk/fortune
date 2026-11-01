@@ -100,3 +100,51 @@ a general filesystem I/O deadline, privileged-host path-swap defense or proof
 that every filesystem/platform honors nonblocking flags. Node documents the flag
 as nonblocking when possible; Windows does not expose it. Linux FIFO tests are
 explicitly skipped on Windows. Existing regular-file CLI tests remain required.
+
+## Serialized weight and supplied-byte rate arithmetic
+
+The actual bounded transaction parser now adds `serializationSize`:
+`baseBytes` is the byte length of its stripped txid serialization;
+`witnessRelatedBytes` is total bytes minus base bytes, including marker/flag,
+per-input stack counts and item-length prefixes, not just witness payload.
+`weightUnits = 3 * baseBytes + byteLength`; `virtualBytes` is the ceiling of
+weight divided by four. These are exact bounded integer counts over supplied
+bytes. Existing `byteLength`, txid/wtxid, output order, Runestone interpretation,
+rejection rules and 100,000-byte application bound remain unchanged.
+
+This follows [BIP141 transaction size calculations](https://github.com/bitcoin/bips/blob/master/bip-0141.mediawiki)
+and Bitcoin Core v30.0 primary source read:
+
+| Source | Git blob |
+| --- | --- |
+| [consensus/validation.h](https://github.com/bitcoin/bitcoin/blob/v30.0/src/consensus/validation.h), `GetTransactionWeight` | `2b2dd4bb6865f500242b0390d7a98a403e963cdf` |
+| [consensus/consensus.h](https://github.com/bitcoin/bitcoin/blob/v30.0/src/consensus/consensus.h), scale factor four | `71b5fe2468d97eba3d8d83ad15acad6018ab856c` |
+| [policy/policy.cpp](https://github.com/bitcoin/bitcoin/blob/v30.0/src/policy/policy.cpp), sigop-adjusted sizing distinction | `3da6cb7489b1731ee51d6afe1b272b24c9e9e313` |
+
+Core's policy function also accounts for sigop cost and a bytes-per-sigop policy.
+This inspector does not evaluate scripts/sigops or mempool policy:
+`sigopAdjustedVirtualBytes` remains null. Serialized size is not a transaction
+validity, block-fit, standardness, package/relay acceptance or confirmation claim.
+The formulas were reviewed against source; no executed Core differential or live
+Bitcoin provider evidence is claimed. The BIP source Git blob is
+`442d9dd8bfc9816414ebc129dacd7e462f5d8c8a`.
+
+Supplied-parent mode integrates that actual child size into
+`suppliedPrevoutAccounting.impliedFeeRatePerSerializedVbyte` as the unreduced
+exact rational `{ numeratorSats, denominatorVbytes }`, both decimal strings.
+The numerator is the existing unverified input-minus-output arithmetic; the
+positive denominator is the child's serialized virtual bytes. There is no
+floating-point division, fee rounding, target rate, recommended payment or live
+fee estimate. Even zero fees are retained as zero over the actual size. Different
+witness lengths can preserve txid and supplied amounts while changing weight and
+the denominator. Parent witness sizes do not become child size or implied fees.
+Top-level/nested `feesSats` and `feeRateSatsPerVbyte` remain null;
+`mempoolPolicyVerified` in supplied-parent mode remains false. All earlier
+UTXO/signature/chain/Rune/custody/bridge/execution/readiness limitations remain.
+
+Tests cover genesis sizing, literal legacy/mixed-witness counts, all four ceiling
+residues, 252/253 and 65,535/65,536 CompactSize item-length boundaries, changed
+witness length with unchanged txid, exact 100,000-byte acceptance/overflow
+rejection, exact non-integral/zero supplied-byte rates and actual gated child
+CLI modes. No keys, signing, construction for broadcast, external fee service,
+public transaction, configuration/dependency or release-gate changes are added.

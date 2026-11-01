@@ -397,6 +397,16 @@ contract WorkHandler is Test {
         clientRefunded += amount;
     }
 
+    function decline(uint256 raw) external {
+        if (escrow.nextJob() == 1) return;
+        uint256 id = bound(raw, 1, escrow.nextJob() - 1);
+        (,,, uint128 amount,,,, E.State state_) = escrow.jobs(id);
+        if (state_ != E.State.Funded) return;
+        vm.prank(WORKER);
+        escrow.decline(id);
+        clientRefunded += amount;
+    }
+
     function finish(uint256 raw, uint128 part, bool cancel_) external {
         if (escrow.nextJob() == 1) return;
         uint256 id = bound(raw, 1, escrow.nextJob() - 1);
@@ -426,10 +436,11 @@ contract FortuneTestnetWorkEscrowInvariantTest is WorkBase {
     function setUp() public override {
         super.setUp();
         handler = new WorkHandler(escrow, asset);
-        bytes4[] memory selectors = new bytes4[](3);
+        bytes4[] memory selectors = new bytes4[](4);
         selectors[0] = handler.create.selector;
         selectors[1] = handler.finish.selector;
         selectors[2] = handler.waive.selector;
+        selectors[3] = handler.decline.selector;
         targetSelector(FuzzSelector(address(handler), selectors));
         targetContract(address(handler));
     }

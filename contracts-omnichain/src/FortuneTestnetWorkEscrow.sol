@@ -69,6 +69,7 @@ contract FortuneTestnetWorkEscrow is ReentrancyGuard {
         uint64 deliverBy
     );
     event JobAccepted(uint256 indexed id);
+    event JobDeclined(uint256 indexed id, address indexed worker);
     event JobDisputed(uint256 indexed id, address indexed openedBy);
     event JobSettled(uint256 indexed id, uint256 workerAmount, uint256 clientRefund, address indexed settledBy);
 
@@ -175,6 +176,15 @@ contract FortuneTestnetWorkEscrow is ReentrancyGuard {
         _asset(j.asset);
         j.state = State.Accepted;
         emit JobAccepted(id);
+    }
+
+    /// @notice Named worker declines an unaccepted job and returns all principal to the original client.
+    function decline(uint256 id) external chain97 open nonReentrant {
+        Job storage j = jobs[id];
+        if (msg.sender != j.worker) revert Unauthorized();
+        if (j.state != State.Funded) revert WrongState();
+        _settle(id, 0);
+        emit JobDeclined(id, msg.sender);
     }
 
     /// @notice Client may cancel before acceptance; after expiry anyone can return the exact client payment.

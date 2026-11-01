@@ -139,3 +139,29 @@ inexact refund rollback and explicit retry. One synthetic asset/EVM is not a
 public escrow, real worker/client identity, independent providers or full P19
 readiness. Changed bytecode requires fresh deployment/audit evidence; no earlier
 contract's deployment, signatures or approval transfer to this source.
+
+## Worker decline before acceptance
+
+`decline(id)` lets only the named worker return the entire funded principal to
+the original client while the job is still Funded. It works before or after
+`acceptBy`, only on chain97 while open. Accepted jobs cannot use this method;
+their existing payment, revision-bound waiver and dispute paths are preserved.
+The first valid acceptance, cancellation or decline wins; later calls reject.
+
+Decline reuses exact refund, asset runtime, backing and reserved-liability
+checks. `JobSettled` and `JobDeclined` bind the job, worker caller and whole
+client refund. A failed/inexact transfer rolls back the state, liabilities and
+events; retry is explicit. Immutable terms and permanent client-scoped funding
+IDs remain stored after decline. There is no arbitrary recipient, partial
+refund, fee, automatic action, pause bypass or new governor/arbitrator power.
+
+Unit/fuzz tests and the liability invariant cover decline. The zero-account
+local HTTP/ABI rehearsal retains all six prior jobs and adds a seventh with
+unauthorized-call rejection, inexact-refund rollback, explicit retry, exact
+recipient/amount receipt checks and terminal-state rejection. This is one local
+synthetic asset/EVM, not public deployment, verified parties or independent
+providers. Decline does not establish legal cancellation, fairness, work
+delivery, identity, IP rights or legitimate capital origin. Changed bytecode
+requires fresh deployment and audit evidence; full P19 and all release gates
+remain incomplete. Never use creator/holder/LP liabilities or launch reserves
+as strategy capital; this component changes no fee allocations.

@@ -2,6 +2,20 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## Counter unsigned atomic-batch runtime integration
+
+An explicit read-only library API prepares the existing isolated multi-asset
+snapshot funding call through the actual allocation engine for each asset.
+Whole-policy preflight, same-snapshot/round agreement, final header/age checks
+and one shared20-second clock/failure fence reject partial or late reviews.
+Per-asset amounts/dust and consecutive IDs remain separate. Actual compiled
+zero-account HTTP/ABI integration executes the returned bytes and preserves
+late transfer rollback, exact retry, replay rejection and recorded claims.
+No contracts, signer, approval, CLI/service/configuration or financial authority
+added. ONE fixture is not public custody, independent providers, eligibility,
+fee/capital origin or full M06/readiness/audit approval. Standard/root pins,
+economics and every release gate remain. See COUNTER_ROUND_ESCROW.md.
+
 ## Counter atomic snapshot funding batch
 
 The isolated chain97 Counter escrow adds governor-only paused atomic funding

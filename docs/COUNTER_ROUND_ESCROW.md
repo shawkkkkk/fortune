@@ -417,3 +417,41 @@ remain burn-only and earned recirculation separate. Changed isolated bytecode
 requires fresh exact-source deployment/audit/configuration evidence; old
 runtime/deployment signatures or audit approval do not transfer. Frozen Standard,
 root dependencies and every public deployment/activation gate remain unchanged.
+
+## Unsigned atomic batch funding review (M06)
+
+`buildCounterBatchFunding` is an explicit read-only library API for the existing
+isolated `fundSnapshotBatch` method. It validates the complete common policy and
+2–10 strictly sorted distinct payout policies before RPC, then invokes the actual
+unchanged allocation read path for each asset. Every allocation must agree on the
+block number/hash/timestamp, initial round, supply and eligible units; any failed
+asset rejects the whole review. Accounts (1–128), exclusions, minimum holding,
+exact pro-rata floors and per-asset dust retain the existing semantics. No value
+or dust is netted across assets. Round range overflow is rejected before encoding.
+
+One outer real20-second lifetime/monotonic safe clock fences all nested RPC on
+success, failure and timeout. Final two-client chain/header rereads and one final
+120-second snapshot-age check cover the whole batch. Inflight calls are not
+cancelled; host scheduling, clocks, policies and RPC are trusted. A moving head
+can make otherwise valid component observations disagree and reject; no automatic
+retry or refreshed snapshot is added. At most ten bounded component reads run
+concurrently, repeating holder reads rather than introducing an index or cache.
+
+Output contains unsigned exact per-asset allocations/dust/consecutive round IDs
+and existing batch calldata. The first round, original block hash and fixed
+block-timestamp-plus120 deadline bind the bytes, not eligibility, legitimate fee
+or capital origin, independent providers, finality or wallet consent. There is no
+balance/allowance approval, signer, submission, service, CLI, real configuration,
+automatic basket selection/rotation or new contract change. Authority remains
+null and execution/full-readiness flags false. Fresh wallet/governance, asset,
+capital/liability, legal, provider and deployment/audit review remain necessary.
+
+Tests cover policy preflight, ten assets, cross-component disagreement, final
+headers/age, overflow, late failure and actual20-second timeout. The compiled
+zero-account local Counter rehearsal executes actual returned bytes, checks late
+transfer rollback then exact-byte retry and replay rejection, and delivers the
+resulting recorded claims. Two clients of ONE synthetic fixture are not independent
+providers, public custody, verified holders/funding or full M06 readiness. Existing
+single funding/claim APIs, frozen Standard/root pins, economics and gates remain.
+Launch-token fees only burn; holder rewards and earned platform recirculation
+stay separate; creator/holder/LP liabilities and reserves are never strategy capital.

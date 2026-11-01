@@ -8,6 +8,7 @@ import {once} from 'node:events';
 import {createServer} from 'node:net';
 import {createPublicClient,createWalletClient,http,keccak256,toHex,decodeEventLog,decodeFunctionData} from 'viem';
 import {bscTestnet} from 'viem/chains';
+import {buildCounterBatchFunding} from '../../lib/counter-batch-funding.ts';
 import {buildCounterClaimBatch} from '../../lib/counter-claims.ts';
 import {buildCounterAllocation,buildCounterSnapshotFunding} from '../../lib/counter-allocation.ts';
 
@@ -135,23 +136,26 @@ try{
  rmSync(cliPolicyDir,{recursive:true});cliPolicyDir=undefined;
  stage='atomic snapshot batch funding rollback, explicit retry and claim receipts';
  await write(GOV,escrow,escrowArtifact,'setPaused',[true]);
- const funding=assets.map((a,i)=>({token:a.token,recipients:[ALICE],amounts:[BigInt(i+3)]}));
+ const funding=assets.map((a,i)=>({token:a.token,recipients:[BOB],amounts:[BigInt(i+3)]}));
  for(const f of funding){await write(GOV,f.token,assetArtifact,'mint',[GOV,f.amounts[0]]);await write(GOV,f.token,assetArtifact,'approve',[escrow,f.amounts[0]]);}
  const balances=await Promise.all(funding.map(f=>read(f.token,assetArtifact,'balanceOf',[GOV])));
- const aliceBefore=await Promise.all(funding.map(f=>read(f.token,assetArtifact,'balanceOf',[ALICE])));
+ const bobBefore=await Promise.all(funding.map(f=>read(f.token,assetArtifact,'balanceOf',[BOB])));
  await rpc.request({method:'anvil_mine',params:['0x14','0x0']});
- const reference=await rpc.getBlock({blockNumber:(await rpc.getBlockNumber({cacheTime:0}))-20n});
- const firstSnapshot={expectedRound:3n,blockNumber:reference.number,blockHash:reference.hash,deadline:reference.timestamp+120n};
+ const {payoutAsset,payoutAssetCodeHash,payoutBudget,...batchBase}=allocationPolicy;
+ const batchReview=await buildCounterBatchFunding(clients,{...batchBase,minimumHolding:'11',payouts:assets.map((a,i)=>({token:a.token.toLowerCase(),codeHash:a.codeHash,budget:String(i+3)}))});
+ const prepared=decodeFunctionData({abi:escrowArtifact.abi,data:batchReview.data});
+ assert.equal(prepared.functionName,'fundSnapshotBatch');assert.deepEqual(prepared.args[0].map(f=>({...f,token:f.token.toLowerCase(),recipients:f.recipients.map(a=>a.toLowerCase())})),funding.map(f=>({...f,token:f.token.toLowerCase()})));
+ const firstSnapshot=prepared.args[1];assert.equal(firstSnapshot.expectedRound,3n);assert.equal(batchReview.executionAuthorized,false);assert.equal(batchReview.currentAuthorization,null);
  await write(GOV,funding[1].token,assetArtifact,'configure',[true,false,'0x0000000000000000000000000000000000000000']);
- const failedFunding=await write(GOV,escrow,escrowArtifact,'fundSnapshotBatch',[funding,firstSnapshot],false);assert.equal(failedFunding.logs.length,0);
+ const failedFunding=await receipt(await wallet(GOV).sendTransaction({to:escrow,data:batchReview.data,gas:5000000n}),false);assert.equal(failedFunding.logs.length,0);
  assert.equal(await read(escrow,escrowArtifact,'nextRound'),3n);
  for(const [i,f] of funding.entries()){
   assert.equal(await read(f.token,assetArtifact,'balanceOf',[GOV]),balances[i]);assert.equal(await read(f.token,assetArtifact,'balanceOf',[escrow]),0n);
   assert.equal(await read(f.token,assetArtifact,'allowance',[GOV,escrow]),f.amounts[0]);assert.equal(await read(escrow,escrowArtifact,'reserved',[f.token]),0n);
-  assert.equal(await read(escrow,escrowArtifact,'claimable',[BigInt(i+3),ALICE]),0n);assert.equal((await read(escrow,escrowArtifact,'roundSnapshots',[BigInt(i+3)]))[0],0n);
+  assert.equal(await read(escrow,escrowArtifact,'claimable',[BigInt(i+3),BOB]),0n);assert.equal((await read(escrow,escrowArtifact,'roundSnapshots',[BigInt(i+3)]))[0],0n);
  }
  await write(GOV,funding[1].token,assetArtifact,'configure',[false,false,'0x0000000000000000000000000000000000000000']);
- const funded=await write(GOV,escrow,escrowArtifact,'fundSnapshotBatch',[funding,firstSnapshot]);
+ const funded=await receipt(await wallet(GOV).sendTransaction({to:escrow,data:batchReview.data,gas:5000000n}));
  const fundingLogs=funded.logs.filter(l=>l.address.toLowerCase()===escrow.toLowerCase()).map(l=>decodeEventLog({abi:escrowArtifact.abi,data:l.data,topics:l.topics}));
  assert.deepEqual(fundingLogs.map(l=>l.eventName),['RoundFunded','SnapshotBound','RoundFunded','SnapshotBound']);
  for(const [i,f] of funding.entries()){
@@ -159,15 +163,15 @@ try{
   assert.equal(fundingLogs[i*2].args.round,id);assert.equal(fundingLogs[i*2].args.asset.toLowerCase(),f.token.toLowerCase());assert.equal(fundingLogs[i*2].args.amount,f.amounts[0]);assert.equal(fundingLogs[i*2+1].args.round,id);assert.equal(fundingLogs[i*2+1].args.blockNumber,firstSnapshot.blockNumber);assert.equal(fundingLogs[i*2+1].args.blockHash,firstSnapshot.blockHash);assert.equal(fundingLogs[i*2+1].args.deadline,firstSnapshot.deadline);
   assert.equal(await read(escrow,escrowArtifact,'reserved',[f.token]),f.amounts[0]);await write(GOV,f.token,assetArtifact,'approve',[escrow,100n]);
  }
- await write(GOV,escrow,escrowArtifact,'fundSnapshotBatch',[funding,firstSnapshot],false);assert.equal(await read(escrow,escrowArtifact,'nextRound'),5n);
+ await receipt(await wallet(GOV).sendTransaction({to:escrow,data:batchReview.data,gas:5000000n}),false);assert.equal(await read(escrow,escrowArtifact,'nextRound'),5n);
  await write(GOV,escrow,escrowArtifact,'setPaused',[false]);
- const batchPaid=await write(GUARD,escrow,escrowArtifact,'claimMany',[[3n,4n],ALICE]);
+ const batchPaid=await write(GUARD,escrow,escrowArtifact,'claimMany',[[3n,4n],BOB]);
  const paidLogs=batchPaid.logs.filter(l=>l.address.toLowerCase()===escrow.toLowerCase()).map(l=>decodeEventLog({abi:escrowArtifact.abi,data:l.data,topics:l.topics}));assert.equal(paidLogs.length,2);
  for(const [i,f] of funding.entries()){
-  assert.equal(paidLogs[i].eventName,'Claimed');assert.equal(paidLogs[i].args.round,BigInt(i+3));assert.equal(paidLogs[i].args.recipient.toLowerCase(),ALICE);assert.equal(paidLogs[i].args.asset.toLowerCase(),f.token.toLowerCase());assert.equal(paidLogs[i].args.amount,f.amounts[0]);
-  assert.equal(await read(f.token,assetArtifact,'balanceOf',[ALICE]),aliceBefore[i]+f.amounts[0]);assert.equal(await read(escrow,escrowArtifact,'reserved',[f.token]),0n);
+  assert.equal(paidLogs[i].eventName,'Claimed');assert.equal(paidLogs[i].args.round,BigInt(i+3));assert.equal(paidLogs[i].args.recipient.toLowerCase(),BOB);assert.equal(paidLogs[i].args.asset.toLowerCase(),f.token.toLowerCase());assert.equal(paidLogs[i].args.amount,f.amounts[0]);
+  assert.equal(await read(f.token,assetArtifact,'balanceOf',[BOB]),bobBefore[i]+f.amounts[0]);assert.equal(await read(escrow,escrowArtifact,'reserved',[f.token]),0n);
  }
- const result={chainId:97,atomicSnapshotBatchFundingObserved:true,lateFundingFailureRollsBackAll:true,exactBatchFundingRetrySucceeded:true,batchFundingReplayRejected:true,batchFundingSnapshotReceiptsBound:true,batchFundedClaimsDelivered:true,actualClaimCliBytesExecuted:true,spentClaimCliRejected:true,actualClaimReviewBytesExecuted:true,spentClaimReviewRejected:true,claimReview,localOnly:true,compiledEscrowDeployed:true,fundedRounds:4,payoutAssets:2,claimsDelivered:6,batchReceiptBound:true,failedLaterAssetRollsBackWholeBatch:true,
+ const result={chainId:97,actualBatchFundingReviewBytesExecuted:true,batchReviewRollbackRetryPreserved:true,batchReviewReplayRejected:true,atomicSnapshotBatchFundingObserved:true,lateFundingFailureRollsBackAll:true,exactBatchFundingRetrySucceeded:true,batchFundingReplayRejected:true,batchFundingSnapshotReceiptsBound:true,batchFundedClaimsDelivered:true,actualClaimCliBytesExecuted:true,spentClaimCliRejected:true,actualClaimReviewBytesExecuted:true,spentClaimReviewRejected:true,claimReview,localOnly:true,compiledEscrowDeployed:true,fundedRounds:4,payoutAssets:2,claimsDelivered:6,batchReceiptBound:true,failedLaterAssetRollsBackWholeBatch:true,
   snapshotAllocationFunded:true,actualOperatorCliFundingBytesMatched:true,roundSnapshotAndDeadlineBound:true,staleRoundHashAndExpiryRejected:true,exactFundingReplayRejected:true,allocationBlock:allocation.blockNumber,allocationDust:allocation.unallocatedDust,incompleteAccountListRejected:true,receiptRecipientAndAmountMatched:true,relayerReceivedNothing:true,duplicateClaimRejected:true,pausedClaimRejected:true,
   guardianCannotOpen:true,inexactTransferRejected:true,failedClaimLiabilityPreserved:true,explicitRetrySucceeded:true,
   finalReserved:['0','0'],generatedAccounts:0,privateKeysUsed:false,publicBroadcasts:false,independentProvidersVerified:false,

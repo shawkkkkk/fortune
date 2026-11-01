@@ -588,3 +588,17 @@ regular-file tests and all parsing/byte bounds/gates remain. This does not add a
 general filesystem deadline or platform-independent I/O guarantee, Bitcoin
 validation, public service or financial authority. See
 BITCOIN_TRANSACTION_INSPECTION.md. Frozen Standard/root pins are unchanged.
+
+## Burn-only inventory receipt integration (M01/M08)
+
+A separate chain97 library observer now verifies the actual burn-only vault's
+outer uint128 burn and three nested logs against supplied runtime/identity pins,
+receipt-height policy/counters and rechecked two-client transaction/header data.
+The existing compiled zero-account OFT/vault rehearsal consumes this observer for
+both burns and replay/mismatch rejection. Direct-token observation/CLI remains
+strictly separate. Event and block-end counters are distinct, evidence IDs need
+consumer deduplication, and fee funding/buyback/finality/supply/execution claims
+remain false. This is no consumed ledger, badge, public service, fee-origin proof
+or full M01/M08 readiness. Shared20-second fencing now rejects invalid host clocks
+before RPC; no financial authority, frozen Standard/root pins or gates change.
+See OMNICHAIN_PERMANENT_BURN.md.

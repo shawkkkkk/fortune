@@ -78,3 +78,52 @@ admin/proxy safety. Height-pinned reads with before/after hash checks are not
 EIP-1898 hash calls, finality, consensus or ABA protection. No durable indexer,
 recovery service, badge, buyback/fee settlement, public deployment, full testnet
 readiness, audit or mainnet approval follows from this component.
+
+## Separate inventory-vault receipts (M01/M08)
+
+`inspectVaultPermanentBurn` is an additional read-only library entry point for
+chain97 FortuneTestnetBurnVault receipts. Its reviewed policy uses the existing
+token/runtime/manifest/amount/transaction pins plus vault address, vault runtime
+hash and exact outer caller. Amounts are positive uint128 values. It accepts
+only a zero-native-value direct outer `burn(uint128)` call to that vault and
+exactly three bound adjacent logs: token Transfer(vault→zero), token PermanentBurn
+and vault InventoryBurned(sequence,caller,amount,cumulative). Canonical topics,
+amounts, log order and receipt/transaction/block identities are required.
+The existing direct-burn API/CLI still accepts only direct token calls with two
+logs; it never silently reinterprets a vault call. No new CLI/service/config is
+activated by adding the library entry point.
+
+At receipt height the observer checks both pinned runtimes, token identity,
+vault token/runtimeHash/manifestHash, positive uint128 cap, open state, disabled
+bridging and bounded totalBurned/burnCount. Event sequence/cumulative cannot
+exceed the block-end vault counters. Token permanentlyBurned is also block-end
+state. These counters are **not transaction deltas**; other transactions in the
+block can change them. Same-block pause/config changes can conservatively reject
+a genuine earlier burn. The observer neither reconstructs pre-state nor proves
+fee origin, a preceding buyback, legitimate capital, issuer/proxy safety or full
+supply accounting. Runtime pins are supplied trust policy, not audit approval.
+
+Both paths use the same two-client receipt/header rereads, 20-confirmation/head
+bounds, real20-second shared lifetime and failure/late-read fences. Safe nonnegative
+integer host clocks are now required before RPC in that shared lifetime.
+In-flight reads are not cancelled. Historical receipts remain allowed; no new
+freshness or finality claim is added. Distinct clients do not prove independent
+providers; height calls are not EIP-1898 hash calls or canonicality/ABA proof.
+
+The result adds `vaultObservation` with caller, vault, sequence, event cumulative,
+block-end vault counters and inventory log index. The token/log evidence ID stays
+stable across repeated reads; consumers must deduplicate and must not sum counters
+or repeated observations. There is still no consumed ledger, totals or badge
+service. Fee funding, buyback, independent-provider/finality/global-supply and
+execution flags always remain false. Launch-token fees only burn; pair rewards
+and earned platform recirculation remain separate, and creator/holder/LP
+liabilities are never strategy capital.
+
+ABI/provider adversarial tests cover malformed nested logs, wrong caller/calldata,
+pins/caps/counters, disagreement, changed rereads and invalid clocks. The existing
+zero-account compiled OFT/vault rehearsal now invokes this actual observer for
+both burns, repeats the first evidence ID and rejects wrong amounts/runtime and
+direct-mode reinterpretation. Two clients of one synthetic local fixture are not
+public providers, legitimate fee inventory, deployment, audit or complete agent/
+omnichain readiness. No contract, dependency, real configuration or release gate
+changes are implied.

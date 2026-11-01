@@ -455,3 +455,47 @@ providers, public custody, verified holders/funding or full M06 readiness. Exist
 single funding/claim APIs, frozen Standard/root pins, economics and gates remain.
 Launch-token fees only burn; holder rewards and earned platform recirculation
 stay separate; creator/holder/LP liabilities and reserves are never strategy capital.
+
+## Operator atomic batch funding CLI (default disabled)
+
+This separate one-shot command calls the actual `buildCounterBatchFunding` engine;
+legacy single-round funding/claim CLIs are unchanged. Prepare an existing reviewed
+policy with the library's common escrow/role/launch-token/account/minimum pins and
+`payouts` array of2–10 strictly sorted distinct `{ token, codeHash, budget }` rows.
+Amounts are exact base-unit strings; do not sum or offset different assets/dust.
+
+```bash
+FORTUNE_COUNTER_BATCH_FUNDING_READ_ENABLED=true \
+FORTUNE_COUNTER_READ_RPC_URL=<reviewed-https-read-origin-one> \
+FORTUNE_COUNTER_SECONDARY_RPC_URL=<reviewed-distinct-https-read-origin-two> \
+node --import ./scripts/register-ts.mjs scripts/prepare-counter-batch-funding.mjs <existing-policy.json>
+```
+
+The enable flag is separate from the old funding/claim flags. The command accepts
+one existing regular file, reads at most16KiB+1 using a nonblocking read-only file
+descriptor, requires strict UTF-8 JSON and pins literal bytes before/after the
+awaited engine. Missing, nonregular, oversized, mutated or foreign policies fail
+privately without output; no initialization, persistence or automatic retry is
+added. This is not a filesystem deadline or privileged-host path-swap defense.
+Two distinct HTTPS origins, no URL userinfo/fragment, five-second transports,
+no redirect/application retry and omitted credentials restrict configured reads;
+different origins are not independent-provider proof. No credentials are printed.
+
+JSON output includes a SHA-256 of the original policy bytes (not authentication),
+the original snapshot/expiry and unsigned exact batch review. All false authority,
+capital/eligibility/provider/finality/readiness flags remain; authorization stays
+null. It cannot approve, fund, sign, submit, refresh the deadline or start a public
+service. Runtime/governance/allowance/funds/legitimate origin/liabilities/asset/legal/
+audit/privacy/ops/recovery review still gates any separately authorized execution.
+Launch-token fees only burn; holder allocations and earned platform recirculation
+remain distinct, with creator/holder/LP liabilities never used as strategy capital.
+
+Actual child-process HTTP/ABI tests cover the engine projection, zero-RPC invalid
+policy/transport preflight, private failures, literal policy mutation and exact
+16KiB/FIFO rejection. The compiled zero-account local Counter rehearsal compares
+CLI and library bytes/rounds/block/deadline, then consumes CLI bytes for late
+transfer rollback, exact-byte retry and replay rejection before delivering claims.
+ONE synthetic fixture/two clients are not independent providers, legitimate funding,
+verified holder eligibility, public custody or full M06/P04 readiness. Contracts,
+frozen Standard/root pins, real configuration, economics and release gates do not
+change. Changed funding bytecode still needs its own fresh deployment/audit evidence.

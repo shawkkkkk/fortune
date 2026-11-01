@@ -2,6 +2,20 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## Counter atomic-batch operator review CLI
+
+A separate default-disabled one-shot CLI now consumes the unchanged actual
+multi-asset funding review engine using a bounded16KiB strict literal policy
+and restricted read providers. Output retains unsigned per-asset amounts/dust,
+consecutive IDs and original block/deadline; checksum is not authentication,
+authorization null and execution/readiness false. Actual child HTTP/ABI tests
+and the compiled zero-account escrow rehearsal consume CLI bytes through
+rollback/exact retry/replay rejection and recorded claims. No contract, signer,
+approval, persistence, automatic retry, service or real configuration is added.
+ONE fixture is not public custody/providers/legitimate capital/holder eligibility
+or full M06/P04/audit approval. Standard/root pins/economics/gates unchanged.
+See COUNTER_ROUND_ESCROW.md.
+
 ## Counter unsigned atomic-batch runtime integration
 
 An explicit read-only library API prepares the existing isolated multi-asset

@@ -193,3 +193,61 @@ public custody or real-party authorization. The changed runtime requires fresh
 deployment/audit evidence; no old deployment evidence transfers. No public service,
 signer, deployment, financial authority or full P19 readiness is enabled. Frozen
 Standard, root pins, economics and release gates are unchanged.
+
+## Pinned job-state observation
+
+`inspectWorkEscrowJob` in `lib/work-escrow-observation.ts` is an explicit read-only
+library API, with no automatic invocation, HTTP/CLI/MCP surface, service or real
+provider configuration. A strict supplied chain97 policy fixes escrow and asset
+runtime hashes, distinct immutable governor/guardian/arbitrator, job ID, client,
+worker, amount, terms hash and asset per-job cap. Addresses/hashes use canonical
+lowercase; IDs/amounts/caps are exact positive bounded decimal strings. Unknown
+policy fields, missing jobs and mismatched identities/terms fail closed.
+
+Two distinct read-client objects select their common minimum head minus twenty,
+with head gap at most ten. Every code/contract call uses that same height. The
+reader checks matching block number/hash/timestamp, snapshot age at most 120
+seconds (including completion after waiting for either client), escrow/asset
+runtime, immutable roles, asset hash/cap, next-job bound, pause state and all job
+fields. Funded, Accepted, Disputed and Settled states are supported, including
+paused escrow. This observation grants no action or pause bypass.
+
+It reads all zero-to-32 stored result revisions in order, rejects missing/zero or
+consecutively repeated hashes, and checks state/disputed-revision consistency.
+A zero disputed revision can accompany submitted results under legacy dispute;
+it does not mean no result or no dispute. Commitments are public, permanent and
+unverified; no preimage/content/URL is fetched. The selected job's outstanding
+principal is its whole amount until Settled, then zero. That amount must fit the
+asset's reported reserved liability, and reported balance must cover reserved.
+Other jobs and assets are not enumerated; this is not a global solvency, capital
+origin, asset/proxy safety or holder/creator/LP allocation proof.
+
+One real twenty-second wall deadline and safe nonnegative monotonic host clock
+bound the whole read. Before/after fences wrap every awaited RPC and stop new
+follow-on reads after success, failure or timeout, preserving original method
+receivers. Finally closes the lifetime on every outcome. Already in-flight work
+is not cancelled; host/event-loop scheduling, trusted policy/clock/RPC and
+height-addressed reads remain limitations. Matching clients do not establish
+independent providers, EIP-1898 hash calls, consensus, finality or ABA/reorg safety.
+A successful returned snapshot is historical, not current authorization.
+
+`workerPaid`, `clientRefund` and `settlementTransaction` always remain null, even
+for Settled storage. The observer does not reconstruct settlement receipts or
+identify whether payment, cancellation, decline, waiver or arbitration settled
+the job. Settlement-receipt, identity, delivery, dispute-fairness, capital-origin,
+provider-independence, finality, global-solvency, execution and full Syndicate
+verification remain false; current authorization is null. No unsigned action,
+signing, transfer, persistence, automatic retry or renewed trust is produced.
+Review privacy before storing or sharing identifiable wallet/commitment metadata.
+
+Focused tests cover all states, pause, 32 revisions, exact policy/term/asset and
+backing failures, provider/header disagreement, stale completion, clock rollback,
+late work and a real twenty-second timeout. The existing eight-job zero-account
+compiled escrow rehearsal now calls the actual observer over viem HTTP/ABI for
+Funded/Accepted/paused/Disputed/Settled snapshots, submitted history and foreign
+terms rejection, retaining all previous settlement/rollback/retry checks. Two
+clients of ONE synthetic local EVM are not independent public providers, real
+parties, legitimate funding, public custody or full P19 readiness. No contract,
+root dependency, Standard fingerprint, economic allocation, authority or release
+gate changes. Exact-source audit/legal/governance, public receipt/service,
+provider/finality, privacy, custody/failure/recovery and operations gates remain.

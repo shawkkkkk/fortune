@@ -2,6 +2,22 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## Syndicate pinned job-state integration
+
+An explicit chain97 read-only `inspectWorkEscrowJob` library API checks supplied
+escrow/asset runtime and immutable role pins, intended job terms, all bounded
+result revisions and reported selected liability/backing through two clients
+at one twenty-confirmed, rechecked fresh block. Funded/Accepted/Disputed/Settled
+and pause state are observed; real twenty-second lifetime/monotonic clock fences
+late work. Settled storage does not reconstruct payment receipts: paid/refund/tx
+stay null and authorization/delivery/fairness/provider/finality/global-solvency/
+capital/execution/full-readiness remain unknown or false. No signer, service,
+CLI/HTTP/MCP, real configuration or financial action added. The actual compiled
+eight-job HTTP/ABI local rehearsal consumes the reader and preserves previous
+settlement/rollback/retry checks. ONE zero-account fixture is not independent
+providers, public custody or full P19/audit/mainnet approval. Standard/root pins,
+economics and gates unchanged. See [SYNDICATE_WORK_ESCROW.md](SYNDICATE_WORK_ESCROW.md).
+
 ## Bitcoin serialized size and supplied-byte rate accounting
 
 The actual legacy/SegWit transaction parser adds exact base/witness-related

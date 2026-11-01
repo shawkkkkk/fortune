@@ -245,6 +245,25 @@ contract FortuneTestnetWorkEscrow is ReentrancyGuard {
         emit ResultApproved(id, revision, resultHash);
     }
 
+    /// @notice Optional party dispute bound to the exact latest submitted result.
+    mapping(uint256 => uint256) public disputedResultRevision;
+    event ResultDisputed(uint256 indexed id, uint256 indexed revision, bytes32 resultHash, address openedBy);
+
+    function disputeResult(uint256 id, uint256 revision, bytes32 resultHash) external chain97 open nonReentrant {
+        Job storage j = jobs[id];
+        if (msg.sender != j.client && msg.sender != j.worker) revert Unauthorized();
+        if (j.state != State.Accepted) revert WrongState();
+        if (
+            revision == 0 || revision != latestResultRevision[id] || resultHash == bytes32(0)
+                || resultHashes[id][revision] != resultHash
+        ) revert InvalidResult();
+        _asset(j.asset);
+        disputedResultRevision[id] = revision;
+        j.state = State.Disputed;
+        emit JobDisputed(id, msg.sender);
+        emit ResultDisputed(id, revision, resultHash, msg.sender);
+    }
+
     function dispute(uint256 id) external chain97 open nonReentrant {
         Job storage j = jobs[id];
         if (j.state != State.Accepted) revert WrongState();

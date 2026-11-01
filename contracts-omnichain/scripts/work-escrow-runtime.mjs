@@ -154,8 +154,25 @@ try{
  assert.equal(await read(escrow,escrowArtifact,'nextJob'),8n);
  assert.equal(await read(escrow,escrowArtifact,'reserved',[token]),0n);
  assert.equal(await read(token,assetArtifact,'balanceOf',[CLIENT]),1820n);assert.equal(await read(token,assetArtifact,'balanceOf',[WORKER]),180n);
- const result={chainId:97,localOnly:true,clientScopedFundingIdObserved:true,fundedApprovedReplayRejectedBeforeAndAfterSettlement:true,compiledWorkEscrowDeployed:true,fundedJobs:7,settledJobs:7,workerDeclineRefundReceiptBound:true,inexactDeclinePreservesFundedLiability:true,declinedJobCannotBeAcceptedOrCancelled:true,workerWaiverRefundReceiptBound:true,staleWaiverRejected:true,inexactWaiverPreservesLiability:true,clientApprovalReceiptBound:true,workerResultHistoryObserved:true,revisionBoundPaymentReceiptObserved:true,staleResultApprovalRejected:true,inexactResultPaymentRetainsLiability:true,
-  workerPaidUnits:'180',clientFinalUnits:'1820',finalReserved:'0',cancellationAndExpiryRefundedClient:true,disputeSplitSettled:true,
+ stage='revision-bound party dispute and arbitration';
+ const eight=await fund(10n);await write(WORKER,escrow,escrowArtifact,'accept',[eight]);
+ const hashA='0x'+'aa'.repeat(32),hashB='0x'+'bb'.repeat(32);
+ await write(WORKER,escrow,escrowArtifact,'submitResult',[eight,0n,hashA]);
+ await write(WORKER,escrow,escrowArtifact,'submitResult',[eight,1n,hashB]);
+ await write(CLIENT,escrow,escrowArtifact,'disputeResult',[eight,1n,hashA],false);
+ assert.equal(await read(escrow,escrowArtifact,'disputedResultRevision',[eight]),0n);
+ const disputed=await write(CLIENT,escrow,escrowArtifact,'disputeResult',[eight,2n,hashB]);
+ const bound=disputed.logs.filter(l=>l.address.toLowerCase()===escrow.toLowerCase()).map(l=>decodeEventLog({abi:escrowArtifact.abi,data:l.data,topics:l.topics}));
+ assert.equal(bound.length,2);assert.equal(bound[0].eventName,'JobDisputed');assert.equal(bound[1].eventName,'ResultDisputed');
+ assert.equal(bound[1].args.id,eight);assert.equal(bound[1].args.revision,2n);assert.equal(bound[1].args.resultHash,hashB);assert.equal(bound[1].args.openedBy.toLowerCase(),CLIENT);
+ await write(WORKER,escrow,escrowArtifact,'submitResult',[eight,2n,hashA],false);
+ await write(ARB,escrow,escrowArtifact,'resolve',[eight,4n]);
+ assert.equal(await read(escrow,escrowArtifact,'disputedResultRevision',[eight]),2n);
+ assert.equal(await read(escrow,escrowArtifact,'resultHashes',[eight,2n]),hashB);
+ assert.equal(await read(escrow,escrowArtifact,'reserved',[token]),0n);
+ assert.equal(await read(token,assetArtifact,'balanceOf',[CLIENT]),1816n);assert.equal(await read(token,assetArtifact,'balanceOf',[WORKER]),184n);
+ const result={chainId:97,revisionBoundDisputeReceiptObserved:true,staleResultDisputeRejected:true,disputedRevisionSurvivesSettlement:true,localOnly:true,clientScopedFundingIdObserved:true,fundedApprovedReplayRejectedBeforeAndAfterSettlement:true,compiledWorkEscrowDeployed:true,fundedJobs:8,settledJobs:8,workerDeclineRefundReceiptBound:true,inexactDeclinePreservesFundedLiability:true,declinedJobCannotBeAcceptedOrCancelled:true,workerWaiverRefundReceiptBound:true,staleWaiverRejected:true,inexactWaiverPreservesLiability:true,clientApprovalReceiptBound:true,workerResultHistoryObserved:true,revisionBoundPaymentReceiptObserved:true,staleResultApprovalRejected:true,inexactResultPaymentRetainsLiability:true,
+  workerPaidUnits:'184',clientFinalUnits:'1816',finalReserved:'0',cancellationAndExpiryRefundedClient:true,disputeSplitSettled:true,
   governorCannotArbitrate:true,guardianCannotOpen:true,pausedPaymentRejected:true,duplicatePaymentRejected:true,inexactSplitRetainsLiability:true,explicitRetrySucceeded:true,
   generatedAccounts:0,privateKeysUsed:false,publicBroadcasts:false,independentProvidersVerified:false,workDeliveryVerified:false,
   workerIdentityVerified:false,disputeFairnessVerified:false,deployedToPublicNetwork:false,fullSyndicateReadiness:false,executionAuthorized:false};

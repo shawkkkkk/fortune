@@ -616,3 +616,15 @@ the integration. This is local untrusted research, NOT a consumed financial ledg
 totals, badge, fee/buyback proof, current authorization, reorg recovery, public
 service or full M01/M08/P10 readiness. No contracts, root pins, real configuration,
 financial authority or release gates change. See OMNICHAIN_PERMANENT_BURN.md.
+
+## Revision-bound Syndicate disputes (P19 component)
+
+Optional disputeResult binds a party's dispute to the exact latest submitted
+revision/hash, rejects stale prepared calldata, and retains that reference through
+existing fixed-arbitrator split settlement. Legacy dispute and its deadline/role
+semantics remain unchanged; its zero binding is explicitly unknown. Solidity tests
+and the actual compiled eight-job local HTTP/ABI rehearsal cover stale rejection,
+events and retained history/liabilities. No content/delivery/legal/fairness proof,
+public custody, signer, deployment or full P19 readiness follows. Changed isolated
+runtime needs fresh deployment/audit evidence; frozen Standard/root pins and all
+release gates remain. See SYNDICATE_WORK_ESCROW.md.

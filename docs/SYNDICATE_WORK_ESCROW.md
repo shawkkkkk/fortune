@@ -165,3 +165,31 @@ delivery, identity, IP rights or legitimate capital origin. Changed bytecode
 requires fresh deployment and audit evidence; full P19 and all release gates
 remain incomplete. Never use creator/holder/LP liabilities or launch reserves
 as strategy capital; this component changes no fee allocations.
+
+## Optional revision-bound disputes
+
+`disputeResult(id, revision, resultHash)` lets only the original client or named
+worker dispute an Accepted job against its exact latest nonzero submitted result.
+A newer worker revision invalidates previously prepared dispute calldata. The
+contract records `disputedResultRevision`, emits JobDisputed and ResultDisputed,
+and retains the revision/hash after resolution. It neither pays nor releases
+liabilities when opening a dispute. Result submission and payment/waiver stop once
+Disputed; the existing fixed arbitrator and exact split settlement remain required.
+The method works before or after deliverBy, subject to the unchanged chain97,
+open-state, non-reentrancy and asset-runtime checks.
+
+Legacy `dispute(id)` remains available with its original roles/deadline semantics,
+including permissionless opening after deliverBy. Its zero disputed revision means
+no revision binding, not absence of submitted results. No result or legal dispute
+is required for that legacy route; zero is not a safety verdict. First valid
+payment, waiver or dispute wins. Hashes remain public, permanent, unverified content
+commitments; neither revision binding nor arbitration proves delivery, identity,
+authorship, IP rights, fairness, legal agreement or legitimate capital origin.
+
+Tests and the actual eight-job compiled escrow/HTTP/ABI local rehearsal cover
+stale rejection, exact event fields, locked liabilities and retained revision
+through split settlement. One zero-account local VM with impersonated roles is not
+public custody or real-party authorization. The changed runtime requires fresh
+deployment/audit evidence; no old deployment evidence transfers. No public service,
+signer, deployment, financial authority or full P19 readiness is enabled. Frozen
+Standard, root pins, economics and release gates are unchanged.

@@ -2,6 +2,18 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## Social ownership stream work bound
+
+The actual shared social ownership HTTP reader now caps non-final fragments at
+4,096 per attempt, including empty fragments, before byte counting/decoding or
+ownership projection. Empty/tiny regressions failed unchanged source; boundary,
+retry/cleanup and existing actual HTTP/deadline tests cover the fix. Body limits,
+eight-second attempt clock/failure fences, one retry and platform fallbacks remain
+unchanged. Highly fragmented valid responses may reject; this is not an upstream
+memory or whole-verification time/work bound. No attestor/binding/claim/financial
+authority, configuration, contract, dependency or frozen Standard changes. Full
+M04 and all release gates remain incomplete. See [SOCIAL_FEES.md](SOCIAL_FEES.md).
+
 ## Syndicate pinned job-state integration
 
 An explicit chain97 read-only `inspectWorkEscrowJob` library API checks supplied

@@ -131,12 +131,14 @@ async function fetchOnce(fetcher: FetchLike, url: string, init?: RequestInit, ma
     if (!reader) return { status: response.status, body: "", location: null };
     const decoder = new TextDecoder();
     let bytes = 0;
+    let fragments = 0;
     let body = "";
     while (true) {
       check();
       const { done, value } = await reader.read();
       check();
       if (done) break;
+      if (++fragments > 4096) throw Error("Social proof response exceeded its fragment limit");
       bytes += value.byteLength;
       if (bytes > maxBytes) throw Error("Social proof response exceeded its byte limit");
       body += decoder.decode(value, { stream: true });

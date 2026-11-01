@@ -488,3 +488,15 @@ remain false. Historical genesis and synthetic full-tree/child-CLI tests are
 component evidence, not public-provider or Bitcoin Core differential evidence.
 See BITCOIN_MERKLE_OBSERVATION.md. No network, signing, broadcasts, financial
 activation, dependency or frozen Standard/release-gate changes are introduced.
+
+## Developer download inspection (P04/P23)
+
+A default-disabled local-file CLI now consumes actual project-data exports,
+checks bounded UTF-8 payload bytes/digest and typed project/factory/block/phase
+bindings, then emits a strict whitelist. Unknown analytics remain null; input
+prose is not emitted or followed. Historical inspection preserves the original
+API timestamp and cannot refresh trust or authorize execution. Actual exporter
+round-trip/adversarial/child-CLI tests are component evidence, not authenticated
+source, independent RPC, current canonicality, full API/dev-tool readiness or
+financial authority. Existing exporter and endpoints are unchanged. See
+PROJECT_DATA_EXPORT.md for bounds, usage and missing service/release gates.

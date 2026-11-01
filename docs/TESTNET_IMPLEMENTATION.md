@@ -577,3 +577,14 @@ actual child CLI tests are component evidence, not Bitcoin Core differential,
 public provider, issuance, custody or bridge proof. Full M05 and all release gates
 remain incomplete. See BITCOIN_TRANSACTION_INSPECTION.md. No financial authority,
 frozen Standard, root pins, real configuration or network actions change.
+
+## Offline Bitcoin CLI nonregular-input rejection
+
+The Runestone, transaction/prevout and Merkle CLIs now open read-only with
+nonblocking flags before existing descriptor regular-file checks. All three
+writerless-FIFO regressions failed original main by child-process timeout; Linux
+actual FIFO/symlink/directory/disabled cases now reject privately. Existing valid
+regular-file tests and all parsing/byte bounds/gates remain. This does not add a
+general filesystem deadline or platform-independent I/O guarantee, Bitcoin
+validation, public service or financial authority. See
+BITCOIN_TRANSACTION_INSPECTION.md. Frozen Standard/root pins are unchanged.

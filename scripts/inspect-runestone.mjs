@@ -1,10 +1,10 @@
-import { openSync, fstatSync, readSync, closeSync } from 'node:fs';
+import { openSync, fstatSync, readSync, closeSync, constants } from 'node:fs';
 import { inspectRunestoneScripts } from '../lib/bitcoin-runestone.ts';
 
 try {
   if (process.env.FORTUNE_RUNESTONE_DECODE_ENABLED !== 'true') throw Error('Disabled');
   if (process.argv.length !== 3) throw Error('Arguments');
-  const fd = openSync(process.argv[2], 'r'); let input;
+  const fd = openSync(process.argv[2], constants.O_RDONLY | constants.O_NONBLOCK); let input;
   try {
     if (!fstatSync(fd).isFile()) throw Error('Regular file required');
     const bytes = Buffer.alloc(196609); let size = 0;

@@ -1,11 +1,11 @@
-import { openSync, fstatSync, readSync, closeSync } from 'node:fs';
+import { openSync, fstatSync, readSync, closeSync, constants } from 'node:fs';
 import { inspectBitcoinTransaction } from '../lib/bitcoin-transaction.ts';
 import { inspectBitcoinPrevouts } from '../lib/bitcoin-prevout-accounting.ts';
 
 try {
   if (process.env.FORTUNE_BITCOIN_TRANSACTION_READ_ENABLED !== 'true') throw Error('Disabled');
   if (process.argv.length !== 3) throw Error('Arguments');
-  const fd = openSync(process.argv[2], 'r'); let input;
+  const fd = openSync(process.argv[2], constants.O_RDONLY | constants.O_NONBLOCK); let input;
   try {
     if (!fstatSync(fd).isFile()) throw Error('Regular file required');
     const bytes = Buffer.alloc(262145); let size = 0;

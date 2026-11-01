@@ -87,3 +87,16 @@ duplicate/extra parents, repeated inputs, overflow/negative fees and actual chil
 CLI tests cover the component. They are not public Bitcoin, Rune issuance,
 UTXO/custody/backing or full M05 readiness evidence. No signing, transaction
 construction, broadcasts, service, dependency or release-gate changes.
+
+## Nonregular local input preflight
+
+The transaction, Runestone-script and Merkle-observation CLIs open with read-only
+`O_NONBLOCK` flags before their existing descriptor-based regular-file checks.
+On the Linux runtime, a writerless FIFO (including a symlink to one) now reaches
+that check and rejects instead of hanging inside the open call. Byte/UTF-8/schema
+limits, feature gates, generic errors, parsing and false authority are unchanged.
+Normal regular-file and regular-file symlink behavior is preserved. This is not
+a general filesystem I/O deadline, privileged-host path-swap defense or proof
+that every filesystem/platform honors nonblocking flags. Node documents the flag
+as nonblocking when possible; Windows does not expose it. Linux FIFO tests are
+explicitly skipped on Windows. Existing regular-file CLI tests remain required.

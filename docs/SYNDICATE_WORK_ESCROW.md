@@ -593,3 +593,37 @@ before the preexisting expiry jump supplies two10-unit boundary jobs (0/10 and
 10/0), consumed through actual HTTP/ABI; original ten-job balances/counts and
 all rollback/retry/history checks remain. One zero-account fixture with two
 clients is not independent providers, public custody or audit evidence.
+
+
+## Direct whole-payment operator CLI
+
+`FORTUNE_WORK_PAYMENT_READ_ENABLED=true node --import ./scripts/register-ts.mjs
+scripts/inspect-work-payment.mjs /protected/payment-policy.json` calls the actual
+unchanged `inspectWorkPaymentReceipt` engine. The explicit policy is the existing
+WorkPaymentPolicy including transactionHash. This separate default-disabled CLI
+accepts only direct original-client zero-native approvePayment(id) receipts;
+result approvals, refunds, arbitration, batch and smart-wallet outer calls reject.
+The old job observer/CLI still leaves settlement amounts and transaction NULL.
+
+An existing regular file is opened nonblocking, read at most16KiB+1, decoded with
+strict UTF-8 and JSON, and literal bytes are checked again before/after RPC. This
+is not a general filesystem deadline or privileged path-swap defense. Configure
+FORTUNE_WORK_READ_RPC_URL and FORTUNE_WORK_SECONDARY_RPC_URL to two reviewed distinct
+HTTPS origins; no userinfo/fragment, redirects or retries; each transport has5sec
+timeout. The original20sec reader lifetime, confirmations, runtime/role/asset/job
+pins, full transaction/receipt/log/block binding and failure fences are unchanged.
+
+Output wraps the ORIGINAL observation with a SHA-256 checksum of policy bytes,
+not policy authentication or approval. currentAuthorization is NULL and execution
+and full readiness remain FALSE. Private generic errors emit no provider URL,
+policy path or raw exception. No signing, calldata generation, submission, writes,
+automatic retry, trust refresh, ledger, badge or service configuration. Stable
+receipt evidence IDs MUST deduplicate; repeated reads do not establish more funds.
+Historical height reads do not prove EIP1898/ABA canonicality/finality, provider
+independence, pre/post balances, current consent, legitimate funding, global
+solvency, identity, delivery, IP, legal validity, audit or full P19 readiness.
+
+Actual child CLI HTTP/ABI tests cover strict file/provider/preflight and failures.
+Compiled zero-account runtime checks match the CLI against the library's original
+whole-payment observation, preserve replay identity and reject a wrong amount.
+Two clients of ONE local fixture are not independent providers/public custody.

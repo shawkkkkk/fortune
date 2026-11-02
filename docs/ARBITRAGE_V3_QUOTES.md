@@ -111,3 +111,44 @@ live five-chain route, complete cost/profit settlement, readiness or audit.
 The reader and its CLI still have no wallet or execution authority. Public
 deployment, economic/legal/asset/privacy/governance, custody/funding, finality,
 operational/recovery and exact-source audit/release gates remain separate.
+
+## Combined two-network route observation
+
+`observeV3Arbitrage` in `lib/arbitrage-v3-route.ts` is an explicit library-only
+integration of the existing V3 reader and spread evaluator. It requires distinct
+supported testnets, at least 20 confirmations on each market and matching reviewed
+token/settlement identities **and decimals** before RPC. It copies both policies,
+validates all modeled amounts/cost fields and requires two complete distinct read
+clients. It does not add a CLI, HTTP endpoint, service, scheduler or live config.
+
+The actual reader obtains an exact-output buy and exact-input sell for the same
+raw token quantity concurrently. One shared real 20-second rejecting lifetime and
+monotonic safe-clock fences cover all six RPC methods, both readers and final
+chain/number/hash/timestamp header rechecks after both legs finish. Both original
+block-time quotes must still satisfy their individual freshness limits and the
+route age limit at the **same completion time**. A failure returns no partial
+route and fences follow-on reads on both clients; in-flight RPC is not canceled.
+The deadline relies on event-loop scheduling and does not bound synchronous
+preflight/host stalls or certify provider cancellation.
+
+The combined result preserves both original snapshots and feeds their actual
+quote values into the unchanged spread model, including adverse fills and all
+four modeled cost categories. `bridge-first`, inadequate supplied cash/inventory
+or insufficient modeled spread remain non-candidates. Neither a candidate nor
+quoted gas establishes realizable profit, executable settlement or spending
+permission. Supplied costs, cash and inventory are **operator assertions**, not
+verified balances, legitimate capital, reserved liabilities or full cost evidence.
+No symbol-based conversion or USD valuation is introduced. No percentage or
+buyback policy is selected; creator/holder/LP liabilities remain unavailable as
+strategy capital, and launch-token fees remain burn-only.
+
+One client per network is not independent-provider agreement. Reviewed identity
+mappings/code pins are not bridge backing, issuer/admin safety or asset approval;
+height-based header rechecks are not EIP1898/ABA protection, finality, synchronized
+cross-chain state or a price lock. `currentAuthorization` remains NULL and all
+cost/capital/inventory/provider/finality/realized-profit/route-execution/readiness
+flags remain false. No wallet, calldata, signing, swap, funding, durable accounting
+or recovery is added. Actual HTTP/ABI tests use two local synthetic servers,
+not public venues, independent providers, public custody or deployment evidence.
+Existing compiled Pancake evidence applies to the unchanged component reader,
+not to this new combined route; full M01/M07/M08 and audit/release gates remain.

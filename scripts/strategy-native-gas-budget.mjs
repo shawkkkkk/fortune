@@ -17,7 +17,7 @@ export function nativeGasPolicyDigest(input){return createHash('sha256').update(
 export class StrategyNativeGasBudget {
   #db;#policy;#clock;#readOnly;
   constructor(path, reviewedPolicy, clock=Date.now, {readOnly=false}={}){
-    if(typeof path!=='string'||!path||path===':memory:')throw Error('Durable budget file required');
+    if(typeof path!=='string'||!path||path===':memory:'||/^file:/i.test(path))throw Error('Durable budget file required');
     this.#policy=policy(reviewedPolicy);this.#clock=clock;this.#readOnly=readOnly;
     const digest=createHash('sha256').update(JSON.stringify(this.#policy)).digest('hex');
     this.#db=new DatabaseSync(path,{readOnly});

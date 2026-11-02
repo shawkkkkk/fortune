@@ -2,6 +2,16 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## Receipt-store literal disk paths (M01/M07/M08)
+
+The actual fill journal, receipt queue and schema2 native-gas book now reject
+SQLite URI strings before opening, including URI memory databases. Three actual
+child-process regressions fail old source and verify rejection/no file creation,
+while ordinary relative disk paths/reopen retain their existing behavior. No
+normalization, migration, reset, recovered history or filesystem durability proof
+is implied. Schemas, policies, holds, clocks, accounting and release gates remain
+unchanged. See RECEIPT_STORE_PATHS.md; full engine readiness remains unfinished.
+
 ## Durable reported strategy-profit accounting (M01/M07/M08)
 
 An explicitly enabled local library now persists operator-reported cycles through

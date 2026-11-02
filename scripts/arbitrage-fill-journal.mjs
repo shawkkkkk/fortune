@@ -7,7 +7,7 @@ export class ArbitrageFillJournal {
   #marketHash;
   #market;
   constructor(path, reviewedMarket, { readOnly = false } = {}) {
-    if (typeof path !== "string" || !path || path === ":memory:") throw new Error("Durable journal path required");
+    if (typeof path !== "string" || !path || path === ":memory:" || /^file:/i.test(path)) throw new Error("Durable journal path required");
     this.#marketHash = fillMarketHash(reviewedMarket);
     this.#market = structuredClone(reviewedMarket);
     this.#db = new DatabaseSync(path, { readOnly });

@@ -78,21 +78,65 @@ export class UpstashStore implements HolderStore {
 
   private async send(path: "/pipeline", commands: RedisCommand[]) {
     if (!commands.length) return [];
-    const response = await this.fetcher(this.url + path, {
-      method: "POST",
-      redirect: "error",
-      cache: "no-store",
-      signal: AbortSignal.timeout(10_000),
-      headers: { Authorization: `Bearer ${this.token}`, "Content-Type": "application/json" },
-      body: JSON.stringify(commands.map((command) => command.map(String))),
-    });
-    if (!response.ok) throw new Error(`Upstash request failed with HTTP ${response.status}.`);
-    const body = (await response.json()) as Array<{ result?: RedisValue; error?: string }>;
-    if (!Array.isArray(body) || body.length !== commands.length) throw new Error("Unexpected Upstash response.");
-    return body.map((row) => {
-      if (row.error) throw new Error("Upstash command failed: " + row.error);
-      return row.result ?? null;
-    });
+    const start = Date.now();
+    let last = start, ended = false, timer: ReturnType<typeof setTimeout> | undefined;
+    let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
+    const controller = new AbortController();
+    const clock = () => {
+      const now = Date.now();
+      if (ended || !Number.isSafeInteger(start) || start < 0 || !Number.isSafeInteger(now)
+        || now < last || now - start > 10_000) throw new Error("Upstash response expired or clock moved backwards.");
+      last = now;
+    };
+    try {
+      clock();
+      return await Promise.race([(async () => {
+        const response = await this.fetcher(this.url + path, {
+          method: "POST", redirect: "error", cache: "no-store", signal: controller.signal,
+          headers: { Authorization: `Bearer ${this.token}`, "Content-Type": "application/json" },
+          body: JSON.stringify(commands.map((command) => command.map(String))),
+        });
+        clock();
+        if (!response.ok) throw new Error(`Upstash request failed with HTTP ${response.status}.`);
+        const declared = response.headers.get("content-length");
+        if (declared !== null && (!/^[0-9]{1,20}$/.test(declared) || BigInt(declared) > 8_388_608n))
+          throw new Error("Upstash response exceeds bounds.");
+        if (!response.body) throw new Error("Unexpected Upstash response.");
+        reader = response.body.getReader();
+        const chunks: Uint8Array[] = [];
+        let size = 0;
+        while (true) {
+          clock();
+          const chunk = await reader.read();
+          clock();
+          if (chunk.done) break;
+          if (!(chunk.value instanceof Uint8Array) || chunks.length >= 4096
+            || size + chunk.value.byteLength > 8_388_608) throw new Error("Upstash response exceeds bounds.");
+          size += chunk.value.byteLength;
+          chunks.push(chunk.value);
+        }
+        clock();
+        const bytes = new Uint8Array(size);
+        let offset = 0;
+        for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
+        const body = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes)) as Array<{ result?: RedisValue; error?: string }>;
+        clock();
+        if (!Array.isArray(body) || body.length !== commands.length) throw new Error("Unexpected Upstash response.");
+        const results = body.map((row) => {
+          if (row.error) throw new Error("Upstash command failed: " + row.error);
+          return row.result ?? null;
+        });
+        clock();
+        return results;
+      })(), new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error("Upstash response timed out.")), 10_000);
+      })]);
+    } finally {
+      ended = true;
+      clearTimeout(timer);
+      try { controller.abort(); } catch {}
+      try { if (reader) void reader.cancel().catch(() => {}); } catch {}
+    }
   }
 
   pipeline(commands: RedisCommand[]) {

@@ -2,6 +2,17 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## Holder-index Redis REST response lifetime
+
+The actual UpstashStore now rejects hung fetch/body reads at a real10-second
+per-call lifetime, with monotonic safe-clock fences and bounded8MiB/4096-chunk
+strictUTF8 JSON response reading. Two old abort-only hang regressions failed old
+source. Existing index/storage commands, Lua scripts, leases, return values and
+authentication remain unchanged; no automatic retry/configuration is added.
+Timeouts leave any submitted write outcome uncertain, not rolled back. See
+HOLDER_INDEX.md for exact limits and reconciliation boundaries. No holder-index,
+service, custody, provider/finality or full P09 readiness is inferred.
+
 ## Syndicate direct whole-payment CLI integration
 
 Default-disabled inspect-work-payment.mjs calls the unchanged pinned two-client

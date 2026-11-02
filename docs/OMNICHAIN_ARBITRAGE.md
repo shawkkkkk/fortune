@@ -16,6 +16,14 @@ These pure helpers do not verify chain receipts or persist a ledger. The future 
 
 ## Remaining implementation and release gates
 
+An additive, default-disabled [reported-profit book](REPORTED_STRATEGY_PROFIT_BOOK.md)
+now persists operator-supplied cycles through the unchanged reducer in one
+SQLite transaction with expected-head fencing and per-book receipt deduplication.
+This supplies local durable accounting, not authenticated profit settlement:
+costs/inventory/receipts remain assertions and all execution/readiness flags stay
+false. It does not connect or atomically commit the existing journal/gas/queue
+stores. No rate, signer, service, funding or release policy is enabled.
+
 - Verified token/pool identities and executable, block-pinned venue quotes on each supported chain; trustworthy normalization into the accounting asset.
 - Dedicated strategy capital and inventory, isolated from launch reserves, creator fees and holder liabilities. Launch-token-side fees remain permanent burns only.
 - Enforced contract/target allowlists, trade/exposure budgets, slippage/minimum outputs, revocation, pause and governance controls. An AI prompt is not a spending limit.

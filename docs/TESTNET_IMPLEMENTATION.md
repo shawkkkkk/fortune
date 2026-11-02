@@ -2,6 +2,17 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## Canonical realized-profit receipt identities (M01/M07/M08)
+
+The actual pure profit reducer rejects leading-zero log-index aliases in new
+cycles and rejects noncanonical or duplicate stored receipt history without
+rewriting it. Two regressions failed old source. Original loss carry, full-cost
+subtraction, policy-bound allocation, totals and canonical receipt format remain.
+This is accounting replay hardening, not authenticated settlement, durable
+accounting, legitimate capital, buyback execution or full engine readiness. No
+Standard/root pins, economics, signer/configuration or release gates change.
+See OMNICHAIN_ARBITRAGE.md for legacy-history and trust boundaries.
+
 ## Coherent all-entry Syndicate result-batch observation (P19)
 
 An explicit library API now requires one fully validated policy per call entry,

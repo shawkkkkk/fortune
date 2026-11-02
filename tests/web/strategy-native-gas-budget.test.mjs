@@ -69,3 +69,44 @@ test('stale and future branded evidence cannot charge; full retained history can
  assert.equal(b.status().retainedEntries,10000);assert.equal(b.status().healthy,false);assert.throws(()=>b.reserve(h(100000),'1'),/limit/);
  }finally{Date.now=original;b?.close();f.clean();}
 });
+
+test('gas charge rejects unsafe or expiring clocks without releasing its durable hold',async()=>{
+ const realNow=Date.now;
+ try{
+  const v=await fill();
+  for(const ticks of [[NaN],[-1],[Number.MAX_SAFE_INTEGER+1],[v.observedAtMs,v.observedAtMs+60001],[v.observedAtMs+1,v.observedAtMs],[v.observedAtMs,v.observedAtMs,v.observedAtMs+60001]]){
+   const f=setup();let b;
+   try{b=new Book(f.path,policy(),f.clock);b.reserve(TX,'100000');const hold=b.beginRecheck(TX,market());const before=b.status();let i=0;
+    Date.now=()=>ticks[Math.min(i++,ticks.length-1)];
+    try{assert.throws(()=>b.charge(v,hold));}finally{Date.now=realNow;}
+    assert.deepEqual(b.status(),before);assert.equal(b.status().pendingRechecks,1);assert.equal(b.status().reservedWei,'100000');
+    b.close();b=new Book(f.path,policy(),f.clock);assert.deepEqual(b.status(),before);
+   }finally{Date.now=realNow;b?.close();f.clean();}
+  }
+ }finally{Date.now=realNow;}
+});
+
+test('gas replay expiry rolls back fence deletion and preserves original charge evidence',async()=>{
+ const f=setup(),realNow=Date.now;let b;
+ try{b=new Book(f.path,policy(),f.clock);b.reserve(TX,'100000');b.charge(await fill());const hold=b.beginRecheck(TX,market());
+  const db=new DatabaseSync(f.path,{readOnly:true});const before=db.prepare('SELECT * FROM gas_entries').all();db.close();
+  const status=b.status(),v=await fill();let i=0;
+  Date.now=()=>v.observedAtMs+(++i>=3?60001:0);
+  try{assert.throws(()=>b.charge(v,hold));}finally{Date.now=realNow;}
+  assert.deepEqual(b.status(),status);b.close();b=new Book(f.path,policy(),f.clock);
+  const check=new DatabaseSync(f.path,{readOnly:true});assert.deepEqual(check.prepare('SELECT * FROM gas_entries').all(),before);
+  assert.equal(check.prepare('SELECT fence FROM gas_recheck_holds WHERE tx=?').get(TX).fence,hold.fence);check.close();
+ }finally{Date.now=realNow;b?.close();f.clean();}
+});
+
+test('actual SQLite lock wait cannot admit an expired gas charge',{timeout:20000},async()=>{
+ const f=setup(),realNow=Date.now;let b,child;
+ try{b=new Book(f.path,policy(),f.clock);b.reserve(TX,'100000');const hold=b.beginRecheck(TX,market()),v=await fill(),before=b.status();
+  child=spawn(process.execPath,['--input-type=module','-e',`import {DatabaseSync} from 'node:sqlite';const db=new DatabaseSync(process.argv[1]);db.exec('BEGIN IMMEDIATE');process.send('locked');setTimeout(()=>{db.exec('COMMIT');db.close();process.disconnect();},1000);`,f.path],{stdio:['ignore','ignore','pipe','ipc']});
+  const exited=once(child,'exit'),[message]=await once(child,'message');assert.equal(message,'locked');const start=realNow(),offset=v.observedAtMs+59500-start;
+  Date.now=()=>realNow()+offset;
+  try{assert.throws(()=>b.charge(v,hold));}finally{Date.now=realNow;}
+  assert.ok(realNow()-start>=500,'real write lock spans freshness boundary');assert.deepEqual(b.status(),before);assert.equal((await exited)[0],0);
+  b.close();b=new Book(f.path,policy(),f.clock);assert.deepEqual(b.status(),before);
+ }finally{Date.now=realNow;child?.kill();b?.close();f.clean();}
+});

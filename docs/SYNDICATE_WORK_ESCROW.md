@@ -696,3 +696,43 @@ runtime consumes the aggregate observer, matches both original payment IDs,
 checks a stable replay digest and rejects a wrong later amount while preserving
 old settlement/rollback/retry assertions. ONE zero-account local VM is not a
 public custody service, independent provider, audit or full P19/mainnet approval.
+
+## Atomic worker result submissions
+
+The isolated chain97 contract adds `submitResultsMany`, accepting 1–16 strictly
+increasing nonzero job IDs with an explicit `expectedRevision` and nonzero
+`resultHash` for each job. The caller must be the named worker on **every** job;
+clients may differ. Every job must be Accepted and at or before its own stored
+`deliverBy`, with unchanged pinned asset runtime, exact current revision below 32
+and a hash different from that job's latest hash. All entries are checked before
+any history write. Only then does each job append its next revision and emit the
+existing `ResultSubmitted` event in call order. Any failure rolls back the entire
+transaction, including events; there is no partial-success result.
+
+Submission does not transfer tokens, change liabilities, recipients, job terms,
+funding IDs or settlement state, and does not authorize payment. A worker batch
+across different clients cannot approve payments for those clients. New revisions
+invalidate older **revision-bound** approvals/disputes; legacy unbound
+`approvePayment` remains an explicit original-client option. All existing single
+submission, acceptance, decline, waiver, dispute, batch approval and arbitration
+paths are preserved. Chain97/open/nonReentrant guards and per-job 32-revision caps
+remain; no deadline extension, admin bypass, new fees, recovery or automatic action
+is added. A paused or uncertain attempt is not permission to resubmit blindly:
+inspect receipts/history first. Successful replay with old expected revisions
+rejects; an unsuccessful attempt does not consume revisions. Explicit retry still
+requires current pause, deadline, role, runtime and revision checks to pass.
+
+Commitments are public permanent hashes, not verified work content, authorship,
+identity, delivery, IP ownership/license, fairness or a legal agreement. Review
+privacy and low-entropy disclosure before submitting real commitments. This source
+change produces new bytecode and needs fresh deployment/audit/governance evidence;
+no existing deployment or approval is upgraded. The default-paused isolated engine
+and all funding/custody/asset/legal/signature/provider/finality/operations/recovery
+release gates remain. Frozen Standard/root dependencies/economics are unchanged.
+
+The compiled local rehearsal preserves the original ten-job escrow and adds a
+separate two-job/two-asset escrow for atomic worker events/history, later invalid
+revision rejection, replay rejection, explicit retry after pause and exact latest
+client-approval payment receipts. Local VM impersonation and synthetic assets are
+not public custody, legitimate capital, independent parties/providers or full P19
+readiness. No real profile, signer, service, public transaction or config is enabled.

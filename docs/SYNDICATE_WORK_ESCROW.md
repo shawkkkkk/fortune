@@ -499,3 +499,49 @@ Stable ID/wrong caller/direct-vs-expired route checks are included. Two clients
 of ONE zero-account local fixture are not public custody/provider or audit proof.
 Worker decline/waiver, arbitrated splits, batches and smart-wallet outer calls
 remain unsupported by these receipt APIs and require separate integration.
+
+
+## Worker decline and revision-bound waiver receipt observer
+
+inspectWorkWorkerRefundReceipt is a separate explicit read-only library API.
+WorkWorkerRefundPolicy is the strict WorkPaymentPolicy plus refundKind decline,
+or refundKind waiver with canonical decimal expectedRevision0–32. Decline must
+not supply expectedRevision; unknown fields and malformed bindings fail before
+RPC. The named worker must be direct transaction/receipt sender with zero native
+value and exact decline(jobId) or waivePayment(jobId, expectedRevision) calldata.
+The receipt has exactly three adjacent canonical logs: whole-principal asset
+Transfer(escrow, original client, principal); escrow JobSettled(id,0,principal,
+worker); then JobDeclined(id,worker) with empty data or PaymentWaived(id,worker,
+expectedRevision). Third-event topic/data arity, emitter, ordering and all original
+receipt/transaction/block/index/header bindings remain exact. At the receipt
+height, stored latestResultRevision must equal zero for decline or the selected
+waiver revision. Waiver revision0 remains supported; revision is not a result
+hash/content/delivery/IP verdict, nor a new deadline or automatic settlement.
+
+The shared engine preserves pinned runtimes, roles, asset/cap/immutable job terms,
+two-client agreement,20 confirmations/head gap10, rereads and REAL20sec monotonic
+safe-clock/failure fences/finally every outcome. In-flight requests may continue
+but late follow-on reads are fenced. Existing approvePayment/approveResult/client
+cancel/third-party expiry APIs and their output remain unchanged and reject worker
+refund routes. Output includes workerRefund kind and waiver revision (NULL for
+decline), directWorkerRefundObserved true, zero workerPaid and whole clientRefund.
+It omits payment/cancellation-observed labels. Stable chain/escrow/tx/settlement-log
+IDs MUST deduplicate: no consumed ledger, totals, badge or reinvestment claim.
+
+Historical-height observations have no freshness-age bound and future headers
+reject. Trusted host/policy/clock/RPC height reads are not independent provider,
+EIP1898/ABA/canonicality/finality proof, pre/post balances, legitimate capital,
+current consent, global solvency, identity, delivery, IP/license, fairness or legal
+approval. currentAuthorization remains NULL and all provider/finality/capital/
+identity/delivery/global-solvency/execution/full-readiness flags are false. No
+contract change, signer, CLI/HTTP/MCP/service/real config or financial action is
+introduced; old storage observer/CLI payment fields remain NULL. Arbitrated splits,
+batches and smart-wallet outer calls stay unsupported by these APIs.
+
+The compiled ten-job fixture consumes actual job six15-unit waiver at revision1
+and job seven25-unit decline receipts, stable rereads, stale waiver revision and
+route-separation failures. Its preexisting101sec expiry jump can also put later
+worker receipts ahead of real host time: a separate at-most60sec safe-monotonic
+REAL wall wait before these readers aligns with the fixed latest receipt header.
+No host clock/header override, reader deadline or workflow budget is changed.
+One local zero-account fixture with two clients is component evidence only.

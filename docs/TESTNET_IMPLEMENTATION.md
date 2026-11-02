@@ -2,6 +2,22 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## Syndicate worker decline and waiver receipt integration
+
+A separate read-only worker-refund API binds exact direct named-worker decline
+or revision-bound waivePayment calldata to whole-principal Transfer back to the
+original client, adjacent JobSettled and canonical JobDeclined/PaymentWaived.
+Receipt-height latestResultRevision must be zero for decline or the explicitly
+expected0–32 waiver revision. Other receipt APIs retain their exact routes/output;
+old job observer/CLI payment fields remain NULL. Actual compiled ten-job worker
+refund receipts and rejection paths are integrated. Test-only bounded real-clock
+alignment precedes the unchanged20sec reader; no contract/workflow limits change.
+No signer/service/config/root pin/economics/authority/release gate changes.
+Matching receipts are not independent providers, capital origin, current consent,
+identity, delivery, IP, fairness, legal or full P19 approval. Arbitrated splits,
+batches and smart-wallet outer calls still require separate receipt integrations.
+See SYNDICATE_WORK_ESCROW.md.
+
 ## Syndicate expired-job third-party refund receipts
 
 A separate explicit read-only API verifies a direct caller other than the original

@@ -72,6 +72,11 @@ export async function inspectWorkArbitrationReceipt(clients: readonly [PublicCli
 export type WorkBatchResultPaymentPolicy = WorkPaymentPolicy & { approvals: readonly {id:string;revision:string;resultHash:Hex}[] };
 /** One selected job in an exactly bound direct batch; other jobs are NOT validated. */
 export async function inspectWorkBatchResultPaymentReceipt(clients: readonly [PublicClient,PublicClient], input: WorkBatchResultPaymentPolicy) {
+  const {policy,result}=batchSelection(input);
+  return inspectPayment(clients,policy,result);
+}
+
+function batchSelection(input: WorkBatchResultPaymentPolicy) {
   const q=structuredClone(input);
   if(!q || !Array.isArray(q.approvals) || q.approvals.length<1 || q.approvals.length>16)throw Error("Invalid result batch");
   let previous=0n;
@@ -82,17 +87,71 @@ export async function inspectWorkBatchResultPaymentReceipt(clients: readonly [Pu
   }
   const index=q.approvals.findIndex(a=>a.id===q.jobId);if(index<0)throw Error("Selected job absent from batch");
   const {approvals,...policy}=q, selected=approvals[index];
-  return inspectPayment(clients,policy,{revision:selected.revision,resultHash:selected.resultHash,batch:{approvals,index}});
+  validateWorkPaymentPolicy(policy);
+  return {policy,result:{revision:selected.revision,resultHash:selected.resultHash,batch:{approvals,index}}};
 }
 
-async function inspectPayment(clients: readonly [PublicClient,PublicClient], input: WorkPaymentPolicy, result?: {revision:string;resultHash:Hex;batch?:{approvals:readonly {id:string;revision:string;resultHash:Hex}[];index:number}}, cancellation=false, expiryCaller?: Hex, workerRefund?: {kind:"decline"|"waiver";revision:string}, arbitrationWorker?: string) {
-  const p = structuredClone(input);
+function validateWorkPaymentPolicy(p: WorkPaymentPolicy) {
   if (!p || Object.keys(p).sort().join() !== "amount,arbitrator,asset,assetCodeHash,chainId,client,escrow,escrowCodeHash,governor,guardian,jobId,maxPerJob,termsHash,transactionHash,worker"
     || p.chainId !== 97 || ![p.escrow,p.asset,p.governor,p.guardian,p.arbitrator,p.client,p.worker].every(addr)
     || new Set([p.escrow,p.asset,p.governor,p.guardian,p.arbitrator]).size !== 5 || p.client===p.worker
     || [p.escrow,p.arbitrator].includes(p.client) || [p.escrow,p.arbitrator].includes(p.worker)
     || ![p.escrowCodeHash,p.assetCodeHash,p.termsHash,p.transactionHash].every(hash) || !positive(p.jobId,256)
     || !positive(p.amount,128) || !positive(p.maxPerJob,128) || BigInt(p.amount)>BigInt(p.maxPerJob)) throw Error("Invalid work payment policy");
+}
+
+/** All call entries, one coherent receipt, no ledger or execution authority. */
+export async function inspectAllWorkBatchResultPayments(clients: readonly [PublicClient,PublicClient], inputs: readonly WorkBatchResultPaymentPolicy[]) {
+  if(!Array.isArray(inputs)||inputs.length<1||inputs.length>16)throw Error("Invalid whole batch policies");
+  const selections=inputs.map(input=>batchSelection(input));
+  const first=selections[0],common=["chainId","escrow","escrowCodeHash","governor","guardian","arbitrator","client","transactionHash"] as const;
+  const binding=(s:typeof first)=>JSON.stringify([common.map(k=>s.policy[k]),s.result.batch.approvals.map(a=>[a.id,a.revision,a.resultHash])]);
+  const expected=binding(first),assets=new Map<string,string>();
+  for(const [i,s]of selections.entries()){
+    if(selections.length!==s.result.batch.approvals.length||s.result.batch.index!==i||binding(s)!==expected)throw Error("Incomplete or differing batch coverage");
+    const assetBinding=JSON.stringify([s.policy.assetCodeHash,s.policy.maxPerJob]);
+    if(assets.has(s.policy.asset)&&assets.get(s.policy.asset)!==assetBinding)throw Error("Differing batch asset policy");
+    assets.set(s.policy.asset,assetBinding);
+  }
+  if(!Array.isArray(clients)||clients.length!==2||clients[0]===clients[1])throw Error("Two distinct read clients required");
+  const start=Date.now();let last=start,ended=false,timer:ReturnType<typeof setTimeout>|undefined,receiptDigest:Hex|undefined;
+  const clock=()=>{const now=Date.now();if(ended||!Number.isSafeInteger(start)||start<0||!Number.isSafeInteger(now)||now<last||now-start>20000)throw Error("Batch observation ended, expired or clock moved backwards");last=now;return now;};
+  type Receipt=Awaited<ReturnType<PublicClient["getTransactionReceipt"]>>;
+  const fingerprint=(r:Receipt)=>{
+    if(!r||!Array.isArray(r.logs)||r.logs.length!==3*selections.length||!uint(r.blockNumber,64)||!Number.isSafeInteger(r.transactionIndex)||r.transactionIndex<0)throw Error("Invalid batch receipt framing");
+    const hex=(v:unknown)=>{if(typeof v!=="string")throw Error("Invalid receipt field");return v.toLowerCase();};
+    const logs=r.logs.map(l=>{
+      if(!Array.isArray(l.topics)||l.topics.length!==3||l.topics.some(t=>typeof t!=="string"||!/^0x[0-9a-fA-F]{64}$/.test(t))
+        ||typeof l.data!=="string"||!/^0x(?:[0-9a-fA-F]{64}){1,2}$/.test(l.data)||!uint(l.blockNumber,64))throw Error("Invalid batch log framing");
+      return [hex(l.address),hex(l.transactionHash),hex(l.blockHash),l.blockNumber.toString(),l.transactionIndex,l.logIndex,l.removed,l.topics.map(hex),hex(l.data)];
+    });
+    return keccak256(new TextEncoder().encode(JSON.stringify([hex(r.transactionHash),r.status,hex(r.blockHash),r.blockNumber.toString(),hex(r.from),hex(r.to),r.transactionIndex,logs])));
+  };
+  const methods=new Set(["getChainId","getBlockNumber","getBlock","getTransactionReceipt","getTransaction","getCode","readContract"]);
+  const guarded=clients.map(client=>new Proxy(client,{get(target,key){const value=Reflect.get(target,key,target);
+    if(typeof key!=="string"||!methods.has(key)||typeof value!=="function")return value;
+    return async(...args:unknown[])=>{clock();const valueOut=await value.apply(target,args);clock();
+      if(key==="getTransactionReceipt"){const digest=fingerprint(valueOut);if(receiptDigest!==undefined&&receiptDigest!==digest)throw Error("Batch receipt observations differ");receiptDigest=digest;}
+      return valueOut;
+    };
+  }})) as [PublicClient,PublicClient];
+  try{
+    clock();const deadline=new Promise<never>((_,reject)=>{timer=setTimeout(()=>reject(Error("Batch observation timed out")),20000);});
+    return await Promise.race([(async()=>{
+      const payments=await Promise.all(selections.map(s=>inspectPayment(guarded,s.policy,s.result)));clock();
+      if(!receiptDigest||new Set(payments.map(p=>p.evidenceId)).size!==payments.length
+        ||payments.some(p=>p.blockNumber!==payments[0].blockNumber||p.blockHash!==payments[0].blockHash||p.blockTimestamp!==payments[0].blockTimestamp))throw Error("Batch snapshots differ");
+      return {chainId:97,escrow:first.policy.escrow,transactionHash:first.policy.transactionHash,payments,receiptConsistencyDigest:receiptDigest,
+        allCallEntriesObserved:true,observedAtMs:clock(),source:"isolated-all-job-work-result-batch-rpc-observation",currentAuthorization:null,
+        independentProvidersVerified:false,finalityVerified:false,capitalOriginVerified:false,partyIdentityVerified:false,workDeliveryVerified:false,
+        globalSolvencyVerified:false,executionAuthorized:false,fullSyndicateReadiness:false};
+    })(),deadline]);
+  }finally{ended=true;clearTimeout(timer);}
+}
+
+async function inspectPayment(clients: readonly [PublicClient,PublicClient], input: WorkPaymentPolicy, result?: {revision:string;resultHash:Hex;batch?:{approvals:readonly {id:string;revision:string;resultHash:Hex}[];index:number}}, cancellation=false, expiryCaller?: Hex, workerRefund?: {kind:"decline"|"waiver";revision:string}, arbitrationWorker?: string) {
+  const p = structuredClone(input);
+  validateWorkPaymentPolicy(p);
   if (!Array.isArray(clients) || clients.length!==2 || clients[0]===clients[1]) throw Error("Two distinct read clients required");
   const arbitration=arbitrationWorker===undefined?undefined:{worker:BigInt(arbitrationWorker),refund:BigInt(p.amount)-BigInt(arbitrationWorker)};
   if(arbitration && arbitration.refund<0n)throw Error("Arbitrated amount exceeds principal");

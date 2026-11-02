@@ -75,3 +75,39 @@ follow-on RPC; separate tests preserve receivers and reject unsafe clocks before
 RPC. Existing buy/sell/provenance/spread/invalid-policy tests remain. Synthetic
 local HTTP/ABI fixtures are not independent providers, live venue routes,
 public execution, finality, profit, full M01/M07/M08 readiness or audit evidence.
+
+## Actual local Pancake quote-to-swap integration
+
+The required `strategy-vault-runtime.mjs` rehearsal now calls the unchanged
+`readV3MarketQuote` against Pancake's actual BSC Testnet QuoterV2 and factory on
+a zero-generated-account Anvil fork. The November 2 official address-table
+recheck matches Fortune's existing QuoterV2 address. Locally compiled synthetic
+plain assets and a newly funded real Pancake V3 pool isolate this compatibility
+drill from public balances. Fixture runtime hashes/identity labels are expressly
+not independent approval pins, asset equivalence or legitimate-capital evidence.
+
+The reader uses its real host clock, twenty-block confirmation policy, original
+sixty-second block-age ceiling and unchanged twenty-second lifetime. The fixture
+waits at most sixty real seconds for a locally mined snapshot to stop being
+future-dated; it never replaces clock/header values or widens a reader limit.
+Both quote directions retain the exact block/hash/time and false execution
+authority. Wrong Quoter runtime and token precision reject against actual RPC.
+Successful and rejected observations leave the local head, pool slot, governor
+balances and pending nonce unchanged.
+
+Only the test harness then uses the already impersonated local governor to
+approve exact synthetic amounts and call the real router: a sell's exact input
+and settlement output match the quote; a buy's exact token output and settlement
+input match its quote. Each direction starts from the same snapshotted pool
+state. All drill state is reverted before the existing bounded-vault swaps,
+receipt queue, gas reconciliation/replay and rollback-quarantine assertions.
+The report adds `v3QuoteVerification`; old assertions remain required. Engine CI
+also follows quote-reader/test changes; commands, deadlines and failure gates
+are preserved.
+
+This is actual venue-bytecode/HTTP/ABI local-fork compatibility and transfer
+evidence, not a public transaction, independent provider, constrained signer,
+live five-chain route, complete cost/profit settlement, readiness or audit.
+The reader and its CLI still have no wallet or execution authority. Public
+deployment, economic/legal/asset/privacy/governance, custody/funding, finality,
+operational/recovery and exact-source audit/release gates remain separate.

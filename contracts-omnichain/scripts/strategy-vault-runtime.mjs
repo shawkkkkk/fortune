@@ -17,10 +17,14 @@ import { ArbitrageFillJournal } from "../../scripts/arbitrage-fill-journal.mjs";
 import { ReceiptObservationQueue, observeNextReceipt } from "../../scripts/arbitrage-observer-queue.mjs";
 import { StrategyNativeGasBudget } from "../../scripts/strategy-native-gas-budget.mjs";
 import { reconcileBudgetedReceipt, observeNextBudgetedReceipt } from "../../scripts/reconcile-budgeted-receipt.mjs";
+import { readV3MarketQuote } from "../../lib/arbitrage-v3-quotes.ts";
 
 const FACTORY = "0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865";
 const ROUTER = "0x1b81D678ffb9C0263b24A97847620C99d213eB14";
 const POSITIONS = "0x427bF5b37357632377eCbEC9de3626C71A5396c1";
+// Official BSC Testnet QuoterV2, also used by Fortune's existing market reader:
+// https://developer.pancakeswap.finance/contracts/v3/addresses
+const QUOTER = "0xbC203d7f83677c7ed3F7acEc959963E7F4ECC5C2";
 const GOV = "0x0000000000000000000000000000000000001111";
 const GUARDIAN = "0x0000000000000000000000000000000000002222";
 const TREASURY = "0x0000000000000000000000000000000000003333";
@@ -124,6 +128,67 @@ try {
   await write(GOV, vault, vaultArtifact.abi, "setOperator", [AGENT]);
   await write(GOV, vault, vaultArtifact.abi, "setPricingFloor", [Q96 * 99n / 100n, Q96 * 99n / 100n, (await rpc.getBlock()).timestamp + 3600n]);
   await write(GOV, vault, vaultArtifact.abi, "unpause");
+  stage = "actual V3 reader and reversible local router execution";
+  const beforeQuoteDrill = await rpc.request({ method: "evm_snapshot" });
+  await rpc.request({ method: "anvil_mine", params: ["0x14"] });
+  // Local mining can advance VM time. Wait for real time, never replace the reader's
+  // clock, block headers, 20-second lifetime or freshness/confirmation policy.
+  const quoteHead = await rpc.getBlockNumber({ cacheTime: 0 });
+  const quoteBlock = await rpc.getBlock({ blockNumber: quoteHead - 20n });
+  const alignmentDeadline = Date.now() + 60_000;
+  while (Number(quoteBlock.timestamp) * 1000 > Date.now()) {
+    assert.ok(Date.now() < alignmentDeadline, "local quote block must become historical within 60 seconds");
+    await new Promise(r => setTimeout(r, 100));
+  }
+  // These hashes and identities are fixture inputs, not independently reviewed
+  // production pins, bridge identity/backing or legitimate-capital evidence.
+  const quoteMarket = { chainId: 97, factory: fp, quoter: await pin(QUOTER),
+    token: { ...ap, decimals: 18, identity: keccak256(toHex("local-synthetic-a")), profile: "plain-erc20" },
+    settlement: { ...bp, decimals: 18, identity: keccak256(toHex("local-synthetic-b")), profile: "plain-erc20" },
+    fee: 500, confirmations: 20, maxBlockAgeMs: 60_000 };
+  const poolStateAbi = parseAbi(["function slot0() view returns(uint160,int24,uint16,uint16,uint16,uint32,bool)"]);
+  const unchangedBefore = { head: await rpc.getBlockNumber({ cacheTime: 0 }),
+    state: await read(pool, poolStateAbi, "slot0"),
+    a: await read(a, asset.abi, "balanceOf", [GOV]), b: await read(b, asset.abi, "balanceOf", [GOV]),
+    nonce: await rpc.getTransactionCount({ address: GOV, blockTag: "pending" }) };
+  const sellQuote = await readV3MarketQuote(rpc, quoteMarket, "sell", 10n * E18);
+  const buyQuote = await readV3MarketQuote(rpc, quoteMarket, "buy", 10n * E18);
+  for (const quote of [sellQuote, buyQuote]) {
+    assert.equal(quote.blockNumber, quoteBlock.number); assert.equal(quote.blockHash, quoteBlock.hash);
+    assert.equal(quote.quote.quotedAtMs, Number(quoteBlock.timestamp) * 1000);
+    assert.equal(quote.pool.toLowerCase(), pool.toLowerCase()); assert.equal(quote.executionAuthorized, false);
+  }
+  await assert.rejects(readV3MarketQuote(rpc, { ...quoteMarket, quoter: { address: QUOTER, codeHash: ap.codeHash } }, "sell", 10n * E18));
+  await assert.rejects(readV3MarketQuote(rpc, { ...quoteMarket, token: { ...quoteMarket.token, decimals: 6 } }, "buy", 10n * E18));
+  assert.deepEqual({ head: await rpc.getBlockNumber({ cacheTime: 0 }), state: await read(pool, poolStateAbi, "slot0"),
+    a: await read(a, asset.abi, "balanceOf", [GOV]), b: await read(b, asset.abi, "balanceOf", [GOV]),
+    nonce: await rpc.getTransactionCount({ address: GOV, blockTag: "pending" }) }, unchangedBefore,
+  "successful and rejected quotes use eth_call without changing local state");
+  const routerAbi = parseAbi([
+    "function exactInputSingle((address tokenIn,address tokenOut,uint24 fee,address recipient,uint256 deadline,uint256 amountIn,uint256 amountOutMinimum,uint160 sqrtPriceLimitX96) params) payable returns(uint256)",
+    "function exactOutputSingle((address tokenIn,address tokenOut,uint24 fee,address recipient,uint256 deadline,uint256 amountOut,uint256 amountInMaximum,uint160 sqrtPriceLimitX96) params) payable returns(uint256)",
+  ]);
+  const beforeSell = await rpc.request({ method: "evm_snapshot" });
+  await write(GOV, a, asset.abi, "approve", [ROUTER, 10n * E18]);
+  await write(GOV, ROUTER, routerAbi, "exactInputSingle", [{ tokenIn: a, tokenOut: b, fee: 500, recipient: GOV,
+    deadline: (await rpc.getBlock()).timestamp + 60n, amountIn: 10n * E18,
+    amountOutMinimum: sellQuote.quote.quoteAmount, sqrtPriceLimitX96: 0n }]);
+  assert.equal(unchangedBefore.a - await read(a, asset.abi, "balanceOf", [GOV]), 10n * E18);
+  assert.equal(await read(b, asset.abi, "balanceOf", [GOV]) - unchangedBefore.b, sellQuote.quote.quoteAmount);
+  assert.equal(await rpc.request({ method: "evm_revert", params: [beforeSell] }), true);
+  await write(GOV, b, asset.abi, "approve", [ROUTER, buyQuote.quote.quoteAmount]);
+  await write(GOV, ROUTER, routerAbi, "exactOutputSingle", [{ tokenIn: b, tokenOut: a, fee: 500, recipient: GOV,
+    deadline: (await rpc.getBlock()).timestamp + 60n, amountOut: 10n * E18,
+    amountInMaximum: buyQuote.quote.quoteAmount, sqrtPriceLimitX96: 0n }]);
+  assert.equal(await read(a, asset.abi, "balanceOf", [GOV]) - unchangedBefore.a, 10n * E18);
+  assert.equal(unchangedBefore.b - await read(b, asset.abi, "balanceOf", [GOV]), buyQuote.quote.quoteAmount);
+  assert.equal(await rpc.request({ method: "evm_revert", params: [beforeQuoteDrill] }), true);
+  const v3QuoteVerification = { actualReaderAndQuoter: true, confirmations: 20, snapshotBlock: quoteBlock.number.toString(),
+    snapshotHash: quoteBlock.hash, tokenUnits: (10n * E18).toString(),
+    sellSettlementUnits: sellQuote.quote.quoteAmount.toString(), buySettlementUnits: buyQuote.quote.quoteAmount.toString(),
+    sellExactInputMatchesLocalTransfer: true, buyExactOutputMatchesLocalTransfer: true,
+    readOnlyStateUnchanged: true, wrongRuntimeAndPrecisionRejected: true, drillStateReverted: true,
+    syntheticAssets: true, independentlyReviewedPins: false, executionAuthorized: false };
   const order = async (tokenIn, amountIn, minAmountOut = 0n) => ({ tokenIn, amountIn, minAmountOut, deadline: (await rpc.getBlock()).timestamp + 60n,
     epoch: await read(vault, vaultArtifact.abi, "authorizationEpoch"), nonce: await read(vault, vaultArtifact.abi, "nextNonce") });
   stage = "bounded swap transactions";
@@ -245,7 +310,7 @@ try {
   journal.close(); journal = new ArbitrageFillJournal(join(folder, "fills.sqlite"), market);
   assert.deepEqual(journal.status(), { observed: 0, quarantined: 2 });
   assert.equal((await observeNextReceipt(queue, journal, readers)).state, "idle");
-  const result = { agedReceiptsRefreshed: refreshed.refreshed, rollbackReceiptsQuarantined: invalidated.quarantined,
+  const result = { v3QuoteVerification, agedReceiptsRefreshed: refreshed.refreshed, rollbackReceiptsQuarantined: invalidated.quarantined,
     quarantineSurvivesReopen: true, completedQueueNotFreshnessAuthority: true, sourceForkBlock: forkBlock.toString(), chainId: 97, successfulSwaps: 2, journalRows: 2, durableObservationJobs: 2, observerQueueReopened: true, noRunnableDuplicateJobs: true, receiptVerification: "passed",
     minedBadFillRollback: "passed", revocation: "passed", treasuryRecovery: "passed", nativeGasReconciled: true,
     budgetedReceiptReconciliation: { reconciledSwapReceipts: 2, queuedCompletionAfterJournalAndCharge: true, exactSwapGasWei, heldRpcCalls,

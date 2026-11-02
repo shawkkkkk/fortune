@@ -2,6 +2,20 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## Actual V3 quote-to-local-venue execution (M01/M07/M08 component)
+
+The existing zero-account Pancake fork runtime now calls the actual unchanged
+V3 quote reader for both directions at one twenty-confirmed snapshot, rejects
+wrong runtime/precision and verifies that reads leave local state unchanged.
+Separate reversible local router swaps compare exact-input sell and exact-output
+buy transfer amounts with those quotes, then restore the original fixture before
+all existing swap/journal/queue/gas/replay/rollback assertions. Required engine CI
+now follows quote source/tests too. No reader, contract, dependency, signer,
+service, economics, authority or release gate changes. Synthetic assets and
+self-observed fixture pins are compatibility inputs, not independently reviewed
+assets, capital, provider/finality, public routes, full engine readiness or audit
+proof. See ARBITRAGE_V3_QUOTES.md for timing, scope and remaining gates.
+
 ## V3 quote engine shared RPC lifetime
 
 The actual V3 reader now has one fixed20sec rejecting wall deadline, monotonic

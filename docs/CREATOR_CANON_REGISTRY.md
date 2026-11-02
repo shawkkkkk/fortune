@@ -168,3 +168,20 @@ Primary standards consulted October 28, 2026:
 replay protection), and [ERC-1271](https://eips.ethereum.org/EIPS/eip-1271) (contract
 validation is a distinct method, intentionally unsupported here). Root packages,
 frozen Standard contracts/signature paths and all release gates remain unchanged.
+
+## Bounded operator inputs
+
+The actual `operate-creator-canon.mjs` policy, Studio draft and signed-update
+readers open read-only/nonblocking, require a regular opened descriptor, and
+retain at most the original limit plus one byte before strict UTF-8 decoding.
+The limits remain16KiB/32KiB/40KiB respectively. Descriptor checks and bounded
+reads replace path-stat/unbounded-read allocation, including files that grow
+between inspection and reading. Descriptors close on every outcome.
+
+Three actual writerless-FIFO CLI regressions timed out against old source;
+regular boundary preparation, overflow, directories and malformed UTF-8 are
+covered alongside existing signature/revision/SQLite/HTTP tests. No registry
+schema, typed payload, authentication, expiry, RPC policy, publication or wallet
+authority changes. Regular-file symlinks retain existing follow behavior; this
+is not privileged path-swap defense, a general filesystem deadline or a Windows
+FIFO guarantee. Failures retain private diagnostics and no accepted version.

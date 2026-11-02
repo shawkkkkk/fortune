@@ -2,6 +2,18 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## Queue lease and clock commit fences (M01/M07/M08)
+
+The actual receipt queue rechecks safe monotonic time and persists the final
+observed clock before each mutation commit. Claim/completion/retry also reject a
+lease expired at that final check, using the stored deadline for finishes. Failed
+checks roll back state, attempts, fences and clock together; explicit retry is
+possible without resetting history. Three corrected old-source regression groups
+cover real SQLite rollback/reopen and exact expiry. Schema1, 120s leases, capacity,
+backoff, terminal deduplication and observer ordering remain. This is a local
+commit guard, not atomic three-store settlement or runtime readiness. See
+RECEIPT_OBSERVER_QUEUE.md; all release gates remain unchanged.
+
 ## Native-gas charge commit freshness (M01/M07/M08)
 
 The actual schema2 native-gas book rechecks safe nonnegative monotonic wall time

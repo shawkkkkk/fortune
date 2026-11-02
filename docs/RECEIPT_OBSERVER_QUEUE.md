@@ -43,3 +43,27 @@ The command exits nonzero for exhausted jobs, expired leases, ready jobs overdue
 Health inspection does not recover a lease, claim/retry a job, clear quarantine, purge retained history or reset attempts. Queue metrics use one SQLite read snapshot; journal metrics use a separate snapshot, so combined CLI output is not an atomic settlement view or proof of service liveness. A healthy empty queue does not prove a worker is running or receipts were ever discovered. Terminal jobs are not automatically revalidated. `readinessAttested`, `executionAuthorized` and `profitAllocated` remain false.
 
 A durable host supervisor can use the JSON and exit code for local alerting. No alert destination, delivery, storage host or supervisor is provisioned or verified by this change. Investigate expired/overdue jobs and the host clock, retain quarantined/exhausted evidence, review capacity/backup procedures, and revalidate canonical receipts before any settlement. Do not remove evidence or manually reset clocks merely to turn monitoring green. Tests cover real disk/CLI health failures, missing and empty files, read-only write rejection, exact expiry/delay boundaries, retry backoff, persisted exhaustion, quarantine and full retention. They do not establish a running service, independent public-provider evidence or release readiness.
+
+## Final transaction clock and lease check
+
+Queue mutations validate the supplied host clock after acquiring the write lock
+and again after job mutations, immediately before persisting the final observed
+clock and committing. Both readings must be safe, nonnegative and nondecreasing,
+with the existing upper bound. A later operation cannot roll back below that final
+persisted observation even if still above the preceding operation's start.
+
+A claim cannot commit an already expired lease. Completion and verification retry
+check the original stored lease deadline at both admission and final check; an
+untrusted caller's `leaseUntil` cannot extend it. Equality is expired. A rejection
+rolls back job state, attempt increments, fences and clock updates, including after
+reopen. Explicit retry must still satisfy the original fence/deadline. Existing
+120-second leases, five attempts, backoff and terminal deduplication remain; retry
+availability and claim expiry remain derived from transaction-start time and are
+never refreshed at commit. No heartbeat, lease recovery/reset or scheduler is added.
+
+Tests use actual temporary SQLite files and supplied clock sequences for unsafe
+final time, commit-boundary expiry, rollback/reopen and persisted-clock rollback.
+They do not prove a general filesystem deadline, power-loss durability or trusted
+clock source. Host time/storage remain trusted and may change after the last
+check. This queue remains separate from journal/gas-book commits; no global
+atomicity, signer/execution authority, provider independence or readiness follows.

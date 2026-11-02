@@ -22,14 +22,17 @@ export class ReceiptObservationQueue {
     } catch (e) { try { this.#db.exec("ROLLBACK"); } catch {} this.#db.close(); throw e; }
   }
   get marketHash() { return this.#policy; }
-  #atomic(fn) {
+  #atomic(fn, beforeCommit) {
     this.#db.exec("BEGIN IMMEDIATE");
     try {
       const now = this.#clock();
       const { last_clock: last } = this.#db.prepare("SELECT last_clock FROM observation_config WHERE singleton=1").get();
       if (!Number.isSafeInteger(now) || now < last || now < 0 || now > Number.MAX_SAFE_INTEGER - 1_000_000) throw Error("Queue clock invalid or moved backwards");
-      this.#db.prepare("UPDATE observation_config SET last_clock=? WHERE singleton=1").run(now);
-      const result = fn(now); this.#db.exec("COMMIT"); return result;
+      const result = fn(now), ended = this.#clock();
+      if (!Number.isSafeInteger(ended) || ended < now || ended < 0 || ended > Number.MAX_SAFE_INTEGER - 1_000_000) throw Error("Queue clock invalid or moved backwards before commit");
+      beforeCommit?.(ended, result);
+      this.#db.prepare("UPDATE observation_config SET last_clock=? WHERE singleton=1").run(ended);
+      this.#db.exec("COMMIT"); return result;
     } catch (e) { this.#db.exec("ROLLBACK"); throw e; }
   }
   enqueue(hash) {
@@ -50,18 +53,20 @@ export class ReceiptObservationQueue {
       const fence = randomUUID(), until = now + LEASE_MS;
       this.#db.prepare("UPDATE observation_jobs SET state='leased',attempts=attempts+1,lease_until=?,fence=? WHERE tx=?").run(until, fence, row.tx);
       return Object.freeze({ tx: row.tx, fence, leaseUntil: until, attempt: row.attempts + 1 });
-    });
+    }, (ended, lease) => { if (lease && lease.leaseUntil <= ended) throw Error("Lease expired before claim commit"); });
   }
   #finish(lease, success) {
     if (!lease || !txValid(lease.tx) || typeof lease.fence !== "string") throw Error("Lease required");
+    let until;
     return this.#atomic(now => {
       const row = this.#db.prepare("SELECT * FROM observation_jobs WHERE tx=?").get(lease.tx);
       if (!row || row.state !== "leased" || row.fence !== lease.fence || row.lease_until <= now) throw Error("Lease expired or superseded");
+      until = row.lease_until;
       const state = success ? "done" : row.attempts >= MAX_ATTEMPTS ? "exhausted" : "pending";
       const delay = Math.min(60_000, 5_000 * 2 ** (row.attempts - 1));
       this.#db.prepare("UPDATE observation_jobs SET state=?,available_at=?,lease_until=0,fence=NULL,last_failure=? WHERE tx=?").run(state, now + (success ? 0 : delay), success ? null : "VERIFICATION_FAILED", row.tx);
       return { state, tx: row.tx, executionAuthorized: false, profitAllocated: false };
-    });
+    }, ended => { if (until <= ended) throw Error("Lease expired before finish commit"); });
   }
   complete(lease) { return this.#finish(lease, true); }
   retry(lease) { return this.#finish(lease, false); }

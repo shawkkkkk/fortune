@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { once } from "node:events";
+import { DatabaseSync } from "node:sqlite";
 import { ReceiptObservationQueue as Queue, observeNextReceipt } from "../../scripts/arbitrage-observer-queue.mjs";
 import { ArbitrageFillJournal as Journal } from "../../scripts/arbitrage-fill-journal.mjs";
 import { market, receiptClient, TX } from "../fixtures/arbitrage-receipts.mjs";
@@ -94,4 +95,41 @@ test("five abandoned claims exhaust persistently, including at the exact lease b
     assert.equal(q.claim(),null);assert.equal(q.stats().exhausted,1);q.close();q=new Queue(f.path,market(),f.clock);
     assert.equal(q.claim(),null);assert.equal(q.enqueue(TX).inserted,false);
   }finally{q?.close();f.clean();}
+});
+
+function queueRows(path) {
+  const db=new DatabaseSync(path,{readOnly:true});
+  try{return {config:db.prepare('SELECT * FROM observation_config').all(),jobs:db.prepare('SELECT * FROM observation_jobs').all()};}finally{db.close();}
+}
+
+test('queue final unsafe or reversed clocks roll back enqueue and claim metadata',()=>{
+ for(const action of ['enqueue','claim'])for(const end of [NaN,-1,999,Number.MAX_SAFE_INTEGER]){
+  const f=setup();let q,sequence=[1000],n=0;
+  const clock=()=>sequence[Math.min(n++,sequence.length-1)];
+  try{q=new Queue(f.path,market(),clock);if(action==='claim')q.enqueue(TX);const before=queueRows(f.path);sequence=[1000,end];n=0;
+   assert.throws(()=>action==='enqueue'?q.enqueue(TX):q.claim());assert.deepEqual(queueRows(f.path),before);
+   q.close();sequence=[1000];n=0;q=new Queue(f.path,market(),clock);assert.deepEqual(queueRows(f.path),before);
+  }finally{q?.close();f.clean();}
+ }
+});
+
+test('queue claim, completion and retry reject expiry at final commit without consuming attempts or fences',()=>{
+ for(const action of ['claim','complete','retry']){
+  const f=setup();let q,sequence=[1000],n=0;
+  const clock=()=>sequence[Math.min(n++,sequence.length-1)];
+  try{q=new Queue(f.path,market(),clock);q.enqueue(TX);const lease=action==='claim'?null:q.claim(),until=lease?.leaseUntil??121000,before=queueRows(f.path);
+   sequence=[action==='claim'?1000:until-1,until];n=0;
+   assert.throws(()=>action==='claim'?q.claim():q[action]({...lease,leaseUntil:until+999999}),/expired/);
+   assert.deepEqual(queueRows(f.path),before);q.close();sequence=[until-1];n=0;q=new Queue(f.path,market(),clock);assert.deepEqual(queueRows(f.path),before);
+   if(action==='claim')assert.equal(q.claim().attempt,1);else assert.equal(q[action](lease).state,action==='complete'?'done':'pending');
+  }finally{q?.close();f.clean();}
+ }
+});
+
+test('queue persists its final observed clock and rejects later rollback above operation start',()=>{
+ const f=setup();let q,sequence=[1000,1010],n=0;
+ const clock=()=>sequence[Math.min(n++,sequence.length-1)];
+ try{q=new Queue(f.path,market(),clock);q.enqueue(TX);q.close();sequence=[1005];n=0;q=new Queue(f.path,market(),clock);
+  assert.throws(()=>q.claim(),/clock/);assert.equal(queueRows(f.path).config[0].last_clock,1010);assert.equal(q.stats().pending,1);
+ }finally{q?.close();f.clean();}
 });

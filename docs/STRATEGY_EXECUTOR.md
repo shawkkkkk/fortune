@@ -65,4 +65,45 @@ Without the fork RPC variable, Foundry explicitly skips the fork contract; norma
 
 This is the first constrained swap primitive, not a complete autonomous project agent or managed-liquidity engine. Required next: independently reviewed manifests and asset behavior, native/global exposure limits, oracle/price-policy design, durable jobs and live receipt reconciliation, failed-leg unwind, bridge/rebalance handling, operator/key custody, incident/recovery drills, loss disclosures and economic tests. Any public testnet deployment needs owner-reviewed public role addresses, policy/capital limits, protected deployment/faucet funding and retained verification evidence. No owner signing service or deployment workflow is provisioned here. Independent security/legal/governance/operations review and all normal release gates remain mandatory before any real-value use.
 
-Runtime failure diagnostics retain only fixed failure-kind labels, the current operation label and source block, never raw provider exceptions. The original queued integration CI run 40563972272 failed during vault configuration before reaching the observation queue; its generic log did not establish a root cause. Fresh local reruns passed at blocks 139284904 and 139284955 on October 27, 2026. The diagnostic update preserves nonzero failure status and fresh-fork checks; it does not infer that a failed attempt passed or waive unavailable-provider evidence. CI now captures sanitized stderr in the retained runtime log, and changes to the observation queue trigger the engine workflow.
+Runtime failure diagnostics retain fixed failure-kind labels, the current operation label and source block, never raw provider exceptions. Deployment receipt failures additionally use the bounded local-only observations described below. The original queued integration CI run 40563972272 failed during vault configuration before reaching the observation queue; its generic log did not establish a root cause. Fresh local reruns passed at blocks 139284904 and 139284955 on October 27, 2026. The diagnostic update preserves nonzero failure status and fresh-fork checks; it does not infer that a failed attempt passed or waive unavailable-provider evidence. CI now captures sanitized stderr in the retained runtime log, and changes to the observation queue trigger the engine workflow.
+
+## Bounded local deployment diagnostics
+
+After a submitted local deployment fails its unchanged receipt/assertion checks,
+the fixture emits a deployment ordinal and at most five concurrent read-only
+loopback observations: the submitted transaction, latest block, sender latest
+and pending nonces, and transaction-pool counts. Exact hash/from/deployment-target
+binding and canonical uint256 quantities are required. Only status, nonce, gas,
+fee, block and pool-count fields are retained; raw exceptions, addresses, hashes,
+calldata, URLs and unknown fields are omitted. An absent legacy base fee stays
+null. Unavailable/malformed/late observations are labeled rather than guessed.
+
+One real three-second diagnostic deadline bounds waiting for all five reads;
+late completions cannot mutate output. In-flight reads are not cancelled and
+event-loop delays can delay timers. These are non-atomic observations of ONE
+local fixture, not a consistent block snapshot or proof of a failure's cause.
+The report always retains `failureCauseEstablished: false`. No remote provider exception or raw Anvil stderr is serialized. A separate fixed
+label classifies only the last16,384 in-memory stderr characters; that label
+does not establish which message caused the failure or prove causation. This
+bounds retained text, not upstream buffers or process-wide memory. A send that fails before returning a hash retains
+the existing generic failure label without transaction diagnostics.
+
+The original failure still exits nonzero, no passing report is written, and the
+30-second receipt limit, eight-second local transport limit, startup/fork/receipt
+checks and workflow budgets remain unchanged. Diagnostics never mine, replace,
+retry, change fees/nonces, fall back to mocks or approve a failed run. Dedicated
+CI tests include a real zero-account standalone Anvil transaction deliberately
+left pending by test-only disabled automining, read-only observation with no block
+advance, then separately explicit local mining. This is a fixture test, not a
+reproduction or diagnosis of earlier public-fork CI timeouts.
+
+PR150 engine run41359605798 failed at local deployment in attempts1 and2;
+controlled latest-fork local repeats passed while a historical-height probe
+failed earlier on unavailable fork state. Those observations do not establish
+causation or retroactively pass either failed attempt. This diagnostic addition
+changes no contract, dependency/root pin, capital/economic policy, signer,
+configuration, financial authority or release gate.
+
+```bash
+FORTUNE_ANVIL_BIN=/tmp/fortune-strategy-anvil/node_modules/@foundry-rs/anvil-linux-amd64/bin/anvil node --test contracts-omnichain/scripts/runtime-transaction-diagnostic.test.mjs
+```

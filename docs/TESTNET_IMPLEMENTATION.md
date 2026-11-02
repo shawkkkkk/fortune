@@ -17,6 +17,19 @@ public custody or full P19 readiness. Changed isolated runtime requires fresh
 deployment/audit evidence; no Standard/root pin/economic/authority/configuration
 or release-gate changes. See SYNDICATE_WORK_ESCROW.md.
 
+## Local strategy deployment failure visibility
+
+The existing venue-fork rehearsal retains its failure status and all deadlines,
+while submitted deployment failures add five bounded read-only loopback
+observations with strict transaction binding and sanitized quantity-only output.
+A real three-second diagnostic deadline fences late results. Actual zero-account
+standalone pending/mined transaction tests exercise the reader without treating
+an intentionally stalled fixture as reproduction of prior fork CI failures.
+Earlier PR150 timeouts remain unclassified and unapproved; no retry, mining,
+fee/nonce change, mock fallback, contract/dependency/root-pin/economic/authority
+or release-gate change is introduced. See STRATEGY_EXECUTOR.md for non-atomic,
+in-flight/event-loop and evidence limits. This does not complete M01/M07.
+
 ## Counter atomic-batch operator review CLI
 
 A separate default-disabled one-shot CLI now consumes the unchanged actual

@@ -2,6 +2,21 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## Syndicate direct client cancellation receipts
+
+A separate explicit read-only cancellation API uses the existing pinned receipt
+engine to bind direct original-client cancel(id) calldata to the whole principal
+Transfer back to that client and adjacent JobSettled(0, principal, client).
+Payment/result readers retain their exact routes and reject cancellation receipts.
+The compiled ten-job rehearsal now feeds job two's actual cancellation into the
+reader, rechecks stable evidence identity, rejects wrong amounts and proves route
+separation. Old storage observer/CLI payment fields remain NULL. No contract,
+signing/service, root pin, economics or release-gate change. Third-party expiry,
+worker decline/waiver, arbitrated split and batch receipt readers remain separate
+unfinished work. Two clients of one local fixture do not establish independent
+providers, public custody, capital provenance, audit or full P19 readiness.
+See SYNDICATE_WORK_ESCROW.md for exact bindings and limitations.
+
 ## Syndicate revision-bound payment receipt integration
 
 A separate read-only result-payment API consumes the actual shared pinned

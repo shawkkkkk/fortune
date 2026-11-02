@@ -416,3 +416,43 @@ Eight focused test groups retain all five legacy groups and add exact result
 binding, adversarial field/method/event/storage cases and a separate real20-second
 result-mode timeout/late-response fence. ONE zero-account local fixture is not
 independent-provider, public custody, full P19/testnet readiness or audit approval.
+
+
+## Direct original-client cancellation receipt observer
+
+inspectWorkCancellationReceipt is a separate explicit read-only library API,
+using the same strict WorkPaymentPolicy and shared bounded receipt engine.
+It supports only direct zero-native original-client cancel(jobId) transactions.
+The successful receipt must contain exactly two adjacent canonical logs:
+asset Transfer(escrow, original client, whole principal), then escrow
+JobSettled(jobId, 0, whole principal, original client). It binds transaction,
+receipt, block and log hashes/numbers/indices, transaction-list position,
+receipt-height runtime/roles/asset cap and settled immutable job terms.
+Two distinct clients must agree after the existing rereads, common minimum head
+with20 confirmations and head gap at most10. The unchanged real20sec monotonic
+clock/failure fences apply to all outcomes; in-flight requests are not cancelled.
+
+The result reports workerPaid zero, clientRefund equal to policy principal,
+directCancellationObserved true and a distinct source label. It does not emit
+directPaymentObserved. Existing approvePayment and approveResult readers stay
+exact and reject cancellation; this reader rejects those payment routes.
+The evidence ID remains chain/escrow/transaction/settlement-log index: consumers
+MUST deduplicate, never sum repeated reads. No consumed ledger, total or badge
+is provided. The old job observer and CLI still leave payment/transaction fields
+NULL; every onchain cancellation and other escrow capability remains intact.
+
+Historical receipts are supported without a freshness-age bound, but future
+headers reject. Runtime/policy/provider/host trust is required. This does not
+prove pre/post balances, legitimate funding, independent providers, EIP1898
+canonicality/ABA/finality, current consent, global solvency, identity, delivery,
+IP/license, fairness or legal agreement. currentAuthorization remains NULL;
+all provider/finality/capital/identity/delivery/global-solvency/execution/full
+Syndicate readiness flags remain false. No signing, calldata preparation,
+CLI/HTTP/MCP/service/config activation or financial action is introduced.
+
+Third-party expired-job cancellation, worker decline/waiver, arbitrated splits,
+batches and smart-wallet outer calls are deliberately unsupported by this API;
+no inference of these routes from settled storage is permitted. The actual
+compiled ten-job rehearsal observes job two's50-unit direct client cancellation,
+stable evidence reread, wrong-amount rejection and both payment/cancellation
+route directions. One zero-account local fixture is component evidence only.

@@ -2,6 +2,18 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## Native-gas charge commit freshness (M01/M07/M08)
+
+The actual schema2 native-gas book rechecks safe nonnegative monotonic wall time
+and original verified-fill age before its charge transaction, after the write
+lock and immediately before successful charge/replay commit. Expiry rolls back
+charge, evidence and hold deletion together; reservations/holds remain blocked.
+Three corrected old-source regressions include actual separate-process SQLite
+contention and replay/reopen. Original budget-clock policy, ceilings, loss of
+trust/quarantine, permanent deduplication and WAL/FULL remain. This is per-charge
+commit admission, not atomic journal/book/queue settlement, recovery, signer
+limits or full strategy readiness. See STRATEGY_NATIVE_GAS_BUDGET.md.
+
 ## Journal commit freshness under write contention (M01/M07/M08)
 
 The actual durable fill journal validates a safe nonnegative monotonic host clock

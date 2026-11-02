@@ -86,3 +86,22 @@ shared cap. The charge inputs come through the real receipt verifier using two
 provider fixtures, including vault-operator payer checks and changed evidence.
 These are fixture receipts, not public route or live custody evidence. Existing
 root dependencies, frozen contracts and other active PRs are untouched.
+
+## Charge commit freshness
+
+`charge` validates safe, nonnegative and nondecreasing wall time within one call,
+with the original verified fill at most 60 seconds old, before `BEGIN IMMEDIATE`,
+after lock acquisition and immediately before committing a successful charge or
+exact replay. If the final check rejects, charge/evidence/clock changes and hold
+deletion all roll back. Existing reservation and random fence remain, including
+after reopen; do not clear or regenerate them automatically. Conflict/overrun
+quarantine commits remain conservative after admission. No limit is widened.
+
+The policy's existing persisted budget clock is separately checked as before;
+this change is not a new shared/global clock or atomicity across journal, book
+and queue. Host clock/storage remain trusted and can change after the last check.
+Three regressions fail old source, including a separate SQLite writer holding a
+real write lock while a shifted test clock crosses the age bound, and expired
+replay rollback/reopen. This is not independent time/provider/capital evidence,
+a general filesystem deadline, power-loss certification, automatic hold recovery
+or wallet spending authority. All release gates remain unchanged.

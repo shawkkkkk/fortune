@@ -37,7 +37,7 @@ export class StrategyNativeGasBudget {
   #totals(now){let reserved=0n,charged=0n,count=0;for(const r of this.#db.prepare('SELECT e.*,EXISTS(SELECT 1 FROM gas_recheck_holds h WHERE h.tx=e.tx) AS held FROM gas_entries e').all()){
     count++;if(r.state!=='charged'||r.held){const c=BigInt(r.cost??'0');reserved+=c>BigInt(r.ceiling)?c:BigInt(r.ceiling);}else if(r.charged_at>now-DAY)charged+=BigInt(r.cost);
   }return {reserved,charged,count};}
-  #mutate(fn){if(this.#readOnly)throw Error('Read-only budget');this.#db.exec('BEGIN IMMEDIATE');try{const t=this.#time();const r=fn(t);this.#db.prepare('UPDATE gas_policy SET last_clock=?').run(t.now);this.#db.exec('COMMIT');return r;}catch(e){try{this.#db.exec('ROLLBACK');}catch{}throw e;}}
+  #mutate(fn,beforeCommit){if(this.#readOnly)throw Error('Read-only budget');this.#db.exec('BEGIN IMMEDIATE');try{const t=this.#time();const r=fn(t);this.#db.prepare('UPDATE gas_policy SET last_clock=?').run(t.now);beforeCommit?.(r);this.#db.exec('COMMIT');return r;}catch(e){try{this.#db.exec('ROLLBACK');}catch{}throw e;}}
   reserve(tx, maximumNativeWei){
     if(!hash(tx))throw Error('Transaction hash required');tx=tx.toLowerCase();const ceiling=amount(maximumNativeWei);
     return this.#mutate(({now,blocked})=>{
@@ -74,12 +74,19 @@ export class StrategyNativeGasBudget {
     if(!hold||!hash(hold.tx)||typeof hold.fence!=='string'||this.#db.prepare('SELECT fence FROM gas_recheck_holds WHERE tx=?').get(hold.tx)?.fence!==hold.fence)throw Error('Recheck fence differs');
   }
   charge(fill, hold){
-    const now=Date.now();
+    let previous=Date.now();
     if(!isVerifiedFill(fill)||fill.chainId!==97||!this.#policy.marketHashes.includes(fill.marketHash.toLowerCase())
-      ||(fill.gasPayer??fill.wallet).toLowerCase()!==this.#policy.payer||!Number.isSafeInteger(fill.observedAtMs)||fill.observedAtMs>now||now-fill.observedAtMs>60000)throw Error('Fresh verified fill for reviewed gas payer required');
+      ||(fill.gasPayer??fill.wallet).toLowerCase()!==this.#policy.payer)throw Error('Fresh verified fill for reviewed gas payer required');
+    const fresh=(now=Date.now())=>{
+      if(!Number.isSafeInteger(previous)||previous<0||!Number.isSafeInteger(now)||now<previous||now<0
+        ||!Number.isSafeInteger(fill.observedAtMs)||fill.observedAtMs<0||fill.observedAtMs>now||now-fill.observedAtMs>60000)throw Error('Fresh verified fill required; host clock invalid, reversed or expired');
+      previous=now;
+    };
+    fresh(previous);
     const cost=amount(fill.nativeGasCost),tx=fill.transactionHash.toLowerCase();
     const evidence=JSON.stringify({receiptId:fill.receiptId,receiptDigest:fill.receiptDigest,blockHash:fill.blockHash,cost:fill.nativeGasCost,marketHash:fill.marketHash});
     return this.#mutate(({now})=>{
+      fresh(); // A competing SQLite writer may have consumed the receipt lifetime.
       const pending=this.#db.prepare('SELECT 1 FROM gas_recheck_holds WHERE tx=?').get(tx);
       if(pending||hold){this.#requireFence(hold);if(hold.tx!==tx)throw Error('Recheck transaction differs');}
       const r=this.#db.prepare('SELECT * FROM gas_entries WHERE tx=?').get(tx);
@@ -96,7 +103,7 @@ export class StrategyNativeGasBudget {
       this.#db.prepare("UPDATE gas_entries SET state='charged',cost=?,charged_at=?,evidence=? WHERE tx=?").run(cost.toString(),now,evidence,tx);
       if(hold)this.#db.prepare('DELETE FROM gas_recheck_holds WHERE tx=? AND fence=?').run(tx,hold.fence);
       return {state:'charged',inserted:true,executionAuthorized:false};
-    });
+    },result=>{if(result.state==='charged')fresh();});
   }
   status(){
     this.#db.exec('BEGIN');try{

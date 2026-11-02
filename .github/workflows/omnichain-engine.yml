@@ -111,6 +111,7 @@ jobs:
         run: |
           set -o pipefail
           mkdir -p .tmp
+          node --test contracts-omnichain/scripts/runtime-transaction-diagnostic.test.mjs
           node --import ./scripts/register-ts.mjs contracts-omnichain/scripts/strategy-vault-runtime.mjs 2>&1 | tee .tmp/strategy-runtime.log
       - name: Preserve strategy fork verification
         if: always()

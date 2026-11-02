@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import { revalidateFillBatch } from "../../scripts/revalidate-arbitrage-fills.mjs";
 import { runtimeFailureKind } from "./runtime-failure.mjs";
+import { inspectLocalDeploymentFailure } from "./runtime-transaction-diagnostic.mjs";
 import { readFileSync, mkdtempSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -27,6 +28,7 @@ const AGENT = "0x0000000000000000000000000000000000004444";
 const E18 = 10n ** 18n, Q96 = 1n << 96n;
 const artifact = (file, name) => JSON.parse(readFileSync(new URL(`../out/${file}/${name}.json`, import.meta.url), "utf8"));
 let node, journal, queue, book, fixtureBlock, stage = "initialization";
+let localVmStderrTail = "";
 const folder = mkdtempSync(join(tmpdir(), "fortune-strategy-runtime-"));
 // A failed repeat must not leave an old passing artifact available to CI.
 rmSync(resolve(".tmp/strategy-runtime.json"), { force: true });
@@ -47,7 +49,10 @@ try {
   const args = ["--host", "127.0.0.1", "--port", String(port), "--chain-id", "97", "--accounts", "0", "--quiet", "--fork-url", fork.href];
   if (process.env.FORTUNE_STRATEGY_FORK_BLOCK) { assert.match(process.env.FORTUNE_STRATEGY_FORK_BLOCK, /^[1-9][0-9]*$/); args.push("--fork-block-number", process.env.FORTUNE_STRATEGY_FORK_BLOCK); }
   stage = "local fork startup";
-  node = spawn(binary, args, { stdio: "ignore" }); let startError = false; node.on("error", () => { startError = true; });
+  node = spawn(binary, args, { stdio: ["ignore", "ignore", "pipe"] });
+  // Retain only a bounded in-memory tail for fixed-label classification; never emit raw stderr.
+  node.stderr.on("data", chunk => { localVmStderrTail = (localVmStderrTail + chunk.toString()).slice(-16_384); });
+  let startError = false; node.on("error", () => { startError = true; });
   const url = `http://127.0.0.1:${port}`;
   const transport = () => http(url, { timeout: 8_000, retryCount: 0 });
   const rpc = createPublicClient({ transport: transport(), chain: bscTestnet });
@@ -69,10 +74,22 @@ try {
   // Every writable client is constructed with the fresh loopback URL, never the fork source URL.
   const wallet = who => createWalletClient({ account: who, chain: bscTestnet, transport: transport() });
   const receipt = hash => rpc.waitForTransactionReceipt({ hash, pollingInterval: 25, timeout: 30_000 });
+  let deploymentOrdinal = 0;
   const deploy = async (item, params = []) => {
-    stage = "local contract deployment";
-    const r = await receipt(await wallet(GOV).deployContract({ abi: item.abi, bytecode: item.bytecode.object, args: params, gas: 10_000_000n }));
-    assert.equal(r.status, "success"); assert.ok(r.contractAddress); return r.contractAddress;
+    stage = "local contract deployment " + ++deploymentOrdinal;
+    const hash = await wallet(GOV).deployContract({ abi: item.abi, bytecode: item.bytecode.object, args: params, gas: 10_000_000n });
+    try {
+      const r = await receipt(hash);
+      assert.equal(r.status, "success"); assert.ok(r.contractAddress); return r.contractAddress;
+    } catch (error) {
+      // Read only the fresh loopback fixture. Preserve the original error/failing gate;
+      // diagnostics cannot mine, replace, retry or approve a failed transaction.
+      let deploymentDiagnostic;
+      try { deploymentDiagnostic = await inspectLocalDeploymentFailure(rpc, hash, GOV); }
+      catch { deploymentDiagnostic = { status: "unavailable", failureCauseEstablished: false }; }
+      console.error(JSON.stringify({ deploymentOrdinal, deploymentDiagnostic }));
+      throw error;
+    }
   };
   const write = async (who, address, abi, functionName, params = [], succeeds = true) => {
     stage = "local contract call: " + functionName;
@@ -238,7 +255,8 @@ try {
     readClientsUseOneLocalFixture: true, generatedAccounts: 0, privateKeysUsed: false, publicBroadcasts: false, deployedToPublicNetwork: false, profitAllocated: false };
   const report = resolve(".tmp/strategy-runtime.json"); mkdirSync(resolve(".tmp"), { recursive: true }); writeFileSync(report, JSON.stringify(result, null, 2) + "\n");
   console.log(JSON.stringify(result, null, 2));
-} catch (error) { console.error(JSON.stringify({ verification: "failed", stage, kind: runtimeFailureKind(error), sourceForkBlock: fixtureBlock, publicBroadcasts: false })); process.exitCode = 1; }
+} catch (error) { console.error(JSON.stringify({ verification: "failed", stage, kind: runtimeFailureKind(error),
+  localVmStderrLabel: runtimeFailureKind(new Error(localVmStderrTail)), sourceForkBlock: fixtureBlock, publicBroadcasts: false })); process.exitCode = 1; }
 finally {
   try { try { queue?.close(); } finally { try { journal?.close(); } finally { book?.close(); } } }
   finally {

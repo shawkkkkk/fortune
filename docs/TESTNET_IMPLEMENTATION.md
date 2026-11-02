@@ -2,6 +2,16 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## Strict realized-profit cycle identities (M01/M07/M08)
+
+The actual pure reducer requires literal string cycle IDs and validates all stored
+cycle IDs as dense, canonical and unique before allocation. Coerced inputs and
+malformed history fail closed without rewriting balances/history. Two regression
+groups fail old source; existing receipt deduplication, full costs, loss carry and
+allocation policy remain. This is replay validation, not receipt authentication,
+durable settlement, capital provenance or execution. No buyback rate is adopted;
+Standard/root pins and all release gates remain unchanged. See OMNICHAIN_ARBITRAGE.md.
+
 ## Atomic worker result batches (P19)
 
 The isolated default-paused chain97 WorkEscrow adds 1–16 strictly sorted worker

@@ -25,3 +25,20 @@ These pure helpers do not verify chain receipts or persist a ledger. The future 
 - Independent contract/economic review, legal review, testnet route evidence and normal mainnet release gates before any real-money operation.
 
 The tests in this PR establish arithmetic, eligibility and retry/deduplication behavior only. There is no live arbitrage bot, funded treasury, deployed strategy token or automatic buyback in this slice.
+
+## Cycle identity validation
+
+`allocateRealizedProfit` requires cycle IDs to be literal strings of 1–80 ASCII
+letters, digits, underscores or hyphens, preserving exact case. Numbers, boxed or
+coercible values are rejected rather than normalized. Existing stored cycle
+history must be an array with every slot present, every ID valid and no duplicate
+IDs; invalid legacy history requires operator review, never automatic rewriting
+or balance recovery. These checks run before allocation and preserve the input
+ledger on rejection. Two new regression groups fail unchanged old source and
+cover coerced inputs, valid boundaries/replay and malformed/duplicate/sparse
+history. Receipt identity checks and loss/cost/allocation arithmetic are unchanged.
+
+Cycle labels remain caller assertions: different valid IDs plus different receipts
+can describe duplicate economic intent. This pure reducer does not authenticate
+receipts, prove legitimate capital, persist atomic state, reconcile reorgs or
+authorize purchases/burns. No buyback percentage, service or release gate is enabled.

@@ -10,7 +10,7 @@ import {once} from 'node:events';
 import {createServer} from 'node:net';
 import {createPublicClient,createWalletClient,http,keccak256,toHex,decodeEventLog,decodeFunctionData} from 'viem';
 import {bscTestnet} from 'viem/chains';
-import {inspectWorkPaymentReceipt,inspectWorkResultPaymentReceipt,inspectWorkCancellationReceipt,inspectWorkExpiredCancellationReceipt} from '../../lib/work-payment-receipt.ts';
+import {inspectWorkPaymentReceipt,inspectWorkResultPaymentReceipt,inspectWorkCancellationReceipt,inspectWorkExpiredCancellationReceipt,inspectWorkWorkerRefundReceipt} from '../../lib/work-payment-receipt.ts';
 import {inspectWorkEscrowJob} from '../../lib/work-escrow-observation.ts';
 
 
@@ -206,6 +206,21 @@ try{
  const declineTransfer=declined.logs.find(l=>l.address.toLowerCase()===token.toLowerCase());
  const declinedRefund=decodeEventLog({abi:assetArtifact.abi,data:declineTransfer.data,topics:declineTransfer.topics});
  assert.equal(declinedRefund.eventName,'Transfer');assert.equal(declinedRefund.args.from.toLowerCase(),escrow.toLowerCase());assert.equal(declinedRefund.args.to.toLowerCase(),CLIENT);assert.equal(declinedRefund.args.value,25n);
+ // The existing expiry jump may still put later worker receipts ahead of real host time.
+ const workerReceiptAt=Number((await rpc.getBlock({blockNumber:declined.blockNumber})).timestamp)*1000;
+ assert.ok(Number.isSafeInteger(workerReceiptAt));let workerNow=Date.now();const workerWaitDeadline=workerNow+60000;
+ assert.ok(workerReceiptAt-workerNow<=60000,'worker fixture timestamp outside bounded wall wait');
+ while(workerNow<workerReceiptAt){await new Promise(r=>setTimeout(r,Math.min(5000,workerReceiptAt-workerNow)));const now=Date.now();assert.ok(Number.isSafeInteger(now)&&now>=workerNow&&now<=workerWaitDeadline,'worker fixture wait clock invalid');workerNow=now;}
+ await rpc.request({method:'anvil_mine',params:['0x14','0x0']});
+ const declinePolicy={...await policyFor(seven,25n),transactionHash:declined.transactionHash,refundKind:'decline'};
+ const waiverPolicy={...await policyFor(six,15n),transactionHash:waived.transactionHash,refundKind:'waiver',expectedRevision:'1'};
+ for(const [policy,kind,amount] of [[declinePolicy,'decline','25'],[waiverPolicy,'waiver','15']]){
+  const refund=await inspectWorkWorkerRefundReceipt(observers,policy);assert.equal(refund.workerRefund.kind,kind);assert.equal(refund.clientRefund,amount);assert.equal(refund.workerPaid,'0');assert.equal(refund.executionAuthorized,false);
+  assert.equal((await inspectWorkWorkerRefundReceipt(observers,policy)).evidenceId,refund.evidenceId);
+  const {refundKind,expectedRevision,...base}=policy;await assert.rejects(inspectWorkCancellationReceipt(observers,base));await assert.rejects(inspectWorkPaymentReceipt(observers,base));
+ }
+ await assert.rejects(inspectWorkWorkerRefundReceipt(observers,{...waiverPolicy,expectedRevision:'0'}));
+ await assert.rejects(inspectWorkWorkerRefundReceipt(observers,{...paymentPolicy,refundKind:'decline'}));
  await write(WORKER,escrow,escrowArtifact,'decline',[seven],false);
  await write(WORKER,escrow,escrowArtifact,'accept',[seven],false);
  await write(CLIENT,escrow,escrowArtifact,'cancel',[seven],false);
@@ -266,7 +281,7 @@ try{
  // The earlier expiry drill advanced VM time by101sec; keep the fresh-state
  // observer's original checks before that jump. Batch evidence here is exact
  // transaction receipts and stored state/history, not a fresh-state observation.
- const result={chainId:97,expiredCancellationReceiptObserved:true,expiredCancellationEvidenceIdStable:true,wrongExpiryCallerRejected:true,directExpiredCancellationReadersSeparated:true,directClientCancellationReceiptObserved:true,cancellationEvidenceIdStable:true,wrongCancellationAmountRejected:true,paymentCancellationReadersSeparated:true,directResultPaymentReceiptObserved:true,resultPaymentEvidenceIdStable:true,wrongResultRevisionRejected:true,legacyReaderRejectsResultReceipt:true,directWholePaymentReceiptObserved:true,repeatedPaymentEvidenceIdStable:true,wrongPaymentAmountRejected:true,atomicResultBatchReceiptsBound:true,staleLaterResultBatchRejected:true,lateBatchPaymentFailureRollsBackAll:true,exactResultBatchRetrySucceeded:true,resultBatchReplayRejected:true,actualWorkJobCliStatesMatched:true,actualWorkJobCliResultHistoryMatched:true,settledCliDoesNotInferPayment:true,actualPinnedJobStatesObserved:true,pausedJobObserved:true,actualResultHistoryObserved:true,foreignTermsObservationRejected:true,settledStorageDoesNotInferPayment:true,revisionBoundDisputeReceiptObserved:true,staleResultDisputeRejected:true,disputedRevisionSurvivesSettlement:true,localOnly:true,clientScopedFundingIdObserved:true,fundedApprovedReplayRejectedBeforeAndAfterSettlement:true,compiledWorkEscrowDeployed:true,fundedJobs:10,settledJobs:10,workerDeclineRefundReceiptBound:true,inexactDeclinePreservesFundedLiability:true,declinedJobCannotBeAcceptedOrCancelled:true,workerWaiverRefundReceiptBound:true,staleWaiverRejected:true,inexactWaiverPreservesLiability:true,clientApprovalReceiptBound:true,workerResultHistoryObserved:true,revisionBoundPaymentReceiptObserved:true,staleResultApprovalRejected:true,inexactResultPaymentRetainsLiability:true,
+ const result={chainId:97,workerDeclineReceiptObserved:true,workerWaiverReceiptObserved:true,workerRefundEvidenceIdsStable:true,staleWaiverReceiptRevisionRejected:true,workerRefundPaymentCancellationReadersSeparated:true,expiredCancellationReceiptObserved:true,expiredCancellationEvidenceIdStable:true,wrongExpiryCallerRejected:true,directExpiredCancellationReadersSeparated:true,directClientCancellationReceiptObserved:true,cancellationEvidenceIdStable:true,wrongCancellationAmountRejected:true,paymentCancellationReadersSeparated:true,directResultPaymentReceiptObserved:true,resultPaymentEvidenceIdStable:true,wrongResultRevisionRejected:true,legacyReaderRejectsResultReceipt:true,directWholePaymentReceiptObserved:true,repeatedPaymentEvidenceIdStable:true,wrongPaymentAmountRejected:true,atomicResultBatchReceiptsBound:true,staleLaterResultBatchRejected:true,lateBatchPaymentFailureRollsBackAll:true,exactResultBatchRetrySucceeded:true,resultBatchReplayRejected:true,actualWorkJobCliStatesMatched:true,actualWorkJobCliResultHistoryMatched:true,settledCliDoesNotInferPayment:true,actualPinnedJobStatesObserved:true,pausedJobObserved:true,actualResultHistoryObserved:true,foreignTermsObservationRejected:true,settledStorageDoesNotInferPayment:true,revisionBoundDisputeReceiptObserved:true,staleResultDisputeRejected:true,disputedRevisionSurvivesSettlement:true,localOnly:true,clientScopedFundingIdObserved:true,fundedApprovedReplayRejectedBeforeAndAfterSettlement:true,compiledWorkEscrowDeployed:true,fundedJobs:10,settledJobs:10,workerDeclineRefundReceiptBound:true,inexactDeclinePreservesFundedLiability:true,declinedJobCannotBeAcceptedOrCancelled:true,workerWaiverRefundReceiptBound:true,staleWaiverRejected:true,inexactWaiverPreservesLiability:true,clientApprovalReceiptBound:true,workerResultHistoryObserved:true,revisionBoundPaymentReceiptObserved:true,staleResultApprovalRejected:true,inexactResultPaymentRetainsLiability:true,
   workerPaidUnits:'284',workerSecondAssetPaidUnits:'80',clientFinalUnits:'1716',clientSecondAssetFinalUnits:'920',finalReserved:'0',cancellationAndExpiryRefundedClient:true,disputeSplitSettled:true,
   governorCannotArbitrate:true,guardianCannotOpen:true,pausedPaymentRejected:true,duplicatePaymentRejected:true,inexactSplitRetainsLiability:true,explicitRetrySucceeded:true,
   generatedAccounts:0,privateKeysUsed:false,publicBroadcasts:false,independentProvidersVerified:false,workDeliveryVerified:false,

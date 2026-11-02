@@ -1,6 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {keccak256,parseAbi,encodeFunctionData} from 'viem';
-import {inspectWorkPaymentReceipt} from '../../lib/work-payment-receipt.ts';
+import {inspectWorkPaymentReceipt,inspectWorkResultPaymentReceipt} from '../../lib/work-payment-receipt.ts';
 const a=n=>'0x'+n.toString(16).padStart(40,'0'),h=n=>'0x'+n.toString(16).padStart(64,'0'),w=n=>BigInt(n).toString(16).padStart(64,'0');
 const code='0x60006000f3',pin=keccak256(code),sig=s=>keccak256(new TextEncoder().encode(s));
 const policy=()=>({chainId:97,escrow:a(1),escrowCodeHash:pin,governor:a(2),guardian:a(3),arbitrator:a(4),jobId:'1',client:a(5),worker:a(6),amount:'100',asset:a(7),assetCodeHash:pin,maxPerJob:'1000',termsHash:h(1),transactionHash:h(9)});
@@ -25,3 +25,15 @@ test('clock rollback and failed peer fence late follow-on reads; method receiver
  const original=Date.now;let now=original();Date.now=()=>now;try{const f=fixture();f.clients[0].getCode=async()=>{now--;return code;};await assert.rejects(inspectWorkPaymentReceipt(f.clients,f.p),/clock/);let calls=0;Date.now=()=>-1;await assert.rejects(inspectWorkPaymentReceipt([{getBlockNumber:async()=>{calls++;}},{}],policy()));assert.equal(calls,0);}finally{Date.now=original;}
 });
 test('real twenty-second deadline fences hung read release',{timeout:25000},async()=>{const f=fixture();let release,follow=0;f.clients[1].getBlockNumber=()=>new Promise(r=>release=r);f.clients[1].getChainId=async()=>{follow++;return 97;};await assert.rejects(inspectWorkPaymentReceipt(f.clients,f.p),/timed out/);release(100n);await new Promise(r=>setImmediate(r));assert.equal(follow,0);});
+
+function resultFixture(){const f=fixture();f.p={...f.p,revision:'2',resultHash:h(12)};
+ f.tx.input=encodeFunctionData({abi:parseAbi(['function approveResult(uint256,uint256,bytes32)']),functionName:'approveResult',args:[1n,2n,h(12)]});
+ f.r.logs.push({...f.r.logs[1],topics:[sig('ResultApproved(uint256,uint256,bytes32)'),h(1),h(2)],data:h(12),logIndex:5});
+ for(const c of f.clients){const read=c.readContract;c.readContract=async q=>q.functionName==='latestResultRevision'?2n:q.functionName==='resultHashes'?h(12):read(q);}
+ return f;}
+test('separate result payment binds exact revision/hash, stored result and third canonical receipt event',async()=>{const f=resultFixture(),x=await inspectWorkResultPaymentReceipt(f.clients,f.p);assert.deepEqual(x.approvedResult,{revision:'2',resultHash:h(12)});assert.equal(x.workerPaid,'100');assert.equal(x.clientRefund,'0');assert.equal(x.executionAuthorized,false);assert.equal((await inspectWorkResultPaymentReceipt(f.clients,f.p)).evidenceId,x.evidenceId);const {revision,resultHash,...base}=f.p;await assert.rejects(inspectWorkPaymentReceipt(f.clients,base));const legacy=fixture();await assert.rejects(inspectWorkResultPaymentReceipt(legacy.clients,{...legacy.p,revision:'2',resultHash:h(12)}));});
+test('result binding rejects before RPC and every mismatched result/call/event fails closed',async()=>{let calls=0;const c={getBlockNumber:async()=>{calls++;return 100n;}};for(const patch of [{revision:'0'},{revision:'01'},{revision:'33'},{revision:2},{resultHash:h(0)},{extra:true}])await assert.rejects(inspectWorkResultPaymentReceipt([c,{}],{...policy(),revision:'2',resultHash:h(12),...patch}));assert.equal(calls,0);
+ for(const change of [f=>f.p.revision='1',f=>f.p.resultHash=h(13),f=>f.tx.input+='00',f=>f.r.logs[2].topics[1]=h(2),f=>f.r.logs[2].topics[2]=h(3),f=>f.r.logs[2].topics.push(h(4)),f=>f.r.logs[2].data+='00',f=>f.r.logs[2].address=a(7),f=>f.r.logs[2].logIndex=6,f=>f.r.logs[2].removed=true,f=>f.r.logs[2].transactionHash=h(10),f=>f.r.logs.reverse(),f=>f.r.logs.push({...f.r.logs[2]})]){const f=resultFixture();change(f);await assert.rejects(inspectWorkResultPaymentReceipt(f.clients,f.p));}
+ for(const name of ['latestResultRevision','resultHashes']){const f=resultFixture(),read=f.clients[1].readContract;f.clients[1].readContract=async q=>q.functionName===name?(name==='latestResultRevision'?3n:h(13)):read(q);await assert.rejects(inspectWorkResultPaymentReceipt(f.clients,f.p),/Stored result/);}
+});
+test('result mode uses same real deadline and failure fence',{timeout:25000},async()=>{const f=resultFixture();let release,follow=0;f.clients[1].getBlockNumber=()=>new Promise(r=>release=r);f.clients[1].getChainId=async()=>{follow++;return 97;};await assert.rejects(inspectWorkResultPaymentReceipt(f.clients,f.p),/timed out/);release(100n);await new Promise(r=>setImmediate(r));assert.equal(follow,0);});

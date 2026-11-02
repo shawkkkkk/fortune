@@ -2,6 +2,19 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## Combined V3 route observation (M01/M07/M08 component)
+
+An explicit read-only library now invokes the actual V3 buy/sell readers on two
+distinct testnets and combines their quotes with the unchanged spread/cost model.
+Full identity/precision/accounting policy preflight precedes RPC; one shared real
+20-second lifetime fences both legs and final header rereads, with both quotes
+rechecked for age at the same completion time. Costs/cash/inventory stay supplied
+assertions; all execution/provider/finality/realized-profit/readiness flags remain
+false. No wallet, CLI/service/config, financial settlement or public route is
+enabled. Actual two-server HTTP/ABI tests are synthetic component integration,
+not independent providers or full engine readiness. Existing readers/economics/
+Standard/root pins and gates remain. See ARBITRAGE_V3_QUOTES.md.
+
 ## Canonical realized-profit receipt identities (M01/M07/M08)
 
 The actual pure profit reducer rejects leading-zero log-index aliases in new

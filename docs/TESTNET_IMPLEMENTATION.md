@@ -2,6 +2,15 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## Syndicate direct whole-payment CLI integration
+
+Default-disabled inspect-work-payment.mjs calls the unchanged pinned two-client
+receipt engine with bounded literal policy and private read-only transports.
+Actual child HTTP/ABI tests and compiled escrow runtime compare the original
+observation, stable replay evidence and wrong-amount rejection. No signing,
+ledger or authority; other settlement routes remain separate. The old job
+observer's NULL payment fields are preserved. See SYNDICATE_WORK_ESCROW.md.
+
 ## Syndicate arbitrated settlement receipt integration
 
 A separate read-only API binds exact direct fixed-arbitrator resolve(id,uint128)

@@ -16,7 +16,7 @@ The page states facts. A large top-ten share or a large early-buyer position is 
 - One cursor per chain moves through confirmed blocks (the head minus 20). Each step reads the factories' `LaunchCreated` and `TaxLaunchCreated` logs, then every `Transfer` of every tracked launch, and the curve's Launch Shield events for launches in their first 64 blocks.
 - One writer at a time: a run takes a lock (`SET NX PX`) holding its own random id.
 - Every write is one Lua script (`EVAL`) that runs atomically on the server. It checks the lock still holds this run's id, extends the lease, and writes the step's balances, rankings, Launch Shield stats and new cursor.
-  - A crash can repeat a range but never half-apply it.
+  - Runs cannot interleave within that script. An interrupted response may hide a completed write; inspect the existing cursor/state rather than infer rollback. Redis script execution is not a general rollback guarantee for command/server errors.
   - The ownership check covers the writes themselves. A lock, once lost, can never hold that run's id again, so a run whose lease expired can never write, even after another run has taken over and finished.
   - Releasing the lock is also a script, so a run never deletes another run's lock.
 - A launch created before the index started is **untracked** and shows nothing. A new index starts about 80,000 blocks back, which is what public log providers keep; with a full-history provider, set `FORTUNE_HOLDER_INDEX_START_BLOCK` to the factory's deployment block to cover every launch.
@@ -67,3 +67,25 @@ Log reads grow with the number of tracked launches: one `eth_getLogs` per nine l
 - Standard and tax-mode Fortune launches only; custom-pair beta launches are not indexed yet.
 - The top list and counts treat every address alike. A wallet is not a person, and one person can hold many wallets; the page says so.
 - Rankings use a floating-point score; balances and shares are exact integers.
+
+
+## Bounded Redis REST responses
+
+Each nonempty Upstash pipeline/owner-checked commit/release call has one real
+10-second rejecting wall timer, a safe nonnegative nondecreasing host-clock fence
+before/after fetch, every streamed read and JSON/result projection, and finally
+cleanup on every outcome. Empty pipelines remain local. Responses are strict
+UTF-8 JSON, at most8MiB declared/actual bytes and4096 nonfinal chunks including
+empty chunks; oversized or highly fragmented valid responses may fail closed.
+Commands, authentication, no-redirect transport, Lua scripts, key/schema/lease
+semantics and return values are unchanged. No new application retry or service
+configuration. Abort/cancel is best effort and never awaited; in-flight work may
+continue, and event-loop scheduling is not a hard process watchdog.
+
+A timeout or discarded malformed response does NOT prove that submitted Redis
+commands failed, rolled back or did not execute. It grants no successful commit
+marker: reconcile existing state/lease under the established index procedure;
+never assume an uncertain write can be blindly replayed. This per-call lifetime
+is not a total cron/index-run budget, Redis transaction rollback guarantee,
+power-loss/recovery certification or independent chain/finality/holder evidence.
+No production Redis credentials or deployment settings are provisioned here.

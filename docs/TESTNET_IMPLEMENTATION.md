@@ -2,6 +2,17 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## Creator-canon operator input bounds (P02/P06 security)
+
+The actual creator operator now bounds policy/draft/signed-update reads on an
+opened regular descriptor with nonblocking open, limit-plus-one allocation,
+strict UTF8 and guaranteed close. Three writerless FIFO CLI regressions failed
+old source; existing signed authorization/revision/storage semantics remain.
+No signatures are generated, real profiles enabled or publication/execution
+permission granted. This is input/runtime hardening, not hosted authentication
+or full creator readiness. See CREATOR_CANON_REGISTRY.md for limits and filesystem
+trust boundaries. Frozen Standard/root pins and all release gates remain.
+
 ## Actual V3 quote-to-local-venue execution (M01/M07/M08 component)
 
 The existing zero-account Pancake fork runtime now calls the actual unchanged

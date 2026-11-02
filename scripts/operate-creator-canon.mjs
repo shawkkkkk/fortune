@@ -1,8 +1,17 @@
-import { readFileSync,statSync } from 'node:fs';
+import { openSync,fstatSync,readSync,closeSync,constants } from 'node:fs';
 import { createPublicClient,http } from 'viem';
 import { CreatorCanonRegistry } from './creator-canon-registry.mjs';
 import { restoreCharacter } from '../lib/creator-character.ts';
-const json=(path,max)=>{if(statSync(path).size>max)throw Error('Size');const raw=readFileSync(path);if(raw.length>max)throw Error('Size');return new TextDecoder('utf-8',{fatal:true}).decode(raw);};
+const json=(path,max)=>{
+  const fd=openSync(path,constants.O_RDONLY|constants.O_NONBLOCK);
+  try {
+    const stat=fstatSync(fd);if(!stat.isFile()||stat.size>max)throw Error('Size/type');
+    const raw=Buffer.alloc(max+1);let size=0;
+    while(size<raw.length){const n=readSync(fd,raw,size,raw.length-size,null);if(!n)break;size+=n;}
+    if(size>max)throw Error('Size');
+    return new TextDecoder('utf-8',{fatal:true}).decode(raw.subarray(0,size));
+  }finally{closeSync(fd);}
+};
 let book;
 try {
   if(process.env.FORTUNE_CREATOR_CANON_ENABLED!=='true')throw Error('Disabled');

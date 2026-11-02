@@ -2,6 +2,21 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## Syndicate revision-bound payment receipt integration
+
+A separate read-only result-payment API consumes the actual shared pinned
+receipt engine, requiring exact direct approveResult job/revision/hash calldata,
+receipt-height stored latest revision/hash and a canonical adjacent third
+ResultApproved event. Legacy direct-payment two-event behavior stays exact;
+old observer/CLI NULL payment fields and every contract method remain intact.
+Actual compiled ten-job integration observes job five, stable identity, wrong
+revision and legacy-reader rejection. The fixture waits at most60sec for its
+preexisting expiry-shifted timestamp to become historical; the production
+20sec clock/confirmation/failure gates and workflow budgets remain unchanged.
+No contract, signer/service, custody, authority, economics, root pin or release
+gate changes. Other settlement receipt routes/full P19 remain unfinished;
+ONE fixture is not public custody/providers/audit proof. See SYNDICATE_WORK_ESCROW.md.
+
 ## Syndicate direct whole-payment receipt integration
 
 A separate explicit read-only two-client engine binds an actual direct client

@@ -378,3 +378,41 @@ and all later job/batch/refund/dispute tests. ONE zero-account fixture with two
 clients is not public custody, real parties, independent providers, audit or full
 P19 readiness. No contract, signer, CLI/HTTP/MCP/service, real configuration,
 dependency/root pin, financial/economic policy or release gate changes.
+
+## Separate revision-bound payment receipt observation
+
+`inspectWorkResultPaymentReceipt` is a separate explicit read-only library API
+with the same exact WorkPaymentPolicy plus canonical revision1–32 and nonzero
+resultHash. It accepts ONLY direct original-client zero-native approveResult
+calldata bound to that exact job/revision/hash. The shared receipt engine retains
+all old runtime/roles/job/asset/block/confirmation/log-binding/reread/provider/
+clock gates, and additionally requires receipt-height latestResultRevision and
+resultHashes to match, followed by an exact canonical adjacent ResultApproved
+log after Transfer and JobSettled. The third event indexes job ID and revision;
+its data is the literal result hash. Missing/extra/noncanonical/stale/mismatched
+bindings reject. The legacy whole-payment reader still requires its exact
+approvePayment calldata and TWO events, never accepting this three-event route.
+
+Output adds approvedResult with literal revision/hash and a separate source label;
+all old authority/readiness limitations remain false/null. It is still a historical
+RPC observation, not current consent, independently verified content/delivery,
+identity/IP/license/fairness/legal approval, independent providers, finality,
+pre/post balances, legitimate capital or public custody. Stable settlement evidence
+IDs still require consumer deduplication; no ledger, totals, service, CLI, wallet,
+publication, contract, root pin, economics or release-gate change follows. Batches,
+refunds, waivers, arbitration and smart-wallet outer calls remain unsupported by
+these two readers; all prior contract methods and storage-observer NULLs remain.
+
+The actual compiled ten-job fixture exercises existing job five's result-bound
+payment, stable reread, wrong-revision rejection and legacy-reader rejection.
+Its PREEXISTING101-second expiry jump can put later local receipt headers in the
+future. The initial newly added read failed without exposing raw errors. Before
+the new read, the fixture now waits for REAL host time to reach that fixed receipt
+timestamp (at most60seconds, monotonic checks), then starts the UNCHANGED20-second
+production reader. No Date.now override, header rewrite, source trust renewal,
+clock/confirmation bypass or workflow timeout increase is used. This test-only
+wall wait is not a public-service policy or diagnosis of earlier CI failures.
+Eight focused test groups retain all five legacy groups and add exact result
+binding, adversarial field/method/event/storage cases and a separate real20-second
+result-mode timeout/late-response fence. ONE zero-account local fixture is not
+independent-provider, public custody, full P19/testnet readiness or audit approval.

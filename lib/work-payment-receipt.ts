@@ -1,6 +1,7 @@
 import { encodeFunctionData, keccak256, parseAbi, type PublicClient, type Hex } from "viem";
 import { WORK_ESCROW_READ_ABI, type WorkJobPolicy } from "@/lib/work-escrow-observation";
 
+const RESOLVE = parseAbi(["function resolve(uint256 id,uint128 workerAmount)"]);
 const DECLINE = parseAbi(["function decline(uint256 id)"]);
 const WAIVE = parseAbi(["function waivePayment(uint256 id,uint256 expectedRevision)"]);
 const DECLINED = keccak256(new TextEncoder().encode("JobDeclined(uint256,address)"));
@@ -20,6 +21,7 @@ const positive = (v: unknown,bits: number) => typeof v === "string" && /^[1-9][0
 export type WorkPaymentPolicy = WorkJobPolicy & { transactionHash: Hex };
 export type WorkExpiredCancellationPolicy = WorkPaymentPolicy & { caller: Hex };
 export type WorkWorkerRefundPolicy = WorkPaymentPolicy & ({ refundKind: "decline" } | { refundKind: "waiver"; expectedRevision: string });
+export type WorkArbitrationPolicy = WorkPaymentPolicy & { workerAmount: string };
 export type WorkResultPaymentPolicy = WorkPaymentPolicy & { revision: string; resultHash: Hex };
 
 /** Direct legacy whole-payment only. Explicit library read, never wallet/service authority. */
@@ -58,7 +60,15 @@ export async function inspectWorkWorkerRefundReceipt(clients: readonly [PublicCl
   return inspectPayment(clients,policy,undefined,true,undefined,{kind,revision:kind==="decline"?"0":expectedRevision as string});
 }
 
-async function inspectPayment(clients: readonly [PublicClient,PublicClient], input: WorkPaymentPolicy, result?: {revision:string;resultHash:Hex}, cancellation=false, expiryCaller?: Hex, workerRefund?: {kind:"decline"|"waiver";revision:string}) {
+/** Direct fixed-arbitrator settlement observation, never a fairness or legal verdict. */
+export async function inspectWorkArbitrationReceipt(clients: readonly [PublicClient,PublicClient], input: WorkArbitrationPolicy) {
+  const q = structuredClone(input);
+  if (!q || typeof q.workerAmount!=="string" || !/^(?:0|[1-9][0-9]{0,38})$/.test(q.workerAmount) || BigInt(q.workerAmount)>=1n<<128n) throw Error("Invalid arbitrated worker amount");
+  const {workerAmount,...policy}=q;
+  return inspectPayment(clients,policy,undefined,false,undefined,undefined,workerAmount);
+}
+
+async function inspectPayment(clients: readonly [PublicClient,PublicClient], input: WorkPaymentPolicy, result?: {revision:string;resultHash:Hex}, cancellation=false, expiryCaller?: Hex, workerRefund?: {kind:"decline"|"waiver";revision:string}, arbitrationWorker?: string) {
   const p = structuredClone(input);
   if (!p || Object.keys(p).sort().join() !== "amount,arbitrator,asset,assetCodeHash,chainId,client,escrow,escrowCodeHash,governor,guardian,jobId,maxPerJob,termsHash,transactionHash,worker"
     || p.chainId !== 97 || ![p.escrow,p.asset,p.governor,p.guardian,p.arbitrator,p.client,p.worker].every(addr)
@@ -67,7 +77,9 @@ async function inspectPayment(clients: readonly [PublicClient,PublicClient], inp
     || ![p.escrowCodeHash,p.assetCodeHash,p.termsHash,p.transactionHash].every(hash) || !positive(p.jobId,256)
     || !positive(p.amount,128) || !positive(p.maxPerJob,128) || BigInt(p.amount)>BigInt(p.maxPerJob)) throw Error("Invalid work payment policy");
   if (!Array.isArray(clients) || clients.length!==2 || clients[0]===clients[1]) throw Error("Two distinct read clients required");
-  const caller=workerRefund?p.worker:expiryCaller??p.client;
+  const arbitration=arbitrationWorker===undefined?undefined:{worker:BigInt(arbitrationWorker),refund:BigInt(p.amount)-BigInt(arbitrationWorker)};
+  if(arbitration && arbitration.refund<0n)throw Error("Arbitrated amount exceeds principal");
+  const caller=arbitration?p.arbitrator:workerRefund?p.worker:expiryCaller??p.client;
   const start=Date.now(); let last=start,ended=false,timer:ReturnType<typeof setTimeout>|undefined;
   const clock=()=>{const now=Date.now();if(ended || !Number.isSafeInteger(start) || start<0 || !Number.isSafeInteger(now) || now<last || now-start>20_000)throw Error("Payment read ended, expired or clock moved backwards");last=now;return now;};
   const action=async<T>(fn:()=>Promise<T>)=>{clock();const r=await fn();clock();return r;};
@@ -77,12 +89,14 @@ async function inspectPayment(clients: readonly [PublicClient,PublicClient], inp
     const receipt=()=>action(()=>c.getTransactionReceipt({hash:p.transactionHash}));
     const r=await receipt();
     if(!same(r.transactionHash,p.transactionHash)||r.status!=="success"||!hash(r.blockHash)||!uint(r.blockNumber,64)||r.blockNumber===0n||head<r.blockNumber+20n
-      ||!same(r.from,caller)||!same(r.to,p.escrow)||!Number.isSafeInteger(r.transactionIndex)||r.transactionIndex<0||!Array.isArray(r.logs)||r.logs.length!==((result||workerRefund)?3:2))throw Error("Direct confirmed whole-payment receipt required");
+      ||!same(r.from,caller)||!same(r.to,p.escrow)||!Number.isSafeInteger(r.transactionIndex)||r.transactionIndex<0||!Array.isArray(r.logs)||r.logs.length!==(arbitration?(arbitration.worker>0n&&arbitration.refund>0n?3:2):((result||workerRefund)?3:2)))throw Error("Direct confirmed whole-payment receipt required");
     const block=()=>action(()=>c.getBlock({blockNumber:r.blockNumber}));const b=await block();
     if(b.number!==r.blockNumber||!same(b.hash,r.blockHash)||!uint(b.timestamp)||b.timestamp*1000n>BigInt(clock())||!Array.isArray(b.transactions)||!same(b.transactions[r.transactionIndex],p.transactionHash))throw Error("Payment block differs");
     const tx=await action(()=>c.getTransaction({hash:p.transactionHash}));
     if(!same(tx.hash,p.transactionHash)||!same(tx.blockHash,r.blockHash)||tx.blockNumber!==r.blockNumber||tx.transactionIndex!==r.transactionIndex||tx.chainId!==97
-      ||!same(tx.from,caller)||!same(tx.to,p.escrow)||tx.value!==0n||!same(tx.input,workerRefund
+      ||!same(tx.from,caller)||!same(tx.to,p.escrow)||tx.value!==0n||!same(tx.input,arbitration
+        ? encodeFunctionData({abi:RESOLVE,functionName:"resolve",args:[BigInt(p.jobId),arbitration.worker]})
+        : workerRefund
         ? (workerRefund.kind==="decline"?encodeFunctionData({abi:DECLINE,functionName:"decline",args:[BigInt(p.jobId)]}):encodeFunctionData({abi:WAIVE,functionName:"waivePayment",args:[BigInt(p.jobId),BigInt(workerRefund.revision)]}))
         : result
         ? encodeFunctionData({abi:RESULT_PAY,functionName:"approveResult",args:[BigInt(p.jobId),BigInt(result.revision),result.resultHash]})
@@ -99,9 +113,18 @@ async function inspectPayment(clients: readonly [PublicClient,PublicClient], inp
       || await read("resultHashes",[BigInt(p.jobId),BigInt(result.revision)])!==result.resultHash))throw Error("Stored result binding differs");
     for(const l of r.logs){if(!same(l.transactionHash,p.transactionHash)||!same(l.blockHash,r.blockHash)||l.blockNumber!==r.blockNumber||l.transactionIndex!==r.transactionIndex
       ||l.removed!==false||!Number.isSafeInteger(l.logIndex)||l.logIndex<0||!Array.isArray(l.topics)||l.topics.some(t=>typeof t!=="string"||!/^0x[0-9a-fA-F]{64}$/.test(t)))throw Error("Payment log binding differs");}
-    const [transfer,settled]=r.logs;
+    const transfer=r.logs[0],settled=arbitration?r.logs[r.logs.length-1]:r.logs[1];
     const topics=[TRANSFER,"0x"+"0".repeat(24)+p.escrow.slice(2),"0x"+"0".repeat(24)+(cancellation?p.client:p.worker).slice(2)];
     const settlementTopics=[SETTLED,"0x"+word(BigInt(p.jobId)),"0x"+"0".repeat(24)+caller.slice(2)];
+    if(arbitration){
+      const payouts=([[arbitration.worker,p.worker],[arbitration.refund,p.client]] as const).filter(([amount])=>amount>0n);
+      for(let i=0;i<payouts.length;i++){
+        const [amount,recipient]=payouts[i],l=r.logs[i],expected=[TRANSFER,"0x"+"0".repeat(24)+p.escrow.slice(2),"0x"+"0".repeat(24)+recipient.slice(2)];
+        if(!same(l.address,p.asset)||l.topics.length!==3||l.topics.some((t,j)=>!same(t,expected[j]))||!same(l.data,"0x"+word(amount))||r.logs[i+1].logIndex!==l.logIndex+1)throw Error("Canonical arbitrated transfer differs");
+      }
+      if(!same(settled.address,p.escrow)||settled.topics.length!==3||settled.topics.some((t,i)=>!same(t,settlementTopics[i]))
+        || !same(settled.data,"0x"+word(arbitration.worker)+word(arbitration.refund)))throw Error("Canonical arbitration settlement differs");
+    }else
     if(!same(transfer.address,p.asset)||!same(settled.address,p.escrow)||transfer.topics.length!==3||settled.topics.length!==3
       ||transfer.topics.some((t,i)=>!same(t,topics[i]))||settled.topics.some((t,i)=>!same(t,settlementTopics[i]))
       ||!same(transfer.data,"0x"+word(BigInt(p.amount)))||!same(settled.data,"0x"+word(cancellation?0n:BigInt(p.amount))+word(cancellation?BigInt(p.amount):0n))||settled.logIndex!==transfer.logIndex+1)throw Error("Canonical payment events differ");
@@ -119,7 +142,7 @@ async function inspectPayment(clients: readonly [PublicClient,PublicClient], inp
     const selected=(v:typeof r)=>({hash:v.transactionHash,status:v.status,block:v.blockNumber,blockHash:v.blockHash,to:v.to,from:v.from,index:v.transactionIndex,logs:v.logs});
     if(stringify(selected(again))!==stringify(selected(r))||after.number!==b.number||after.hash!==b.hash||after.timestamp!==b.timestamp||!same(after.transactions[r.transactionIndex],p.transactionHash)||await action(()=>c.getChainId())!==97)throw Error("Payment observation changed");
     return {...(workerRefund?{workerRefund:{kind:workerRefund.kind,revision:workerRefund.kind==="waiver"?workerRefund.revision:null}}:{}),...(expiryCaller?{cancellationCaller:expiryCaller}:{}),...(result?{approvedResult:{revision:result.revision,resultHash:result.resultHash}}:{}),chainId:97,escrow:p.escrow,asset:p.asset,client:p.client,worker:p.worker,jobId:p.jobId,termsHash:p.termsHash,
-      workerPaid:cancellation?"0":p.amount,clientRefund:cancellation?p.amount:"0",transactionHash:p.transactionHash,blockNumber:r.blockNumber.toString(),blockHash:r.blockHash,blockTimestamp:b.timestamp.toString(),settlementLogIndex:settled.logIndex,
+      workerPaid:arbitration?arbitration.worker.toString():cancellation?"0":p.amount,clientRefund:arbitration?arbitration.refund.toString():cancellation?p.amount:"0",transactionHash:p.transactionHash,blockNumber:r.blockNumber.toString(),blockHash:r.blockHash,blockTimestamp:b.timestamp.toString(),settlementLogIndex:settled.logIndex,
       evidenceId:`97:${p.escrow}:${p.transactionHash}:${settled.logIndex}`};
   };
   try {clock();return await Promise.race([(async()=>{
@@ -127,7 +150,7 @@ async function inspectPayment(clients: readonly [PublicClient,PublicClient], inp
     if(heads.some(h=>!uint(h,64)||h<21n)||(heads[0]>heads[1]?heads[0]-heads[1]:heads[1]-heads[0])>10n)throw Error("Payment heads differ");
     const head=heads[0]<heads[1]?heads[0]:heads[1],results=await Promise.all(clients.map(c=>observe(c,head)));
     if(stringify(results[0])!==stringify(results[1]))throw Error("Payment providers disagree");
-    return {...results[0],observedAtMs:clock(),source:workerRefund?"isolated-worker-work-refund-rpc-observation":expiryCaller?"isolated-expired-work-cancellation-rpc-observation":cancellation?"isolated-direct-work-cancellation-rpc-observation":result?"isolated-direct-work-result-payment-rpc-observation":"isolated-direct-work-payment-rpc-observation",...(workerRefund?{directWorkerRefundObserved:true}:cancellation?{directCancellationObserved:true}:{directPaymentObserved:true}),currentAuthorization:null,
+    return {...results[0],observedAtMs:clock(),source:arbitration?"isolated-direct-work-arbitration-rpc-observation":workerRefund?"isolated-worker-work-refund-rpc-observation":expiryCaller?"isolated-expired-work-cancellation-rpc-observation":cancellation?"isolated-direct-work-cancellation-rpc-observation":result?"isolated-direct-work-result-payment-rpc-observation":"isolated-direct-work-payment-rpc-observation",...(arbitration?{directArbitrationObserved:true,disputeFairnessVerified:false}:workerRefund?{directWorkerRefundObserved:true}:cancellation?{directCancellationObserved:true}:{directPaymentObserved:true}),currentAuthorization:null,
       independentProvidersVerified:false,finalityVerified:false,capitalOriginVerified:false,partyIdentityVerified:false,workDeliveryVerified:false,globalSolvencyVerified:false,executionAuthorized:false,fullSyndicateReadiness:false};
   })(),new Promise<never>((_,reject)=>{timer=setTimeout(()=>reject(Error("Payment observation timed out")),20_000);})]);}
   finally{ended=true;clearTimeout(timer);}

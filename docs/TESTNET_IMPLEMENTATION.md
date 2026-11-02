@@ -2,6 +2,22 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## Syndicate arbitrated settlement receipt integration
+
+A separate read-only API binds exact direct fixed-arbitrator resolve(id,uint128)
+calldata, selected worker amount0–principal, settled immutable job terms and
+canonical payout transfers/JobSettled. It handles zero/full amounts with one
+transfer and intermediate splits with ordered worker/client transfers; principal
+is conserved and recipients cannot be replaced. Existing receipt routes/output
+and old job observer/CLI NULL fields remain intact. The original compiled ten-job
+rehearsal supplies its60/40 split, and a separate two-job compiled escrow supplies
+zero/full boundaries without changing original balances/count assertions.
+No contract/signer/service/root pin/economics/authority/release gate changes.
+This is historical receipt observation, not dispute fairness, legal approval,
+independent providers, capital origin, custody or full P19 readiness. Batch and
+smart-wallet outer-call receipt integrations remain separate. See
+SYNDICATE_WORK_ESCROW.md.
+
 ## Syndicate worker decline and waiver receipt integration
 
 A separate read-only worker-refund API binds exact direct named-worker decline

@@ -545,3 +545,51 @@ worker receipts ahead of real host time: a separate at-most60sec safe-monotonic
 REAL wall wait before these readers aligns with the fixed latest receipt header.
 No host clock/header override, reader deadline or workflow budget is changed.
 One local zero-account fixture with two clients is component evidence only.
+
+
+## Direct fixed-arbitrator settlement receipt observer
+
+inspectWorkArbitrationReceipt / WorkArbitrationPolicy is a separate read-only
+library API. Its strict base policy adds canonical decimal workerAmount0–principal
+bounded to uint128. Unknown fields, malformed/out-of-range amounts and a split
+above the job principal reject before RPC. Only the pinned arbitrator's exact
+zero-native direct resolve(jobId,uint128 workerAmount) transaction is accepted.
+
+Principal is split exactly into workerAmount and principal minus workerAmount.
+Zero worker amount requires only an escrow→original-client principal Transfer;
+full worker amount requires only escrow→named-worker principal Transfer. An
+intermediate split requires TWO transfers in worker then client order, with
+exact amounts and recipients, followed by the escrow JobSettled event binding
+job/worker amount/refund/arbitrator. No zero-value/extra/foreign/reordered logs
+are accepted. All logs are canonical and adjacent, bound to the same mined
+transaction/block/indices; the transaction's block-list position also binds.
+The shared pinned runtime/roles/asset cap/settled immutable job terms, two-client
+agreement/common20confirmations/head gap10/rereads and REAL20sec monotonic-clock
+failure/finally fences remain. In-flight reads may continue; late follow-ons
+are fenced. Legacy payment/result/client-cancel/expiry/worker-refund APIs keep
+their exact outputs/routes and reject arbitration receipts.
+
+Output reports exact workerPaid/clientRefund, directArbitrationObserved true,
+a distinct source label and disputeFairnessVerified false. Payment/cancellation
+labels are omitted. Stable chain/escrow/tx/settlement-log ID MUST deduplicate;
+no ledger/totals/badge. Old storage observer/CLI payment/transaction fields remain
+NULL. No contract, signer/calldata builder, CLI/HTTP/MCP/service/config or financial
+action is introduced. Batch and smart-wallet outer calls remain unsupported.
+
+Historical receipts have no freshness-age bound; future headers reject. Trusted
+host/policy/clock/RPC height reads are not EIP1898/ABA/canonicality/finality or
+independent-provider proof. Receipt/state/runtime matching does not prove
+pre/post balances, legitimate funding, current consent, global solvency, party
+identity, work delivery, IP/license, fairness or legal approval. In particular,
+this reader does not reconstruct pre-transaction Disputed state or independently
+verify the arbitrator's decision. currentAuthorization stays NULL and all old
+provider/finality/capital/identity/delivery/global-solvency/execution/full-readiness
+flags remain false. No audit/deployment/mainnet approval transfers.
+
+Actual compiled integration reads the original ten-job fixture's job three
+60/40 settlement after its existing bounded clock alignment, checks stable ID,
+wrong amount and route separation. A separate synthetic asset/compiled escrow
+before the preexisting expiry jump supplies two10-unit boundary jobs (0/10 and
+10/0), consumed through actual HTTP/ABI; original ten-job balances/counts and
+all rollback/retry/history checks remain. One zero-account fixture with two
+clients is not independent providers, public custody or audit evidence.

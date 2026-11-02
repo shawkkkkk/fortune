@@ -2,6 +2,21 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## Atomic worker result batches (P19)
+
+The isolated default-paused chain97 WorkEscrow adds 1–16 strictly sorted worker
+result submissions with exact expected revisions. Every named-worker role, Accepted
+state, per-job deadline, asset runtime, nonzero/nonrepeated hash and 32-revision cap
+is checked before any append/event. Any failure rolls back all entries; no funds,
+liabilities, recipients, terms or settlement state change. Existing single/batch
+client approval and all prior paths remain; worker commitments never grant client
+payment consent or prove content/delivery/IP/identity/legal fairness. New bytecode
+requires fresh exact-source evidence, never old deployment/audit approval. Tests
+and a separate compiled two-job/two-asset fixture cover history/replay/late failure,
+explicit retry and latest client payment while preserving the original ten jobs.
+No Standard/root pins, economics, signer/service/configuration or release gates
+change. Full P19 remains unfinished; see SYNDICATE_WORK_ESCROW.md.
+
 ## Combined V3 route observation (M01/M07/M08 component)
 
 An explicit read-only library now invokes the actual V3 buy/sell readers on two

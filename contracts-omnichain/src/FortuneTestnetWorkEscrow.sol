@@ -232,6 +232,40 @@ contract FortuneTestnetWorkEscrow is ReentrancyGuard {
         emit ResultSubmitted(id, msg.sender, revision, resultHash);
     }
 
+    struct ResultSubmission {
+        uint256 id;
+        uint256 expectedRevision;
+        bytes32 resultHash;
+    }
+
+    /// @notice Atomic worker commitments only; no payment consent or verified delivery.
+    function submitResultsMany(ResultSubmission[] calldata submissions) external chain97 open nonReentrant {
+        if (submissions.length == 0 || submissions.length > 16) revert InvalidResult();
+        uint256 previousId;
+        // Check every job and immutable asset pin before writing any result history.
+        for (uint256 i; i < submissions.length; ++i) {
+            ResultSubmission calldata a = submissions[i];
+            if (a.id <= previousId) revert InvalidResult();
+            previousId = a.id;
+            Job storage j = jobs[a.id];
+            if (msg.sender != j.worker) revert Unauthorized();
+            if (j.state != State.Accepted || block.timestamp > j.deliverBy) revert WrongState();
+            uint256 previous = latestResultRevision[a.id];
+            if (
+                a.expectedRevision != previous || previous >= 32 || a.resultHash == bytes32(0)
+                    || a.resultHash == resultHashes[a.id][previous]
+            ) revert InvalidResult();
+            _asset(j.asset);
+        }
+        for (uint256 i; i < submissions.length; ++i) {
+            ResultSubmission calldata a = submissions[i];
+            uint256 revision = a.expectedRevision + 1;
+            latestResultRevision[a.id] = revision;
+            resultHashes[a.id][revision] = a.resultHash;
+            emit ResultSubmitted(a.id, msg.sender, revision, a.resultHash);
+        }
+    }
+
     /// @notice Optional payment consent bound to the exact latest worker revision.
     function approveResult(uint256 id, uint256 revision, bytes32 resultHash) external chain97 open nonReentrant {
         Job storage j = jobs[id];

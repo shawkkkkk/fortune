@@ -2,6 +2,19 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## Durable reported strategy-profit accounting (M01/M07/M08)
+
+An explicitly enabled local library now persists operator-reported cycles through
+the unchanged profit reducer, with pinned policy, expected-head transactions,
+receipt-label uniqueness, full-history replay and atomic rollback. Exact historical
+retries preserve original time/digest without another allocation. Real SQLite,
+reopen, clock/corruption/capacity/overflow and two-process tests cover the slice.
+The bounded256-report book defaults read-only and has no reset/prune/recovery,
+signer, service or real configuration. Costs, receipts and closed inventory remain
+assertions; realized-profit verification/financial execution/readiness stay false.
+No percentage or release baseline is adopted. Full M01/M07/M08 remains unfinished;
+see REPORTED_STRATEGY_PROFIT_BOOK.md for all authority/storage/review limits.
+
 ## Queue lease and clock commit fences (M01/M07/M08)
 
 The actual receipt queue rechecks safe monotonic time and persists the final

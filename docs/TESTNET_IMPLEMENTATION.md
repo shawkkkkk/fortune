@@ -2,6 +2,20 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## Selected Syndicate batch-result receipt integration (P19)
+
+A separate explicit read-only API verifies one selected job in exactly bound
+1–16-entry direct approveResultsMany calldata and3N-log receipt framing, reusing
+the actual pinned two-client result-payment engine and its20sec failure fences.
+Selected amount/recipient/terms/stored revision/hash and stable settlement ID are
+checked; other jobs remain explicitly unverified, never a complete batch ledger.
+Existing direct routes/CLI/contract behavior and false authority are preserved.
+The compiled ten-job/two-asset runtime consumes actual selected observations,
+replay and wrong-amount/direct-route rejection while preserving old assertions.
+No contracts, root pins, economics, signer/service/config or release gate changes;
+full P19/capital/provider/finality/custody/audit readiness remains incomplete.
+See SYNDICATE_WORK_ESCROW.md for selected-only and historical trust boundaries.
+
 ## Creator-canon operator input bounds (P02/P06 security)
 
 The actual creator operator now bounds policy/draft/signed-update reads on an

@@ -8,6 +8,7 @@ const DECLINED = keccak256(new TextEncoder().encode("JobDeclined(uint256,address
 const WAIVED = keccak256(new TextEncoder().encode("PaymentWaived(uint256,address,uint256)"));
 const CANCEL = parseAbi(["function cancel(uint256 id)"]);
 const PAY = parseAbi(["function approvePayment(uint256 id)"]);
+const BATCH_PAY = parseAbi(["function approveResultsMany((uint256 id,uint256 revision,bytes32 resultHash)[] approvals)"]);
 const RESULT_PAY = parseAbi(["function approveResult(uint256 id,uint256 revision,bytes32 resultHash)"]);
 const APPROVED = keccak256(new TextEncoder().encode("ResultApproved(uint256,uint256,bytes32)"));
 const SETTLED = keccak256(new TextEncoder().encode("JobSettled(uint256,uint256,uint256,address)"));
@@ -68,7 +69,23 @@ export async function inspectWorkArbitrationReceipt(clients: readonly [PublicCli
   return inspectPayment(clients,policy,undefined,false,undefined,undefined,workerAmount);
 }
 
-async function inspectPayment(clients: readonly [PublicClient,PublicClient], input: WorkPaymentPolicy, result?: {revision:string;resultHash:Hex}, cancellation=false, expiryCaller?: Hex, workerRefund?: {kind:"decline"|"waiver";revision:string}, arbitrationWorker?: string) {
+export type WorkBatchResultPaymentPolicy = WorkPaymentPolicy & { approvals: readonly {id:string;revision:string;resultHash:Hex}[] };
+/** One selected job in an exactly bound direct batch; other jobs are NOT validated. */
+export async function inspectWorkBatchResultPaymentReceipt(clients: readonly [PublicClient,PublicClient], input: WorkBatchResultPaymentPolicy) {
+  const q=structuredClone(input);
+  if(!q || !Array.isArray(q.approvals) || q.approvals.length<1 || q.approvals.length>16)throw Error("Invalid result batch");
+  let previous=0n;
+  for(const a of q.approvals){
+    if(!a || Object.keys(a).sort().join()!=="id,resultHash,revision" || !positive(a.id,256) || BigInt(a.id)<=previous
+      || !positive(a.revision,256) || BigInt(a.revision)>32n || !hash(a.resultHash))throw Error("Invalid result batch binding");
+    previous=BigInt(a.id);
+  }
+  const index=q.approvals.findIndex(a=>a.id===q.jobId);if(index<0)throw Error("Selected job absent from batch");
+  const {approvals,...policy}=q, selected=approvals[index];
+  return inspectPayment(clients,policy,{revision:selected.revision,resultHash:selected.resultHash,batch:{approvals,index}});
+}
+
+async function inspectPayment(clients: readonly [PublicClient,PublicClient], input: WorkPaymentPolicy, result?: {revision:string;resultHash:Hex;batch?:{approvals:readonly {id:string;revision:string;resultHash:Hex}[];index:number}}, cancellation=false, expiryCaller?: Hex, workerRefund?: {kind:"decline"|"waiver";revision:string}, arbitrationWorker?: string) {
   const p = structuredClone(input);
   if (!p || Object.keys(p).sort().join() !== "amount,arbitrator,asset,assetCodeHash,chainId,client,escrow,escrowCodeHash,governor,guardian,jobId,maxPerJob,termsHash,transactionHash,worker"
     || p.chainId !== 97 || ![p.escrow,p.asset,p.governor,p.guardian,p.arbitrator,p.client,p.worker].every(addr)
@@ -89,7 +106,7 @@ async function inspectPayment(clients: readonly [PublicClient,PublicClient], inp
     const receipt=()=>action(()=>c.getTransactionReceipt({hash:p.transactionHash}));
     const r=await receipt();
     if(!same(r.transactionHash,p.transactionHash)||r.status!=="success"||!hash(r.blockHash)||!uint(r.blockNumber,64)||r.blockNumber===0n||head<r.blockNumber+20n
-      ||!same(r.from,caller)||!same(r.to,p.escrow)||!Number.isSafeInteger(r.transactionIndex)||r.transactionIndex<0||!Array.isArray(r.logs)||r.logs.length!==(arbitration?(arbitration.worker>0n&&arbitration.refund>0n?3:2):((result||workerRefund)?3:2)))throw Error("Direct confirmed whole-payment receipt required");
+      ||!same(r.from,caller)||!same(r.to,p.escrow)||!Number.isSafeInteger(r.transactionIndex)||r.transactionIndex<0||!Array.isArray(r.logs)||r.logs.length!==(result?.batch?3*result.batch.approvals.length:arbitration?(arbitration.worker>0n&&arbitration.refund>0n?3:2):((result||workerRefund)?3:2)))throw Error("Direct confirmed whole-payment receipt required");
     const block=()=>action(()=>c.getBlock({blockNumber:r.blockNumber}));const b=await block();
     if(b.number!==r.blockNumber||!same(b.hash,r.blockHash)||!uint(b.timestamp)||b.timestamp*1000n>BigInt(clock())||!Array.isArray(b.transactions)||!same(b.transactions[r.transactionIndex],p.transactionHash))throw Error("Payment block differs");
     const tx=await action(()=>c.getTransaction({hash:p.transactionHash}));
@@ -98,6 +115,8 @@ async function inspectPayment(clients: readonly [PublicClient,PublicClient], inp
         ? encodeFunctionData({abi:RESOLVE,functionName:"resolve",args:[BigInt(p.jobId),arbitration.worker]})
         : workerRefund
         ? (workerRefund.kind==="decline"?encodeFunctionData({abi:DECLINE,functionName:"decline",args:[BigInt(p.jobId)]}):encodeFunctionData({abi:WAIVE,functionName:"waivePayment",args:[BigInt(p.jobId),BigInt(workerRefund.revision)]}))
+        : result?.batch
+        ? encodeFunctionData({abi:BATCH_PAY,functionName:"approveResultsMany",args:[result.batch.approvals.map(a=>({id:BigInt(a.id),revision:BigInt(a.revision),resultHash:a.resultHash}))]})
         : result
         ? encodeFunctionData({abi:RESULT_PAY,functionName:"approveResult",args:[BigInt(p.jobId),BigInt(result.revision),result.resultHash]})
         : (cancellation?encodeFunctionData({abi:CANCEL,functionName:"cancel",args:[BigInt(p.jobId)]}):encodeFunctionData({abi:PAY,functionName:"approvePayment",args:[BigInt(p.jobId)]}))))throw Error("Direct payment transaction differs");
@@ -112,8 +131,9 @@ async function inspectPayment(clients: readonly [PublicClient,PublicClient], inp
     if(result && (await read("latestResultRevision",[BigInt(p.jobId)])!==BigInt(result.revision)
       || await read("resultHashes",[BigInt(p.jobId),BigInt(result.revision)])!==result.resultHash))throw Error("Stored result binding differs");
     for(const l of r.logs){if(!same(l.transactionHash,p.transactionHash)||!same(l.blockHash,r.blockHash)||l.blockNumber!==r.blockNumber||l.transactionIndex!==r.transactionIndex
-      ||l.removed!==false||!Number.isSafeInteger(l.logIndex)||l.logIndex<0||!Array.isArray(l.topics)||l.topics.some(t=>typeof t!=="string"||!/^0x[0-9a-fA-F]{64}$/.test(t)))throw Error("Payment log binding differs");}
-    const transfer=r.logs[0],settled=arbitration?r.logs[r.logs.length-1]:r.logs[1];
+      ||l.removed!==false||!Number.isSafeInteger(l.logIndex)||l.logIndex<0||!Array.isArray(l.topics)||(result?.batch&&(l.topics.length!==3||typeof l.data!=="string"||!/^0x(?:[0-9a-fA-F]{64}){1,2}$/.test(l.data)))||l.topics.some(t=>typeof t!=="string"||!/^0x[0-9a-fA-F]{64}$/.test(t)))throw Error("Payment log binding differs");}
+    const offset=result?.batch?result.batch.index*3:0;
+    const transfer=r.logs[offset],settled=arbitration?r.logs[r.logs.length-1]:r.logs[offset+1];
     const topics=[TRANSFER,"0x"+"0".repeat(24)+p.escrow.slice(2),"0x"+"0".repeat(24)+(cancellation?p.client:p.worker).slice(2)];
     const settlementTopics=[SETTLED,"0x"+word(BigInt(p.jobId)),"0x"+"0".repeat(24)+caller.slice(2)];
     if(arbitration){
@@ -129,7 +149,7 @@ async function inspectPayment(clients: readonly [PublicClient,PublicClient], inp
       ||transfer.topics.some((t,i)=>!same(t,topics[i]))||settled.topics.some((t,i)=>!same(t,settlementTopics[i]))
       ||!same(transfer.data,"0x"+word(BigInt(p.amount)))||!same(settled.data,"0x"+word(cancellation?0n:BigInt(p.amount))+word(cancellation?BigInt(p.amount):0n))||settled.logIndex!==transfer.logIndex+1)throw Error("Canonical payment events differ");
     if(result){
-      const approval=r.logs[2],topics=[APPROVED,"0x"+word(BigInt(p.jobId)),"0x"+word(BigInt(result.revision))];
+      const approval=r.logs[offset+2],topics=[APPROVED,"0x"+word(BigInt(p.jobId)),"0x"+word(BigInt(result.revision))];
       if(!same(approval.address,p.escrow)||approval.topics.length!==3||approval.topics.some((t,i)=>!same(t,topics[i]))
         || !same(approval.data,result.resultHash)||approval.logIndex!==settled.logIndex+1)throw Error("Canonical result approval differs");
     }
@@ -150,7 +170,7 @@ async function inspectPayment(clients: readonly [PublicClient,PublicClient], inp
     if(heads.some(h=>!uint(h,64)||h<21n)||(heads[0]>heads[1]?heads[0]-heads[1]:heads[1]-heads[0])>10n)throw Error("Payment heads differ");
     const head=heads[0]<heads[1]?heads[0]:heads[1],results=await Promise.all(clients.map(c=>observe(c,head)));
     if(stringify(results[0])!==stringify(results[1]))throw Error("Payment providers disagree");
-    return {...results[0],observedAtMs:clock(),source:arbitration?"isolated-direct-work-arbitration-rpc-observation":workerRefund?"isolated-worker-work-refund-rpc-observation":expiryCaller?"isolated-expired-work-cancellation-rpc-observation":cancellation?"isolated-direct-work-cancellation-rpc-observation":result?"isolated-direct-work-result-payment-rpc-observation":"isolated-direct-work-payment-rpc-observation",...(arbitration?{directArbitrationObserved:true,disputeFairnessVerified:false}:workerRefund?{directWorkerRefundObserved:true}:cancellation?{directCancellationObserved:true}:{directPaymentObserved:true}),currentAuthorization:null,
+    return {...results[0],observedAtMs:clock(),source:result?.batch?"isolated-selected-batch-work-result-payment-rpc-observation":arbitration?"isolated-direct-work-arbitration-rpc-observation":workerRefund?"isolated-worker-work-refund-rpc-observation":expiryCaller?"isolated-expired-work-cancellation-rpc-observation":cancellation?"isolated-direct-work-cancellation-rpc-observation":result?"isolated-direct-work-result-payment-rpc-observation":"isolated-direct-work-payment-rpc-observation",...(result?.batch?{selectedBatchResultPaymentObserved:true,batchJobCount:result.batch.approvals.length,batchJobIndex:result.batch.index,otherBatchJobsVerified:false}:arbitration?{directArbitrationObserved:true,disputeFairnessVerified:false}:workerRefund?{directWorkerRefundObserved:true}:cancellation?{directCancellationObserved:true}:{directPaymentObserved:true}),currentAuthorization:null,
       independentProvidersVerified:false,finalityVerified:false,capitalOriginVerified:false,partyIdentityVerified:false,workDeliveryVerified:false,globalSolvencyVerified:false,executionAuthorized:false,fullSyndicateReadiness:false};
   })(),new Promise<never>((_,reject)=>{timer=setTimeout(()=>reject(Error("Payment observation timed out")),20_000);})]);}
   finally{ended=true;clearTimeout(timer);}

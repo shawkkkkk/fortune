@@ -2,6 +2,22 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## Syndicate direct whole-payment receipt integration
+
+A separate explicit read-only two-client engine binds an actual direct client
+approvePayment receipt to exact calldata, mined block/transaction/indices,
+pinned receipt-height runtimes/roles/job terms and canonical adjacent whole
+worker-transfer/zero-refund settlement events. Rereads and real20-second monotonic
+failure fences reject changed or late observations. Stable evidence IDs require
+consumer deduplication; no ledger, authority or readiness is granted. The old
+job observer/CLI keeps NULL payment fields. Compiled ten-job HTTP/ABI integration
+consumes the actual first payment, stable replay and wrong-amount rejection while
+preserving every prior job/batch/refund/split test. Other settlement methods reject
+in this narrowly scoped reader; contracts and prior capabilities are unchanged.
+ONE local zero-account fixture is not independent providers/public custody/capital
+or full P19/audit readiness. Standard/root pins/economics/gates unchanged. See
+SYNDICATE_WORK_ESCROW.md for historical-height and trust limits.
+
 ## Syndicate atomic revision-bound result approvals
 
 The isolated WorkEscrow adds client-only atomic approval of1–16 sorted job IDs,

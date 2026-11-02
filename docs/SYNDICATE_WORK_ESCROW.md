@@ -338,3 +338,43 @@ economics and all asset/custody/capital/privacy/provider/finality/legal/governan
 funding/failure/recovery/ops gates remain. Launch-token-side fees only burn; pair-
 asset holder rewards and earned platform recirculation stay distinct; creator/
 holder/LP liabilities and launch reserves are never strategy capital.
+
+## Direct whole-payment receipt observation
+
+The separate explicit read-only library `inspectWorkPaymentReceipt` accepts an
+exact `WorkJobPolicy` plus transactionHash. It supports ONLY a direct zero-native
+original-client `approvePayment(id)` transaction: successful receipt, twenty
+confirmations at a common two-client head (head gap at most10), exact mined
+transaction/block/index bindings, receipt-height escrow and payout-token runtime
+pins, immutable roles, asset policy and exact settled job terms. Canonical adjacent
+asset Transfer(escrow, worker, whole principal) and JobSettled(id, principal,0,client)
+logs are required; extra/removed/foreign/noncanonical logs reject. Receipt and block
+are reread and both clients must agree. Historical receipts are allowed; headers
+must not be future-dated, but this is no fresh-state/head-age guarantee.
+
+One real20-second lifetime and safe nonnegative monotonic host clock fence every
+awaited read and every outcome. Late peer completions cannot start follow-on reads;
+in-flight calls are not cancelled. Trusted host/policy/clock/RPC and height-based
+reads are not independent-provider proof, EIP1898 hash calls, consensus, finality
+or ABA/reorg-recovery proof. Runtime pins are supplied trust, not independent
+security/issuer/proxy review. Receipt events and block-end settled storage do not
+independently prove pre/post balances, legitimate capital, global solvency,
+identity, delivery, IP, fairness, current consent or legal approval.
+
+The result exposes exact reported workerPaid and zero clientRefund ONLY for this
+matched direct path. The old storage observer and CLI remain unchanged with NULL
+payment/transaction fields. Evidence ID is chain/escrow/transaction/settlement-log;
+repeated reads retain it and MUST be deduplicated by consumers. No durable consumed
+ledger, totals, badge, custody service, current authorization or execution authority
+is added. Revision-bound payments, atomic batches, refunds/declines/waivers,
+arbitrated splits and smart-wallet outer calls are deliberately unsupported by
+this reader and reject; their existing contract capabilities remain intact.
+
+Five focused adversarial groups include actual twenty-second timeout/late-response
+checks. The unchanged compiled escrow's ten-job/two-asset HTTP/ABI rehearsal now
+passes its first actual direct payment through this reader, rereads the stable
+identity, rejects a wrong amount and preserves the old settled-storage NULL fields
+and all later job/batch/refund/dispute tests. ONE zero-account fixture with two
+clients is not public custody, real parties, independent providers, audit or full
+P19 readiness. No contract, signer, CLI/HTTP/MCP/service, real configuration,
+dependency/root pin, financial/economic policy or release gate changes.

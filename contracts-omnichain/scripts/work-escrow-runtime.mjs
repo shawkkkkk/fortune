@@ -10,6 +10,7 @@ import {once} from 'node:events';
 import {createServer} from 'node:net';
 import {createPublicClient,createWalletClient,http,keccak256,toHex,decodeEventLog,decodeFunctionData} from 'viem';
 import {bscTestnet} from 'viem/chains';
+import {inspectWorkPaymentReceipt} from '../../lib/work-payment-receipt.ts';
 import {inspectWorkEscrowJob} from '../../lib/work-escrow-observation.ts';
 
 
@@ -85,6 +86,10 @@ try{
  const events=paid.logs.filter(l=>l.address.toLowerCase()===escrow.toLowerCase()).map(l=>decodeEventLog({abi:escrowArtifact.abi,data:l.data,topics:l.topics}));
  assert.equal(events.length,1);assert.equal(events[0].eventName,'JobSettled');assert.equal(events[0].args.id,one);assert.equal(events[0].args.workerAmount,100n);assert.equal(events[0].args.clientRefund,0n);assert.equal(events[0].args.settledBy.toLowerCase(),CLIENT);
  const settledObservation=await observe(one,100n,'Settled');assert.equal(settledObservation.backing.selectedOutstanding,'0');
+ const paymentPolicy={...await policyFor(one,100n),transactionHash:paid.transactionHash};
+ const payment=await inspectWorkPaymentReceipt(observers,paymentPolicy);assert.equal(payment.workerPaid,'100');assert.equal(payment.clientRefund,'0');assert.equal(payment.directPaymentObserved,true);assert.equal(payment.executionAuthorized,false);
+ const repeatedPayment=await inspectWorkPaymentReceipt(observers,paymentPolicy);assert.equal(repeatedPayment.evidenceId,payment.evidenceId);
+ await assert.rejects(inspectWorkPaymentReceipt(observers,{...paymentPolicy,amount:'99'}));
  await assert.rejects(inspectWorkEscrowJob(observers,{...await policyFor(one,100n),termsHash:'0x'+'99'.repeat(32)}));
  await write(CLIENT,escrow,escrowArtifact,'approvePayment',[one],false);
  await write(CLIENT,escrow,escrowArtifact,'fundWithId',firstFundingArgs,false);
@@ -236,7 +241,7 @@ try{
  // The earlier expiry drill advanced VM time by101sec; keep the fresh-state
  // observer's original checks before that jump. Batch evidence here is exact
  // transaction receipts and stored state/history, not a fresh-state observation.
- const result={chainId:97,atomicResultBatchReceiptsBound:true,staleLaterResultBatchRejected:true,lateBatchPaymentFailureRollsBackAll:true,exactResultBatchRetrySucceeded:true,resultBatchReplayRejected:true,actualWorkJobCliStatesMatched:true,actualWorkJobCliResultHistoryMatched:true,settledCliDoesNotInferPayment:true,actualPinnedJobStatesObserved:true,pausedJobObserved:true,actualResultHistoryObserved:true,foreignTermsObservationRejected:true,settledStorageDoesNotInferPayment:true,revisionBoundDisputeReceiptObserved:true,staleResultDisputeRejected:true,disputedRevisionSurvivesSettlement:true,localOnly:true,clientScopedFundingIdObserved:true,fundedApprovedReplayRejectedBeforeAndAfterSettlement:true,compiledWorkEscrowDeployed:true,fundedJobs:10,settledJobs:10,workerDeclineRefundReceiptBound:true,inexactDeclinePreservesFundedLiability:true,declinedJobCannotBeAcceptedOrCancelled:true,workerWaiverRefundReceiptBound:true,staleWaiverRejected:true,inexactWaiverPreservesLiability:true,clientApprovalReceiptBound:true,workerResultHistoryObserved:true,revisionBoundPaymentReceiptObserved:true,staleResultApprovalRejected:true,inexactResultPaymentRetainsLiability:true,
+ const result={chainId:97,directWholePaymentReceiptObserved:true,repeatedPaymentEvidenceIdStable:true,wrongPaymentAmountRejected:true,atomicResultBatchReceiptsBound:true,staleLaterResultBatchRejected:true,lateBatchPaymentFailureRollsBackAll:true,exactResultBatchRetrySucceeded:true,resultBatchReplayRejected:true,actualWorkJobCliStatesMatched:true,actualWorkJobCliResultHistoryMatched:true,settledCliDoesNotInferPayment:true,actualPinnedJobStatesObserved:true,pausedJobObserved:true,actualResultHistoryObserved:true,foreignTermsObservationRejected:true,settledStorageDoesNotInferPayment:true,revisionBoundDisputeReceiptObserved:true,staleResultDisputeRejected:true,disputedRevisionSurvivesSettlement:true,localOnly:true,clientScopedFundingIdObserved:true,fundedApprovedReplayRejectedBeforeAndAfterSettlement:true,compiledWorkEscrowDeployed:true,fundedJobs:10,settledJobs:10,workerDeclineRefundReceiptBound:true,inexactDeclinePreservesFundedLiability:true,declinedJobCannotBeAcceptedOrCancelled:true,workerWaiverRefundReceiptBound:true,staleWaiverRejected:true,inexactWaiverPreservesLiability:true,clientApprovalReceiptBound:true,workerResultHistoryObserved:true,revisionBoundPaymentReceiptObserved:true,staleResultApprovalRejected:true,inexactResultPaymentRetainsLiability:true,
   workerPaidUnits:'284',workerSecondAssetPaidUnits:'80',clientFinalUnits:'1716',clientSecondAssetFinalUnits:'920',finalReserved:'0',cancellationAndExpiryRefundedClient:true,disputeSplitSettled:true,
   governorCannotArbitrate:true,guardianCannotOpen:true,pausedPaymentRejected:true,duplicatePaymentRejected:true,inexactSplitRetainsLiability:true,explicitRetrySucceeded:true,
   generatedAccounts:0,privateKeysUsed:false,publicBroadcasts:false,independentProvidersVerified:false,workDeliveryVerified:false,

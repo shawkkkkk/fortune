@@ -7,7 +7,7 @@ const txValid = value => typeof value === "string" && /^0x[0-9a-fA-F]{64}$/.test
 export class ReceiptObservationQueue {
   #db; #clock; #policy;
   constructor(path, market, clock = Date.now, { readOnly = false } = {}) {
-    if (typeof path !== "string" || !path || path === ":memory:") throw Error("Durable queue path required");
+    if (typeof path !== "string" || !path || path === ":memory:" || /^file:/i.test(path)) throw Error("Durable queue path required");
     const policy = fillMarketHash(market);
     this.#clock = clock; this.#policy = policy;
     this.#db = new DatabaseSync(path, { readOnly });

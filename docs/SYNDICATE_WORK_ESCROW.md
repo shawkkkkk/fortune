@@ -627,3 +627,36 @@ Actual child CLI HTTP/ABI tests cover strict file/provider/preflight and failure
 Compiled zero-account runtime checks match the CLI against the library's original
 whole-payment observation, preserve replay identity and reject a wrong amount.
 Two clients of ONE local fixture are not independent providers/public custody.
+
+
+## Selected result payment in a direct batch
+
+`inspectWorkBatchResultPaymentReceipt` is a separate read-only API for ONE
+selected job in direct `approveResultsMany`. Policy adds `approvals`: the exact
+1–16 strictly increasing positive uint256 IDs, revisions1–32 and nonzero result
+hashes, all detached before awaits. Each entry has exactly id/revision/resultHash;
+the selected policy job must occur. Full zero-native original-client calldata,
+exact3N receipt logs and selected positional Transfer/JobSettled/ResultApproved
+bind to that tuple. Every log retains block/transaction/index binding and bounded
+three-topic/one-or-two-word data framing. Selected receipt-height job terms,
+runtimes, roles and latest result/hash reuse the original actual reader.
+
+Output explicitly says `selectedBatchResultPaymentObserved:true`, zero-based
+batchJobIndex, batchJobCount and `otherBatchJobsVerified:false`. Other jobs'
+asset, terms, worker, amounts and storage are NOT verified; never present this as
+a complete batch ledger, total, backing/fairness/identity/current-consent or full
+Syndicate approval. Stable selected settlement evidence IDs MUST be deduplicated;
+re-reading never creates another payment. Direct single-payment/result/refund
+APIs keep their strict routes and reject batch outer calls. No signing, writes,
+service, CLI or authority is added; all existing false flags remain.
+
+The same two-client20-confirmation/head-gap10/reread/real20-second monotonic-clock
+and failure fences apply. Historical height calls are not independent providers,
+EIP1898/ABA/finality, pre/post balances or legitimate-capital proof. First/last,
+1/16 boundaries, policy/transaction/event mutations and late-reader fencing are
+tested. The unchanged compiled ten-job escrow rehearsal feeds its two-asset
+batch into the actual observer for each job, replay identity and wrong-amount/
+legacy-route rejection, preserving all earlier balances/rollback/retry tests.
+Any test-only real-clock alignment precedes the unchanged reader; clocks, headers
+and production limits are never replaced. One zero-account local VM with copied
+source-matched artifacts is component evidence, not public custody or audit.

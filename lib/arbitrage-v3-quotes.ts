@@ -55,7 +55,7 @@ export function validateV3QuoteMarket(m: V3QuoteMarket) {
  * Buy uses exact OUTPUT and sell exact INPUT for the same raw token quantity.
  * Settlement units are the reviewed asset's own units, never a dollar-price estimate.
  */
-export async function readV3MarketQuote(
+async function observeV3MarketQuote(
   client: PublicClient, market: V3QuoteMarket, side: "buy" | "sell", tokenUnits: bigint,
   clock: () => number = Date.now,
 ) {
@@ -119,4 +119,39 @@ export async function readV3MarketQuote(
     pool, blockNumber, blockHash: block.hash, observedAtMs: finishedAt,
     gasEstimate, ticksCrossed, sqrtPriceAfter, executionAuthorized: false as const,
   };
+}
+
+
+/** One shared observation lifetime; read-only RPC work may remain in flight. */
+export async function readV3MarketQuote(
+  client: PublicClient, market: V3QuoteMarket, side: "buy" | "sell", tokenUnits: bigint,
+  clock: () => number = Date.now,
+) {
+  const start = clock();
+  let previous = start, ended = false, timer: ReturnType<typeof setTimeout> | undefined;
+  const time = () => {
+    const now = clock();
+    if (ended || !Number.isSafeInteger(start) || start < 0 || !Number.isSafeInteger(now)
+      || now < previous || now - start > 20_000) throw new Error("Quote observation ended, expired or clock moved backwards");
+    previous = now;
+    return now;
+  };
+  const methods = new Set(["getChainId", "getBlockNumber", "getBlock", "getCode", "readContract", "simulateContract"]);
+  const guarded = new Proxy(client, { get(target, key) {
+    const value = Reflect.get(target, key, target);
+    if (typeof key !== "string" || !methods.has(key) || typeof value !== "function") return value;
+    return async (...args: unknown[]) => {
+      time();
+      const result = await value.apply(target, args);
+      time();
+      return result;
+    };
+  } });
+  try {
+    time();
+    const deadline = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error("Quote observation timed out")), 20_000);
+    });
+    return await Promise.race([observeV3MarketQuote(guarded, market, side, tokenUnits, time), deadline]);
+  } finally { ended = true; clearTimeout(timer); }
 }

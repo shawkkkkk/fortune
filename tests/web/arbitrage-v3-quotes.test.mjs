@@ -123,3 +123,22 @@ test("operator CLI fails nonzero without exposing upstream or credential-bearing
   assert.match(result.stderr, /No transaction was submitted/);
   assert.doesNotMatch(result.stderr, /secret-user|secret-password|private-key|example.invalid|missing-manifest/);
 });
+
+test('V3 intermediate clock rollback above initial time rejects before simulation',async()=>{
+ await fixture(async client=>{let now=102_000,simulations=0;const observed={getChainId:()=>client.getChainId(),getBlockNumber:q=>client.getBlockNumber(q),getBlock:q=>client.getBlock(q),getCode:async q=>{now=103_000;return client.getCode(q);},readContract:q=>{now=102_500;return client.readContract(q);},simulateContract:q=>{simulations++;return client.simulateContract(q);}};
+  await assert.rejects(readV3MarketQuote(observed,market(),'buy',1000n,()=>now),/clock/);assert.equal(simulations,0);
+ });
+});
+for(const method of ['getBlockNumber','simulateContract'])test(`V3 real lifetime fences late ${method} completion`,{timeout:24000},async()=>{
+ await fixture(async(client,calls)=>{let release,timer;const observed=new Proxy(client,{get(target,key){const value=Reflect.get(target,key,target);if(typeof value!=='function')return value;if(key===method)return async(...args)=>{const result=await value.apply(target,args);return new Promise(r=>release=()=>r(result));};return (...args)=>value.apply(target,args);}});
+  const pending=readV3MarketQuote(observed,market(),'buy',1000n,()=>102_000);pending.catch(()=>{});
+  try{await assert.rejects(Promise.race([pending,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('OUTER deadline exceeded')),21500);})]),/Quote observation timed out/);
+   const before=calls.length;assert.equal(typeof release,'function');release();await new Promise(r=>setTimeout(r,30));assert.equal(calls.length,before,'late result cannot begin any follow-on RPC');
+  }finally{clearTimeout(timer);release?.();await pending.catch(()=>{});}
+ });
+});
+
+test('V3 lifetime preserves original method receivers and rejects unsafe clocks before RPC',async()=>{
+ await fixture(async client=>{let observed;observed=Object.fromEntries(['getChainId','getBlockNumber','getBlock','getCode','readContract','simulateContract'].map(key=>[key,function(...args){assert.equal(this,observed);return client[key](...args);} ]));assert.equal((await readV3MarketQuote(observed,market(),'sell',1000n,()=>102_000)).executionAuthorized,false);let calls=0;for(const now of [-1,NaN,Infinity,Number.MAX_SAFE_INTEGER+1])await assert.rejects(readV3MarketQuote({getChainId:async()=>{calls++;return 97;}},market(),'buy',1000n,()=>now));assert.equal(calls,0);
+ });
+});

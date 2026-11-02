@@ -48,3 +48,30 @@ Quote simulations have a fixed 2,000,000 gas cap. A route exceeding that simulat
 A read-only public BSC Testnet probe on October 27, 2026 reached the configured reference pool's identity/precision checks but timed out at QuoterV2. Its hashes were self-observed for compatibility testing, not independently approved pins. No successful live quote or route evidence is claimed from that attempt. The adapter now explicitly bounds simulation gas; a real route must still pass with its reviewed configuration and provider.
 
 Before enabling a route: retain the reviewed per-chain deployment manifests and fresh live/fork observations; add independent RPC/finality policy; verify canonical identity and settlement equivalence; reconcile dedicated balances, all costs and inventory; implement durable receipt accounting and enforced executor limits; rehearse adverse fills, partial legs, bridge delays, losses, restart/reorg and recovery. Neither a favorable quote nor this adapter's identity checks authorize spending. Optional strategy-token buybacks remain funded only from realized distributable strategy profit. No Fortune CA, live percentage, exact-price-parity or profit promise is introduced.
+
+
+## Shared quote observation lifetime
+
+The actual readV3MarketQuote engine has a fixed20-second rejecting wall deadline
+and safe nonnegative nondecreasing supplied-clock checks before/after every
+getChainId/getBlockNumber/getBlock/getCode/readContract/simulateContract RPC.
+Original client method receivers are preserved; finally fences success, failure
+and timeout. Late responses cannot begin follow-on RPCs or return a quote.
+In-flight requests are not canceled, and event-loop scheduling is not a process
+watchdog. The lifetime is shared across all reads, not a fresh20sec per call.
+Slow reads previously tolerated within maxBlockAgeMs may now reject earlier.
+
+The existing snapshot engine body, manifest cloning/validation, exact-input/output
+math,2million simulation gas cap, confirmations and block-number/hash/timestamp
+reread/freshness policy remain unchanged. The original block timestamp still
+sets quote age; observing/retrying does not refresh old state. No added retry,
+CLI/service configuration, signing, approvals, router calldata, spending or
+financial authority. executionAuthorized remains FALSE.
+
+Three old-source regressions failed: an intermediate clock rollback above the
+initial time and hung head/simulation reads exceeding21.5sec. The new real20sec
+wall tests release those actual HTTP/ABI results afterward and assert no
+follow-on RPC; separate tests preserve receivers and reject unsafe clocks before
+RPC. Existing buy/sell/provenance/spread/invalid-policy tests remain. Synthetic
+local HTTP/ABI fixtures are not independent providers, live venue routes,
+public execution, finality, profit, full M01/M07/M08 readiness or audit evidence.

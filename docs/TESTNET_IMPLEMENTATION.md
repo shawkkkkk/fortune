@@ -2,6 +2,17 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## V3 quote engine shared RPC lifetime
+
+The actual V3 reader now has one fixed20sec rejecting wall deadline, monotonic
+safe-clock fences around every RPC and finally fencing for all outcomes. Three
+old-source clock/hung-head/hung-simulation regressions failed. The snapshot/math
+engine body is preserved; original gas/freshness/block pins/false authority and
+CLI remain unchanged. Late results cannot begin follow-on reads; in-flight RPC
+is not canceled. This is read-runtime hardening, not executable venue/route,
+independent-provider, profit or complete agent/managed-liquidity readiness. See
+ARBITRAGE_V3_QUOTES.md.
+
 ## Holder-index Redis REST response lifetime
 
 The actual UpstashStore now rejects hung fetch/body reads at a real10-second

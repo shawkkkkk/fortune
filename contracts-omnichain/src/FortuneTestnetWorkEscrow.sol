@@ -245,6 +245,36 @@ contract FortuneTestnetWorkEscrow is ReentrancyGuard {
         emit ResultApproved(id, revision, resultHash);
     }
 
+    struct ResultApproval {
+        uint256 id;
+        uint256 revision;
+        bytes32 resultHash;
+    }
+
+    /// @notice Atomic whole payments for 1-16 exact latest results, only by their original client.
+    function approveResultsMany(ResultApproval[] calldata approvals) external chain97 open nonReentrant {
+        if (approvals.length == 0 || approvals.length > 16) revert InvalidResult();
+        uint256 previous;
+        // Validate every job before transferring any principal. No caller-selected recipient or amount.
+        for (uint256 i; i < approvals.length; ++i) {
+            ResultApproval calldata a = approvals[i];
+            if (a.id <= previous) revert InvalidResult();
+            previous = a.id;
+            Job storage j = jobs[a.id];
+            if (msg.sender != j.client) revert Unauthorized();
+            if (j.state != State.Accepted) revert WrongState();
+            if (
+                a.revision == 0 || a.revision != latestResultRevision[a.id] || a.resultHash == bytes32(0)
+                    || resultHashes[a.id][a.revision] != a.resultHash
+            ) revert InvalidResult();
+        }
+        for (uint256 i; i < approvals.length; ++i) {
+            ResultApproval calldata a = approvals[i];
+            _settle(a.id, jobs[a.id].amount);
+            emit ResultApproved(a.id, a.revision, a.resultHash);
+        }
+    }
+
     /// @notice Optional party dispute bound to the exact latest submitted result.
     mapping(uint256 => uint256) public disputedResultRevision;
     event ResultDisputed(uint256 indexed id, uint256 indexed revision, bytes32 resultHash, address openedBy);

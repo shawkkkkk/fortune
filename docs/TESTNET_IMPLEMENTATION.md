@@ -2,6 +2,21 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## Syndicate atomic revision-bound result approvals
+
+The isolated WorkEscrow adds client-only atomic approval of1–16 sorted job IDs,
+each bound to its exact latest submitted revision/hash before any payment.
+Existing exact whole-payment settlement preserves fixed workers, runtime/backing/
+liability checks and receipts; any later failure rolls back all earlier effects.
+Explicit retry/replay rejection and all legacy job paths/history/funding IDs are
+preserved. Unit/boundary/foreign-client/reentry/conservation fuzz tests and the
+compiled ten-job/two-asset local HTTP/ABI rehearsal cover stale rejection, late
+transfer rollback, exact retry and receipt fields. ONE zero-account fixture does
+not establish identity/delivery/IP/fairness/legal/legitimate capital/providers/
+public custody or full P19 readiness. Changed isolated runtime requires fresh
+deployment/audit evidence; no Standard/root pin/economic/authority/configuration
+or release-gate changes. See SYNDICATE_WORK_ESCROW.md.
+
 ## Local strategy deployment failure visibility
 
 The existing venue-fork rehearsal retains its failure status and all deadlines,

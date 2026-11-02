@@ -68,6 +68,10 @@ export type ReconciledCycle = {
   costs: ArbitrageCosts;
 };
 
+function canonicalCycleId(value: unknown): value is string {
+  return typeof value === "string" && value.length >= 1 && value.length <= 80 && !/[^A-Za-z0-9_-]/.test(value);
+}
+
 function canonicalReceiptId(value: unknown): value is string {
   return typeof value === "string" && /^(97|84532|11155111):0x[0-9a-f]{64}:(0|[1-9][0-9]{0,7})$/.test(value);
 }
@@ -79,10 +83,12 @@ function canonicalReceiptId(value: unknown): value is string {
 export function allocateRealizedProfit(ledger: ProfitLedger, cycle: ReconciledCycle): ProfitLedger {
   if (!Array.isArray(ledger.processedReceipts) || !Array.from(ledger.processedReceipts).every(canonicalReceiptId)
     || new Set(ledger.processedReceipts).size !== ledger.processedReceipts.length) throw new Error("Invalid stored receipt identities");
+  if (!Array.isArray(ledger.processedCycles) || !Array.from(ledger.processedCycles).every(canonicalCycleId)
+    || new Set(ledger.processedCycles).size !== ledger.processedCycles.length) throw new Error("Invalid stored cycle identities");
   const share = bps(ledger.policy.buybackBps);
   if (typeof ledger.policy.accountingAsset !== "string" || !/^[A-Za-z0-9:_-]{1,64}$/.test(ledger.policy.accountingAsset) || cycle.accountingAsset !== ledger.policy.accountingAsset) throw new Error("Settlement denomination differs from policy");
   amount(ledger.lossCarry); amount(ledger.buybackBudget); amount(ledger.retainedProfit);
-  if (cycle.reconciled !== true || cycle.inventoryDelta !== 0n || !/^[A-Za-z0-9_-]{1,80}$/.test(cycle.id)) throw new Error("Cycle must be reconciled with no unmatched inventory");
+  if (cycle.reconciled !== true || cycle.inventoryDelta !== 0n || !canonicalCycleId(cycle.id)) throw new Error("Cycle must be reconciled with no unmatched inventory");
   if (ledger.processedCycles.includes(cycle.id)) throw new Error("Cycle already processed");
   if (!Array.isArray(cycle.receiptIds) || cycle.receiptIds.length < 1 || cycle.receiptIds.length > 32 || new Set(cycle.receiptIds).size !== cycle.receiptIds.length
     || Array.from(cycle.receiptIds).some(r => !canonicalReceiptId(r) || ledger.processedReceipts.includes(r))) throw new Error("Invalid or reused receipt identity");

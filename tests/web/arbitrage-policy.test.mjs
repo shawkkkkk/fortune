@@ -79,3 +79,25 @@ test("noncanonical or duplicate stored receipt history fails closed without rewr
     assert.equal(allocateRealizedProfit(emptyProfitLedger("USD:6", 0), { ...cycle("3", 100n), receiptIds }).retainedProfit, 100n);
   }
 });
+
+test("cycle identifiers reject coerced aliases before allocating profit", () => {
+  for (const id of [1, 1n, true, ["1"], { toString: () => "1" }, null, undefined, "", "a".repeat(81), "1\n", "1 "]) {
+    const ledger = emptyProfitLedger("USD:6", 0);
+    assert.throws(() => allocateRealizedProfit(ledger, { ...cycle("1", 100n), id }));
+    assert.deepEqual(ledger, emptyProfitLedger("USD:6", 0));
+  }
+  for (const id of ["a", "A_1-9", "a".repeat(80)]) {
+    const ledger = allocateRealizedProfit(emptyProfitLedger("USD:6", 0), { ...cycle("1", 100n), id });
+    assert.deepEqual(ledger.processedCycles, [id]);
+    assert.throws(() => allocateRealizedProfit(ledger, { ...cycle("2", 100n), id }));
+  }
+});
+
+test("malformed stored cycle history fails closed without rewriting accounting", () => {
+  const ledger = allocateRealizedProfit(emptyProfitLedger("USD:6", 0), cycle("1", -30n));
+  for (const processedCycles of [undefined, "1", [1], [""], ["a".repeat(81)], ["1", "1"], Array(1)]) {
+    const input = { ...ledger, processedCycles }, before = structuredClone(input);
+    assert.throws(() => allocateRealizedProfit(input, cycle("2", 100n)));
+    assert.deepEqual(input, before);
+  }
+});

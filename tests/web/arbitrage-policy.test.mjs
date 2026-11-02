@@ -56,3 +56,26 @@ test("settlements retain the launch policy and cannot mix accounting denominatio
   assert.equal(second.buybackBudget, 60n);
   assert.throws(() => allocateRealizedProfit(first, { ...cycle("3", 100n), accountingAsset: "BNB:18" }));
 });
+
+test("receipt log indices reject leading-zero aliases before any profit allocation", () => {
+  const c = cycle("1", 100n), canonical = c.receiptIds[0].slice(0, -1) + "1", alias = canonical.slice(0, -1) + "01";
+  const ledger = allocateRealizedProfit(emptyProfitLedger("USD:6", 0), { ...c, receiptIds: [canonical] });
+  for (const receiptIds of [[alias], [canonical, alias]]) {
+    const input = structuredClone(ledger);
+    assert.throws(() => allocateRealizedProfit(input, { ...cycle("2", 100n), receiptIds }));
+    assert.deepEqual(input, ledger);
+  }
+});
+
+test("noncanonical or duplicate stored receipt history fails closed without rewriting history", () => {
+  const ledger = allocateRealizedProfit(emptyProfitLedger("USD:6", 0), cycle("1", 100n));
+  for (const processedReceipts of [[ledger.processedReceipts[0] + "0"], [ledger.processedReceipts[0], ledger.processedReceipts[0]]]) {
+    const input = { ...ledger, processedReceipts }, before = structuredClone(input);
+    assert.throws(() => allocateRealizedProfit(input, cycle("2", 100n)));
+    assert.deepEqual(input, before);
+  }
+  for (const index of ["0", "1", "99999999"]) {
+    const receiptIds = [ledger.processedReceipts[0].slice(0, -1) + index];
+    assert.equal(allocateRealizedProfit(emptyProfitLedger("USD:6", 0), { ...cycle("3", 100n), receiptIds }).retainedProfit, 100n);
+  }
+});

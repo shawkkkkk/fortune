@@ -68,18 +68,24 @@ export type ReconciledCycle = {
   costs: ArbitrageCosts;
 };
 
+function canonicalReceiptId(value: unknown): value is string {
+  return typeof value === "string" && /^(97|84532|11155111):0x[0-9a-f]{64}:(0|[1-9][0-9]{0,7})$/.test(value);
+}
+
 /** Caller must authenticate receipts and persist the returned ledger atomically.
  * This pure reducer cannot attest chain state, custody or ledger durability.
  * Allocating a buyback budget is NOT a successful buyback or burn.
  */
 export function allocateRealizedProfit(ledger: ProfitLedger, cycle: ReconciledCycle): ProfitLedger {
+  if (!Array.isArray(ledger.processedReceipts) || !ledger.processedReceipts.every(canonicalReceiptId)
+    || new Set(ledger.processedReceipts).size !== ledger.processedReceipts.length) throw new Error("Invalid stored receipt identities");
   const share = bps(ledger.policy.buybackBps);
   if (typeof ledger.policy.accountingAsset !== "string" || !/^[A-Za-z0-9:_-]{1,64}$/.test(ledger.policy.accountingAsset) || cycle.accountingAsset !== ledger.policy.accountingAsset) throw new Error("Settlement denomination differs from policy");
   amount(ledger.lossCarry); amount(ledger.buybackBudget); amount(ledger.retainedProfit);
   if (cycle.reconciled !== true || cycle.inventoryDelta !== 0n || !/^[A-Za-z0-9_-]{1,80}$/.test(cycle.id)) throw new Error("Cycle must be reconciled with no unmatched inventory");
   if (ledger.processedCycles.includes(cycle.id)) throw new Error("Cycle already processed");
-  if (cycle.receiptIds.length < 1 || cycle.receiptIds.length > 32 || new Set(cycle.receiptIds).size !== cycle.receiptIds.length
-    || cycle.receiptIds.some(r => !/^(97|84532|11155111):0x[0-9a-f]{64}:[0-9]{1,8}$/.test(r) || ledger.processedReceipts.includes(r))) throw new Error("Invalid or reused receipt identity");
+  if (!Array.isArray(cycle.receiptIds) || cycle.receiptIds.length < 1 || cycle.receiptIds.length > 32 || new Set(cycle.receiptIds).size !== cycle.receiptIds.length
+    || cycle.receiptIds.some(r => !canonicalReceiptId(r) || ledger.processedReceipts.includes(r))) throw new Error("Invalid or reused receipt identity");
   const net = amount(cycle.proceeds) - amount(cycle.purchaseCost) - costs(cycle.costs);
   const recovered = net > 0n ? (net < ledger.lossCarry ? net : ledger.lossCarry) : 0n;
   const distributable = net > 0n ? net - recovered : 0n;

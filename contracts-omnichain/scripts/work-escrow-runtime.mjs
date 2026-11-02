@@ -10,7 +10,7 @@ import {once} from 'node:events';
 import {createServer} from 'node:net';
 import {createPublicClient,createWalletClient,http,keccak256,toHex,decodeEventLog,decodeFunctionData} from 'viem';
 import {bscTestnet} from 'viem/chains';
-import {inspectWorkPaymentReceipt,inspectWorkResultPaymentReceipt,inspectWorkCancellationReceipt,inspectWorkExpiredCancellationReceipt,inspectWorkWorkerRefundReceipt} from '../../lib/work-payment-receipt.ts';
+import {inspectWorkPaymentReceipt,inspectWorkResultPaymentReceipt,inspectWorkCancellationReceipt,inspectWorkExpiredCancellationReceipt,inspectWorkWorkerRefundReceipt,inspectWorkArbitrationReceipt} from '../../lib/work-payment-receipt.ts';
 import {inspectWorkEscrowJob} from '../../lib/work-escrow-observation.ts';
 
 
@@ -116,7 +116,19 @@ try{
  assert.equal(await read(escrow,escrowArtifact,'reserved',[token]),100n);assert.equal((await read(escrow,escrowArtifact,'jobs',[three]))[7],3);
  assert.equal(await read(token,assetArtifact,'balanceOf',[WORKER]),100n);
  await write(GOV,token,assetArtifact,'configure',[false,false,'0x0000000000000000000000000000000000000000']);
- await write(ARB,escrow,escrowArtifact,'resolve',[three,60n]);
+ const arbitratedSplit=await write(ARB,escrow,escrowArtifact,'resolve',[three,60n]);
+ stage='separate compiled arbitration zero/full boundary receipts';
+ const edgeToken=await deploy(assetArtifact),edgePin=keccak256(await rpc.getCode({address:edgeToken}));
+ const edgeEscrow=await deploy(escrowArtifact,[GOV,GUARD,ARB,[{token:edgeToken,codeHash:edgePin,maxPerJob:1000n}]]);
+ await write(GOV,edgeEscrow,escrowArtifact,'setPaused',[false]);await write(GOV,edgeToken,assetArtifact,'mint',[CLIENT,20n]);await write(CLIENT,edgeToken,assetArtifact,'approve',[edgeEscrow,20n]);
+ for(const workerAmount of [0n,10n]){
+  const id=await read(edgeEscrow,escrowArtifact,'nextJob'),at=(await rpc.getBlock()).timestamp;
+  await write(CLIENT,edgeEscrow,escrowArtifact,'fund',[WORKER,edgeToken,10n,'0x'+'11'.repeat(32),at+100n,at+200n]);await write(WORKER,edgeEscrow,escrowArtifact,'accept',[id]);await write(CLIENT,edgeEscrow,escrowArtifact,'dispute',[id]);
+  const resolved=await write(ARB,edgeEscrow,escrowArtifact,'resolve',[id,workerAmount]);await rpc.request({method:'anvil_mine',params:['0x14','0x0']});
+  const policy={...await policyFor(id,10n),escrow:edgeEscrow.toLowerCase(),escrowCodeHash:keccak256(await rpc.getCode({address:edgeEscrow})),asset:edgeToken.toLowerCase(),assetCodeHash:edgePin,transactionHash:resolved.transactionHash,workerAmount:workerAmount.toString()};
+  const observed=await inspectWorkArbitrationReceipt(observers,policy);assert.equal(observed.workerPaid,workerAmount.toString());assert.equal(observed.clientRefund,(10n-workerAmount).toString());assert.equal(resolved.logs.length,2);assert.equal(observed.executionAuthorized,false);
+ }
+ assert.equal(await read(edgeToken,assetArtifact,'balanceOf',[CLIENT]),10n);assert.equal(await read(edgeToken,assetArtifact,'balanceOf',[WORKER]),10n);assert.equal(await read(edgeEscrow,escrowArtifact,'reserved',[edgeToken]),0n);
  stage='expired unaccepted job returns only client funding';
  const four=await fund(30n);await rpc.request({method:'evm_increaseTime',params:[101]});await rpc.request({method:'evm_mine'});
  await write(WORKER,escrow,escrowArtifact,'accept',[four],false);const expiredRefund=await write(GOV,escrow,escrowArtifact,'cancel',[four]);
@@ -155,6 +167,12 @@ try{
  await assert.rejects(inspectWorkExpiredCancellationReceipt(observers,{...expiryPolicy,caller:WORKER}));
  const {caller,...expiredBase}=expiryPolicy;await assert.rejects(inspectWorkCancellationReceipt(observers,expiredBase));
  await assert.rejects(inspectWorkExpiredCancellationReceipt(observers,{...cancelPolicy,caller:GOV}));
+ const arbitrationPolicy={...await policyFor(three,100n),transactionHash:arbitratedSplit.transactionHash,workerAmount:'60'};
+ const arbitration=await inspectWorkArbitrationReceipt(observers,arbitrationPolicy);assert.equal(arbitration.workerPaid,'60');assert.equal(arbitration.clientRefund,'40');assert.equal(arbitration.directArbitrationObserved,true);assert.equal(arbitration.disputeFairnessVerified,false);assert.equal(arbitration.executionAuthorized,false);
+ assert.equal((await inspectWorkArbitrationReceipt(observers,arbitrationPolicy)).evidenceId,arbitration.evidenceId);
+ await assert.rejects(inspectWorkArbitrationReceipt(observers,{...arbitrationPolicy,workerAmount:'59'}));
+ const {workerAmount,...arbitrationBase}=arbitrationPolicy;await assert.rejects(inspectWorkPaymentReceipt(observers,arbitrationBase));await assert.rejects(inspectWorkCancellationReceipt(observers,arbitrationBase));
+ await assert.rejects(inspectWorkArbitrationReceipt(observers,{...paymentPolicy,workerAmount:'100'}));
  const resultPayment=await inspectWorkResultPaymentReceipt(observers,resultPaymentPolicy);assert.deepEqual(resultPayment.approvedResult,{revision:'2',resultHash:resultB});assert.equal(resultPayment.workerPaid,'20');assert.equal(resultPayment.executionAuthorized,false);
  assert.equal((await inspectWorkResultPaymentReceipt(observers,resultPaymentPolicy)).evidenceId,resultPayment.evidenceId);
  await assert.rejects(inspectWorkResultPaymentReceipt(observers,{...resultPaymentPolicy,revision:'1'}));
@@ -281,7 +299,7 @@ try{
  // The earlier expiry drill advanced VM time by101sec; keep the fresh-state
  // observer's original checks before that jump. Batch evidence here is exact
  // transaction receipts and stored state/history, not a fresh-state observation.
- const result={chainId:97,workerDeclineReceiptObserved:true,workerWaiverReceiptObserved:true,workerRefundEvidenceIdsStable:true,staleWaiverReceiptRevisionRejected:true,workerRefundPaymentCancellationReadersSeparated:true,expiredCancellationReceiptObserved:true,expiredCancellationEvidenceIdStable:true,wrongExpiryCallerRejected:true,directExpiredCancellationReadersSeparated:true,directClientCancellationReceiptObserved:true,cancellationEvidenceIdStable:true,wrongCancellationAmountRejected:true,paymentCancellationReadersSeparated:true,directResultPaymentReceiptObserved:true,resultPaymentEvidenceIdStable:true,wrongResultRevisionRejected:true,legacyReaderRejectsResultReceipt:true,directWholePaymentReceiptObserved:true,repeatedPaymentEvidenceIdStable:true,wrongPaymentAmountRejected:true,atomicResultBatchReceiptsBound:true,staleLaterResultBatchRejected:true,lateBatchPaymentFailureRollsBackAll:true,exactResultBatchRetrySucceeded:true,resultBatchReplayRejected:true,actualWorkJobCliStatesMatched:true,actualWorkJobCliResultHistoryMatched:true,settledCliDoesNotInferPayment:true,actualPinnedJobStatesObserved:true,pausedJobObserved:true,actualResultHistoryObserved:true,foreignTermsObservationRejected:true,settledStorageDoesNotInferPayment:true,revisionBoundDisputeReceiptObserved:true,staleResultDisputeRejected:true,disputedRevisionSurvivesSettlement:true,localOnly:true,clientScopedFundingIdObserved:true,fundedApprovedReplayRejectedBeforeAndAfterSettlement:true,compiledWorkEscrowDeployed:true,fundedJobs:10,settledJobs:10,workerDeclineRefundReceiptBound:true,inexactDeclinePreservesFundedLiability:true,declinedJobCannotBeAcceptedOrCancelled:true,workerWaiverRefundReceiptBound:true,staleWaiverRejected:true,inexactWaiverPreservesLiability:true,clientApprovalReceiptBound:true,workerResultHistoryObserved:true,revisionBoundPaymentReceiptObserved:true,staleResultApprovalRejected:true,inexactResultPaymentRetainsLiability:true,
+ const result={chainId:97,arbitratedSplitReceiptObserved:true,arbitrationZeroAndFullReceiptsObserved:true,arbitrationEvidenceIdStable:true,wrongArbitratedAmountRejected:true,arbitrationPaymentCancellationReadersSeparated:true,workerDeclineReceiptObserved:true,workerWaiverReceiptObserved:true,workerRefundEvidenceIdsStable:true,staleWaiverReceiptRevisionRejected:true,workerRefundPaymentCancellationReadersSeparated:true,expiredCancellationReceiptObserved:true,expiredCancellationEvidenceIdStable:true,wrongExpiryCallerRejected:true,directExpiredCancellationReadersSeparated:true,directClientCancellationReceiptObserved:true,cancellationEvidenceIdStable:true,wrongCancellationAmountRejected:true,paymentCancellationReadersSeparated:true,directResultPaymentReceiptObserved:true,resultPaymentEvidenceIdStable:true,wrongResultRevisionRejected:true,legacyReaderRejectsResultReceipt:true,directWholePaymentReceiptObserved:true,repeatedPaymentEvidenceIdStable:true,wrongPaymentAmountRejected:true,atomicResultBatchReceiptsBound:true,staleLaterResultBatchRejected:true,lateBatchPaymentFailureRollsBackAll:true,exactResultBatchRetrySucceeded:true,resultBatchReplayRejected:true,actualWorkJobCliStatesMatched:true,actualWorkJobCliResultHistoryMatched:true,settledCliDoesNotInferPayment:true,actualPinnedJobStatesObserved:true,pausedJobObserved:true,actualResultHistoryObserved:true,foreignTermsObservationRejected:true,settledStorageDoesNotInferPayment:true,revisionBoundDisputeReceiptObserved:true,staleResultDisputeRejected:true,disputedRevisionSurvivesSettlement:true,localOnly:true,clientScopedFundingIdObserved:true,fundedApprovedReplayRejectedBeforeAndAfterSettlement:true,compiledWorkEscrowDeployed:true,fundedJobs:10,settledJobs:10,workerDeclineRefundReceiptBound:true,inexactDeclinePreservesFundedLiability:true,declinedJobCannotBeAcceptedOrCancelled:true,workerWaiverRefundReceiptBound:true,staleWaiverRejected:true,inexactWaiverPreservesLiability:true,clientApprovalReceiptBound:true,workerResultHistoryObserved:true,revisionBoundPaymentReceiptObserved:true,staleResultApprovalRejected:true,inexactResultPaymentRetainsLiability:true,
   workerPaidUnits:'284',workerSecondAssetPaidUnits:'80',clientFinalUnits:'1716',clientSecondAssetFinalUnits:'920',finalReserved:'0',cancellationAndExpiryRefundedClient:true,disputeSplitSettled:true,
   governorCannotArbitrate:true,guardianCannotOpen:true,pausedPaymentRejected:true,duplicatePaymentRejected:true,inexactSplitRetainsLiability:true,explicitRetrySucceeded:true,
   generatedAccounts:0,privateKeysUsed:false,publicBroadcasts:false,independentProvidersVerified:false,workDeliveryVerified:false,

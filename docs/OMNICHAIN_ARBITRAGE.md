@@ -42,3 +42,19 @@ Cycle labels remain caller assertions: different valid IDs plus different receip
 can describe duplicate economic intent. This pure reducer does not authenticate
 receipts, prove legitimate capital, persist atomic state, reconcile reorgs or
 authorize purchases/burns. No buyback percentage, service or release gate is enabled.
+
+## Fill-journal commit clock
+
+`ArbitrageFillJournal.record` checks safe, nonnegative, nondecreasing host time
+and the original verified fill's 60-second observation age before `BEGIN
+IMMEDIATE`, after lock acquisition and immediately before successful insert or
+revalidation commit. A blocked writer cannot publish a fill that expired while
+waiting. Rejection rolls back its transaction; no timestamp or trust is renewed.
+Conflict/sibling quarantine remains persistent and has no automatic restore.
+
+Tests use actual temporary SQLite files, including a separate process holding a
+write lock while a shifted host clock crosses the existing age limit; no limits
+are widened. This tests commit admission, not wall-clock trust, a general
+filesystem deadline, power-loss durability, independent providers, or atomicity
+across the journal/gas book/queue. The host remains trusted, and a clock can change
+after the last check. No signer, service, financial action or release gate changes.

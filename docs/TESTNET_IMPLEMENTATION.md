@@ -2,6 +2,17 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## Journal commit freshness under write contention (M01/M07/M08)
+
+The actual durable fill journal validates a safe nonnegative monotonic host clock
+and receipt age before opening its transaction, after the SQLite write lock, and
+before successful insert/revalidation commit. An expired or reversed observation
+rolls back; conflict quarantine commits remain conservative. Two old-source
+regressions include a real competing SQLite writer across the 60-second boundary.
+This is local commit validation, not atomic multi-store settlement, signing,
+provider independence, recovery or complete strategy readiness. Existing schema,
+WAL/FULL, deduplication and release gates remain. See OMNICHAIN_ARBITRAGE.md.
+
 ## Strict realized-profit cycle identities (M01/M07/M08)
 
 The actual pure reducer requires literal string cycle IDs and validates all stored

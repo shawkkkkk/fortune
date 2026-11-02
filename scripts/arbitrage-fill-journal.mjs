@@ -28,13 +28,22 @@ export class ArbitrageFillJournal {
     return this.#db.prepare("UPDATE fills SET state='quarantined' WHERE receipt_id LIKE ?").run(`${this.#market.chainId}:${txHash.toLowerCase()}:%`).changes;
   }
   record(fill) {
-    if (!isVerifiedFill(fill) || fill.marketHash !== this.#marketHash || Date.now() - fill.observedAtMs > 60_000 || fill.observedAtMs > Date.now()) throw new Error("Fresh verified receipt for this exact market required");
+    if (!isVerifiedFill(fill) || fill.marketHash !== this.#marketHash) throw new Error("Fresh verified receipt for this exact market required");
+    let previous = Date.now();
+    const fresh = (now = Date.now()) => {
+      if (!Number.isSafeInteger(now) || now < 0 || !Number.isSafeInteger(previous) || now < previous
+        || !Number.isSafeInteger(fill.observedAtMs) || fill.observedAtMs < 0 || now < fill.observedAtMs
+        || now - fill.observedAtMs > 60_000) throw new Error("Journal clock invalid, reversed or verified receipt expired");
+      previous = now;
+    };
+    fresh(previous);
     // Re-verification times may differ; economic and block evidence must be identical.
     const { observedAtMs: _time, ...evidence } = fill;
     const payload = JSON.stringify(evidence);
     this.#db.exec("BEGIN IMMEDIATE");
     let conflict = false;
     try {
+      fresh(); // BEGIN IMMEDIATE can wait for a competing writer.
       // A reorg can change the swap log index and therefore receipt_id. Bind all
       // observations of this transaction before permitting a new row.
       const siblings = this.#db.prepare("SELECT receipt_id FROM fills WHERE receipt_id LIKE ? AND receipt_id<>?")
@@ -56,11 +65,13 @@ export class ArbitrageFillJournal {
           conflict = true;
         } else if (existing.state === "quarantined") throw new Error("Receipt remains quarantined");
         else this.#db.prepare("UPDATE fills SET observed_at_ms=? WHERE receipt_id=?").run(fill.observedAtMs, fill.receiptId);
+        if (!conflict) fresh();
         this.#db.exec("COMMIT");
         if (conflict) throw new Error("Receipt changed; journal quarantined it");
         return { inserted: false, receiptId: fill.receiptId, executionAuthorized: false };
       }
       this.#db.prepare("INSERT INTO fills VALUES(?,?,?,?,'observed')").run(fill.receiptId, payload, fill.blockHash, fill.observedAtMs);
+      fresh();
       this.#db.exec("COMMIT");
       return { inserted: true, receiptId: fill.receiptId, executionAuthorized: false };
     } catch (e) { try { this.#db.exec("ROLLBACK"); } catch {} throw e; }

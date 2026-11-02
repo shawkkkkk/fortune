@@ -106,3 +106,59 @@ test("two worker processes racing the same receipt commit exactly one journal ro
     const db = new ArbitrageFillJournal(path, market()); assert.equal(db.list().length, 1); db.close();
   } finally { children.forEach(child => child.kill()); rmSync(dir, { recursive: true, force: true }); }
 });
+
+test("journal rejects unsafe or expired host clocks before publishing a durable observation", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "fortune-journal-clock-"));
+  const realNow = Date.now;
+  try {
+    const r = await fill();
+    for (const values of [[NaN], [-1], [Number.MAX_SAFE_INTEGER + 1], [r.observedAtMs, r.observedAtMs + 60001], [r.observedAtMs + 1, r.observedAtMs], [r.observedAtMs, r.observedAtMs, r.observedAtMs + 60001], [r.observedAtMs + 1, r.observedAtMs + 1, r.observedAtMs]]) {
+      const db = new ArbitrageFillJournal(join(dir, String(Math.random()) + ".sqlite"), market());
+      let index = 0; Date.now = () => values[Math.min(index++, values.length - 1)];
+      try { assert.throws(() => db.record(r)); }
+      finally { Date.now = realNow; }
+      assert.equal(db.list().length, 0); db.close();
+    }
+  } finally { Date.now = realNow; rmSync(dir, { recursive: true, force: true }); }
+});
+
+test("actual SQLite write-lock wait cannot admit a receipt that expires while blocked", { timeout: 20000 }, async () => {
+  const dir = mkdtempSync(join(tmpdir(), "fortune-journal-lock-")), path = join(dir, "fills.sqlite");
+  const db = new ArbitrageFillJournal(path, market()), realNow = Date.now;
+  let child;
+  try {
+    const r = await fill();
+    child = spawn(process.execPath, ["--input-type=module", "-e", `
+      import { DatabaseSync } from 'node:sqlite';
+      const db=new DatabaseSync(process.argv[1]); db.exec('BEGIN IMMEDIATE');
+      process.send('locked'); setTimeout(()=>{db.exec('COMMIT');db.close();process.disconnect();},1000);
+    `, path], { stdio: ["ignore", "ignore", "pipe", "ipc"] });
+    const exited = once(child, "exit"), [message] = await once(child, "message");
+    assert.equal(message, "locked");
+    const start = realNow(), offset = r.observedAtMs + 59500 - start;
+    Date.now = () => realNow() + offset;
+    try { assert.throws(() => db.record(r)); }
+    finally { Date.now = realNow; }
+    assert.ok(realNow() - start >= 500, "actual write lock held across the freshness boundary");
+    assert.equal(db.list().length, 0);
+    assert.equal((await exited)[0], 0);
+    db.close();
+    const reopened = new ArbitrageFillJournal(path, market());
+    assert.equal(reopened.list().length, 0); reopened.close();
+  } finally { Date.now = realNow; child?.kill(); try {db.close();} catch {} rmSync(dir, { recursive: true, force: true }); }
+});
+
+
+test("expired journal replay rolls back timestamp update and preserves the original durable row", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "fortune-journal-replay-clock-")), path = join(dir, "fills.sqlite"), realNow = Date.now;
+  let db;
+  try {
+    db = new ArbitrageFillJournal(path, market());
+    db.record(await fill()); const before = db.list();
+    const replay = await fill(); let calls = 0;
+    Date.now = () => replay.observedAtMs + (++calls >= 3 ? 60001 : 0);
+    try { assert.throws(() => db.record(replay)); } finally { Date.now = realNow; }
+    assert.deepEqual(db.list(), before); db.close();
+    db = new ArbitrageFillJournal(path, market()); assert.deepEqual(db.list(), before);
+  } finally { Date.now = realNow; db?.close(); rmSync(dir, { recursive: true, force: true }); }
+});

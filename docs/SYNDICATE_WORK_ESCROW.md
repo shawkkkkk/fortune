@@ -456,3 +456,46 @@ no inference of these routes from settled storage is permitted. The actual
 compiled ten-job rehearsal observes job two's50-unit direct client cancellation,
 stable evidence reread, wrong-amount rejection and both payment/cancellation
 route directions. One zero-account local fixture is component evidence only.
+
+
+## Separate expired-job third-party cancellation observer
+
+inspectWorkExpiredCancellationReceipt takes WorkExpiredCancellationPolicy:
+the strict WorkPaymentPolicy plus one explicit lowercase nonzero caller.
+The caller must differ from the original client and escrow. It strips caller
+before invoking the existing strict base-policy validator; unknown fields still
+reject before RPC. Only direct zero-native cancel(jobId) is supported. The
+receipt and transaction sender and canonical JobSettled settledBy must equal
+that caller. At the receipt height, the stored job acceptBy must be strictly
+less than the matching block timestamp: before and exactly at expiry reject.
+The whole-principal Transfer recipient stays the original client, never caller.
+The exactly-two adjacent-event requirement and all other runtime/role/asset/job,
+block/transaction/log/index, confirmation/head-gap and reread checks remain.
+
+Output adds cancellationCaller and a separate source label; the same stable
+chain/escrow/transaction/settlement-log ID MUST be deduplicated. workerPaid is
+zero, clientRefund is whole principal and directCancellationObserved is true.
+Existing direct-client cancellation/payment/result APIs keep exact old output
+and route restrictions; direct-client and third-party cancellation readers
+mutually reject. No ledger/totals/badge or financial action is supplied. Old
+storage observer/CLI NULL payment/transaction semantics and all escrow methods
+remain unchanged. No CLI/HTTP/MCP/service/real config is introduced.
+
+The existing REAL20sec safe monotonic clock/failure fences cover every outcome;
+in-flight reads are not cancelled. Historical receipts have no freshness-age
+bound, future headers reject. Trusted host/policy/clock/RPC height reads are
+not independent provider/EIP1898/ABA/canonicality/finality proof. This does not
+establish pre/post balances, legitimate funding, current consent, global solvency,
+identity, delivery, IP/license, fairness or legal agreement. currentAuthorization
+is NULL and all provider/finality/capital/identity/delivery/global-solvency/
+execution/full-readiness flags stay false. A governor observed calling the
+public expired-job refund method is not new governor privilege or authority.
+
+The compiled ten-job fixture uses the existing30-unit job four cancelled by the
+governor after the existing101sec expiry jump. It reads that older receipt only
+after the already bounded real-host-clock alignment for job five; no header,
+host clock, reader lifetime, confirmation check or workflow budget is altered.
+Stable ID/wrong caller/direct-vs-expired route checks are included. Two clients
+of ONE zero-account local fixture are not public custody/provider or audit proof.
+Worker decline/waiver, arbitrated splits, batches and smart-wallet outer calls
+remain unsupported by these receipt APIs and require separate integration.

@@ -2,6 +2,22 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## Syndicate expired-job third-party refund receipts
+
+A separate explicit read-only API verifies a direct caller other than the original
+client cancel(id), requiring receipt-block timestamp strictly after the stored
+acceptBy deadline, caller-bound transaction/JobSettled and whole principal
+Transfer back to the original client. Existing direct-client cancellation and
+payment/result APIs retain their exact routes. The compiled rehearsal feeds job
+four's governor-triggered expired refund after the existing bounded real-clock
+alignment, without changing the20sec reader or any contract/workflow time limit.
+Old observer/CLI payment fields remain NULL; no signer/service, financial
+execution, root pin, economics or release gate is enabled. Caller labels and
+matching receipts do not prove independent providers, pre/post balances,
+legitimate capital, current consent, legal approval, public custody or full P19.
+Worker decline/waiver, arbitration and batch receipt integration remain separate.
+See SYNDICATE_WORK_ESCROW.md.
+
 ## Syndicate direct client cancellation receipts
 
 A separate explicit read-only cancellation API uses the existing pinned receipt

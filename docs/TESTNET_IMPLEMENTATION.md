@@ -2,6 +2,20 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## Coherent all-entry Syndicate result-batch observation (P19)
+
+An explicit library API now requires one fully validated policy per call entry,
+preflights all policies before RPC, then invokes the actual selected-payment
+engine for every job under one shared20-second failure/clock lifetime. All
+receipts must share one bounded byte-consistency digest and receipt header;
+per-job payment units and stable IDs stay separate. No partial result, totals,
+consumed ledger, signing, execution, capital/provider/finality/identity or full
+readiness claim. Existing selected/direct readers and contract behavior remain.
+The compiled two-asset ten-job runtime consumes all-entry observation, replay and
+late-amount rejection while preserving previous assertions. No Standard/root
+pin/economic/configuration/authority/release gate changes. See
+SYNDICATE_WORK_ESCROW.md for checksum, custody and historical trust boundaries.
+
 ## Selected Syndicate batch-result receipt integration (P19)
 
 A separate explicit read-only API verifies one selected job in exactly bound

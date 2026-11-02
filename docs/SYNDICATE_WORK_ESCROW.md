@@ -660,3 +660,39 @@ legacy-route rejection, preserving all earlier balances/rollback/retry tests.
 Any test-only real-clock alignment precedes the unchanged reader; clocks, headers
 and production limits are never replaced. One zero-account local VM with copied
 source-matched artifacts is component evidence, not public custody or audit.
+
+## Coherent observation of every result-batch entry
+
+`inspectAllWorkBatchResultPayments(clients, policies)` is a separate library API.
+It requires exactly one full selected-job policy for every1–16 calldata entry,
+in call order. ALL policies are detached and validated before RPC. Missing,
+repeated, reordered or conflicting entries/transaction/escrow/client/role pins,
+and conflicting runtime/cap pins for the same asset, reject without RPC.
+
+It invokes the actual selected-payment engine for every entry, under one shared
+real20-second deadline and monotonic safe-clock fences around all seven RPC
+methods. Original receivers are preserved. Every receipt read from every job and
+both clients must have one identical normalized, bounded receipt/log fingerprint;
+all outputs must agree on receipt block/hash/timestamp and have distinct stable
+settlement IDs. The digest is a consistency checksum, NOT authentication or an
+independent chain anchor. Failure or expiry discards the whole result and fences
+all jobs' follow-on calls; in-flight RPC is not canceled and event-loop scheduling
+is not a process watchdog. Existing per-job lifetime/finality limits remain.
+
+Output `allCallEntriesObserved:true` means all supplied exact call entries were
+observed together through trusted configured RPC. `payments` retains each original
+selected observation and its own narrow-scope `otherBatchJobsVerified:false`;
+the envelope combines their coverage without changing those individual claims.
+Amounts remain separate in each payout asset's own units. No cross-asset total,
+consumed ledger, capital origin, solvency, identity, delivery/IP, current consent,
+provider independence, finality, execution or full Syndicate readiness follows.
+All authority/readiness flags remain false and currentAuthorization stays null.
+Existing selected-only/direct APIs and all contract methods remain available.
+
+Tests cover complete1/2/16-entry coverage, zero-RPC whole-policy preflight,
+late-job mismatches, changing unselected receipt bytes, method receivers and the
+actual20sec timeout/failed-peer fence. The unchanged compiled two-asset ten-job
+runtime consumes the aggregate observer, matches both original payment IDs,
+checks a stable replay digest and rejects a wrong later amount while preserving
+old settlement/rollback/retry assertions. ONE zero-account local VM is not a
+public custody service, independent provider, audit or full P19/mainnet approval.

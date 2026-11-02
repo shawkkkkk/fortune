@@ -1,6 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {keccak256,parseAbi,encodeFunctionData} from 'viem';
-import {inspectWorkBatchResultPaymentReceipt,inspectWorkPaymentReceipt,inspectWorkResultPaymentReceipt,inspectWorkCancellationReceipt,inspectWorkExpiredCancellationReceipt,inspectWorkWorkerRefundReceipt,inspectWorkArbitrationReceipt} from '../../lib/work-payment-receipt.ts';
+import {inspectAllWorkBatchResultPayments,inspectWorkBatchResultPaymentReceipt,inspectWorkPaymentReceipt,inspectWorkResultPaymentReceipt,inspectWorkCancellationReceipt,inspectWorkExpiredCancellationReceipt,inspectWorkWorkerRefundReceipt,inspectWorkArbitrationReceipt} from '../../lib/work-payment-receipt.ts';
 const a=n=>'0x'+n.toString(16).padStart(40,'0'),h=n=>'0x'+n.toString(16).padStart(64,'0'),w=n=>BigInt(n).toString(16).padStart(64,'0');
 const code='0x60006000f3',pin=keccak256(code),sig=s=>keccak256(new TextEncoder().encode(s));
 const policy=()=>({chainId:97,escrow:a(1),escrowCodeHash:pin,governor:a(2),guardian:a(3),arbitrator:a(4),jobId:'1',client:a(5),worker:a(6),amount:'100',asset:a(7),assetCodeHash:pin,maxPerJob:'1000',termsHash:h(1),transactionHash:h(9)});
@@ -74,3 +74,24 @@ test('batch binding preflight and selected calldata/log/state mutations fail clo
  const f=resultFixture(),{revision,resultHash,...p}=f.p;await assert.rejects(inspectWorkBatchResultPaymentReceipt(f.clients,{...p,approvals:[{id:p.jobId,revision,resultHash}]}));
 });
 test('selected batch uses original real deadline and fences late peer reads',{timeout:25000},async()=>{const f=batchFixture(1);let release,follow=0;f.clients[1].getBlockNumber=()=>new Promise(r=>release=r);f.clients[1].getChainId=async()=>{follow++;return 97;};await assert.rejects(inspectWorkBatchResultPaymentReceipt(f.clients,f.p),/timed out/);release(100n);await new Promise(r=>setImmediate(r));assert.equal(follow,0);});
+
+function allBatchFixture(count=2){const f=batchFixture(0,count);f.policies=f.p.approvals.map(a=>({...structuredClone(f.p),jobId:a.id}));return f;}
+test('all-job batch observer covers every entry with one receipt digest, preserving per-asset units and replay IDs',async()=>{
+ for(const count of [1,2,16]){const f=allBatchFixture(count),x=await inspectAllWorkBatchResultPayments(f.clients,f.policies);assert.equal(x.allCallEntriesObserved,true);assert.equal(x.payments.length,count);assert.equal(new Set(x.payments.map(p=>p.evidenceId)).size,count);assert.equal(x.executionAuthorized,false);assert.equal(x.currentAuthorization,null);assert.equal(x.fullSyndicateReadiness,false);const again=await inspectAllWorkBatchResultPayments(f.clients,f.policies);assert.equal(again.receiptConsistencyDigest,x.receiptConsistencyDigest);assert.deepEqual(again.payments.map(p=>p.evidenceId),x.payments.map(p=>p.evidenceId));}
+});
+test('all-job complete policy preflight rejects omissions/duplicates/late malformed or mixed bindings with zero RPC',async()=>{
+ const f=allBatchFixture();let calls=0;const c={getBlockNumber:async()=>{calls++;}};
+ const variants=[[],f.policies.slice(0,1),[f.policies[1],f.policies[0]],[f.policies[0],f.policies[0]],[f.policies[0],{...f.policies[1],amount:'0'}],[f.policies[0],{...f.policies[1],transactionHash:h(99)}],[f.policies[0],{...f.policies[1],assetCodeHash:h(99)}],[f.policies[0],{...f.policies[1],termsHash:'bad'}]];
+ for(const p of variants)await assert.rejects(inspectAllWorkBatchResultPayments([c,{}],p));assert.equal(calls,0);
+ for(const change of [g=>g.r.logs[3].data='0x'+w(99),g=>g.r.logs[5].data=h(99)]){const g=allBatchFixture();change(g);await assert.rejects(inspectAllWorkBatchResultPayments(g.clients,g.policies));}
+});
+test('all-job observer rejects changing unselected receipt bytes and preserves original method receivers',async()=>{
+ const f=allBatchFixture(),r=structuredClone(f.r);r.logs[3].data='0x'+w(42);
+ for(const c of f.clients){let n=0;c.getTransactionReceipt=async()=>structuredClone((n++%2)?r:f.r);}
+ await assert.rejects(inspectAllWorkBatchResultPayments(f.clients,f.policies),/receipt observations differ/);
+ const g=allBatchFixture();for(const c of g.clients)for(const key of ['getChainId','getBlockNumber','getBlock','getTransactionReceipt','getTransaction','getCode','readContract']){const old=c[key];c[key]=function(...a){assert.equal(this,c);return old.apply(c,a);};}await inspectAllWorkBatchResultPayments(g.clients,g.policies);
+});
+test('all-job shared real20sec deadline fences every delayed job and failed peer without follow-on reads',{timeout:25000},async()=>{
+ const f=allBatchFixture();let releases=[],follow=0;f.clients[1].getBlockNumber=()=>new Promise(r=>releases.push(r));f.clients[1].getChainId=async()=>{follow++;return 97;};await assert.rejects(inspectAllWorkBatchResultPayments(f.clients,f.policies),/timed out/);for(const r of releases)r(100n);await new Promise(r=>setImmediate(r));assert.equal(follow,0);
+ const g=allBatchFixture();let late=[];g.clients[0].getBlockNumber=async()=>{throw Error('peer');};g.clients[1].getBlockNumber=()=>new Promise(r=>late.push(r));g.clients[1].getChainId=async()=>{follow++;return 97;};await assert.rejects(inspectAllWorkBatchResultPayments(g.clients,g.policies));for(const r of late)r(100n);await new Promise(r=>setImmediate(r));assert.equal(follow,0);
+});

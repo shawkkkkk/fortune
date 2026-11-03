@@ -2,6 +2,14 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## Precise local LP custody failure locations (M07 diagnostics)
+
+The unchanged local fork lifecycle now labels each custody substep and reports
+only a bounded initial public fork height on failure. Calls, assertions, budgets,
+failure exits and pass-artifact rules remain unchanged; errors and RPC payloads
+stay private. These diagnostics do not classify PR187's two failed main LP jobs
+or establish readiness. See MANAGED_LIQUIDITY_READER.md.
+
 ## Disabled funding-receipt operator integration (P19 component)
 
 The explicit `inspect-work-funding.mjs` CLI calls the unchanged direct funding

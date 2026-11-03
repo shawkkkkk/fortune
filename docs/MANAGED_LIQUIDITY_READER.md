@@ -98,3 +98,20 @@ finality/ABA protection. Raw liquidity/last-computed owed, null claimable/value,
 false execution/readiness and existing venue/ownership/runtime pins remain.
 No custody, LP mutation, financial authority, contract/dependency/configuration,
 frozen Standard or release-gate changes follow. Full M07 remains unfinished.
+
+
+## Local custody drill failure evidence
+
+The local fork drill reports fixed substep labels for deployment, NFT approval,
+opening/deposit, held-state and policy observations, rejection assertions,
+pausing/release and treasury observations. A failed run also reports its initial
+public fork block as a positive uint64 decimal, or `unknown` before a valid height
+was obtained. No raw exception, provider URL, address, transaction hash/calldata or
+Anvil stderr is added. The last selected substep is location evidence, not a cause.
+The recorded initial fork height is not a later custody snapshot or finality proof.
+
+Every existing call, assertion, timeout, cleanup, failure exit and pass-artifact
+rule remains. No retry, transaction replacement, mining or clock change is added.
+The two PR187 post-main failures remain unclassified; new diagnostics cannot
+retroactively explain or approve them. One local VM is not independent providers,
+public custody, legitimate capital, full M07 readiness or audit approval.

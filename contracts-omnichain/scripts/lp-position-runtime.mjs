@@ -17,7 +17,7 @@ const GOV = "0x0000000000000000000000000000000000001111";
 const TREASURY = "0x0000000000000000000000000000000000003333";
 const E18 = 10n ** 18n, Q96 = 1n << 96n;
 const artifact = (file, name) => JSON.parse(readFileSync(new URL(`../out/${file}/${name}.json`, import.meta.url), "utf8"));
-let node, stage = "initialization";
+let node, forkBlock, stage = "initialization";
 const folder = mkdtempSync(join(tmpdir(), "fortune-strategy-runtime-"));
 // A failed repeat must not leave an old passing artifact available to CI.
 rmSync(resolve(".tmp/lp-position-runtime.json"), { force: true });
@@ -50,7 +50,7 @@ try {
     await new Promise(r => setTimeout(r, 100));
   }
   assert.ok(ready);
-  const forkBlock = await rpc.getBlockNumber({ cacheTime: 0 });
+  forkBlock = await rpc.getBlockNumber({ cacheTime: 0 });
   assert.deepEqual(await rpc.request({ method: "eth_accounts" }), [], "Anvil generated no wallet accounts or keys");
   stage = "local VM account provisioning";
   for (const who of [GOV]) {
@@ -98,40 +98,58 @@ try {
   stage = "actual pinned position custody";
   const custodyArtifact = artifact("FortuneTestnetPositionCustody.sol", "FortuneTestnetPositionCustody");
   const custodyPin = p => ({ target: p.address, codeHash: p.codeHash });
+  stage = "custody contract deployment";
   const custody = await deploy(custodyArtifact, [GOV, "0x0000000000000000000000000000000000002222", TREASURY, {
     manager: custodyPin(policy.manager), factory: custodyPin(policy.factory), pool: custodyPin(policy.pool),
     token0: custodyPin(policy.token0), token1: custodyPin(policy.token1), positionId: tokenId, fee: 500,
     tickLower: -887270, tickUpper: 887270, expectedLiquidity: BigInt(first.liquidityUnits),
   }]);
+  stage = "custody NFT approval";
   await write(GOV, POSITIONS, parseAbi(["function approve(address,uint256)"]), "approve", [custody, tokenId]);
+  stage = "custody opening";
   await write(GOV, custody, custodyArtifact.abi, "setPaused", [false]);
+  stage = "custody NFT deposit";
   await write(GOV, custody, custodyArtifact.abi, "deposit");
+  stage = "custody held flag";
   assert.equal(await read(custody, custodyArtifact.abi, "held"), true);
   await rpc.request({method: "anvil_mine", params: ["0x14"]});
+  stage = "former-owner rejection";
   await assert.rejects(inspectLiquidityPosition(readers, policy));
+  stage = "held-position observation";
   const held = await inspectLiquidityPosition(readers, {...policy, owner: custody});
   assert.equal(held.owner, custody.toLowerCase()); assert.equal(held.liquidityUnits, first.liquidityUnits);
+  stage = "custody runtime pin";
   const custodyReadPolicy = {...policy, custody: await pin(custody), governor: GOV,
     guardian: "0x0000000000000000000000000000000000002222", treasury: TREASURY,
     tickLower: -887270, tickUpper: 887270, expectedLiquidity: first.liquidityUnits};
   delete custodyReadPolicy.owner;
+  stage = "held custody policy observation";
   const heldState = await inspectLiquidityCustody(readers, custodyReadPolicy);
+  stage = "held custody output assertions";
   assert.equal(heldState.held, true); assert.equal(heldState.paused, false);
   assert.equal(heldState.position.liquidityUnits, first.liquidityUnits);
   assert.equal(heldState.currentAuthorization, null); assert.equal(heldState.executionAuthorized, false);
+  stage = "foreign-treasury rejection";
   await assert.rejects(inspectLiquidityCustody(readers, {...custodyReadPolicy, treasury: GOV}));
   stage = "paused fixed-treasury release";
   await write(GOV, custody, custodyArtifact.abi, "releaseToTreasury", [], false);
+  stage = "custody pausing";
   await write(GOV, custody, custodyArtifact.abi, "setPaused", [true]);
   await rpc.request({method: "anvil_mine", params: ["0x14"]});
+  stage = "paused custody observation";
   assert.equal((await inspectLiquidityCustody(readers, custodyReadPolicy)).paused, true);
+  stage = "fixed-treasury release";
   await write(GOV, custody, custodyArtifact.abi, "releaseToTreasury");
+  stage = "released custody flags";
   assert.equal(await read(custody, custodyArtifact.abi, "released"), true);
   assert.equal(await read(custody, custodyArtifact.abi, "held"), false);
   await write(GOV, custody, custodyArtifact.abi, "releaseToTreasury", [], false);
   await rpc.request({method: "anvil_mine", params: ["0x14"]});
+  stage = "former-owner rejection";
   await assert.rejects(inspectLiquidityPosition(readers, policy));
+  stage = "released-custody rejection";
   await assert.rejects(inspectLiquidityCustody(readers, custodyReadPolicy));
+  stage = "treasury-position observation";
   const transferred = await inspectLiquidityPosition(readers, {...policy, owner: TREASURY});
   assert.equal(transferred.owner, TREASURY.toLowerCase());
   assert.equal(transferred.liquidityUnits, first.liquidityUnits);
@@ -143,7 +161,12 @@ try {
   mkdirSync(resolve(".tmp"), {recursive: true});
   writeFileSync(resolve(".tmp/lp-position-runtime.json"), JSON.stringify(result,null,2)+"\n");
   console.log(JSON.stringify(result,null,2));
-} catch { console.error(`Local LP observation verification failed at ${stage}; no public transaction was submitted.`); process.exitCode=1; }
+} catch {
+  // Fixed local labels and a bounded public height only; never print exceptions or RPC data.
+  const sourceBlock = typeof forkBlock === "bigint" && forkBlock > 0n && forkBlock < (1n << 64n) ? forkBlock.toString() : "unknown";
+  console.error(`Local LP observation verification failed at ${stage}; source fork block ${sourceBlock}; no public transaction was submitted.`);
+  process.exitCode=1;
+}
 finally {
   if(node && node.exitCode===null){node.kill("SIGTERM");const force=setTimeout(()=>node.kill("SIGKILL"),3000);await once(node,"exit").catch(()=>{});clearTimeout(force);}
   rmSync(folder,{recursive:true,force:true});

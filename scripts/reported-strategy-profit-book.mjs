@@ -143,6 +143,7 @@ export class ReportedStrategyProfitBook {
       for (const id of d.receiptIds) this.#db.prepare("INSERT INTO profit_receipts VALUES(?,?)").run(id, sequence);
       const ended = time(this.#now()); if (ended < s.now) throw Error("Book clock moved backwards");
       this.#db.prepare("UPDATE profit_book SET last_clock=? WHERE singleton=1").run(ended);
+      if (time(this.#now()) < ended) throw Error("Book clock moved backwards");
       this.#db.exec("COMMIT;"); return { inserted: true, sequence, digest, recordedAtMs: s.now, ...flags() };
     } catch (e) { try { this.#db.exec("ROLLBACK;"); } catch {} throw e; }
   }

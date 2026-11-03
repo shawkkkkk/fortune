@@ -2,6 +2,16 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## Reported-profit append completion clock (M01/M07/M08)
+
+The actual durable reported-profit book checks its clock after metadata writes
+and before commit. A reproduced late reversal now rolls back all three tables;
+reopen/explicit retry and a valid advancing final clock preserve original record
+time, digest and retry semantics. No schema, reducer, allocation, recovery or
+authority changes. Host time remains trusted and can change after the final
+sample; no global clock/power-loss certification is implied. See
+REPORTED_STRATEGY_PROFIT_BOOK.md. Standard/root pins and release gates remain.
+
 ## Character-policy descriptor bounds (P02/P03/P06 security)
 
 The actual historical reader, pinned provenance reader and revalidator now read

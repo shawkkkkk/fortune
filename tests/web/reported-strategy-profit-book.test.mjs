@@ -144,3 +144,32 @@ try{const r=b.appendReportedCycle({expectedHead:head,cycle:{id,accountingAsset:'
     }
   } finally { b?.close(); f.clean(); }
 });
+
+test("post-metadata invalid or reversed clock rolls back all profit tables and allows only explicit retry", () => {
+  for (const final of [1015, -1, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1]) {
+    const f = fixture(); let b, samples = [1000], i = 0;
+    try {
+      b = f.open({ now: () => samples[Math.min(i++, samples.length - 1)] });
+      const head = b.read().head, before = rows(f.path), request = { cycle: cycle("late_clock"), expectedHead: head };
+      samples = [1000, 1010, 1020, final]; i = 0;
+      assert.throws(() => b.appendReportedCycle(request), /clock/);
+      assert.deepEqual(rows(f.path), before); b.close(); b = f.open();
+      assert.equal(b.read().total, 0); assert.deepEqual(rows(f.path), before);
+      assert.equal(b.appendReportedCycle(request).inserted, true); assert.equal(b.read().total, 1);
+    } finally { b?.close(); f.clean(); }
+  }
+});
+
+test("valid final clock check preserves original record, digest and metadata sample without retry renewal", () => {
+  const f = fixture(); let b, samples = [1000], i = 0;
+  try {
+    b = f.open({ now: () => samples[Math.min(i++, samples.length - 1)] });
+    const head = b.read().head, request = { cycle: cycle("late_valid"), expectedHead: head };
+    samples = [1000, 1010, 1020, 1030]; i = 0;
+    const result = b.appendReportedCycle(request);
+    assert.equal(result.recordedAtMs, 1010); assert.equal(rows(f.path)[0][0].last_clock, 1020);
+    b.close(); b = f.open({ now: () => 2000 }); const before = rows(f.path);
+    const retry = b.appendReportedCycle(request); assert.equal(retry.inserted, false);
+    assert.equal(retry.digest, result.digest); assert.equal(retry.recordedAtMs, 1010); assert.deepEqual(rows(f.path), before);
+  } finally { b?.close(); f.clean(); }
+});

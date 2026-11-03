@@ -90,3 +90,8 @@ test('64-batch capacity never prunes or makes RPC for a new batch; original retr
  f.count(1);const {b,path}=openBook(f);try{const initial=b.read().head;for(let n=1;n<=64;n++){f.tx(100+n);f.start(n);await b.capture(f.clients,f.inputs(),b.read().head);}assert.equal(b.read().total,64);assert.equal(rows(path)[2].length,64);const before=rows(path),calls=f.calls();f.tx(165);f.start(65);await assert.rejects(b.capture(f.clients,f.inputs(),b.read().head),/capacity/);assert.equal(f.calls(),calls);assert.deepEqual(rows(path),before);f.tx(101);f.start(1);const r=await b.capture(f.clients,f.inputs(),initial);assert.equal(r.inserted,false);assert.equal(r.sequence,1);assert.deepEqual(rows(path),before);
  }finally{b.close();}
 }));
+
+test('capture clock covers the read-only preflight without restarting its monotonic sequence',async()=>rpcFixture(async f=>{
+ const base=Date.now()+1000;let samples=[base],i=0;const path=join(f.dir,'clock.sqlite');Book.initialize(path,bookPolicy(),{enabled:true,now:base-100});const b=new Book(path,bookPolicy(),{enabled:true,readOnly:false,now:()=>samples[Math.min(i++,samples.length-1)]});
+ try{const head=b.read().head,before=rows(path);samples=[base,base+20,base+15,base+30];i=0;await assert.rejects(b.capture(f.clients,f.inputs(),head),/clock/);assert.equal(f.calls(),0);assert.deepEqual(rows(path),before);}finally{b.close();}
+}));

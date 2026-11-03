@@ -12,6 +12,7 @@ const SCHEMA=[
 ];
 const sha=v=>createHash('sha256').update(JSON.stringify(v)).digest('hex');
 const time=v=>{if(!Number.isSafeInteger(v)||v<0)throw Error('Invalid observation clock');return v;};
+const operationClock=now=>{let last=time(now());return()=>{const current=time(now());if(current<last)throw Error('Observation clock moved backwards');last=current;return current;};};
 const address=v=>typeof v==='string'&&/^0x[0-9a-f]{40}$/.test(v)&&!/^0x0+$/.test(v);
 const hash=v=>typeof v==='string'&&/^0x[0-9a-f]{64}$/.test(v)&&!/^0x0+$/.test(v);
 const exact=(v,keys)=>{if(!v||![Object.prototype,null].includes(Object.getPrototypeOf(v))||Reflect.ownKeys(v).sort().join()!==[...keys].sort().join()||Object.values(Object.getOwnPropertyDescriptors(v)).some(d=>!('value'in d)))throw Error('Literal observation fields required');};
@@ -61,11 +62,11 @@ export class WorkBatchObservationBook{
   for(const [i,r]of rows.entries()){const parsed=JSON.parse(r.document);exact(parsed,['policies','observation']);const d=document(parsed.policies,parsed.observation,this.#policy);if(r.sequence!==i+1||r.transaction_hash!==d.observation.transactionHash||r.previous!==head||time(r.recorded_at)<last||r.recorded_at>m.last_clock||time(r.observed_at)>r.recorded_at||r.recorded_at-r.observed_at>5000||JSON.stringify(d)!==r.document||r.digest!==sha([1,m.book_id,this.#policy,r.sequence,r.previous,r.recorded_at,r.observed_at,d]))throw Error('Observation history differs');for(const x of d.observation.payments)receipts.push({evidence_id:x.evidenceId,job_id:x.jobId,sequence:r.sequence});head=r.digest;last=r.recorded_at;}
   receipts.sort((a,b)=>a.evidence_id<b.evidence_id?-1:a.evidence_id>b.evidence_id?1:0);if(JSON.stringify(receipts)!==JSON.stringify(this.#db.prepare('SELECT evidence_id,job_id,sequence FROM batch_receipts ORDER BY evidence_id').all()))throw Error('Observation index differs');return {m,rows,head};
  }
- read(){const now=time(this.#now());this.#db.exec('BEGIN;');try{const s=this.#scan(now);if(time(this.#now())<now)throw Error('Observation clock moved backwards');return {schemaVersion:1,bookId:s.m.book_id,policy:{...this.#policy},head:s.head,total:s.rows.length,quarantined:s.m.blocked===1,entries:s.rows.map(r=>({sequence:r.sequence,previous:r.previous,digest:r.digest,recordedAtMs:r.recorded_at,readerObservedAtMs:r.observed_at,...JSON.parse(r.document)})),...flags()};}finally{this.#db.exec('ROLLBACK;');}}
+ #snapshot(clock){const now=clock();this.#db.exec('BEGIN;');try{const s=this.#scan(now);clock();return {schemaVersion:1,bookId:s.m.book_id,policy:{...this.#policy},head:s.head,total:s.rows.length,quarantined:s.m.blocked===1,entries:s.rows.map(r=>({sequence:r.sequence,previous:r.previous,digest:r.digest,recordedAtMs:r.recorded_at,readerObservedAtMs:r.observed_at,...JSON.parse(r.document)})),...flags()};}finally{this.#db.exec('ROLLBACK;');}}
+ read(){return this.#snapshot(operationClock(this.#now));}
  async capture(clients,input,expectedHead){
   if(this.#readOnly)throw Error('Observation book is read-only');if(typeof expectedHead!=='string'||!/^[0-9a-f]{64}$/.test(expectedHead))throw Error('Expected observation head required');const inputs=literal(input);if(Buffer.byteLength(JSON.stringify(inputs))>65536)throw Error('Observation input bound');bind(inputs,this.#policy);
-  const first=this.read(),prior=first.entries.find(x=>x.observation.transactionHash===inputs[0].transactionHash);if(first.quarantined)throw Error('Observation book quarantined');if(prior?prior.previous!==expectedHead:first.head!==expectedHead||first.total>=LIMIT)throw Error('Observation head or capacity differs');
-  let last=time(this.#now());const clock=()=>{const now=time(this.#now());if(now<last)throw Error('Observation clock moved backwards');last=now;return now;};
+  const clock=operationClock(this.#now),first=this.#snapshot(clock),prior=first.entries.find(x=>x.observation.transactionHash===inputs[0].transactionHash);if(first.quarantined)throw Error('Observation book quarantined');if(prior?prior.previous!==expectedHead:first.head!==expectedHead||first.total>=LIMIT)throw Error('Observation head or capacity differs');
   const observed=await inspectAllWorkBatchResultPayments(clients,inputs);clock();const d=document(inputs,observed,this.#policy),payload=JSON.stringify(d);
   const fresh=()=>{const now=clock();if(!Number.isSafeInteger(observed.observedAtMs)||observed.observedAtMs<0||now<observed.observedAtMs||now-observed.observedAtMs>5000)throw Error('Observation commit expired');return now;};fresh();
   this.#db.exec('BEGIN IMMEDIATE;');try{

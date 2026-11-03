@@ -2,6 +2,16 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## Creator registry filesystem target binding (P02/P06 security)
+
+The actual creator registry now rejects SQLite memory/URI targets before filesystem
+or policy/SQLite access. A real old-source fixture imported authorization history
+into shared memory behind an empty literal file, then lost it on close; ordinary
+disk paths preserved records and replay rejection. Two early predicates preserve
+schema, signatures, clocks, RPC fences and null/false authority. URI configurations
+need operator inspection, never silent stripping, reinitialization or revision
+reset. See CREATOR_CANON_REGISTRY.md; no migration/recovery or real creator proof.
+
 ## Agent contribution and release qualification guides (P24 documentation)
 
 Root agent instructions, contribution/setup guidance, an implementation work queue,

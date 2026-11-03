@@ -2,6 +2,17 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## Compiled work observation rollback/conflict drill (P19 reconciliation)
+
+A separate zero-account local VM connects actual compiled two-asset batch
+payments to the unchanged all-job reader and durable observation book. Missing
+receipts after VM rollback reject without changing history; an actually valid
+alternate payment for the same jobs must trigger persistent conflict quarantine.
+Original times/head/entries survive reopen, and quarantined capture fails before
+RPC. Readers preserve chain state. This is one local fixture, not independent
+providers, public reorg/finality, retained storage, recovery or full P19 readiness.
+See WORK_BATCH_OBSERVATION_BOOK.md; contracts/readers/book/old drills unchanged.
+
 ## Notebook Buffer memory-path guard (P03/P18 security)
 
 The notebook's existing memory-target guard now includes Buffer paths before

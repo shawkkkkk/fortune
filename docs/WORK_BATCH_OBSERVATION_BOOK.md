@@ -138,3 +138,28 @@ local operator provenance, not current authorization, payment authority or a
 financial consumed-receipt ledger. Privacy permission remains required before
 sharing real identifiable provenance with any external client/model. No real
 configuration is enabled here; full P19/readiness and all release gates remain.
+
+
+## Compiled local rollback and positive conflict drill
+
+`contracts-omnichain/scripts/work-observation-reorg-runtime.mjs` runs a separate
+zero-account chain-97 local VM with the actual compiled WorkEscrow and two
+synthetic assets. It records a paid two-job batch through the actual all-job
+receipt reader and SQLite book, rolls the VM back before payment, and checks
+that missing receipts reject without changing stored history. Missing-receipt
+rejection does **not** automatically quarantine or revalidate saved observations.
+
+A different local transaction then pays the same jobs on the alternate branch.
+The actual reader must accept that new complete receipt before the book rejects
+it as a positive job conflict and durably quarantines. Original entries, receipt
+IDs, digests, record/observation times and head remain unchanged; reopening stays
+blocked before RPC. Reader/book calls must leave chain head, wallet nonces,
+synthetic balances and liabilities unchanged. Only explicit local VM actions
+change the fixture chain. No existing lifecycle drill is modified.
+
+This demonstrates one controlled local rollback, not a public reorg, provider
+independence, finality, automatic canonicality monitoring or recovery. The two
+clients use one fixture. Temporary SQLite storage is deleted after the drill;
+it is not retained backup or power-loss evidence. Quarantine has no reset API.
+Historical observations remain untrusted and confer no payment, badge, identity,
+capital-origin, delivery, custody or execution authority. Full P19 remains gated.

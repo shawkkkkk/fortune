@@ -1,13 +1,8 @@
-import {readFileSync,statSync} from 'node:fs';
+import {readCharacterPolicyBytes as policyBytes} from './character-policy-bytes.mjs';
 import {characterRecordReader} from './character-record-reader.mjs';
 import {revalidateCharacterRecord} from './revalidate-character-record.mjs';
 import {projectToken} from '../lib/project-canon.ts';
 
-function policyBytes(path){
-  if(statSync(path).size>16384)throw Error('Policy bound');
-  const bytes=readFileSync(path);if(bytes.length>16384)throw Error('Policy bound');
-  return bytes;
-}
 /** Explicit operator opt-in: fresh observation only, never stored or session authority. */
 export function characterProvenanceReader(config,clients,{now=Date.now}={}){
   const fixed=Object.freeze({path:config.path,policyPath:config.policyPath,token:projectToken(config.token)});

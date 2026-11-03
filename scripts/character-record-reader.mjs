@@ -1,4 +1,4 @@
-import { readFileSync,statSync } from 'node:fs';
+import {readCharacterPolicyBytes} from './character-policy-bytes.mjs';
 import { recoverAddress } from 'viem';
 import { CreatorCanonRegistry } from './creator-canon-registry.mjs';
 import { canonPolicy } from '../lib/creator-canon-authorization.ts';
@@ -7,8 +7,8 @@ import { projectToken } from '../lib/project-canon.ts';
 /** Opt-in disclosure of a historical local record; never merges into live API canon. */
 export function characterRecordReader({path,policyPath,token,now=Date.now}) {
   token=projectToken(token);
-  if(!path||!policyPath||statSync(policyPath).size>16384)throw Error('Character record configuration');
-  const bytes=readFileSync(policyPath);if(bytes.length>16384)throw Error('Character policy bound');
+  if(!path||!policyPath)throw Error('Character record configuration');
+  const bytes=readCharacterPolicyBytes(policyPath);
   const policy=canonPolicy(JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes)));
   if(policy.token!==token)throw Error('Different project');
   // Validate existing storage at startup too. No creation, migration or write connection.

@@ -221,3 +221,21 @@ bytes; positive120-second boundaries pass. This is completion admission under
 trusted host clock/RPCs, not independent providers, finality, current login,
 renewed signatures, publication, filesystem deadlines or release readiness.
 Time can still advance after the final sample.
+
+## Bounded policy descriptors
+
+The historical character reader, startup-pinned provenance reader and standalone
+revalidator use a shared policy-byte reader. It opens with O_RDONLY|O_NONBLOCK,
+checks that the opened descriptor is regular and at most16 KiB, reads at most
+16 KiB+1 into bounded storage, and closes in finally. Existing strict UTF8/JSON,
+policy validation and literal byte comparisons remain in their original callers.
+Regular-file symlinks continue to work; FIFO targets, including symlinks to them,
+are rejected before reading or RPC. Growing files cannot bypass the byte cap.
+
+Three Linux child-process regressions time out against old source on writerless
+FIFOs; final tests reject those policies and preserve valid16-KiB inputs, regular
+symlinks and unchanged read-only SQLite bytes. FIFO tests skip on Windows. This
+is not a generic filesystem deadline, privileged-host file-swap defense, Windows
+FIFO guarantee or durability certification. Existing clocks,20-second RPC limit,
+completion freshness, signatures, schema, disclosure and authority gates remain.
+No policy/profile/provider/service is enabled, and full readiness is unfinished.

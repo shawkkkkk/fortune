@@ -78,3 +78,27 @@ read/capture result retains null current authorization and false execution,
 provider independence, finality, capital-origin, identity, delivery, solvency and
 full-readiness flags. No CLI, HTTP, MCP, scheduler, signer or financial adapter is
 added. Full P19/testnet readiness/audit handoff and all release gates remain.
+
+## Compiled local escrow integration
+
+The zero-account WorkEscrow runtime now feeds its existing actual two-asset
+`approveResultsMany` receipt through the unchanged book. It compares the stored
+receipt digest/IDs, per-asset payments, reader/recording timestamps and one-batch/
+two-job SQLite index against the existing receipt-reader observations. Read-only
+reopen and explicit replay preserve the entire stored view; a wrong later-job
+policy rejects without changing or quarantining the valid history.
+
+Before/after height, all fixture-role latest/pending nonces, escrow/client/worker
+asset balances and per-asset reserved liabilities must remain unchanged during
+book operations. Only temporary SQLite storage is written. The test deletes the
+book afterward; retained reports/logs are not a retained database or power-loss
+certificate. Existing ten-job and separate worker-submission lifecycles remain.
+
+This is one local VM with compiled escrow and synthetic assets, using VM
+impersonation and zero generated accounts/keys/public broadcasts. Two read clients
+are not independent providers. The integration does not exercise an actual
+chain reorg or conflicting positive receipt against this compiled VM; those book
+conflict cases remain HTTP-fixture evidence. It does not establish public custody,
+legitimate capital, live deployment, identity, delivery, IP, fairness, consensus,
+financial settlement, full P19 readiness or audit/mainnet approval. No book,
+reader, contract, Standard/root pins, authority or release gate is changed.

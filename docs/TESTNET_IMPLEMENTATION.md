@@ -2,6 +2,20 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## Saved character + live project Co-Pilot integration (M02/P02/P06)
+
+An explicitly enabled local Co-Pilot mode combines the actual saved-character
+reader, public project brief and two-client provenance revalidator. Policy and
+history preflight, creator/factory binding, final record/policy rereads and one
+shared lifetime discard stale or changed inputs. A deterministic announcement
+copies literal saved wording with a source revision/digest and required review;
+blanks remain blank. Separate plaintext disclosure review is required; no model,
+registry write, public canon, publishing, login or financial authority is added.
+Actual child CLI/HTTP ABI/SQLite tests cover the composition, private failures
+and disabled gates. One fixture is not independent-provider/real-creator proof;
+full M02/P02/P06 and release readiness remain unfinished. See
+CREATOR_CHARACTER_BRIEF.md. Existing modes/Standard/root pins and gates remain.
+
 ## Creator import commit checks (P02/P06)
 
 The actual creator registry now checks its original observation window, signed

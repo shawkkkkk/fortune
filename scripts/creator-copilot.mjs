@@ -2,7 +2,15 @@
 import { readCreatorProjectBrief } from "../lib/creator-project-brief.ts";
 import { selectCreatorHelp } from "../lib/creator-copilot.ts";
 try {
-  if (process.argv[2] === "--brief") {
+  if (process.argv[2] === "--character-brief") {
+    if (process.argv.length !== 6 || process.env.FORTUNE_COPILOT_CHARACTER_BRIEF_ENABLED !== "true" || process.env.FORTUNE_COPILOT_CHARACTER_DISCLOSURE_REVIEWED !== "true") throw Error("Character brief disabled");
+    const {readCreatorCharacterBrief}=await import('./creator-character-brief.mjs');
+    const {createPublicClient,http}=await import('viem');
+    const urls=[process.env.FORTUNE_CANON_READ_RPC_URL,process.env.FORTUNE_CANON_SECONDARY_RPC_URL].map(x=>new URL(x||''));
+    if(urls.some(u=>u.protocol!=='https:'||u.username||u.password||u.hash)||urls[0].origin===urls[1].origin)throw Error('Reviewed origins required');
+    const readers=urls.map(u=>createPublicClient({transport:http(u.href,{timeout:8000,retryCount:0,fetchOptions:{redirect:'error'}})}));
+    console.log(JSON.stringify(await readCreatorCharacterBrief({token:process.argv[3],path:process.argv[4],policyPath:process.argv[5]},readers,{enabled:true,discloseLocalCharacter:true}),null,2));
+  } else if (process.argv[2] === "--brief") {
     if (process.argv.length !== 4 || process.env.FORTUNE_COPILOT_PROJECT_BRIEF_ENABLED !== "true") throw Error("Brief disabled or arguments");
     console.log(JSON.stringify(await readCreatorProjectBrief(process.argv[3]), null, 2));
   } else {

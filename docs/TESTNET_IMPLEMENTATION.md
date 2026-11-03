@@ -2,6 +2,18 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## Complete batch payment operator integration (P19)
+
+A separate default-disabled local command now invokes the actual unchanged
+all-job result-payment observer. Complete1–16 policies, bounded strict UTF8 and
+literal before/after pins bind the existing two-provider read engine; output
+retains per-asset units, stable dedup IDs, null authorization and false authority.
+Actual child CLI/HTTP ABI tests cover1/2/16jobs, replay, later-job failures,
+preflight, provider restrictions and64-KiB/FIFO bounds. No writes, financial
+actions, ledger, service or real configuration added; fixture evidence is not
+provider independence, legitimate capital, public custody or full P19 readiness.
+See WORK_BATCH_PAYMENT_CLI.md. Standard/root pins and release gates remain.
+
 ## Reported-profit append completion clock (M01/M07/M08)
 
 The actual durable reported-profit book checks its clock after metadata writes

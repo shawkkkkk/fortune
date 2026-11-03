@@ -161,3 +161,14 @@ strip/decode the URI, initialize an empty replacement, refresh the expected head
 or assume that vanished in-memory history can be recovered. This adds no
 migration, history repair, automatic recovery, backup or power-loss guarantee.
 Stored research remains unverified; operator and MCP disclosure gates remain.
+
+The memory-sentinel comparison also covers Buffer paths accepted by Node SQLite.
+Only comparison uses `String(path)`; the original path is passed unchanged to the
+filesystem and SQLite. Ordinary Buffer disk paths retain append/reopen/retry
+behavior. Before this correction, Buffer memory initialization returned success
+while only an empty literal file survived; opening Buffer memory reached SQLite
+and failed its schema check instead of rejecting before access. This does not
+show an accepted note in that isolated memory connection or recover lost state.
+No schema, history, clock, retry, permission or RPC behavior changes. Stop and
+inspect any memory-target configuration; never initialize a replacement or reset
+its history to hide an uncertain outcome.

@@ -190,3 +190,34 @@ test('expiry and clock rollback during network reads do not commit an authorizat
     }finally{s.book.close();s.cleanup();}
   }
 });
+
+
+test('creator import commit fences reject expiry, stale observations and reversed clocks after SQLite writes',async()=>{
+  for(const stage of ['INSERT INTO canon_versions','UPDATE canon_policy'])for(const advance of [5001,300000,-1,NaN]){
+    const s=setup();let time=now,armed=false;const original=DatabaseSync.prototype.prepare;
+    try{
+      s.book.close();s.book=new CreatorCanonRegistry(s.path,policy,{now:()=>time});
+      const p=s.book.prepare(fields),creator=await creatorFor(p);
+      DatabaseSync.prototype.prepare=function(sql){const statement=original.call(this,sql);
+        if(armed&&sql.startsWith(stage)){const run=statement.run;statement.run=function(...args){const result=run.apply(this,args);time=now+advance;return result;};}
+        return statement;};
+      armed=true;await assert.rejects(s.book.accept(envelope(p),clients(creator)),/Authorization|clock|Clock/);
+      armed=false;time=now;assert.equal(s.book.latest(),null);s.book.close();
+      s.book=new CreatorCanonRegistry(s.path,policy,{now:()=>now});assert.equal(s.book.latest(),null);
+      const db=new DatabaseSync(s.path,{readOnly:true});try{assert.equal(db.prepare('SELECT last_clock FROM canon_policy').get().last_clock,now);}finally{db.close();}
+      await s.book.accept(envelope(p),clients(creator));assert.equal(s.book.latest().update.revision,1);
+    }finally{DatabaseSync.prototype.prepare=original;s.book.close();s.cleanup();}
+  }
+});
+
+test('creator import persists the valid post-insert clock without renewing signed update or RPC evidence',async()=>{
+  const s=setup();let time=now,armed=false;const original=DatabaseSync.prototype.prepare;
+  try{
+    s.book.close();s.book=new CreatorCanonRegistry(s.path,policy,{now:()=>time});const p=s.book.prepare(fields),creator=await creatorFor(p);
+    DatabaseSync.prototype.prepare=function(sql){const statement=original.call(this,sql);if(armed&&sql.startsWith('INSERT INTO canon_versions')){
+      const run=statement.run;statement.run=function(...args){const result=run.apply(this,args);time=now+100;return result;};}return statement;};
+    armed=true;await s.book.accept(envelope(p),clients(creator));armed=false;
+    const record=s.book.latest();assert.deepEqual(record.update,p.update);assert.equal(record.acceptedAtMs,now);assert.equal(record.evidence.observedAtMs,now);
+    const db=new DatabaseSync(s.path,{readOnly:true});try{assert.equal(db.prepare('SELECT last_clock FROM canon_policy').get().last_clock,now+100);}finally{db.close();}
+  }finally{DatabaseSync.prototype.prepare=original;s.book.close();s.cleanup();}
+});

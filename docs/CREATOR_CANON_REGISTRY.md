@@ -185,3 +185,21 @@ schema, typed payload, authentication, expiry, RPC policy, publication or wallet
 authority changes. Regular-file symlinks retain existing follow behavior; this
 is not privileged path-swap defense, a general filesystem deadline or a Windows
 FIFO guarantee. Failures retain private diagnostics and no accepted version.
+
+
+## Import commit checks
+
+The import transaction rechecks safe monotonic host time after inserting the
+version and again after updating its persisted clock, before COMMIT. The original
+five-second observation-admission window and signed-update expiry still apply;
+no timestamp, signature or RPC evidence is renewed. Rejection rolls back both the
+version and clock update, allowing an explicitly reviewed retry. The valid
+post-insert time is persisted; a later valid final-check time is only admission,
+not a renewed authorization timestamp. Existing accepted-at/evidence fields stay
+unchanged. Actual SQLite statement instrumentation in tests advances or reverses
+the supplied clock after real writes and verifies rollback/reopen and retry.
+
+This is a local commit guard, not a filesystem deadline or proof of trusted host
+clock, independent providers, power-loss durability, current creator login,
+publication permission or financial authority. Time can change after the final
+sample. Existing signature, RPC, schema, five-second and release gates remain.

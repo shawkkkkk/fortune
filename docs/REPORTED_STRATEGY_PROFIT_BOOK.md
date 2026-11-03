@@ -142,3 +142,15 @@ retry/reopen, stale heads, duplicate labels, input bounds and disabled/foreign
 identity rejection against real temporary SQLite files. These are synthetic
 operator assertions; no real book/configuration, provider, custody, capital,
 financial execution or full readiness evidence is established.
+
+## Final append clock check
+
+An append checks the safe nonnegative host clock again after updating metadata,
+before COMMIT. A reversal relative to the preceding sample or an invalid clock
+rolls back cycle, receipt-index and metadata writes together. Reopen and explicit
+retry retain the original head; there is no automatic retry or history repair.
+The final check does not renew recordedAtMs, digest, or the earlier persisted
+metadata sample. Exact retries still return the original record without writing.
+The host clock remains trusted and can change after the final sample; this is not
+a global persistent clock or filesystem/power-loss guarantee. Reports remain
+unverified and allocations are not cash, buybacks, burns or execution authority.

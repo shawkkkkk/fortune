@@ -203,3 +203,21 @@ This is a local commit guard, not a filesystem deadline or proof of trusted host
 clock, independent providers, power-loss durability, current creator login,
 publication permission or financial authority. Time can change after the final
 sample. Existing signature, RPC, schema, five-second and release gates remain.
+
+
+## Recheck completion freshness
+
+The standalone provenance revalidator rechecks every checked-block timestamp
+against one final observed-at sample after both RPC observations and local
+history/policy rereads. A block that ages beyond120 seconds during factory reads
+or while the peer finishes is rejected rather than returned with a fresh local
+timestamp. Exactly120 seconds remains admissible. Existing20-second wall limit,
+monotonic clock/RPC fences, signatures, historical block semantics and null
+current authorization/false execution authority remain unchanged. MCP and local
+Co-Pilot consume this same engine; no service/configuration is enabled.
+
+Two regressions fail old source at119→121 seconds and preserve actual SQLite
+bytes; positive120-second boundaries pass. This is completion admission under
+trusted host clock/RPCs, not independent providers, finality, current login,
+renewed signatures, publication, filesystem deadlines or release readiness.
+Time can still advance after the final sample.

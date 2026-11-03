@@ -2,6 +2,17 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## Creator provenance completion freshness (P02/P03/P06)
+
+The actual shared revalidator now checks both RPC block ages against the same
+final observation time after peer and local-history/policy checks. Two old-source
+regressions reproduce119→121-second acceptance during factory reads and final
+peer completion; final checks reject both while retaining the120-second boundary
+and unchanged SQLite bytes. Existing20-second lifetime, stored evidence,
+signatures, currentAuthorization null and execution false remain. MCP/Co-Pilot
+inherit the fix without service/configuration or Standard/root changes. See
+CREATOR_CANON_REGISTRY.md; full authenticated creator readiness remains unfinished.
+
 ## Saved character + live project Co-Pilot integration (M02/P02/P06)
 
 An explicitly enabled local Co-Pilot mode combines the actual saved-character

@@ -2,6 +2,19 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## Durable work batch observation book (P19)
+
+An explicit default-disabled local SQLite book calls the unchanged all-job batch
+reader before atomic historical record/receipt/job-index writes. Expected-head
+rechecks, exact replay without timestamp renewal, five-second commit freshness
+and final clock checks preserve history; conflicting positive observations or
+duplicate jobs across transactions permanently quarantine without replacement.
+Actual HTTP ABI/SQLite tests cover replay/reopen, two-handle dedup, later-job
+failures, clock rollback, corruption and capacity. This is not financial
+settlement, independent-provider proof or current authorization; no service,
+signer, real config, recovery/reset or full P19 readiness is added. See
+WORK_BATCH_OBSERVATION_BOOK.md. Standard/root pins and all gates remain.
+
 ## Complete batch payment operator integration (P19)
 
 A separate default-disabled local command now invokes the actual unchanged

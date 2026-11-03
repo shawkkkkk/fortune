@@ -2,6 +2,18 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## Direct Counter claim receipt observation (M06)
+
+An explicit read-only library now binds a successful direct single-round payout
+to canonical transfer/claim events, caller/recipient/amount/round, receipt-height
+runtime/roles/asset pins and transaction/block indices. Two-client confirmation,
+agreement and reread checks share one real20-second monotonic lifetime. Stable
+evidence IDs require downstream deduplication; no ledger, badge or current claim
+authority is implied. Actual compiled local Counter HTTP/ABI integration covers
+replay, wrong amounts and batch exclusion while preserving prior lifecycles.
+Provider/finality/eligibility/capital/solvency/execution/full-readiness flags remain
+false. No contract or Standard/root pins change; see COUNTER_CLAIM_RECEIPTS.md.
+
 ## Local reported-profit operator integration (M01/M07/M08)
 
 A default-disabled local command now reads or explicitly appends to the actual

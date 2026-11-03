@@ -63,7 +63,13 @@ export class CreatorCanonRegistry {
         const n=this.#checkClock(),current=this.#head();
         if(n<evidence.observedAtMs||n-evidence.observedAtMs>5000||n>=v.expiresAtMs||v.revision!==current.revision+1||v.previousDigest!==current.digest)throw Error('Authorization/revision changed');
         this.#db.prepare('INSERT INTO canon_versions VALUES(?,?,?,?,?,?)').run(v.revision,evidence.digest,JSON.stringify(v),signature,JSON.stringify(evidence),n);
-        this.#db.prepare('UPDATE canon_policy SET last_clock=? WHERE singleton=1').run(n);this.#db.exec('COMMIT;');
+        let previous=n;
+        const commitClock=()=>{const ended=this.#checkClock();
+          if(ended<previous||ended-evidence.observedAtMs>5000||ended>=v.expiresAtMs)throw Error('Authorization expired or clock changed before commit');
+          previous=ended;return ended;};
+        const ended=commitClock();
+        this.#db.prepare('UPDATE canon_policy SET last_clock=? WHERE singleton=1').run(ended);
+        commitClock();this.#db.exec('COMMIT;');
       }catch(e){this.#db.exec('ROLLBACK;');throw e;}
       return {revision:v.revision,digest:evidence.digest,executionAuthorized:false};
     }finally{this.#busy=false;}

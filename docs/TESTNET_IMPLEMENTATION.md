@@ -2,6 +2,17 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## Creator import commit checks (P02/P06)
+
+The actual creator registry now checks its original observation window, signed
+expiry and monotonic host clock after version insertion and after clock update,
+before commit. Failures roll back both writes; valid imports preserve original
+accepted-at and RPC evidence. Two old-source regression groups exercise real
+SQLite writes, rollback/reopen, explicit retry and valid clock persistence.
+No schema, signature payload, RPC limits, service, publication or execution
+permission changes. Full authenticated creator integration remains unfinished;
+see CREATOR_CANON_REGISTRY.md for trust and final-sample limitations.
+
 ## Complete Counter batch payout observation (M06)
 
 A separate read-only library now verifies every entry of an exact1–32-round

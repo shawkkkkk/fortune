@@ -47,3 +47,19 @@ test('actual viem HTTP and ABI reads recheck both historical and current heights
  const clients=[0,1].map(()=>createPublicClient({transport:http(url,{timeout:2000,retryCount:0})})),before=readFileSync(s.path);
  const r=await revalidateCharacterRecord(s,clients,{now:()=>later});assert.equal(r.factoryCreatorMatched,true);assert.deepEqual([...heights].sort(),['0x6e','0x8c']);assert.equal(seen.filter(x=>x==='eth_call').length,2);assert.deepEqual(readFileSync(s.path),before);
  }finally{if(server)await new Promise(resolve=>server.close(resolve));s.cleanup();}});
+
+async function completionAge(stage){
+ const s=await setup();try{
+  let t=later,seen=0,release;const gate=new Promise(r=>release=r),before=readFileSync(s.path);
+  const readers=[0,1].map(i=>{const c=observed(s),block=c.getBlock,code=c.getCode,chain=c.getChainId;let chainReads=0;
+   c.getBlock=async o=>{const b=await block(o);return o.blockNumber===140n?{...b,timestamp:BigInt(later/1000)-119n}:b;};
+   c.getCode=async o=>{if(stage==='factory'&&o.address===policy.factory){if(++seen===2){t=later+2000;release();}await gate;}return code(o);};
+   c.getChainId=async()=>{if(++chainReads===2&&stage==='peer'&&i===1)t=later+2000;return chain();};return c;});
+  await assert.rejects(revalidateCharacterRecord(s,readers,{now:()=>t}),/stale/i);
+  assert.deepEqual(readFileSync(s.path),before);
+  const boundary=[observed(s),observed(s)].map(c=>{const block=c.getBlock;c.getBlock=async o=>{const b=await block(o);return o.blockNumber===140n?{...b,timestamp:BigInt(later/1000)-120n}:b;};return c;});
+  const r=await revalidateCharacterRecord(s,boundary,{now:()=>later});assert.equal(r.observedAtMs,later);assert.equal(r.currentAuthorization,null);assert.equal(r.executionAuthorized,false);assert.deepEqual(readFileSync(s.path),before);
+ }finally{s.cleanup();}
+}
+test('recheck rejects a snapshot aging from119 to121 seconds during factory reads',()=>completionAge('factory'));
+test('recheck rejects a snapshot aging from119 to121 seconds while the final peer completes',()=>completionAge('peer'));

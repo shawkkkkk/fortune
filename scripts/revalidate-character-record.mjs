@@ -39,8 +39,10 @@ export async function revalidateCharacterRecord(config,clients,{now=Date.now}={}
   if(JSON.stringify(observations[0])!==JSON.stringify(observations[1]))throw Error('Providers disagree');
   const second=await reader(p.token);
   if(JSON.stringify(second.record)!==JSON.stringify(r)||policyBytes(config.policyPath)!==raw)throw Error('Local history/policy changed');
+  const observedAtMs=time();
+  if(observations.some(o=>BigInt(observedAtMs)-BigInt(o.timestamp)*1000n>120000n))throw Error('Completed observation block is stale');
   return Object.freeze({schemaVersion:1,source:'operator-character-rpc-recheck',chainId:97,token:p.token,revision:r.revision,digest:r.digest,
-   historicalBlock:{number:r.observedBlockNumber,hash:r.observedBlockHash},checkedBlock:observations[0],observedAtMs:time(),
+   historicalBlock:{number:r.observedBlockNumber,hash:r.observedBlockHash},checkedBlock:observations[0],observedAtMs,
    storedSignatureConsistent:true,historicalBlockMatched:true,factoryCreatorMatched:true,currentAuthorization:null,executionAuthorized:false,
    limitations:['Point-in-time trusted RPC observations, not independent providers, EIP-1898 hash-bound reads or finality.',
     'Expired historical signatures are not renewed. No login, IP/license/moderation, publication or financial authority.',

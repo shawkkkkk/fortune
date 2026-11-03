@@ -2,6 +2,17 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## Character-policy descriptor bounds (P02/P03/P06 security)
+
+The actual historical reader, pinned provenance reader and revalidator now read
+policy bytes from nonblocking regular descriptors with a16-KiB+1 allocation and
+finally-close. Three actual writerless-FIFO child regressions failed old source;
+final tests cover direct/symlink FIFOs, valid16-KiB regular policies, strict UTF8,
+oversize rejection before RPC and unchanged SQLite. Existing policy pins, clocks,
+RPC limits, signatures, schema and null/false authority remain. Regular symlinks
+stay supported; no general filesystem deadline or host-swap guarantee is claimed.
+See CREATOR_CANON_REGISTRY.md; Standard/root pins and release gates are unchanged.
+
 ## Creator provenance completion freshness (P02/P03/P06)
 
 The actual shared revalidator now checks both RPC block ages against the same

@@ -1,10 +1,10 @@
-import {readFileSync,statSync} from 'node:fs';
+import {readCharacterPolicyBytes} from './character-policy-bytes.mjs';
 import {keccak256,parseAbi} from 'viem';
 import {characterRecordReader} from './character-record-reader.mjs';
 import {canonPolicy} from '../lib/creator-canon-authorization.ts';
 const ABI=parseAbi(['function launches(uint256) view returns(address,address,address,address,address,address,address,bytes32,bytes32,uint64)']);
 const hash=x=>typeof x==='string'&&/^0x[0-9a-f]{64}$/.test(x)&&!/^0x0{64}$/.test(x);
-function policyBytes(path){if(statSync(path).size>16384)throw Error('Policy bound');const b=readFileSync(path);if(b.length>16384)throw Error('Policy bound');return new TextDecoder('utf-8',{fatal:true}).decode(b);}
+function policyBytes(path){return new TextDecoder('utf-8',{fatal:true}).decode(readCharacterPolicyBytes(path));}
 /** One explicit observation. Never renews a signature, persists trust or authorizes a session. */
 export async function revalidateCharacterRecord(config,clients,{now=Date.now}={}){
  const start=now();let timer,last=start,expired=false;

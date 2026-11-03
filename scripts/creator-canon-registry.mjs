@@ -13,6 +13,7 @@ function regular(path) { const s=lstatSync(path); if(!s.isFile()||s.isSymbolicLi
 export class CreatorCanonRegistry {
   #db; #policy; #id; #now; #readOnly; #busy=false;
   static initialize(path,policy,now=Date.now()) {
+    if(String(path)===':memory:'||/^file:/i.test(path))throw Error('SQLite memory and URI paths are not supported');
     const p=canonPolicy(policy);clock(now);
     const fd=openSync(path,constants.O_CREAT|constants.O_EXCL|constants.O_WRONLY|constants.O_NOFOLLOW,0o600);closeSync(fd);
     const db=new DatabaseSync(path);try {
@@ -21,6 +22,7 @@ export class CreatorCanonRegistry {
     }finally{db.close();}
   }
   constructor(path,policy,{readOnly=false,now=Date.now}={}) {
+    if(String(path)===':memory:'||/^file:/i.test(path))throw Error('SQLite memory and URI paths are not supported');
     this.#policy=canonPolicy(policy);this.#now=now;this.#readOnly=readOnly;const original=regular(path);
     this.#db=new DatabaseSync(path,{readOnly});
     try {

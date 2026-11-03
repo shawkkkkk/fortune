@@ -239,3 +239,26 @@ is not a generic filesystem deadline, privileged-host file-swap defense, Windows
 FIFO guarantee or durability certification. Existing clocks,20-second RPC limit,
 completion freshness, signatures, schema, disclosure and authority gates remain.
 No policy/profile/provider/service is enabled, and full readiness is unfinished.
+
+
+## Filesystem paths only
+
+Initialization and opening reject exact `:memory:` and case-insensitive `file:`
+URI prefixes before filesystem, policy or SQLite access. Ordinary relative and
+absolute filesystem paths remain supported, including Buffer paths. The special
+target comparison covers both string and Buffer path representations. A literal URI-named regular file
+cannot stand in for an unrelated SQLite shared-memory or alternate URI target.
+The schema, signatures, history, clock/expiry/RPC fences and authority are unchanged.
+
+For an existing URI configuration, stop every registry writer/restart path and
+review the actual target and available history. Never strip/decode the URI,
+initialize an empty replacement, reset revisions or assume vanished in-memory
+records are recoverable. This adds no migration, repair, recovery or power-loss
+guarantee. Trusted-host storage and historical-authorization limits still apply.
+
+Real SQLite regressions cover URI and direct-memory initialization rejection,
+an actual fixture-authorized import into shared memory followed by history loss
+on old source, and ordinary disk reopen with unchanged records/replay rejection.
+The existing arbitrary valid r/s/v fixture assigns the recovered creator to its
+fixture factory: no key/account generation or signing, real creator approval,
+independent providers, public publication or financial authority is established.

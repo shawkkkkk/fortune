@@ -2,6 +2,18 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## Compiled escrow → durable observation book integration (P19)
+
+The existing zero-account compiled WorkEscrow drill now captures its actual
+two-asset paid result batch through the unchanged observation book. Receipt
+digest/IDs, per-asset units and SQLite index match; reopen/replay retain original
+timestamps/history, and a wrong later-job policy writes nothing. Before/after
+chain height, nonces, balances and liabilities stay unchanged during book reads.
+Only the temporary book is written. The old ten-job/worker-batch cases and all
+reader/contract/root/clock/authority gates remain. One local VM is not independent
+providers, real capital/public custody, reorg recovery or full P19 readiness; see
+WORK_BATCH_OBSERVATION_BOOK.md for evidence scope and remaining limits.
+
 ## Durable work batch observation book (P19)
 
 An explicit default-disabled local SQLite book calls the unchanged all-job batch

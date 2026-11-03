@@ -1,6 +1,8 @@
 // Actual compiled escrow -> zero-account LOCAL EVM -> viem HTTP/ABI -> receipts/state.
 // All writes use a fresh loopback URL and local VM impersonation. No fork or keys.
 import assert from 'node:assert/strict';
+import {DatabaseSync} from 'node:sqlite';
+import {WorkBatchObservationBook} from '../../scripts/work-batch-observation-book.mjs';
 import {readFileSync,writeFileSync,mkdirSync,rmSync,mkdtempSync} from 'node:fs';
 import {resolve,join} from 'node:path';
 import {tmpdir} from 'node:os';
@@ -330,6 +332,49 @@ try{
  assert.equal(allObserved.allCallEntriesObserved,true);assert.deepEqual(allObserved.payments.map(p=>p.workerPaid),['100','80']);assert.deepEqual(allObserved.payments.map(p=>p.evidenceId),batchIds);assert.equal(allObserved.executionAuthorized,false);
  const allReplay=await inspectAllWorkBatchResultPayments(observers,allBatchPolicies);assert.equal(allReplay.receiptConsistencyDigest,allObserved.receiptConsistencyDigest);assert.deepEqual(allReplay.payments.map(p=>p.evidenceId),batchIds);
  await assert.rejects(inspectAllWorkBatchResultPayments(observers,[allBatchPolicies[0],{...allBatchPolicies[1],amount:'79'}]));
+ // BEGIN compiled observation-book drill: reads only against the existing paid batch.
+ {
+  stage='durable observation book against compiled two-asset batch';
+  const dir=mkdtempSync(join(tmpdir(),'fortune-compiled-work-book-')),path=join(dir,'observations.sqlite');
+  const bookPolicy=Object.fromEntries(['chainId','escrow','escrowCodeHash','governor','guardian','arbitrator','client'].map(k=>[k,allBatchPolicies[0][k]]));
+  const chainState=async()=>({
+   head:await rpc.getBlockNumber({cacheTime:0}),
+   nonces:await Promise.all([GOV,GUARD,ARB,CLIENT,WORKER].flatMap(address=>['latest','pending'].map(blockTag=>rpc.getTransactionCount({address,blockTag})))),
+   balances:await Promise.all([token,secondToken].flatMap(asset=>[escrow,CLIENT,WORKER].map(who=>read(asset,assetArtifact,'balanceOf',[who])))),
+   reserved:await Promise.all([token,secondToken].map(asset=>read(escrow,escrowArtifact,'reserved',[asset]))),
+  });
+  const chainBefore=await chainState();let book;
+  try{
+   WorkBatchObservationBook.initialize(path,bookPolicy,{enabled:true});
+   book=new WorkBatchObservationBook(path,bookPolicy,{enabled:true,readOnly:false});
+   const initial=book.read().head,recorded=await book.capture(observers,allBatchPolicies,initial),saved=book.read();
+   assert.equal(recorded.inserted,true);assert.equal(saved.total,1);assert.equal(saved.quarantined,false);
+   assert.deepEqual(saved.entries[0].observation.payments.map(p=>p.evidenceId),batchIds);
+   assert.deepEqual(saved.entries[0].observation.payments.map(p=>p.asset),[token,secondToken].map(a=>a.toLowerCase()));
+   assert.deepEqual(saved.entries[0].observation.payments.map(p=>p.workerPaid),['100','80']);
+   assert.equal(saved.entries[0].observation.receiptConsistencyDigest,allObserved.receiptConsistencyDigest);
+   assert.equal(saved.currentAuthorization,null);assert.equal(saved.executionAuthorized,false);assert.equal(saved.fullSyndicateReadiness,false);
+   book.close();book=undefined;
+   const readonly=new WorkBatchObservationBook(path,bookPolicy,{enabled:true});
+   try{assert.deepEqual(readonly.read(),saved);await assert.rejects(readonly.capture(observers,allBatchPolicies,initial),/read-only/);}finally{readonly.close();}
+   book=new WorkBatchObservationBook(path,bookPolicy,{enabled:true,readOnly:false});
+   const replay=await book.capture(observers,allBatchPolicies,initial);
+   assert.equal(replay.inserted,false);assert.equal(replay.digest,recorded.digest);
+   assert.equal(replay.recordedAtMs,recorded.recordedAtMs);assert.equal(replay.readerObservedAtMs,recorded.readerObservedAtMs);
+   assert.deepEqual(book.read(),saved);
+   await assert.rejects(book.capture(observers,[allBatchPolicies[0],{...allBatchPolicies[1],amount:'79'}],initial));
+   assert.deepEqual(book.read(),saved);
+   const db=new DatabaseSync(path,{readOnly:true});
+   try{
+    assert.equal(db.prepare('SELECT count(*) AS n FROM batch_observations').get().n,1);
+    const actual=db.prepare('SELECT evidence_id,job_id,sequence FROM batch_receipts ORDER BY evidence_id').all().map(row=>({...row}));
+    const expected=allBatchPolicies.map((p,i)=>({evidence_id:batchIds[i],job_id:p.jobId,sequence:1})).sort((a,b)=>a.evidence_id<b.evidence_id?-1:1);
+    assert.deepEqual(actual,expected);
+   }finally{db.close();}
+   assert.deepEqual(await chainState(),chainBefore);
+  }finally{book?.close();rmSync(dir,{recursive:true,force:true});}
+ }
+ // END compiled observation-book drill.
  {
  stage='atomic worker result submissions on separate two-asset escrow';
  const submissionTokens=[await deploy(assetArtifact),await deploy(assetArtifact)];
@@ -375,7 +420,7 @@ try{
  // Preserve the original ten-job escrow's balances, liabilities and history.
  assert.equal(await read(escrow,escrowArtifact,'nextJob'),11n);assert.equal(await read(token,assetArtifact,'balanceOf',[WORKER]),284n);assert.equal(await read(secondToken,assetArtifact,'balanceOf',[WORKER]),80n);
  }
- const result={chainId:97,atomicWorkerResultBatchSubmitted:true,lateWorkerBatchFailureKeepsHistory:true,workerBatchReplayRejected:true,workerBatchExactRetryAfterPause:true,workerBatchLatestApprovalReceiptsBound:true,workerSubmissionFixtureJobs:2,allBatchJobsReceiptObserved:true,allBatchReceiptDigestAndReplayStable:true,wrongLaterBatchJobRejected:true,selectedBatchPaymentsObserved:true,selectedBatchEvidenceStableAndDistinct:true,wrongSelectedBatchAmountRejected:true,directAndBatchResultReadersSeparated:true,actualWorkPaymentCliMatched:true,workPaymentCliEvidenceStable:true,workPaymentCliWrongAmountRejected:true,arbitratedSplitReceiptObserved:true,arbitrationZeroAndFullReceiptsObserved:true,arbitrationEvidenceIdStable:true,wrongArbitratedAmountRejected:true,arbitrationPaymentCancellationReadersSeparated:true,workerDeclineReceiptObserved:true,workerWaiverReceiptObserved:true,workerRefundEvidenceIdsStable:true,staleWaiverReceiptRevisionRejected:true,workerRefundPaymentCancellationReadersSeparated:true,expiredCancellationReceiptObserved:true,expiredCancellationEvidenceIdStable:true,wrongExpiryCallerRejected:true,directExpiredCancellationReadersSeparated:true,directClientCancellationReceiptObserved:true,cancellationEvidenceIdStable:true,wrongCancellationAmountRejected:true,paymentCancellationReadersSeparated:true,directResultPaymentReceiptObserved:true,resultPaymentEvidenceIdStable:true,wrongResultRevisionRejected:true,legacyReaderRejectsResultReceipt:true,directWholePaymentReceiptObserved:true,repeatedPaymentEvidenceIdStable:true,wrongPaymentAmountRejected:true,atomicResultBatchReceiptsBound:true,staleLaterResultBatchRejected:true,lateBatchPaymentFailureRollsBackAll:true,exactResultBatchRetrySucceeded:true,resultBatchReplayRejected:true,actualWorkJobCliStatesMatched:true,actualWorkJobCliResultHistoryMatched:true,settledCliDoesNotInferPayment:true,actualPinnedJobStatesObserved:true,pausedJobObserved:true,actualResultHistoryObserved:true,foreignTermsObservationRejected:true,settledStorageDoesNotInferPayment:true,revisionBoundDisputeReceiptObserved:true,staleResultDisputeRejected:true,disputedRevisionSurvivesSettlement:true,localOnly:true,clientScopedFundingIdObserved:true,fundedApprovedReplayRejectedBeforeAndAfterSettlement:true,compiledWorkEscrowDeployed:true,fundedJobs:10,settledJobs:10,workerDeclineRefundReceiptBound:true,inexactDeclinePreservesFundedLiability:true,declinedJobCannotBeAcceptedOrCancelled:true,workerWaiverRefundReceiptBound:true,staleWaiverRejected:true,inexactWaiverPreservesLiability:true,clientApprovalReceiptBound:true,workerResultHistoryObserved:true,revisionBoundPaymentReceiptObserved:true,staleResultApprovalRejected:true,inexactResultPaymentRetainsLiability:true,
+ const result={chainId:97,compiledBatchBookRecorded:true,compiledBatchBookReplayPreservedOriginalTimes:true,compiledBatchBookBadLaterPolicyRejected:true,compiledBatchBookReadOnlyReopenMatched:true,compiledBatchBookReadOnlyChainStateUnchanged:true,compiledBatchBookUniqueReceipts:true,compiledBatchBookBatches:1,compiledBatchBookJobs:2,atomicWorkerResultBatchSubmitted:true,lateWorkerBatchFailureKeepsHistory:true,workerBatchReplayRejected:true,workerBatchExactRetryAfterPause:true,workerBatchLatestApprovalReceiptsBound:true,workerSubmissionFixtureJobs:2,allBatchJobsReceiptObserved:true,allBatchReceiptDigestAndReplayStable:true,wrongLaterBatchJobRejected:true,selectedBatchPaymentsObserved:true,selectedBatchEvidenceStableAndDistinct:true,wrongSelectedBatchAmountRejected:true,directAndBatchResultReadersSeparated:true,actualWorkPaymentCliMatched:true,workPaymentCliEvidenceStable:true,workPaymentCliWrongAmountRejected:true,arbitratedSplitReceiptObserved:true,arbitrationZeroAndFullReceiptsObserved:true,arbitrationEvidenceIdStable:true,wrongArbitratedAmountRejected:true,arbitrationPaymentCancellationReadersSeparated:true,workerDeclineReceiptObserved:true,workerWaiverReceiptObserved:true,workerRefundEvidenceIdsStable:true,staleWaiverReceiptRevisionRejected:true,workerRefundPaymentCancellationReadersSeparated:true,expiredCancellationReceiptObserved:true,expiredCancellationEvidenceIdStable:true,wrongExpiryCallerRejected:true,directExpiredCancellationReadersSeparated:true,directClientCancellationReceiptObserved:true,cancellationEvidenceIdStable:true,wrongCancellationAmountRejected:true,paymentCancellationReadersSeparated:true,directResultPaymentReceiptObserved:true,resultPaymentEvidenceIdStable:true,wrongResultRevisionRejected:true,legacyReaderRejectsResultReceipt:true,directWholePaymentReceiptObserved:true,repeatedPaymentEvidenceIdStable:true,wrongPaymentAmountRejected:true,atomicResultBatchReceiptsBound:true,staleLaterResultBatchRejected:true,lateBatchPaymentFailureRollsBackAll:true,exactResultBatchRetrySucceeded:true,resultBatchReplayRejected:true,actualWorkJobCliStatesMatched:true,actualWorkJobCliResultHistoryMatched:true,settledCliDoesNotInferPayment:true,actualPinnedJobStatesObserved:true,pausedJobObserved:true,actualResultHistoryObserved:true,foreignTermsObservationRejected:true,settledStorageDoesNotInferPayment:true,revisionBoundDisputeReceiptObserved:true,staleResultDisputeRejected:true,disputedRevisionSurvivesSettlement:true,localOnly:true,clientScopedFundingIdObserved:true,fundedApprovedReplayRejectedBeforeAndAfterSettlement:true,compiledWorkEscrowDeployed:true,fundedJobs:10,settledJobs:10,workerDeclineRefundReceiptBound:true,inexactDeclinePreservesFundedLiability:true,declinedJobCannotBeAcceptedOrCancelled:true,workerWaiverRefundReceiptBound:true,staleWaiverRejected:true,inexactWaiverPreservesLiability:true,clientApprovalReceiptBound:true,workerResultHistoryObserved:true,revisionBoundPaymentReceiptObserved:true,staleResultApprovalRejected:true,inexactResultPaymentRetainsLiability:true,
   workerPaidUnits:'284',workerSecondAssetPaidUnits:'80',clientFinalUnits:'1716',clientSecondAssetFinalUnits:'920',finalReserved:'0',cancellationAndExpiryRefundedClient:true,disputeSplitSettled:true,
   governorCannotArbitrate:true,guardianCannotOpen:true,pausedPaymentRejected:true,duplicatePaymentRejected:true,inexactSplitRetainsLiability:true,explicitRetrySucceeded:true,
   generatedAccounts:0,privateKeysUsed:false,publicBroadcasts:false,independentProvidersVerified:false,workDeliveryVerified:false,

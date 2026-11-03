@@ -58,3 +58,13 @@ test('ordinary relative and absolute notebook files preserve history and origina
   }finally{book.close();}
  });
 });
+
+test('direct SQLite memory target is rejected before initialization or opening filesystem storage',()=>{
+ fixture(()=>{
+  assert.throws(()=>Book.initialize(':memory:',token,now),/SQLite memory and URI/);
+  assert.equal(existsSync(':memory:'),false);
+  writeFileSync(':memory:','',{mode:0o600});
+  assert.throws(()=>new Book(':memory:',token,{now:()=>now}),/SQLite memory and URI/);
+  assert.equal(statSync(':memory:').size,0);
+ });
+});

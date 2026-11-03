@@ -2,6 +2,17 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## Research notebook filesystem target binding (P03/P18 foundation)
+
+Initialization and opening now reject SQLite memory/URI targets before filesystem or
+SQLite access, preserving ordinary relative/absolute paths and all existing
+schema, history, retry, clock and authority rules. Real SQLite regressions cover
+URI initialization and a shared-memory target behind an unrelated literal file;
+ordinary disk reopen/retry remains a positive control. URI configurations require
+operator inspection, never silent stripping, empty replacement or history reset.
+See PROJECT_RESEARCH_NOTEBOOK.md. This is not recovery, independent timestamp,
+verified research, full Arena/workspace or public-service readiness.
+
 ## Research notebook commit-clock fence (P03/P18 foundation)
 
 The actual durable append now checks a safe positive clock after metadata writes

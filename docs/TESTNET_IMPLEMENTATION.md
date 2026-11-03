@@ -2,6 +2,16 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## Notebook Buffer memory-path guard (P03/P18 security)
+
+The notebook's existing memory-target guard now includes Buffer paths before
+filesystem/SQLite access while preserving ordinary Buffer disk paths. Actual
+old-source regressions reproduced successful ephemeral initialization and later
+schema failure; they do not establish an accepted note in that connection.
+Append/reopen/original retry identity remains intact. Two comparison changes
+preserve schema, clocks, history, interfaces and false authority. No automatic
+repair, reset or recovery. See PROJECT_RESEARCH_NOTEBOOK.md.
+
 ## Creator registry filesystem target binding (P02/P06 security)
 
 The actual creator registry now rejects SQLite memory/URI targets before filesystem

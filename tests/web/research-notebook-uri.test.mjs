@@ -68,3 +68,31 @@ test('direct SQLite memory target is rejected before initialization or opening f
   assert.equal(statSync(':memory:').size,0);
  });
 });
+
+// Buffer paths are accepted by both Node filesystem and SQLite APIs.
+test('Buffer SQLite memory target is rejected before notebook initialization creates a file',()=>{
+ fixture(()=>{
+  const path=Buffer.from(':memory:');
+  assert.throws(()=>Book.initialize(path,token,now),/SQLite memory and URI/);
+  assert.equal(existsSync(path),false);
+ });
+});
+test('Buffer SQLite memory target is rejected before opening unrelated literal storage',()=>{
+ fixture(()=>{
+  const path=Buffer.from(':memory:');writeFileSync(path,'',{mode:0o600});
+  assert.throws(()=>new Book(path,token,{now:()=>now}),/SQLite memory and URI/);
+  assert.equal(statSync(path).size,0);
+ });
+});
+test('ordinary Buffer disk path preserves committed notebook history and retry identity',()=>{
+ fixture(dir=>{
+  const path=Buffer.from(join(dir,'buffer.sqlite'));Book.initialize(path,token,now);
+  let book=new Book(path,token,{now:()=>now});
+  try{
+   const request={id:'buffer-disk-00001',expectedHead:book.read().head,document},result=book.append(request);
+   book.close();book=new Book(path,token,{now:()=>now+10});
+   assert.equal(book.read().total,1);assert.equal(book.readEntry(request.id).recordedAtMs,now);
+   assert.deepEqual(book.append(request),{...result,replayed:true});
+  }finally{book.close();}
+ });
+});

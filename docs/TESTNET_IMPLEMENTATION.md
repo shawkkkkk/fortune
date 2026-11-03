@@ -2,6 +2,18 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## Durable Counter batch-claim observations (M06/P10 reconciliation)
+
+A separate disabled local observation book connects the unchanged complete batch
+claim reader to protected WAL/FULL SQLite. It binds one escrow/recipient policy,
+retains per-asset raw units and stable IDs, deduplicates transactions/rounds,
+preserves original retry times and quarantines positive conflicts without
+rewriting history. A compiled zero-account two-asset rollback fixture exercises
+the actual Counter/reader/book path. No balances, totals, badges, global claim
+consumption, current eligibility or financial authority follow. No public service
+or automatic recovery; see COUNTER_CLAIM_OBSERVATION_BOOK.md. Full M06/P10 remains
+unfinished; contracts, old readers/drills and frozen Standard are unchanged.
+
 ## Compiled work observation rollback/conflict drill (P19 reconciliation)
 
 A separate zero-account local VM connects actual compiled two-asset batch

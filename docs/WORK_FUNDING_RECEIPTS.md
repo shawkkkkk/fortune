@@ -4,7 +4,8 @@
 isolated chain-97 WorkEscrow. It accepts the existing immutable job/asset/runtime/
 role policy plus exact decimal uint64 `acceptBy`, `deliverBy` and `fundingId`:
 `null` means direct legacy `fund`; a nonzero bytes32 means direct `fundWithId`.
-There is no CLI, HTTP/MCP endpoint, service, signer or enabled real configuration.
+The optional operator CLI below is disabled by default. There is no HTTP/MCP
+endpoint, service, signer or enabled real configuration.
 
 The two supplied distinct clients must agree on a common head with at least
 20 confirmations and a head gap at most 10. The successful receipt, transaction,
@@ -50,3 +51,37 @@ added. The original ten-job, worker-batch, observation-book and settlement tests
 remain. Two clients of this one VM and synthetic assets are not independent
 providers, real parties/capital, public custody/deployment or full P19 readiness.
 No source contract, frozen Standard/root pin, economics or release gate changes.
+
+## Disabled operator CLI
+
+With `FORTUNE_WORK_FUNDING_READ_ENABLED=true`, run:
+
+```sh
+node --import ./scripts/register-ts.mjs scripts/inspect-work-funding.mjs /absolute/reviewed-policy.json
+```
+
+`FORTUNE_WORK_READ_RPC_URL` and `FORTUNE_WORK_SECONDARY_RPC_URL` must be two
+reviewed distinct HTTPS origins without userinfo or fragments. Transports have
+five-second timeouts, no retries or redirects and omit credentials. The CLI calls
+this unchanged reader once; the original shared twenty-second lifetime remains.
+
+The existing policy file is opened nonblocking, checked through its descriptor
+as a regular file, read up to 16 KiB plus one byte and decoded as strict UTF-8 JSON.
+Literal bytes must match before and after the observer call. Missing, oversized,
+malformed, foreign or unknown-field policies fail privately; no file is created.
+This is not a general filesystem deadline or protection against a privileged host
+swapping files between checks. The SHA-256 output is a policy-byte checksum, not
+approval or authentication. Provider errors, URLs, policy paths and raw exceptions
+are not printed. Successful output preserves the reader's original observation,
+null authorization and false execution/readiness flags. No transaction, signing,
+ledger consumption, retry, background loop or configuration write is added.
+
+Child-process tests cover both direct funding modes through actual viem HTTP/ABI,
+ID mapping, replay, foreign terms/transfers, provider failures and changed policy
+bytes; disabled/invalid selections make zero RPC. Exact-size, strict UTF-8 and
+Linux writerless-FIFO cases retain the same bound. The compiled zero-account drill
+also runs the actual CLI against both existing funding receipts, matches every
+reader field except each call's own observation time, checks replay and wrong
+amount/mode rejection, and retains the original read-only chain-state assertion.
+Synthetic HTTPS test origins map to one loopback VM through a test-only preload;
+this is not independent-provider, public-service or legitimate-capital evidence.

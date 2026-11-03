@@ -9,6 +9,7 @@ import {createServer} from 'node:net';
 import {createPublicClient,createWalletClient,http,keccak256,toHex,decodeEventLog,decodeFunctionData} from 'viem';
 import {bscTestnet} from 'viem/chains';
 import {buildCounterBatchFunding} from '../../lib/counter-batch-funding.ts';
+import {inspectCounterBatchClaimReceipt} from '../../lib/counter-batch-claim-receipt.ts';
 import {inspectCounterClaimReceipt} from '../../lib/counter-claim-receipt.ts';
 import {buildCounterClaimBatch} from '../../lib/counter-claims.ts';
 import {buildCounterAllocation,buildCounterSnapshotFunding} from '../../lib/counter-allocation.ts';
@@ -144,6 +145,20 @@ try{
  assert.equal(await read(second,assetArtifact,'balanceOf',[GUARD]),0n);
  assert.equal(await read(first,assetArtifact,'balanceOf',[BOB]),25n);assert.equal(await read(second,assetArtifact,'balanceOf',[BOB]),41n);
  await rpc.request({method:'anvil_mine',params:['0x14','0x0']});
+ // Complete batch receipt observation uses the original already-confirmed two-asset payment.
+ const {asset:directAsset,assetCodeHash:directPin,round:directRound,amount:directAmount,...commonReceipt}=receiptPolicy;
+ const batchReceiptPolicy={...commonReceipt,recipient:BOB,transactionHash:batch.transactionHash,claims:[
+  {round:'1',asset:first.toLowerCase(),assetCodeHash:allocationPolicy.payoutAssetCodeHash,amount:'25'},
+  {round:'2',asset:second.toLowerCase(),assetCodeHash:keccak256(await rpc.getCode({address:second})),amount:'41'}]};
+ const observedBatch=await inspectCounterBatchClaimReceipt(clients,batchReceiptPolicy);
+ assert.equal(observedBatch.allCallEntriesObserved,true);assert.equal(observedBatch.claims.length,2);
+ assert.deepEqual(observedBatch.claims.map(c=>[c.round,c.asset,c.amount]),batchReceiptPolicy.claims.map(c=>[c.round,c.asset,c.amount]));
+ assert.equal(new Set(observedBatch.claims.map(c=>c.evidenceId)).size,2);assert.equal(observedBatch.currentAuthorization,null);assert.equal(observedBatch.executionAuthorized,false);
+ const replayBatch=await inspectCounterBatchClaimReceipt(clients,batchReceiptPolicy);
+ assert.equal(replayBatch.receiptConsistencyDigest,observedBatch.receiptConsistencyDigest);assert.deepEqual(replayBatch.claims,observedBatch.claims);
+ await assert.rejects(inspectCounterBatchClaimReceipt(clients,{...batchReceiptPolicy,claims:[batchReceiptPolicy.claims[0],{...batchReceiptPolicy.claims[1],amount:'40'}]}));
+ await assert.rejects(inspectCounterBatchClaimReceipt(clients,{...commonReceipt,claims:[{round:directRound,asset:directAsset,assetCodeHash:directPin,amount:directAmount}]}));
+ // End complete batch receipt addition.
  await assert.rejects(buildCounterClaimBatch(clients,claimPolicy));
  const spentCli=runClaimCli();assert.equal(spentCli.status,1);assert.equal(spentCli.stdout,'');
  // The direct reader must never reinterpret a batch as one direct claim.
@@ -194,7 +209,7 @@ try{
   assert.equal(paidLogs[i].eventName,'Claimed');assert.equal(paidLogs[i].args.round,BigInt(i+3));assert.equal(paidLogs[i].args.recipient.toLowerCase(),BOB);assert.equal(paidLogs[i].args.asset.toLowerCase(),f.token.toLowerCase());assert.equal(paidLogs[i].args.amount,f.amounts[0]);
   assert.equal(await read(f.token,assetArtifact,'balanceOf',[BOB]),bobBefore[i]+f.amounts[0]);assert.equal(await read(escrow,escrowArtifact,'reserved',[f.token]),0n);
  }
- const result={chainId:97,actualDirectClaimReceiptObserved:true,directClaimReceiptReplayStable:true,directClaimWrongAmountRejected:true,batchClaimRejectedByDirectReader:true,actualBatchFundingCliBytesMatched:true,actualBatchFundingCliBytesExecuted:true,batchFundingCliRollbackRetryReplayPreserved:true,actualBatchFundingReviewBytesExecuted:true,batchReviewRollbackRetryPreserved:true,batchReviewReplayRejected:true,atomicSnapshotBatchFundingObserved:true,lateFundingFailureRollsBackAll:true,exactBatchFundingRetrySucceeded:true,batchFundingReplayRejected:true,batchFundingSnapshotReceiptsBound:true,batchFundedClaimsDelivered:true,actualClaimCliBytesExecuted:true,spentClaimCliRejected:true,actualClaimReviewBytesExecuted:true,spentClaimReviewRejected:true,claimReview,localOnly:true,compiledEscrowDeployed:true,fundedRounds:4,payoutAssets:2,claimsDelivered:6,batchReceiptBound:true,failedLaterAssetRollsBackWholeBatch:true,
+ const result={chainId:97,actualAllBatchClaimsObserved:true,batchClaimReceiptReplayStable:true,batchClaimWrongLaterAmountRejected:true,singleClaimRejectedByBatchReader:true,actualDirectClaimReceiptObserved:true,directClaimReceiptReplayStable:true,directClaimWrongAmountRejected:true,batchClaimRejectedByDirectReader:true,actualBatchFundingCliBytesMatched:true,actualBatchFundingCliBytesExecuted:true,batchFundingCliRollbackRetryReplayPreserved:true,actualBatchFundingReviewBytesExecuted:true,batchReviewRollbackRetryPreserved:true,batchReviewReplayRejected:true,atomicSnapshotBatchFundingObserved:true,lateFundingFailureRollsBackAll:true,exactBatchFundingRetrySucceeded:true,batchFundingReplayRejected:true,batchFundingSnapshotReceiptsBound:true,batchFundedClaimsDelivered:true,actualClaimCliBytesExecuted:true,spentClaimCliRejected:true,actualClaimReviewBytesExecuted:true,spentClaimReviewRejected:true,claimReview,localOnly:true,compiledEscrowDeployed:true,fundedRounds:4,payoutAssets:2,claimsDelivered:6,batchReceiptBound:true,failedLaterAssetRollsBackWholeBatch:true,
   snapshotAllocationFunded:true,actualOperatorCliFundingBytesMatched:true,roundSnapshotAndDeadlineBound:true,staleRoundHashAndExpiryRejected:true,exactFundingReplayRejected:true,allocationBlock:allocation.blockNumber,allocationDust:allocation.unallocatedDust,incompleteAccountListRejected:true,receiptRecipientAndAmountMatched:true,relayerReceivedNothing:true,duplicateClaimRejected:true,pausedClaimRejected:true,
   guardianCannotOpen:true,inexactTransferRejected:true,failedClaimLiabilityPreserved:true,explicitRetrySucceeded:true,
   finalReserved:['0','0'],generatedAccounts:0,privateKeysUsed:false,publicBroadcasts:false,independentProvidersVerified:false,

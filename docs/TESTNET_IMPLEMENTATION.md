@@ -2,6 +2,18 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## Complete Counter batch payout observation (M06)
+
+A separate read-only library now verifies every entry of an exact1–32-round
+direct claimMany receipt under one shared20-second monotonic lifetime. Complete
+policy/calldata and2N canonical transfer/claim pairs bind all selected recipients,
+assets, amounts and receipt-height round state. Both clients and rereads must
+agree on the whole normalized receipt checksum; per-round evidence IDs require
+permanent downstream deduplication. No cross-asset total, ledger, badge, signer
+or execution authority is added. Actual compiled local two-asset integration
+checks replay, a wrong later amount and direct-route separation; old direct
+source/previous lifecycles and all release gates remain. See COUNTER_CLAIM_RECEIPTS.md.
+
 ## Direct Counter claim receipt observation (M06)
 
 An explicit read-only library now binds a successful direct single-round payout

@@ -52,3 +52,36 @@ synthetic local VM are not independent providers, public custody, legitimate
 capital, a public deployment or audit approval. No real policy/configuration,
 contract, Standard/root pin, dependency, economics, authority or release gate is
 changed; full M06 and release readiness remain unfinished.
+
+## Complete batch observation
+
+The separate `inspectCounterBatchClaimReceipt` library accepts exactly one policy
+for a direct `claimMany(ids,recipient)` call. Common fields match the direct
+reader except the single `asset`, `assetCodeHash`, `round` and `amount` are
+replaced by a dense `claims` list. Every1–32 entry has exactly those four fields;
+round IDs must be strictly increasing, assets may repeat with one consistent
+runtime pin, and at most10 distinct assets are allowed. Every entry is validated
+before RPC. No entry may be omitted: exact calldata and2N canonical adjacent
+Transfer/Claimed log pairs must match the complete list. A valid omitted-list
+policy can only be rejected once the actual receipt/transaction is fetched.
+
+One shared real20-second monotonic lifetime covers both clients and every asset/
+round, including all receipt-height roles, code/pins, funded/remaining/allocation
+hash and zero selected entitlement checks. There is no per-round budget renewal.
+Full normalized receipt bytes must agree before/after and between clients. The
+returned receipt-consistency digest is a checksum, **not authentication**. Unknown
+gas/receipt extras are excluded. Results keep one stable evidence ID and raw
+asset-specific amount per round; there is no cross-asset monetary total, consumed
+ledger, badge or claim of independent providers/finality, pre/post balances,
+eligibility, funding/capital origin, global solvency or full Counter readiness.
+All authorization/verification/execution limits above remain unchanged.
+
+The old direct library/source is unchanged and still rejects batches. The new
+batch reader rejects direct single claims even for a one-entry policy. No CLI,
+API, service, signer, real policy/configuration or financial action is enabled.
+Tests cover1/2/32 entries, sparse/late-invalid preflight, missing and incorrect
+later payments, repeated-asset pins, receipt/header/clock changes and the shared
+real deadline. The compiled zero-account local lifecycle checks the actual
+25/41-unit two-asset batch, stable replay, wrong-later-amount rejection and direct
+route exclusion while retaining all older assertions/limits. One fixture is not
+independent-provider/public custody/capital/audit proof; full M06 remains unfinished.

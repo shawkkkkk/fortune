@@ -2,6 +2,16 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## Historical direct work funding receipts (P19)
+
+A separate read-only engine binds direct legacy/ID-scoped funding calldata to
+whole client-to-escrow principal transfer, canonical JobFunded/optional FundingBound
+and receipt-height runtime/role/asset/job terms. Stable IDs require downstream
+deduplication; no current consent, capital origin, solvency or financial authority
+is inferred. Existing compiled zero-account first/second funding receipts exercise
+both routes without new transactions or time changes. Old settlement/book engines
+are preserved. See WORK_FUNDING_RECEIPTS.md; full P19 readiness remains incomplete.
+
 ## Explicit work observation-book operator (P19)
 
 A default-disabled local command reads an existing protected book without RPC or,

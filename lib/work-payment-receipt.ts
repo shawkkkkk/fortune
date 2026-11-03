@@ -91,7 +91,7 @@ function batchSelection(input: WorkBatchResultPaymentPolicy) {
   return {policy,result:{revision:selected.revision,resultHash:selected.resultHash,batch:{approvals,index}}};
 }
 
-function validateWorkPaymentPolicy(p: WorkPaymentPolicy) {
+export function validateWorkPaymentPolicy(p: WorkPaymentPolicy) {
   if (!p || Object.keys(p).sort().join() !== "amount,arbitrator,asset,assetCodeHash,chainId,client,escrow,escrowCodeHash,governor,guardian,jobId,maxPerJob,termsHash,transactionHash,worker"
     || p.chainId !== 97 || ![p.escrow,p.asset,p.governor,p.guardian,p.arbitrator,p.client,p.worker].every(addr)
     || new Set([p.escrow,p.asset,p.governor,p.guardian,p.arbitrator]).size !== 5 || p.client===p.worker

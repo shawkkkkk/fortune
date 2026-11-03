@@ -54,7 +54,7 @@ export class ProjectResearchNotebook{
    if(old){if(old.document!==JSON.stringify(d)||old.previous!==expectedHead)throw Error('Id conflict');this.#db.exec('ROLLBACK;');return {sequence:old.seq,digest:old.digest,replayed:true};}
    if(s.head!==expectedHead||s.rows.length>=1000||d.corrects>s.rows.length)throw Error('Head/capacity/correction');
    const seq=s.rows.length+1,digest=sha([s.m.id,seq,id,expectedHead,s.now,d]);this.#db.prepare('INSERT INTO notes VALUES(?,?,?,?,?,?)').run(seq,id,expectedHead,digest,s.now,JSON.stringify(d));
-   this.#db.prepare('UPDATE notebook SET last_clock=?').run(s.now);this.#db.exec('COMMIT;');return {sequence:seq,digest,replayed:false};
+   this.#db.prepare('UPDATE notebook SET last_clock=?').run(s.now);if(time(this.#now())<s.now)throw Error('Clock moved backwards before commit');this.#db.exec('COMMIT;');return {sequence:seq,digest,replayed:false};
   }catch(e){try{this.#db.exec('ROLLBACK;');}catch{}throw e;}
  }
  close(){this.#db.close();}

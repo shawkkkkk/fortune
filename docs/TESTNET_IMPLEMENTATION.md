@@ -2,6 +2,15 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## Research notebook commit-clock fence (P03/P18 foundation)
+
+The actual durable append now checks a safe positive clock after metadata writes
+and before COMMIT. Invalid/reversed time rolls back note and metadata atomically;
+valid advances preserve original timestamps/digests and exact retries. Schema,
+limits, correction/history rules, operator/MCP interfaces and authority remain
+unchanged. See PROJECT_RESEARCH_NOTEBOOK.md; this is not independent timestamp,
+research verification, full Arena or public-service readiness.
+
 ## Precise local LP custody failure locations (M07 diagnostics)
 
 The unchanged local fork lifecycle now labels each custody substep and reports

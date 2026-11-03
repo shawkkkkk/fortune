@@ -133,3 +133,15 @@ advancing the head while the read waits, and the real disabled CLI. These are lo
 fixtures, not a hosted agent or independent-provider drill. Enabling capture for
 real project data and disclosing the notebook to an MCP client remain separate
 operator/privacy decisions.
+
+
+Append checks a fresh safe positive host-clock sample after inserting the note
+and updating notebook metadata, immediately before COMMIT. An invalid sample or
+reversal below the original history-scan time rolls back both tables together.
+A valid advance preserves the original recorded timestamp, digest and persisted
+clock; retries return the original note without renewing its time. The schema,
+WAL/FULL policy, five-second lock wait, expected-head/correction/retry rules and
+read-only MCP outputs are unchanged. The trusted host can change time after the
+final sample: this is not a global clock, filesystem deadline, power-loss or
+independent timestamp certificate. Operator research remains unverified and has
+no publication, prediction-scoring or financial authority.

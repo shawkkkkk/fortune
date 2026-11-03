@@ -145,3 +145,19 @@ read-only MCP outputs are unchanged. The trusted host can change time after the
 final sample: this is not a global clock, filesystem deadline, power-loss or
 independent timestamp certificate. Operator research remains unverified and has
 no publication, prediction-scoring or financial authority.
+
+
+## Filesystem paths only
+
+Initialization and opening reject `:memory:` and case-insensitive `file:` URI prefixes before
+filesystem or SQLite access. Ordinary relative and absolute filesystem paths
+retain their existing behavior. The filesystem checks and SQLite must refer to
+the same disk file: a literal URI-named regular file must not stand in for a
+separate shared-memory or alternate SQLite URI target.
+
+If an existing configuration uses a SQLite URI, stop the notebook and every
+writer/restart path and review the actual target and available history. Do not
+strip/decode the URI, initialize an empty replacement, refresh the expected head
+or assume that vanished in-memory history can be recovered. This adds no
+migration, history repair, automatic recovery, backup or power-loss guarantee.
+Stored research remains unverified; operator and MCP disclosure gates remain.

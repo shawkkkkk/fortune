@@ -19,10 +19,12 @@ const regular=p=>{const s=lstatSync(p);if(!s.isFile()||s.nlink!==1||s.isSymbolic
 export class ProjectResearchNotebook{
  #db;#token;#now;#readOnly;
  static initialize(path,token,now=Date.now()){
+  if(path===':memory:'||/^file:/i.test(path))throw Error('SQLite memory and URI paths are not supported');
   token=projectToken(token);time(now);const fd=openSync(path,constants.O_CREAT|constants.O_EXCL|constants.O_WRONLY|constants.O_NOFOLLOW,0o600);closeSync(fd);
   const db=new DatabaseSync(path);try{db.exec('PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; BEGIN IMMEDIATE;');db.exec(schema);db.prepare('INSERT INTO notebook VALUES(1,1,?,?,?)').run(token,randomBytes(32).toString('hex'),now);db.exec('COMMIT;');}finally{db.close();}
  }
  constructor(path,token,{readOnly=false,now=Date.now}={}){
+  if(path===':memory:'||/^file:/i.test(path))throw Error('SQLite memory and URI paths are not supported');
   this.#token=projectToken(token);this.#now=now;this.#readOnly=readOnly;const before=regular(path);this.#db=new DatabaseSync(path,{readOnly});
   try{const after=regular(path);if(before.ino!==after.ino||before.dev!==after.dev)throw Error('Replaced');this.#db.exec('PRAGMA busy_timeout=5000;');if(!readOnly)this.#db.exec('PRAGMA synchronous=FULL;');
    const tables=this.#db.prepare("SELECT sql FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' ORDER BY name").all();

@@ -48,8 +48,8 @@ test('creator registry cannot accept ephemeral signed history behind an unrelate
  });
 });
 test('ordinary relative and absolute creator registries preserve accepted history and replay rejection after reopen',async()=>{
- for(const absolute of [false,true])await fixture(async dir=>{
-  const path=absolute?join(dir,'canon.sqlite'):'canon.sqlite';Registry.initialize(path,policy,now);
+ for(const style of ['relative','absolute','buffer'])await fixture(async dir=>{
+  const path=style==='buffer'?Buffer.from(join(dir,'canon.sqlite')):style==='absolute'?join(dir,'canon.sqlite'):'canon.sqlite';Registry.initialize(path,policy,now);
   let book=new Registry(path,policy,{now:()=>now});
   try{
    const record=await accept(book);book.close();book=new Registry(path,policy,{now:()=>now});
@@ -60,8 +60,8 @@ test('ordinary relative and absolute creator registries preserve accepted histor
  });
 });
 test('creator registry rejects direct memory targets before filesystem initialization and opening',async()=>{
- await fixture(async()=>{
-  assert.throws(()=>Registry.initialize(':memory:',policy,now),/memory and URI/);assert.equal(existsSync(':memory:'),false);
-  writeFileSync(':memory:','',{mode:0o600});assert.throws(()=>new Registry(':memory:',policy,{now:()=>now}),/memory and URI/);assert.equal(statSync(':memory:').size,0);
+ for(const path of [':memory:',Buffer.from(':memory:')])await fixture(async()=>{
+  assert.throws(()=>Registry.initialize(path,policy,now),/memory and URI/);assert.equal(existsSync(path),false);
+  writeFileSync(path,'',{mode:0o600});assert.throws(()=>new Registry(path,policy,{now:()=>now}),/memory and URI/);assert.equal(statSync(path).size,0);
  });
 });

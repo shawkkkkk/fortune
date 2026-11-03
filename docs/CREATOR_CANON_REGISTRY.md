@@ -245,7 +245,8 @@ No policy/profile/provider/service is enabled, and full readiness is unfinished.
 
 Initialization and opening reject exact `:memory:` and case-insensitive `file:`
 URI prefixes before filesystem, policy or SQLite access. Ordinary relative and
-absolute filesystem paths remain supported. A literal URI-named regular file
+absolute filesystem paths remain supported, including Buffer paths. The special
+target comparison covers both string and Buffer path representations. A literal URI-named regular file
 cannot stand in for an unrelated SQLite shared-memory or alternate URI target.
 The schema, signatures, history, clock/expiry/RPC fences and authority are unchanged.
 

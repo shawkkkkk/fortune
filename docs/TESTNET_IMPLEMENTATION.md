@@ -2,6 +2,17 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## Disabled funding-receipt operator integration (P19 component)
+
+The explicit `inspect-work-funding.mjs` CLI calls the unchanged direct funding
+reader with a bounded strict policy, two reviewed HTTPS read origins and literal
+before/after policy-byte pins. It preserves historical provenance, null auth and
+false execution/readiness; no signing, ledger consumption, service or real config.
+Actual child HTTP/ABI tests and the existing compiled zero-account escrow drill
+cover legacy/ID-bound receipts, stable replay, wrong terms and read-only state.
+See [WORK_FUNDING_RECEIPTS.md](WORK_FUNDING_RECEIPTS.md). This component does not
+complete P19 or establish independent providers, legitimate capital or readiness.
+
 ## Historical direct work funding receipts (P19)
 
 A separate read-only engine binds direct legacy/ID-scoped funding calldata to

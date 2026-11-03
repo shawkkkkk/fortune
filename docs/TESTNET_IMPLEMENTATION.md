@@ -2,6 +2,17 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## Local reported-profit operator integration (M01/M07/M08)
+
+A default-disabled local command now reads or explicitly appends to the actual
+unchanged durable reported-profit book/reducer. Separate write enablement, pinned
+book identity/policy, read-only history preflight, bounded strict inputs and the
+original expected head constrain operator reports. Real child/SQLite tests cover
+loss carry, historical retries, stale heads and invalid inputs. No initialization,
+repair, automatic retry, RPC, signer, cash/buyback/burn or verification authority is
+added. Reports remain unverified assertions; full strategy readiness is unfinished.
+See REPORTED_STRATEGY_PROFIT_BOOK.md; Standard/root pins and all gates remain.
+
 ## Receipt-store literal disk paths (M01/M07/M08)
 
 The actual fill journal, receipt queue and schema2 native-gas book now reject

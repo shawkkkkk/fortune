@@ -105,3 +105,40 @@ and independent audits. Never spend creator/holder/LP liabilities or launch
 reserves as strategy capital. Launch-token fees only burn; holder rewards and
 earned platform recirculation remain separate. Full M01/M07/M08 and mainnet
 readiness are unfinished; frozen Standard/root pins and release gates are unchanged.
+
+## Local operator command
+
+`reported-strategy-profit.mjs read <config.json>` calls the actual existing book
+read-only. `append <config.json> <report.json>` calls its unchanged transactional
+append/reducer. Both require `FORTUNE_REPORTED_PROFIT_ENABLED=true`; append also
+requires `FORTUNE_REPORTED_PROFIT_WRITE_ENABLED=true`, before input access. Run
+with `node --import ./scripts/register-ts.mjs scripts/reported-strategy-profit.mjs`.
+No command initializes, repairs, migrates, resets or prunes a book.
+
+The config has exactly `bookPath` (protected absolute existing file), `bookId`
+(the already inspected public64-hex identity) and `policy` (the three fields
+above). The command verifies identity/history read-only before opening a writer,
+then rechecks identity and literal config bytes. The config SHA256 output is a
+checksum, not authentication. Host/config/path trust and privileged swaps remain.
+
+The report has exactly `expectedHead` and `cycle`, using all library cycle fields
+above. Encode every quantity, including the four costs and zero inventory delta,
+as a canonical unsigned decimal uint128 **string**; numbers/coercions reject.
+No default percentage, head refresh, receipt lookup, chain/RPC read or conversion
+is inferred. Input descriptors open nonblocking, must be regular, and use bounded
+limit-plus-one reads: config16KiB, report12KiB, strict UTF8 JSON. Library report8KiB,
+256-cycle and32-receipt bounds still apply. This is not a general filesystem
+latency deadline or path-swap defense.
+
+Read output preserves the complete original book observation and all false
+verification/execution flags. Append returns the original insert/retry receipt,
+not cash availability or a fresh trust claim. Errors omit paths, report contents
+and underlying exceptions. A crash/stdout failure can follow a commit: inspect
+history before an explicit retry with the **original** report/predecessor. Never
+automatically refresh the head or interpret nonzero exit as rollback proof.
+
+Actual child-process tests exercise loss carry, profit allocation, exact old
+retry/reopen, stale heads, duplicate labels, input bounds and disabled/foreign
+identity rejection against real temporary SQLite files. These are synthetic
+operator assertions; no real book/configuration, provider, custody, capital,
+financial execution or full readiness evidence is established.

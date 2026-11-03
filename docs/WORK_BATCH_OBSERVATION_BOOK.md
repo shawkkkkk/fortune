@@ -102,3 +102,39 @@ conflict cases remain HTTP-fixture evidence. It does not establish public custod
 legitimate capital, live deployment, identity, delivery, IP, fairness, consensus,
 financial settlement, full P19 readiness or audit/mainnet approval. No book,
 reader, contract, Standard/root pins, authority or release gate is changed.
+
+## Explicit local operator command
+
+`scripts/work-batch-observations.mjs read <config>` reads an existing protected
+book without RPC. Both modes require `FORTUNE_WORK_BOOK_ENABLED=true`. Capture
+also requires `FORTUNE_WORK_BOOK_WRITE_ENABLED=true` and an explicit request:
+`capture <config> <request>`. There is no initialization, loop, automatic retry,
+head refresh, repair, unquarantine, migration, signer or financial transaction.
+
+The strict 16KiB UTF8 JSON config contains exactly `bookPath`, `bookId` and
+`policy` (the existing book policy above). Pin the reviewed existing book ID.
+The strict 68KiB request contains exactly `policies` (the complete ordered batch
+policies accepted by the unchanged reader, within its existing 64KiB bound) and
+`expectedHead` (the original predecessor for replay, never refreshed implicitly).
+Inputs use nonblocking opened regular files and bounded max+1 reads; this is not
+a generic filesystem deadline or privileged-host/path-swap defense.
+
+Capture validates the existing complete history read-only before opening a writer,
+checks the identity again and calls the unchanged book/reader once. Use the same
+reviewed `FORTUNE_WORK_READ_RPC_URL` and `FORTUNE_WORK_SECONDARY_RPC_URL` as the
+batch reader: distinct HTTPS origins, no userinfo/fragment/redirect/retry, 5s
+transport timeout. Config and request bytes are pinned around every awaited RPC,
+including final reads before the synchronous book commit. A privileged host may
+still change files after the last check. The existing 20s reader and 5s commit
+freshness/clock gates remain unchanged; no inflight cancellation guarantee.
+
+Read prints the bounded complete historical view; capture prints only book ID,
+config SHA256 and the original capture result. The checksum is not authentication.
+A replay performs RPC but returns original timestamps/digest and adds no row.
+Failure or lost output can follow commit or quarantine: inspect existing history
+before an explicit retry with the original request. Never initialize a replacement
+book or silently refresh a head to make an uncertain command pass. History is
+local operator provenance, not current authorization, payment authority or a
+financial consumed-receipt ledger. Privacy permission remains required before
+sharing real identifiable provenance with any external client/model. No real
+configuration is enabled here; full P19/readiness and all release gates remain.

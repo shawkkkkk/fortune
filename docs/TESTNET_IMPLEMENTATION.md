@@ -2,6 +2,16 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## Explicit work observation-book operator (P19)
+
+A default-disabled local command reads an existing protected book without RPC or,
+with a separate write gate, captures one explicitly reviewed complete result batch
+through the unchanged book/reader. It pins book identity, literal input bytes and
+original expected head; reopen/replay preserve original receipt history/times.
+No initialization, automatic retry/recovery, service, signer or financial authority
+is added. See WORK_BATCH_OBSERVATION_BOOK.md for exact bounds, uncertain-commit
+handling and privacy/host/provider limits. Full P19 readiness remains incomplete.
+
 ## Compiled escrow → durable observation book integration (P19)
 
 The existing zero-account compiled WorkEscrow drill now captures its actual

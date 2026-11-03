@@ -2,6 +2,15 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## Agent contribution and release qualification guides (P24 documentation)
+
+Root agent instructions, contribution/setup guidance, an implementation work queue,
+a PR evidence template and a testnet/mainnet qualification checklist now point to
+the full M01-M08/P01-P24 scope and actual engine entrypoints. Readiness stages,
+mainnet fork early-return limits and separate audit/activation gates are explicit.
+README setup follows existing CI pins. This documentation adds no engine,
+deployment, audit approval, accepted baseline or financial authority.
+
 ## Research notebook filesystem target binding (P03/P18 foundation)
 
 Initialization and opening now reject SQLite memory/URI targets before filesystem or

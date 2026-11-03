@@ -12,6 +12,15 @@ Fortune is a BNB Smart Chain launchpad. The creator-facing path is **name → ti
 
 The product direction is **no dumping, holders get paid, pair with anything**. These are goals for the separate Burn + Rewards v2 architecture, not active Standard payout claims. V2 must burn any launch-token-side fee and fund direct holder claims from the pair-asset side without selling the launch token. Its isolated reward-accounting prototype is in `contracts-v2/`; no Infinity hook or real-value deployment exists yet. `docs/BURN_REWARDS_V2.md` has the proof requirements.
 
+## Contributing and agent work
+
+Start with [AGENTS.md](AGENTS.md) and [CONTRIBUTING.md](CONTRIBUTING.md).
+The [agent work queue](docs/AGENT_WORK_QUEUE.md) maps implementation tracks to
+actual source and the full M01-M08/P01-P24 requirements. Use the
+[testnet/mainnet qualification checklist](docs/AGENT_RELEASE_CHECKLIST.md) to
+separate functional tests, fork evidence, independent review and activation gates.
+These contribution guides do not declare the full feature set mainnet-ready.
+
 ## What is built
 
 ### Web product
@@ -237,7 +246,7 @@ docs/                 architecture, security, product and testnet docs
 ## Web development
 
 ```bash
-npm install
+npm ci
 npm run dev
 ```
 
@@ -245,11 +254,13 @@ Open http://localhost:3000.
 
 ## Contracts
 
+Use Foundry v1.8.3 and the same exact library commits as current CI:
+
 ```bash
 cd contracts
-forge install OpenZeppelin/openzeppelin-contracts@v5.1.0 --no-commit
-forge install foundry-rs/forge-std --no-commit
-forge test -vvv
+forge install OpenZeppelin/openzeppelin-contracts@69c8def5f222ff96f2b5beff05dfba996368aa79 --no-commit
+forge install foundry-rs/forge-std@8bbcf6e3f8f62f419e5429a0bd89331c85c37824 --no-commit
+forge test --fuzz-runs 1000 -vvv
 ```
 
 See `docs/TESTNET.md` for the isolated BSC testnet deployment flow.

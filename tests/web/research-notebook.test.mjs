@@ -16,3 +16,31 @@ for(const enabled of ['false','true']){const r=spawnSync(process.execPath,['--im
 assert.deepEqual(readFileSync(s.path),before);}finally{s.book.close();s.clean();}});
 test('process death around commit leaves one whole note or none and exact retry does not duplicate',async()=>{for(const when of ['before','after']){const s=setup();try{const r=request(s.book.read().head);const source=`import {DatabaseSync} from 'node:sqlite';import {ProjectResearchNotebook as B} from './scripts/project-research-notebook.mjs';const b=new B(process.argv[1],process.argv[2],{now:()=>Number(process.argv[4])}),exec=DatabaseSync.prototype.exec;DatabaseSync.prototype.exec=function(sql){if(sql==='COMMIT;'){if(process.argv[5]==='before')process.exit(42);exec.call(this,sql);process.exit(43);}return exec.call(this,sql);};b.append(JSON.parse(process.argv[3]));`;
 const code=await new Promise((resolve,reject)=>{const c=spawn(process.execPath,['--import','./scripts/register-ts.mjs','--input-type=module','-e',source,s.path,token,JSON.stringify(r),String(now),when],{stdio:'ignore'});c.on('error',reject);c.on('exit',resolve);});assert.equal(code,when==='before'?42:43);assert.equal(s.book.read().total,when==='before'?0:1);const retry=s.book.append(r);assert.equal(retry.replayed,when==='after');assert.equal(s.book.read().total,1);}finally{s.book.close();s.clean();}}});
+
+test('late post-metadata invalid or reversed notebook clock rolls back both tables and permits explicit retry',()=>{
+ for(const final of [now-1,0,-1,NaN,Infinity,Number.MAX_SAFE_INTEGER+1]){
+  const s=setup();let clock=now;const prepare=DatabaseSync.prototype.prepare;
+  const rows=()=>{const db=new DatabaseSync(s.path,{readOnly:true});try{return [db.prepare('SELECT * FROM notebook').all(),db.prepare('SELECT * FROM notes ORDER BY seq').all()];}finally{db.close();}};
+  try{
+   s.book.close();s.book=new Book(s.path,token,{now:()=>clock});const r=request(s.book.read().head),before=rows();let mutated=false;
+   DatabaseSync.prototype.prepare=function(sql){const statement=prepare.call(this,sql);if(sql!=='UPDATE notebook SET last_clock=?')return statement;
+    return new Proxy(statement,{get(target,key){if(key==='run')return(...args)=>{const result=target.run(...args);mutated=true;clock=final;return result;};const v=Reflect.get(target,key,target);return typeof v==='function'?v.bind(target):v;}});};
+   assert.throws(()=>s.book.append(r),/Clock/);assert.equal(mutated,true);assert.deepEqual(rows(),before);
+   DatabaseSync.prototype.prepare=prepare;s.book.close();clock=now;s.book=new Book(s.path,token,{now:()=>clock});assert.deepEqual(rows(),before);assert.equal(s.book.read().total,0);
+   assert.equal(s.book.append(r).replayed,false);assert.equal(s.book.read().total,1);
+  }finally{DatabaseSync.prototype.prepare=prepare;s.book.close();s.clean();}
+ }
+});
+
+test('valid post-metadata clock advance preserves original note timestamp, digest and retry identity',()=>{
+ const s=setup();let clock=now;const prepare=DatabaseSync.prototype.prepare;
+ try{
+  s.book.close();s.book=new Book(s.path,token,{now:()=>clock});const r=request(s.book.read().head);let mutated=false;
+  DatabaseSync.prototype.prepare=function(sql){const statement=prepare.call(this,sql);if(sql!=='UPDATE notebook SET last_clock=?')return statement;
+   return new Proxy(statement,{get(target,key){if(key==='run')return(...args)=>{const result=target.run(...args);mutated=true;clock=now+10;return result;};const v=Reflect.get(target,key,target);return typeof v==='function'?v.bind(target):v;}});};
+  const result=s.book.append(r);assert.equal(mutated,true);DatabaseSync.prototype.prepare=prepare;
+  const db=new DatabaseSync(s.path,{readOnly:true});try{assert.equal(db.prepare('SELECT last_clock FROM notebook').get().last_clock,now);assert.equal(db.prepare('SELECT recorded_at FROM notes').get().recorded_at,now);}finally{db.close();}
+  s.book.close();s.book=new Book(s.path,token,{now:()=>now+100});assert.equal(s.book.readEntry(r.id).recordedAtMs,now);assert.equal(s.book.readEntry(r.id).digest,result.digest);
+  assert.deepEqual(s.book.append(r),{...result,replayed:true});assert.equal(s.book.read().total,1);
+ }finally{DatabaseSync.prototype.prepare=prepare;s.book.close();s.clean();}
+});

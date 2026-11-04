@@ -1,5 +1,30 @@
 # Isolated testnet scoped-work escrow
 
+## Selected batch-decline receipt observation (P19)
+
+inspectWorkBatchDeclineReceipt binds ONE selected refund in direct chain97
+ declineMany calldata with 1–16 strictly sorted nonzero IDs. Exact worker/call,
+transaction/receipt/block/log positions, receipt-height runtime/role/asset/job
+pins and zero latest result revision must agree across both read clients.
+Canonical selected Transfer/JobSettled/JobDeclined returns whole principal to
+the original client. Stable settlement IDs MUST be deduplicated downstream.
+The existing20-confirmation/head-gap10/real20second monotonic RPC fences,
+original receivers, before/after rereads and finally fences remain unchanged.
+Other entries' assets/amounts/parties/terms/state are NOT verified; output says
+otherBatchJobsVerified:false. No complete-batch ledger, cash/badge, signer,
+service, CLI or configuration is added; authorization null/all authority false.
+
+Tests cover1/16 and first/last selection, malformed preflight0RPC, selected
+call/event/refund/revision mutations, peer/reread own-topic slots, stable replay,
+receiver binding, real timeout/late-follow-on fencing and direct-route separation.
+The actual compiled zero-account two-client/two-asset decline drill now reads
+both original refunds, rejects wrong amounts/direct routes and checks unchanged
+height/nonces/balances/liabilities/history during observation. Twenty local
+confirmation blocks are snapshot-restored; old runtime assertions remain.
+One fixture is not independent providers, public custody, finality, capital,
+identity/delivery/IP/legal/fairness/recovery, audit or full P19 readiness.
+Contracts, old test groups/readers' routes, Standard/root pins and gates remain.
+
 ## Atomic unaccepted-job batch decline (P19)
 
 `declineMany(uint256[])` adds an isolated chain97 worker action for 1–16 strictly

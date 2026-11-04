@@ -1,6 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {keccak256,parseAbi,encodeFunctionData} from 'viem';
-import {inspectWorkBatchWaiverReceipt,inspectAllWorkBatchResultPayments,inspectWorkBatchResultPaymentReceipt,inspectWorkPaymentReceipt,inspectWorkResultPaymentReceipt,inspectWorkCancellationReceipt,inspectWorkExpiredCancellationReceipt,inspectWorkWorkerRefundReceipt,inspectWorkArbitrationReceipt} from '../../lib/work-payment-receipt.ts';
+import {inspectWorkBatchDeclineReceipt,inspectWorkBatchWaiverReceipt,inspectAllWorkBatchResultPayments,inspectWorkBatchResultPaymentReceipt,inspectWorkPaymentReceipt,inspectWorkResultPaymentReceipt,inspectWorkCancellationReceipt,inspectWorkExpiredCancellationReceipt,inspectWorkWorkerRefundReceipt,inspectWorkArbitrationReceipt} from '../../lib/work-payment-receipt.ts';
 const a=n=>'0x'+n.toString(16).padStart(40,'0'),h=n=>'0x'+n.toString(16).padStart(64,'0'),w=n=>BigInt(n).toString(16).padStart(64,'0');
 const code='0x60006000f3',pin=keccak256(code),sig=s=>keccak256(new TextEncoder().encode(s));
 const policy=()=>({chainId:97,escrow:a(1),escrowCodeHash:pin,governor:a(2),guardian:a(3),arbitrator:a(4),jobId:'1',client:a(5),worker:a(6),amount:'100',asset:a(7),assetCodeHash:pin,maxPerJob:'1000',termsHash:h(1),transactionHash:h(9)});
@@ -150,3 +150,23 @@ test('batch waiver preserves original receivers and real deadline with late foll
 });
 
 test('batch waiver accepts exact revision32 boundary',async()=>{const f=waiverBatchFixture(0,1,32),x=await inspectWorkBatchWaiverReceipt(f.clients,f.p);assert.equal(x.workerRefund.revision,'32');assert.equal(x.clientRefund,'100');});
+
+function declineBatchFixture(index=0,count=2){const f=workerRefundFixture('decline'),ids=Array.from({length:count},(_,i)=>String(i+1)),template=structuredClone(f.r.logs);
+ f.r.logs=ids.flatMap((id,i)=>template.map((l,j)=>({...structuredClone(l),topics:j===0?l.topics:[l.topics[0],h(i+1),l.topics[2]],logIndex:3+i*3+j})));
+ const {refundKind,...p}=f.p;f.p={...p,jobId:String(index+1),declineIds:ids};f.tx.input=encodeFunctionData({abi:parseAbi(['function declineMany(uint256[])']),functionName:'declineMany',args:[ids.map(BigInt)]});return f;
+}
+test('selected decline batch binds 1/16 boundaries, whole refunds, stable IDs and explicit selected-only scope',async()=>{
+ for(const [index,count]of [[0,1],[0,2],[1,2],[15,16]]){const f=declineBatchFixture(index,count),x=await inspectWorkBatchDeclineReceipt(f.clients,f.p);assert.equal(x.clientRefund,'100');assert.equal(x.workerPaid,'0');assert.equal(x.selectedBatchDeclineObserved,true);assert.equal(x.otherBatchJobsVerified,false);assert.equal(x.batchJobIndex,index);assert.equal(x.batchJobCount,count);assert.deepEqual(x.workerRefund,{kind:'decline',revision:null});assert.equal(x.currentAuthorization,null);assert.equal(x.executionAuthorized,false);assert.equal((await inspectWorkBatchDeclineReceipt(f.clients,f.p)).evidenceId,x.evidenceId);
+ const {declineIds,...p}=f.p;await assert.rejects(inspectWorkWorkerRefundReceipt(f.clients,{...p,refundKind:'decline'}));await assert.rejects(inspectWorkBatchWaiverReceipt(f.clients,{...p,waivers:declineIds.map(id=>({id,expectedRevision:'0'}))}));}
+ const f=declineBatchFixture();f.r.logs[3].data='0x'+w(42);assert.equal((await inspectWorkBatchDeclineReceipt(f.clients,f.p)).otherBatchJobsVerified,false);
+});
+test('decline batch malformed input preflight performs zero RPC',async()=>{let calls=0;const c={getBlockNumber:async()=>{calls++;}};for(const declineIds of [[],Array(17).fill('1'),Array(2),['0'],['01'],['2'],['1','1'],['2','1'],[1],['1',(1n<<256n).toString()]])await assert.rejects(inspectWorkBatchDeclineReceipt([c,{}],{...policy(),declineIds}));assert.equal(calls,0);});
+test('selected decline call, refund, event and revision mutations reject on either peer and reread',async()=>{
+ for(const index of [0,1])for(const mutate of [f=>f.tx.input+='00',f=>f.tx.from=a(8),f=>f.r.logs[index*3].data='0x'+w(99),f=>f.r.logs[index*3+1].topics[1]=h(99),f=>f.r.logs[index*3+2].data=h(0),f=>f.r.logs[index*3+2].logIndex++,f=>f.r.logs.pop(),f=>f.r.logs.push({...f.r.logs[0]}),f=>f.r.logs[0].removed=true]){const f=declineBatchFixture(index);mutate(f);await assert.rejects(inspectWorkBatchDeclineReceipt(f.clients,f.p));}
+ for(const peer of [0,1])for(const stage of [1,2])for(let slot=0;slot<3;slot++){const f=declineBatchFixture(1),c=f.clients[peer],old=c.getTransactionReceipt;let n=0;c.getTransactionReceipt=async()=>{const r=await old();if(++n===stage)delete r.logs[5].topics[slot];return r;};await assert.rejects(inspectWorkBatchDeclineReceipt(f.clients,f.p));}
+ const f=declineBatchFixture(),old=f.clients[1].readContract;f.clients[1].readContract=async q=>q.functionName==='latestResultRevision'?1n:old(q);await assert.rejects(inspectWorkBatchDeclineReceipt(f.clients,f.p));
+});
+test('decline batch retains receiver binding and real deadline fencing',{timeout:25000},async()=>{
+ const f=declineBatchFixture();for(const c of f.clients)for(const k of ['getChainId','getBlockNumber','getBlock','getTransactionReceipt','getTransaction','getCode','readContract']){const old=c[k];c[k]=function(...a){assert.equal(this,c);return old.apply(c,a);};}await inspectWorkBatchDeclineReceipt(f.clients,f.p);
+ const g=declineBatchFixture();let release,follow=0;g.clients[1].getBlockNumber=()=>new Promise(r=>release=r);g.clients[1].getChainId=async()=>{follow++;return 97;};await assert.rejects(inspectWorkBatchDeclineReceipt(g.clients,g.p),/timed out/);release(100n);await new Promise(r=>setImmediate(r));assert.equal(follow,0);
+});

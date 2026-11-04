@@ -3,6 +3,7 @@ import { WORK_ESCROW_READ_ABI, type WorkJobPolicy } from "@/lib/work-escrow-obse
 
 const RESOLVE = parseAbi(["function resolve(uint256 id,uint128 workerAmount)"]);
 const DECLINE = parseAbi(["function decline(uint256 id)"]);
+const BATCH_DECLINE = parseAbi(["function declineMany(uint256[] ids)"]);
 const BATCH_WAIVE = parseAbi(["function waivePaymentsMany((uint256 id,uint256 expectedRevision)[] waivers)"]);
 const WAIVE = parseAbi(["function waivePayment(uint256 id,uint256 expectedRevision)"]);
 const DECLINED = keccak256(new TextEncoder().encode("JobDeclined(uint256,address)"));
@@ -108,6 +109,21 @@ export async function inspectWorkBatchWaiverReceipt(clients: readonly [PublicCli
   return inspectPayment(clients,policy,undefined,true,undefined,{kind:"waiver",revision:waivers[index].expectedRevision},undefined,{waivers,index});
 }
 
+export type WorkBatchDeclinePolicy = WorkPaymentPolicy & { declineIds: readonly string[] };
+/** One selected unaccepted-job refund only; no whole-batch or current authority. */
+export async function inspectWorkBatchDeclineReceipt(clients: readonly [PublicClient,PublicClient], input: WorkBatchDeclinePolicy) {
+  const q=structuredClone(input);
+  if(!q || !Array.isArray(q.declineIds) || q.declineIds.length<1 || q.declineIds.length>16)throw Error("Invalid decline batch");
+  let previous=0n;
+  for(const id of q.declineIds){
+    if(!positive(id,256) || BigInt(id)<=previous)throw Error("Invalid decline batch binding");
+    previous=BigInt(id);
+  }
+  const index=q.declineIds.indexOf(q.jobId);if(index<0)throw Error("Selected job absent from decline batch");
+  const {declineIds,...policy}=q;validateWorkPaymentPolicy(policy);
+  return inspectPayment(clients,policy,undefined,true,undefined,{kind:"decline",revision:"0"},undefined,undefined,{ids:declineIds,index});
+}
+
 export function validateWorkPaymentPolicy(p: WorkPaymentPolicy) {
   if (!p || Object.keys(p).sort().join() !== "amount,arbitrator,asset,assetCodeHash,chainId,client,escrow,escrowCodeHash,governor,guardian,jobId,maxPerJob,termsHash,transactionHash,worker"
     || p.chainId !== 97 || ![p.escrow,p.asset,p.governor,p.guardian,p.arbitrator,p.client,p.worker].every(addr)
@@ -166,13 +182,13 @@ export async function inspectAllWorkBatchResultPayments(clients: readonly [Publi
   }finally{ended=true;clearTimeout(timer);}
 }
 
-async function inspectPayment(clients: readonly [PublicClient,PublicClient], input: WorkPaymentPolicy, result?: {revision:string;resultHash:Hex;batch?:{approvals:readonly {id:string;revision:string;resultHash:Hex}[];index:number}}, cancellation=false, expiryCaller?: Hex, workerRefund?: {kind:"decline"|"waiver";revision:string}, arbitrationWorker?: string, waiverBatch?: {waivers:readonly {id:string;expectedRevision:string}[];index:number}) {
+async function inspectPayment(clients: readonly [PublicClient,PublicClient], input: WorkPaymentPolicy, result?: {revision:string;resultHash:Hex;batch?:{approvals:readonly {id:string;revision:string;resultHash:Hex}[];index:number}}, cancellation=false, expiryCaller?: Hex, workerRefund?: {kind:"decline"|"waiver";revision:string}, arbitrationWorker?: string, waiverBatch?: {waivers:readonly {id:string;expectedRevision:string}[];index:number}, declineBatch?: {ids:readonly string[];index:number}) {
   const p = structuredClone(input);
   validateWorkPaymentPolicy(p);
   if (!Array.isArray(clients) || clients.length!==2 || clients[0]===clients[1]) throw Error("Two distinct read clients required");
   const arbitration=arbitrationWorker===undefined?undefined:{worker:BigInt(arbitrationWorker),refund:BigInt(p.amount)-BigInt(arbitrationWorker)};
   if(arbitration && arbitration.refund<0n)throw Error("Arbitrated amount exceeds principal");
-  const batchCount=result?.batch?.approvals.length??waiverBatch?.waivers.length;
+  const batchCount=result?.batch?.approvals.length??waiverBatch?.waivers.length??declineBatch?.ids.length;
   const caller=arbitration?p.arbitrator:workerRefund?p.worker:expiryCaller??p.client;
   const start=Date.now(); let last=start,ended=false,timer:ReturnType<typeof setTimeout>|undefined;
   const clock=()=>{const now=Date.now();if(ended || !Number.isSafeInteger(start) || start<0 || !Number.isSafeInteger(now) || now<last || now-start>20_000)throw Error("Payment read ended, expired or clock moved backwards");last=now;return now;};
@@ -190,6 +206,8 @@ async function inspectPayment(clients: readonly [PublicClient,PublicClient], inp
     if(!same(tx.hash,p.transactionHash)||!same(tx.blockHash,r.blockHash)||tx.blockNumber!==r.blockNumber||tx.transactionIndex!==r.transactionIndex||tx.chainId!==97
       ||!same(tx.from,caller)||!same(tx.to,p.escrow)||tx.value!==0n||!same(tx.input,arbitration
         ? encodeFunctionData({abi:RESOLVE,functionName:"resolve",args:[BigInt(p.jobId),arbitration.worker]})
+        : declineBatch
+        ? encodeFunctionData({abi:BATCH_DECLINE,functionName:"declineMany",args:[declineBatch.ids.map(BigInt)]})
         : waiverBatch
         ? encodeFunctionData({abi:BATCH_WAIVE,functionName:"waivePaymentsMany",args:[waiverBatch.waivers.map(a=>({id:BigInt(a.id),expectedRevision:BigInt(a.expectedRevision)}))]})
         : workerRefund
@@ -210,8 +228,8 @@ async function inspectPayment(clients: readonly [PublicClient,PublicClient], inp
     if(result && (await read("latestResultRevision",[BigInt(p.jobId)])!==BigInt(result.revision)
       || await read("resultHashes",[BigInt(p.jobId),BigInt(result.revision)])!==result.resultHash))throw Error("Stored result binding differs");
     for(const l of r.logs){if(!same(l.transactionHash,p.transactionHash)||!same(l.blockHash,r.blockHash)||l.blockNumber!==r.blockNumber||l.transactionIndex!==r.transactionIndex
-      ||l.removed!==false||!Number.isSafeInteger(l.logIndex)||l.logIndex<0||!Array.isArray(l.topics)||((result?.batch||waiverBatch)&&(l.topics.length!==3||typeof l.data!=="string"||!/^0x(?:[0-9a-fA-F]{64}){1,2}$/.test(l.data)))||[0,1,2].some(i=>!Object.hasOwn(l.topics,i)||typeof l.topics[i]!=="string"||!/^0x[0-9a-fA-F]{64}$/.test(l.topics[i])))throw Error("Payment log binding differs");}
-    const offset=result?.batch?result.batch.index*3:waiverBatch?waiverBatch.index*3:0;
+      ||l.removed!==false||!Number.isSafeInteger(l.logIndex)||l.logIndex<0||!Array.isArray(l.topics)||((result?.batch||waiverBatch||declineBatch)&&(l.topics.length!==3||typeof l.data!=="string"||!(declineBatch?/^0x(?:[0-9a-fA-F]{64}){0,2}$/:/^0x(?:[0-9a-fA-F]{64}){1,2}$/).test(l.data)))||[0,1,2].some(i=>!Object.hasOwn(l.topics,i)||typeof l.topics[i]!=="string"||!/^0x[0-9a-fA-F]{64}$/.test(l.topics[i])))throw Error("Payment log binding differs");}
+    const offset=result?.batch?result.batch.index*3:waiverBatch?waiverBatch.index*3:declineBatch?declineBatch.index*3:0;
     const transfer=r.logs[offset],settled=arbitration?r.logs[r.logs.length-1]:r.logs[offset+1];
     const topics=[TRANSFER,"0x"+"0".repeat(24)+p.escrow.slice(2),"0x"+"0".repeat(24)+(cancellation?p.client:p.worker).slice(2)];
     const settlementTopics=[SETTLED,"0x"+word(BigInt(p.jobId)),"0x"+"0".repeat(24)+caller.slice(2)];
@@ -250,7 +268,7 @@ async function inspectPayment(clients: readonly [PublicClient,PublicClient], inp
     if(heads.some(h=>!uint(h,64)||h<21n)||(heads[0]>heads[1]?heads[0]-heads[1]:heads[1]-heads[0])>10n)throw Error("Payment heads differ");
     const head=heads[0]<heads[1]?heads[0]:heads[1],results=await Promise.all(clients.map(c=>observe(c,head)));
     if(stringify(results[0])!==stringify(results[1]))throw Error("Payment providers disagree");
-    return {...results[0],observedAtMs:clock(),source:waiverBatch?"isolated-selected-batch-work-waiver-rpc-observation":result?.batch?"isolated-selected-batch-work-result-payment-rpc-observation":arbitration?"isolated-direct-work-arbitration-rpc-observation":workerRefund?"isolated-worker-work-refund-rpc-observation":expiryCaller?"isolated-expired-work-cancellation-rpc-observation":cancellation?"isolated-direct-work-cancellation-rpc-observation":result?"isolated-direct-work-result-payment-rpc-observation":"isolated-direct-work-payment-rpc-observation",...(waiverBatch?{selectedBatchWorkerRefundObserved:true,batchJobCount:waiverBatch.waivers.length,batchJobIndex:waiverBatch.index,otherBatchJobsVerified:false}:result?.batch?{selectedBatchResultPaymentObserved:true,batchJobCount:result.batch.approvals.length,batchJobIndex:result.batch.index,otherBatchJobsVerified:false}:arbitration?{directArbitrationObserved:true,disputeFairnessVerified:false}:workerRefund?{directWorkerRefundObserved:true}:cancellation?{directCancellationObserved:true}:{directPaymentObserved:true}),currentAuthorization:null,
+    return {...results[0],observedAtMs:clock(),source:declineBatch?"isolated-selected-batch-work-decline-rpc-observation":waiverBatch?"isolated-selected-batch-work-waiver-rpc-observation":result?.batch?"isolated-selected-batch-work-result-payment-rpc-observation":arbitration?"isolated-direct-work-arbitration-rpc-observation":workerRefund?"isolated-worker-work-refund-rpc-observation":expiryCaller?"isolated-expired-work-cancellation-rpc-observation":cancellation?"isolated-direct-work-cancellation-rpc-observation":result?"isolated-direct-work-result-payment-rpc-observation":"isolated-direct-work-payment-rpc-observation",...(declineBatch?{selectedBatchDeclineObserved:true,batchJobCount:declineBatch.ids.length,batchJobIndex:declineBatch.index,otherBatchJobsVerified:false}:waiverBatch?{selectedBatchWorkerRefundObserved:true,batchJobCount:waiverBatch.waivers.length,batchJobIndex:waiverBatch.index,otherBatchJobsVerified:false}:result?.batch?{selectedBatchResultPaymentObserved:true,batchJobCount:result.batch.approvals.length,batchJobIndex:result.batch.index,otherBatchJobsVerified:false}:arbitration?{directArbitrationObserved:true,disputeFairnessVerified:false}:workerRefund?{directWorkerRefundObserved:true}:cancellation?{directCancellationObserved:true}:{directPaymentObserved:true}),currentAuthorization:null,
       independentProvidersVerified:false,finalityVerified:false,capitalOriginVerified:false,partyIdentityVerified:false,workDeliveryVerified:false,globalSolvencyVerified:false,executionAuthorized:false,fullSyndicateReadiness:false};
   })(),new Promise<never>((_,reject)=>{timer=setTimeout(()=>reject(Error("Payment observation timed out")),20_000);})]);}
   finally{ended=true;clearTimeout(timer);}

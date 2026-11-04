@@ -1,5 +1,30 @@
 # Testnet implementation ledger
 
+## Selected batch worker-waiver receipt engine (P19)
+
+The explicit read-only inspectWorkBatchWaiverReceipt library API observes ONE
+selected refund in direct chain97 waivePaymentsMany calldata containing 1–16
+sorted job IDs and exact revisions0–32. It binds worker/call/receipt/block/log
+indices, runtime/role/asset/job terms and receipt-height latest revision; exact
+positional Transfer/JobSettled/PaymentWaived events must return whole principal
+only to the selected original client. Shared two-client20confirmed/gap10,
+20-second monotonic lifetime/fences and reread guards remain. Stable settlement
+IDs MUST be deduplicated; repeated observations are not additional payments.
+Other jobs' terms/assets/amounts/storage are NOT verified; otherBatchJobsVerified
+stays false. No batch totals, consumed ledger, CLI, service, signer or new config.
+Existing direct APIs, contracts, root pins and authority gates stay unchanged.
+
+The zero-account compiled waiver drill uses a snapshot-restored block to observe
+both existing refunds at20confirmations via actual HTTP/ABI, repeat stable IDs,
+reject wrong amounts/direct-route confusion and preserve balances/liabilities,
+height and role nonces during reads. The snapshot is restored before old replay
+assertions. No extra financial transaction or clock override; two clients still
+reach ONE local synthetic fixture, not independent providers or public custody.
+Always null current authorization/false execution, provider independence,
+finality, capital/identity/delivery/IP/legal/fairness and full-readiness claims;
+full P19 and audit/deployment qualification remain unfinished.
+
+
 ## Work settlement receipt own-topic validation (P19/P10)
 
 Both shared receipt topic validators now require own canonical bytes32 values at

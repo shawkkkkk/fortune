@@ -133,12 +133,39 @@ try{
  assert.deepEqual(refunded.revisions,accepted.revisions);assert.equal(refunded.result,accepted.result);
  assert.deepEqual(refunded.fundingIds,accepted.fundingIds);
  for(let i=0;i<jobs.length;i++)assert.deepEqual(refunded.jobs[i],[...accepted.jobs[i].slice(0,7),4]);
+ // BEGIN selected batch waiver receipt integration (snapshot-restored, no extra financial transaction).
+ stage='selected batch waiver receipt observation';
+ await import('../../scripts/register-ts.mjs');
+ const {inspectWorkBatchWaiverReceipt,inspectWorkWorkerRefundReceipt}=await import('../../lib/work-payment-receipt.ts');
+ const snapshot=await rpc.request({method:'evm_snapshot'});
+ const readState=async()=>({height:await rpc.getBlockNumber({cacheTime:0}),financial:await financialState(),
+  nonces:await Promise.all(actors.map(async address=>[await rpc.getTransactionCount({address,blockTag:'latest'}),await rpc.getTransactionCount({address,blockTag:'pending'})]))});
+ const originalReadState=await readState();
+ try{
+  await rpc.request({method:'anvil_mine',params:['0x14']});
+  const before=await readState(),clients=[createPublicClient({transport:transport(),chain:bscTestnet}),createPublicClient({transport:transport(),chain:bscTestnet})];
+  const common={chainId:97,escrow:escrow.toLowerCase(),escrowCodeHash:keccak256(await rpc.getCode({address:escrow})),governor:GOV,guardian:GUARD,arbitrator:ARB,worker:WORKER,maxPerJob:'1000',transactionHash:paid.transactionHash,
+   waivers:waivers.map(a=>({id:a.id.toString(),expectedRevision:a.expectedRevision.toString()}))};
+  for(const [i,j]of jobs.entries()){
+   const policy={...common,jobId:j.id.toString(),asset:j.paymentToken.toLowerCase(),assetCodeHash:keccak256(await rpc.getCode({address:j.paymentToken})),client:j.client,amount:j.amount.toString(),termsHash:keys[i]};
+   const x=await inspectWorkBatchWaiverReceipt(clients,policy),again=await inspectWorkBatchWaiverReceipt(clients,policy);
+   assert.equal(x.clientRefund,j.amount.toString());assert.equal(x.workerPaid,'0');assert.equal(x.batchJobIndex,i);assert.equal(x.batchJobCount,2);
+   assert.equal(x.workerRefund.revision,String(i));assert.equal(x.settlementLogIndex,paid.logs[i*3+1].logIndex);assert.equal(x.evidenceId,again.evidenceId);
+   assert.equal(x.selectedBatchWorkerRefundObserved,true);assert.equal(x.otherBatchJobsVerified,false);assert.equal(x.currentAuthorization,null);assert.equal(x.executionAuthorized,false);
+   await assert.rejects(inspectWorkBatchWaiverReceipt(clients,{...policy,amount:(j.amount+1n).toString()}));
+   const {waivers:ignored,...direct}=policy;await assert.rejects(inspectWorkWorkerRefundReceipt(clients,{...direct,refundKind:'waiver',expectedRevision:String(i)}));
+  }
+  assert.deepEqual(await readState(),before);
+ }finally{assert.equal(await rpc.request({method:'evm_revert',params:[snapshot]}),true);}
+ assert.deepEqual(await readState(),originalReadState);
+ assert.deepEqual(await financialState(),refunded);
+ // END selected batch waiver receipt integration.
  stage='settled batch replay rejection';
  await write(WORKER,escrow,work,'waivePaymentsMany',[waivers],false);
  assert.deepEqual(await financialState(),refunded);
  for(const who of actors)await rpc.request({method:'anvil_stopImpersonatingAccount',params:[who]});
  assert.deepEqual(await rpc.request({method:'eth_accounts'}),[]);
- const result={compiledBatchWaiverObserved:true,mixedClientAssetRefundsMatched:true,staleRevisionAndForeignCallerRejected:true,
+ const result={selectedBatchWaiverReceiptObserved:true,selectedBatchWaiverReplayStable:true,selectedBatchWaiverWrongAmountAndDirectRouteRejected:true,selectedBatchWaiverReadsPreserveState:true,compiledBatchWaiverObserved:true,mixedClientAssetRefundsMatched:true,staleRevisionAndForeignCallerRejected:true,
   pausedBatchRejected:true,lateTransferRolledBackWholeBatch:true,exactCalldataRetryMatched:true,canonicalSixLogReceiptMatched:true,
   originalResultAndFundingHistoryPreserved:true,successfulReplayRejected:true,ownedCompiledSourcesMatched:true,
   generatedAccounts:0,privateKeysUsed:false,publicBroadcasts:false,executionAuthorized:false,deployedToPublicNetwork:false,

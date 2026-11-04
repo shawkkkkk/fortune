@@ -136,6 +136,27 @@ try{
  assert.deepEqual(refunded.fundingIds,funded.fundingIds);assert.equal(refunded.nextJob,funded.nextJob);
  for(let i=0;i<jobs.length;i++)assert.deepEqual(refunded.jobs[i],[...funded.jobs[i].slice(0,7),4]);
  assert.deepEqual(refunded.jobs[2],funded.jobs[2]);
+ // BEGIN selected decline receipt observation (snapshot restored).
+ stage='selected decline receipt observation';
+ await import('../../scripts/register-ts.mjs');
+ const {inspectWorkBatchDeclineReceipt,inspectWorkWorkerRefundReceipt}=await import('../../lib/work-payment-receipt.ts');
+ const snapshot=await rpc.request({method:'evm_snapshot'});
+ const readState=async()=>({financial:await financialState(),head:await rpc.getBlockNumber({cacheTime:0}),nonces:await Promise.all(actors.map(address=>rpc.getTransactionCount({address,blockTag:'pending'})))});
+ const original=await readState();
+ try{
+  await rpc.request({method:'anvil_mine',params:['0x14']});const before=await readState();
+  const clients=[createPublicClient({transport:transport(),chain:bscTestnet}),createPublicClient({transport:transport(),chain:bscTestnet})];
+  for(const [i,j]of jobs.entries()){
+   const policy={chainId:97,escrow:escrow.toLowerCase(),escrowCodeHash:keccak256(await rpc.getCode({address:escrow})),governor:GOV,guardian:GUARD,arbitrator:ARB,jobId:j.id.toString(),client:j.client,worker:WORKER,amount:j.amount.toString(),asset:j.paymentToken.toLowerCase(),assetCodeHash:keccak256(await rpc.getCode({address:j.paymentToken})),maxPerJob:'1000',termsHash:keys[i],transactionHash:paid.transactionHash,declineIds:ids.map(String)};
+   const x=await inspectWorkBatchDeclineReceipt(clients,policy),again=await inspectWorkBatchDeclineReceipt(clients,policy);
+   assert.equal(x.clientRefund,j.amount.toString());assert.equal(x.workerPaid,'0');assert.equal(x.batchJobIndex,i);assert.equal(x.batchJobCount,2);assert.equal(x.selectedBatchDeclineObserved,true);assert.equal(x.otherBatchJobsVerified,false);assert.equal(x.workerRefund.kind,'decline');assert.equal(x.workerRefund.revision,null);assert.equal(x.settlementLogIndex,paid.logs[i*3+1].logIndex);assert.equal(x.evidenceId,again.evidenceId);assert.equal(x.currentAuthorization,null);assert.equal(x.executionAuthorized,false);
+   await assert.rejects(inspectWorkBatchDeclineReceipt(clients,{...policy,amount:(j.amount+1n).toString()}));
+   const {declineIds,...direct}=policy;await assert.rejects(inspectWorkWorkerRefundReceipt(clients,{...direct,refundKind:'decline'}));
+  }
+  assert.deepEqual(await readState(),before);
+ }finally{assert.equal(await rpc.request({method:'evm_revert',params:[snapshot]}),true);}
+ assert.deepEqual(await readState(),original);
+ // END selected decline receipt observation.
  stage='settled batch replay and old single-route rejection';
  await write(WORKER,escrow,work,'declineMany',[ids],false);
  await write(WORKER,escrow,work,'decline',[ids[0]],false);
@@ -144,7 +165,7 @@ try{
  assert.deepEqual(await financialState(),refunded);
  for(const who of actors)await rpc.request({method:'anvil_stopImpersonatingAccount',params:[who]});
  assert.deepEqual(await rpc.request({method:'eth_accounts'}),[]);
- const result={compiledBatchDeclineObserved:true,mixedClientAssetRefundsMatched:true,
+ const result={selectedDeclineReceiptObserved:true,selectedDeclineReplayStable:true,selectedDeclineWrongPolicyAndDirectRouteRejected:true,selectedDeclineReadsPreserveState:true,compiledBatchDeclineObserved:true,mixedClientAssetRefundsMatched:true,
   callerBoundsOrderingAndAcceptedJobRejected:true,pausedBatchRejected:true,lateTransferRolledBackWholeBatch:true,
   exactCalldataRetryMatched:true,canonicalSixLogReceiptMatched:true,unselectedAcceptedLiabilityPreserved:true,
   originalTermsFundingAndResultHistoryPreserved:true,successfulReplayAndOldRoutesRejected:true,ownedCompiledSourcesMatched:true,

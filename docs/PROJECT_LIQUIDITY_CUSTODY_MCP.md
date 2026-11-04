@@ -79,3 +79,38 @@ preload. This is component integration, not independent public providers, a
 hosted MCP client/model, real creator approval, public custody, audit or full
 P03/M07 readiness. No contracts, frozen Standard/root dependencies, fees,
 signer, service, ledger, recovery or release gates change.
+
+## Compiled custody lifecycle rehearsal
+
+The existing `contracts-omnichain/scripts/lp-position-runtime.mjs` now consumes
+this actual stdio command at its existing twenty-confirmed held, paused and
+released checkpoints. The rehearsal deploys the unchanged custody contract in
+a zero-account local BSC Testnet fork, with synthetic assets and the actual
+Pancake position manager/factory/pool. No new financial transaction, mining call
+or clock override is added for the MCP reads.
+
+At held and paused checkpoints, both the tool and resource must match a direct
+unchanged custody-engine observation, including its nested position snapshot;
+only each read's two host observation timestamps may differ. Exact SHA256 policy
+bytes, project binding, null authorization, false execution/readiness and unknown
+claimable fees/value are checked. At the already released checkpoint, the tool
+must return its private read error and the resource its generic protocol error.
+Each child also performs actual initialization and discovery. All old receipt,
+custody release and ownership assertions still run.
+
+Before/after checks compare the chain head, latest/pending governor, guardian
+and treasury nonces, NFT owner/approval/full position tuple, and custody held,
+released and pause flags. The temporary mode0600 policy remains byte-identical
+and is deleted with the fixture. A new seventy-second child cleanup timer wraps
+two sequential reads; neither original thirty-second engine lifetime nor the
+existing five-minute workflow budget changes. It is not a service deadline.
+Only new dependency paths are added to both LP workflow triggers; commands,
+toolchain pins, permissions and failure gates stay unchanged.
+
+The test-only preload maps two synthetic HTTPS origins onto the same local VM.
+This integration can establish compiled-contract/RPC/stdio data agreement and
+read-only state preservation for that exact source. It cannot establish two
+independent providers, public custody/deployment, a hosted client/model,
+creator consent, legitimate capital, finality, recovery, power-loss durability,
+audit approval or full P03/M07 readiness. Old source evidence does not approve
+changed source; consult the implementing PR's exact-head and separate-main runs.

@@ -1,5 +1,35 @@
 # Testnet implementation ledger
 
+## Durable batch-waiver observation book (P19)
+
+The separately disabled WorkWaiverObservationBook calls the unchanged complete
+batch-waiver reader and stores each original client's refund in its own asset
+units. Explicit exclusive0600 initialization, existing protected absolute files,
+read-only default, worker/runtime/role policy, WAL/FULL, expected predecessor,
+64 batches of up to16 jobs, 96KiB documents and a5second commit freshness fence
+constrain capture. Separate schema rejects result-payment books; no migration.
+Full history/hash-chain/index validation, transaction/job/evidence deduplication,
+immutable original retry records and permanent conflict quarantine survive reopen.
+New positive conflicting observations quarantine; failed RPC/invalid policies
+do not manufacture replacement evidence. No reset, repair, prune, recovery,
+CLI, service, signing, cash totals, badges or financial authority.
+
+Actual HTTP/ABI plus SQLite tests exercise mixed clients/assets,1/16 jobs,
+capacity, concurrent handles, corruption, clock rollback/expiry, replay and
+positive changed-block/job conflicts. The existing zero-account compiled drill
+now captures its two actual refunds, reopens/replays original times/digests and
+rejects a later bad policy without writes; existing snapshot/state assertions
+remain. No added financial transaction, mining or clock override.
+
+Host storage/clock/policy/RPC remain trusted; local hash chains are rewritable,
+not independent anchors. Deduplication is per book only; separate payment and
+waiver books are not atomic/global settlement. Uncertain output may follow commit
+or quarantine: inspect existing history before explicit original retry. No silent
+head renewal or unquarantine. Temporary drill DB is deleted; no retained storage,
+power-loss certification, public reorg/recovery, independent providers, legitimate
+capital, identity, delivery/IP/legal/fairness, audit or fullP19 readiness proof.
+Authorization stays null; execution/readiness flags stay false. All gates remain.
+
 ## Complete worker batch-waiver receipt observation (P19)
 
 inspectAllWorkBatchWaivers requires COMPLETE ordered policies for all1–16 call

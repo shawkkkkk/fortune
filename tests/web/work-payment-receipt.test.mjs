@@ -95,3 +95,29 @@ test('all-job shared real20sec deadline fences every delayed job and failed peer
  const f=allBatchFixture();let releases=[],follow=0;f.clients[1].getBlockNumber=()=>new Promise(r=>releases.push(r));f.clients[1].getChainId=async()=>{follow++;return 97;};await assert.rejects(inspectAllWorkBatchResultPayments(f.clients,f.policies),/timed out/);for(const r of releases)r(100n);await new Promise(r=>setImmediate(r));assert.equal(follow,0);
  const g=allBatchFixture();let late=[];g.clients[0].getBlockNumber=async()=>{throw Error('peer');};g.clients[1].getBlockNumber=()=>new Promise(r=>late.push(r));g.clients[1].getChainId=async()=>{follow++;return 97;};await assert.rejects(inspectAllWorkBatchResultPayments(g.clients,g.policies));for(const r of late)r(100n);await new Promise(r=>setImmediate(r));assert.equal(follow,0);
 });
+
+const topicRoutes=[
+ ['payment',fixture,inspectWorkPaymentReceipt],['result',resultFixture,inspectWorkResultPaymentReceipt],
+ ['cancel',cancellationFixture,inspectWorkCancellationReceipt],['expiry',expiryFixture,inspectWorkExpiredCancellationReceipt],
+ ['decline',()=>workerRefundFixture(),inspectWorkWorkerRefundReceipt],['waiver',()=>workerRefundFixture('waiver','2'),inspectWorkWorkerRefundReceipt],
+ ...['0','60','100'].map(amount=>['arbitration'+amount,()=>arbitrationFixture(amount),inspectWorkArbitrationReceipt]),
+ ['selected',()=>batchFixture(1),inspectWorkBatchResultPaymentReceipt],
+ ['all',()=>allBatchFixture(2),(clients,p,f)=>inspectAllWorkBatchResultPayments(clients,f.policies)],
+];
+for(const inherited of [false,true])test(`work receipts reject ${inherited?'inherited':'missing'} own topic slots across every route`,async()=>{
+ for(const [name,make,inspect]of topicRoutes){const sample=make();
+  for(let log=0;log<sample.r.logs.length;log++)for(let slot=0;slot<3;slot++)for(const stage of ['both','initial','reread'])for(const peer of [0,1,'both']){
+   const f=make();for(const [i,c]of f.clients.entries()){let reads=0;const original=c.getTransactionReceipt;c.getTransactionReceipt=async(...args)=>{
+    const r=await original.apply(c,args),read=++reads;
+    if((peer==='both'||peer===i)&&(stage==='both'||stage==='initial'&&read===1||stage==='reread'&&read===2)){
+     const topics=r.logs[log].topics,value=topics[slot];delete topics[slot];
+     if(inherited){const proto=Object.create(Array.prototype);Object.defineProperty(proto,slot,{value,enumerable:true});Object.setPrototypeOf(topics,proto);}
+    }return r;
+   };}
+   await assert.rejects(inspect(f.clients,f.p,f),`${name}/log${log}/slot${slot}/${stage}/peer${peer}`);
+  }
+ }
+});
+test('dense canonical topic controls preserve all work receipt routes and authority boundaries',async()=>{
+ for(const [,make,inspect]of topicRoutes){const f=make(),r=await inspect(f.clients,f.p,f);assert.equal(r.executionAuthorized,false);assert.equal(r.currentAuthorization,null);}
+});

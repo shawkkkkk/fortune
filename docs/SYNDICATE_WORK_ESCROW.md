@@ -1,5 +1,21 @@
 # Isolated testnet scoped-work escrow
 
+## Own-topic validation in work receipt readers (P19/P10)
+
+Both shared receipt topic validators now require own canonical bytes32 values at
+all three expected slots; receipt rereads also require own slots before JSON
+comparison (which would otherwise serialize inherited values). Missing slots and values supplied only by an array
+prototype reject before canonical event comparison or batch digesting. Payment,
+result, cancellation, expiry, worker refund, arbitration and selected/all-job
+batch routes preserve their calldata, amount, runtime, role, confirmation,
+20-second lifetime, reread, stable-ID and null/false authority rules. Tests cover
+every log/slot, either peer, initial/reread/both observations, inherited slots
+and dense controls. Two new groups fail on old source; dense controls pass.
+JSON cannot encode holes; this is an in-process client-result boundary, not a
+claimed public JSON-RPC exploit. No contract, schema, ledger recovery, signer,
+configuration or financial authority change; full P19/P10 remains incomplete.
+
+
 `FortuneTestnetWorkEscrow` is an unaudited chain97-only P19 settlement primitive.
 It is separate from project treasury agents, frozen Standard, holder rewards,
 Social Fees, Counter and managed liquidity. There is no deployment script, public

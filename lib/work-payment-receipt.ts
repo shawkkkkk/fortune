@@ -121,7 +121,7 @@ export async function inspectAllWorkBatchResultPayments(clients: readonly [Publi
     if(!r||!Array.isArray(r.logs)||r.logs.length!==3*selections.length||!uint(r.blockNumber,64)||!Number.isSafeInteger(r.transactionIndex)||r.transactionIndex<0)throw Error("Invalid batch receipt framing");
     const hex=(v:unknown)=>{if(typeof v!=="string")throw Error("Invalid receipt field");return v.toLowerCase();};
     const logs=r.logs.map(l=>{
-      if(!Array.isArray(l.topics)||l.topics.length!==3||l.topics.some(t=>typeof t!=="string"||!/^0x[0-9a-fA-F]{64}$/.test(t))
+      if(!Array.isArray(l.topics)||l.topics.length!==3||[0,1,2].some(i=>!Object.hasOwn(l.topics,i)||typeof l.topics[i]!=="string"||!/^0x[0-9a-fA-F]{64}$/.test(l.topics[i]))
         ||typeof l.data!=="string"||!/^0x(?:[0-9a-fA-F]{64}){1,2}$/.test(l.data)||!uint(l.blockNumber,64))throw Error("Invalid batch log framing");
       return [hex(l.address),hex(l.transactionHash),hex(l.blockHash),l.blockNumber.toString(),l.transactionIndex,l.logIndex,l.removed,l.topics.map(hex),hex(l.data)];
     });
@@ -190,7 +190,7 @@ async function inspectPayment(clients: readonly [PublicClient,PublicClient], inp
     if(result && (await read("latestResultRevision",[BigInt(p.jobId)])!==BigInt(result.revision)
       || await read("resultHashes",[BigInt(p.jobId),BigInt(result.revision)])!==result.resultHash))throw Error("Stored result binding differs");
     for(const l of r.logs){if(!same(l.transactionHash,p.transactionHash)||!same(l.blockHash,r.blockHash)||l.blockNumber!==r.blockNumber||l.transactionIndex!==r.transactionIndex
-      ||l.removed!==false||!Number.isSafeInteger(l.logIndex)||l.logIndex<0||!Array.isArray(l.topics)||(result?.batch&&(l.topics.length!==3||typeof l.data!=="string"||!/^0x(?:[0-9a-fA-F]{64}){1,2}$/.test(l.data)))||l.topics.some(t=>typeof t!=="string"||!/^0x[0-9a-fA-F]{64}$/.test(t)))throw Error("Payment log binding differs");}
+      ||l.removed!==false||!Number.isSafeInteger(l.logIndex)||l.logIndex<0||!Array.isArray(l.topics)||(result?.batch&&(l.topics.length!==3||typeof l.data!=="string"||!/^0x(?:[0-9a-fA-F]{64}){1,2}$/.test(l.data)))||[0,1,2].some(i=>!Object.hasOwn(l.topics,i)||typeof l.topics[i]!=="string"||!/^0x[0-9a-fA-F]{64}$/.test(l.topics[i])))throw Error("Payment log binding differs");}
     const offset=result?.batch?result.batch.index*3:0;
     const transfer=r.logs[offset],settled=arbitration?r.logs[r.logs.length-1]:r.logs[offset+1];
     const topics=[TRANSFER,"0x"+"0".repeat(24)+p.escrow.slice(2),"0x"+"0".repeat(24)+(cancellation?p.client:p.worker).slice(2)];
@@ -218,6 +218,7 @@ async function inspectPayment(clients: readonly [PublicClient,PublicClient], inp
         || !same(refunded.data,workerRefund.kind==="decline"?"0x":"0x"+word(BigInt(workerRefund.revision)))||refunded.logIndex!==settled.logIndex+1)throw Error("Canonical worker refund differs");
     }
     const again=await receipt(),after=await block();
+    if(!Array.isArray(again.logs)||again.logs.some(l=>!Array.isArray(l.topics)||l.topics.length!==3||[0,1,2].some(i=>!Object.hasOwn(l.topics,i))))throw Error("Payment reread has missing own topics");
     const selected=(v:typeof r)=>({hash:v.transactionHash,status:v.status,block:v.blockNumber,blockHash:v.blockHash,to:v.to,from:v.from,index:v.transactionIndex,logs:v.logs});
     if(stringify(selected(again))!==stringify(selected(r))||after.number!==b.number||after.hash!==b.hash||after.timestamp!==b.timestamp||!same(after.transactions[r.transactionIndex],p.transactionHash)||await action(()=>c.getChainId())!==97)throw Error("Payment observation changed");
     return {...(workerRefund?{workerRefund:{kind:workerRefund.kind,revision:workerRefund.kind==="waiver"?workerRefund.revision:null}}:{}),...(expiryCaller?{cancellationCaller:expiryCaller}:{}),...(result?{approvedResult:{revision:result.revision,resultHash:result.resultHash}}:{}),chainId:97,escrow:p.escrow,asset:p.asset,client:p.client,worker:p.worker,jobId:p.jobId,termsHash:p.termsHash,

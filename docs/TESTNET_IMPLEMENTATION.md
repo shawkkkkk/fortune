@@ -2,6 +2,17 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## Counter receipt required topic slots (M06/P10 security)
+
+The actual direct and complete-batch claim readers now require own values at
+every expected Transfer/Claimed topic slot, including receipt rereads. Two
+old-source groups accepted sparse/inherited in-process adapter arrays; tests
+cover all slots, peers and read stages plus dense controls. JSON cannot encode
+holes, so this is adapter validation rather than a demonstrated public RPC
+exploit. Four comparisons change; contracts, old reader bodies, IDs, accounting,
+CLIs/books, deadlines and authority remain. Full M06/P10 readiness is unfinished;
+see COUNTER_CLAIM_RECEIPTS.md. Standard/root pins and all release gates remain.
+
 ## Disabled custody receipt operator integration (M07)
 
 An explicit default-disabled local command now invokes the unchanged deposit or

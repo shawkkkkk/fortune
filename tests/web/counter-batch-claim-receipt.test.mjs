@@ -55,3 +55,26 @@ test('one real20sec budget and failed-peer fences cover the entire batch',{timeo
  const f=fixture(32);let release,follow=0;f.clients[1].getBlockNumber=()=>new Promise(r=>release=r);f.clients[1].getChainId=async()=>{follow++;return 97;};await assert.rejects(inspectCounterBatchClaimReceipt(f.clients,f.p),/timed out/);release(100n);await new Promise(r=>setImmediate(r));assert.equal(follow,0);
  const g=fixture();let delayed;g.clients[0].getBlockNumber=async()=>{throw Error('peer');};g.clients[1].getBlockNumber=()=>new Promise(r=>delayed=r);g.clients[1].getChainId=async()=>{follow++;return 97;};await assert.rejects(inspectCounterBatchClaimReceipt(g.clients,g.p));delayed(100n);await new Promise(r=>setImmediate(r));assert.equal(follow,0);
 });
+
+// Adapter arrays may be sparse even though JSON arrays cannot encode holes.
+test('every claim topic slot must be an own value on initial receipts and rereads',async()=>{
+ const rejected=[], accepted=[];
+ for(const stage of ['initial','reread'])for(const peer of [0,1])for(const inherited of [false,true]){
+  const shape=fixture();
+  for(let log=0;log<shape.r.logs.length;log++)for(let slot=0;slot<shape.r.logs[log].topics.length;slot++){
+   const f=fixture();let reads=0;
+   f.clients[peer].getTransactionReceipt=async()=>{
+    const r=structuredClone(f.r);
+    if(stage==='initial'||reads>0){
+     const topics=r.logs[log].topics,value=topics[slot];delete topics[slot];
+     if(inherited){const proto=Object.create(Array.prototype);proto[slot]=value;Object.setPrototypeOf(topics,proto);}
+    }
+    reads++;return r;
+   };
+   const label=`${stage}/${peer}/${inherited?'inherited':'hole'}/${log}/${slot}`;
+   try{await inspectCounterBatchClaimReceipt(f.clients,f.p);accepted.push(label);}catch{rejected.push(label);}
+  }
+ }
+ assert.ok(rejected.length>0);assert.deepEqual(accepted,[],'No absent topic slot may produce an observation');
+ const f=fixture();assert.equal((await inspectCounterBatchClaimReceipt(f.clients,f.p)).executionAuthorized,false);
+});

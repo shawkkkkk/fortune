@@ -49,8 +49,8 @@ export async function inspectCounterClaimReceipt(clients: readonly [PublicClient
         || !Number.isSafeInteger(l.logIndex) || l.logIndex < 0 || !Array.isArray(l.topics) || l.topics.some(t => typeof t !== 'string' || !/^0x[0-9a-fA-F]{64}$/.test(t))) throw Error('Claim log binding differs');
       const [transfer,claimed] = v.logs;
       const a = [TRANSFER,topicAddress(p.escrow),topicAddress(p.recipient)], b = [CLAIMED,word(BigInt(p.round)),topicAddress(p.recipient),topicAddress(p.asset)];
-      if (!same(transfer.address,p.asset) || transfer.topics.length !== 3 || transfer.topics.some((t,i) => !same(t,a[i])) || !same(transfer.data,word(BigInt(p.amount)))
-        || !same(claimed.address,p.escrow) || claimed.topics.length !== 4 || claimed.topics.some((t,i) => !same(t,b[i])) || !same(claimed.data,word(BigInt(p.amount))) || claimed.logIndex !== transfer.logIndex + 1) throw Error('Canonical claim events differ');
+      if (!same(transfer.address,p.asset) || transfer.topics.length !== 3 || a.some((t,i) => !Object.hasOwn(transfer.topics,i) || !same(transfer.topics[i],t)) || !same(transfer.data,word(BigInt(p.amount)))
+        || !same(claimed.address,p.escrow) || claimed.topics.length !== 4 || b.some((t,i) => !Object.hasOwn(claimed.topics,i) || !same(claimed.topics[i],t)) || !same(claimed.data,word(BigInt(p.amount))) || claimed.logIndex !== transfer.logIndex + 1) throw Error('Canonical claim events differ');
       return [v.transactionHash.toLowerCase(),v.status,v.blockNumber.toString(),v.blockHash.toLowerCase(),v.from.toLowerCase(),v.to?.toLowerCase(),v.transactionIndex,
         v.logs.map(l => [l.address.toLowerCase(),l.transactionHash?.toLowerCase(),l.blockHash?.toLowerCase(),l.blockNumber?.toString(),l.transactionIndex,l.logIndex,l.removed,l.topics.map(t => t.toLowerCase()),l.data.toLowerCase()])];
     };

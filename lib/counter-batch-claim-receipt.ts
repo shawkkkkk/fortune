@@ -59,8 +59,8 @@ export async function inspectCounterBatchClaimReceipt(clients: readonly [PublicC
       for (const [i,q] of p.claims.entries()) {
         const [transfer,claimed] = v.logs.slice(i*2,i*2+2);
         const a=[TRANSFER,topicAddress(p.escrow),topicAddress(p.recipient)], b=[CLAIMED,word(BigInt(q.round)),topicAddress(p.recipient),topicAddress(q.asset)];
-        if (!same(transfer.address,q.asset) || transfer.topics.length!==3 || transfer.topics.some((t,j)=>!same(t,a[j])) || !same(transfer.data,word(BigInt(q.amount)))
-          || !same(claimed.address,p.escrow) || claimed.topics.length!==4 || claimed.topics.some((t,j)=>!same(t,b[j])) || !same(claimed.data,word(BigInt(q.amount)))
+        if (!same(transfer.address,q.asset) || transfer.topics.length!==3 || a.some((t,j) => !Object.hasOwn(transfer.topics,j) || !same(transfer.topics[j],t)) || !same(transfer.data,word(BigInt(q.amount)))
+          || !same(claimed.address,p.escrow) || claimed.topics.length!==4 || b.some((t,j) => !Object.hasOwn(claimed.topics,j) || !same(claimed.topics[j],t)) || !same(claimed.data,word(BigInt(q.amount)))
           || claimed.logIndex!==transfer.logIndex+1 || (i>0 && transfer.logIndex!==v.logs[i*2-1].logIndex+1)) throw Error('Canonical batch claim events differ');
       }
       return [v.transactionHash.toLowerCase(),v.status,v.blockNumber.toString(),v.blockHash.toLowerCase(),v.from.toLowerCase(),v.to?.toLowerCase(),v.transactionIndex,

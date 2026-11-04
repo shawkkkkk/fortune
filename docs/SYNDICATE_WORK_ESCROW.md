@@ -1,5 +1,32 @@
 # Isolated testnet scoped-work escrow
 
+## Complete worker batch-waiver receipt observation (P19)
+
+inspectAllWorkBatchWaivers requires COMPLETE ordered policies for all1–16 call
+entries before RPC: common batch/worker/runtime/roles, exact job IDs/revisions,
+consistent per-asset code/cap pins, and each original client/amount/terms policy.
+It calls the actual unchanged selected-job reader for EVERY entry under ONE
+shared real20second monotonic lifetime, original RPC receivers and finally fences.
+All receipt reads must share a bounded normalized whitelist digest and header;
+every settlement ID is distinct and MUST be deduplicated downstream. Refunds
+retain individual asset/base-unit amounts; no cross-asset total or consumed ledger.
+The digest is consistency, not authentication. The selected API still reports
+otherBatchJobsVerifiedfalse; the complete API marks allCallEntriesObserved only
+after every selected observation passes. No CLI/service/signer/new configuration.
+
+Tests cover1/2/16 entries, mixed clients/assets, complete-policy preflight with
+zeroRPC, later failures, receipt changes, own slots, receiver binding, intermediate
+clock reversal and shared timeout/late-follow-on fences. The existing compiled
+zero-account waiver rehearsal reads both actual refunds through the whole engine,
+checks replay digest/IDs, rejects incomplete/later wrong policies, and preserves
+its original height/nonces/balances/liabilities via the existing snapshot restore.
+No new financial transaction, mining or clock behavior. Existing selected engine,
+contracts, root pins and old tests remain unchanged; workflow adds only two paths
+in both triggers. One local fixture is not independent providers/public custody,
+capital/identity/delivery/IP/legal/fairness/finality/recovery/audit/fullP19 proof.
+Authorization remains null and execution/readiness false; all gates remain.
+
+
 ## Selected batch worker-waiver receipt engine (P19)
 
 The explicit read-only inspectWorkBatchWaiverReceipt library API observes ONE

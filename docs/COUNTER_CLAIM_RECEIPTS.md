@@ -85,3 +85,16 @@ real deadline. The compiled zero-account local lifecycle checks the actual
 25/41-unit two-asset batch, stable replay, wrong-later-amount rejection and direct
 route exclusion while retaining all older assertions/limits. One fixture is not
 independent-provider/public custody/capital/audit proof; full M06 remains unfinished.
+
+## Required topic slots at the adapter boundary
+
+Both direct and complete-batch readers require an own, present value at every
+expected Transfer and Claimed topic index, on initial receipts and rereads.
+Sparse arrays and inherited topic values reject rather than letting array
+iteration skip a required event signature, round, recipient or asset binding.
+Two old-source regression groups accepted malformed in-process adapter arrays;
+the final tests exercise every slot, either peer, initial/reread, holes and
+inherited values, with dense controls. JSON cannot encode array holes: this is
+adapter-boundary validation, not evidence of a public RPC exploit or financial
+loss. Contracts, receipt IDs, deadlines, history, CLI/book behavior, null
+authorization, false authority and all readiness/release gates remain unchanged.

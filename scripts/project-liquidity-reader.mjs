@@ -1,10 +1,10 @@
-import { openSync, fstatSync, readSync, closeSync } from 'node:fs';
+import { constants, openSync, fstatSync, readSync, closeSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { projectToken } from '../lib/project-canon.ts';
 import { inspectLiquidityPosition, validateLiquidityPositionPolicy } from '../lib/managed-liquidity-position.ts';
 
 function policyBytes(path) {
-  const fd = openSync(path, 'r');
+  const fd = openSync(path, constants.O_RDONLY | constants.O_NONBLOCK);
   try {
     const stat = fstatSync(fd);
     if (!stat.isFile() || stat.size > 16384) throw Error('Policy bound');

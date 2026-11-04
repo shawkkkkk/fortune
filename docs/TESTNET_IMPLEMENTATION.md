@@ -2,6 +2,18 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## LP MCP policy descriptor admission (P03/M07 security)
+
+The actual optional LP adapter now opens policy paths read-only/nonblocking
+before its existing regular-descriptor check. Writerless FIFO and FIFO-symlink
+policies reject at startup and before/after actual engine observations; valid
+regular-file symlinks and exact16KiB policies remain supported. Linux child
+regressions reproduce original blocking opens and exercise actual MCP startup.
+Only the import/open mode changes; old engine/body/tests, byte/UTF8/schema bounds,
+transports, quota, outputs and false authority remain. No generic filesystem
+deadline, host-swap defense or Windows FIFO certification. Full P03/M07 remains
+unfinished; see PROJECT_LIQUIDITY_MCP.md. Standard/root pins and gates remain.
+
 ## Counter receipt required topic slots (M06/P10 security)
 
 The actual direct and complete-batch claim readers now require own values at

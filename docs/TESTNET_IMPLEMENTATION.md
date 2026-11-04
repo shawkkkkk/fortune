@@ -1350,3 +1350,14 @@ consumes those bytes, preserves batch transfer rollback/retry and rejects consum
 claims on a new snapshot. No signer, service, public deployment or full M06
 readiness follows; no contracts/root pins/economics/gates change. See
 COUNTER_ROUND_ESCROW.md.
+
+
+### P24: bounded web regression CI execution
+
+Fortune CI now assigns its existing web regression step a 20-minute fail-closed
+budget. Only that workflow field changes; commands, tests, individual deadlines,
+pins, permissions and subsequent build/runtime/browser gates remain unchanged.
+This limits future step execution; it does not diagnose PR195's unclassified
+run41723886807/job126223476063 or certify control-plane termination/log delivery.
+No overrun drill, new engine runtime, public testnet, audit or activation evidence
+is claimed. Exact-head CI and independent post-merge checks are still required.

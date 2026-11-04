@@ -63,6 +63,27 @@ jobs:
           set -o pipefail
           mkdir -p .tmp
           node --import ./scripts/register-ts.mjs contracts-omnichain/scripts/work-escrow-runtime.mjs 2>&1 | tee .tmp/work-escrow-runtime.log
+      # BEGIN isolated compiled worker batch decline drill.
+      - name: Verify atomic unaccepted worker batch declines through local zero-account RPC
+        timeout-minutes: 3
+        working-directory: .
+        env:
+          FORTUNE_ANVIL_BIN: /tmp/fortune-strategy-anvil/node_modules/@foundry-rs/anvil-linux-amd64/bin/anvil
+        run: |
+          set -o pipefail
+          mkdir -p .tmp
+          node contracts-omnichain/scripts/work-batch-decline-runtime.mjs 2>&1 | tee .tmp/work-batch-decline-runtime.log
+      - name: Preserve local batch decline verification
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: testnet-work-batch-decline
+          path: |
+            .tmp/work-batch-decline-runtime.log
+            .tmp/work-batch-decline-runtime.json
+          if-no-files-found: warn
+          retention-days: 14
+      # END isolated compiled worker batch decline drill.
       # BEGIN isolated compiled worker batch waiver drill.
       - name: Verify atomic worker batch waivers through local zero-account RPC
         timeout-minutes: 3

@@ -187,6 +187,25 @@ contract FortuneTestnetWorkEscrow is ReentrancyGuard {
         emit JobDeclined(id, msg.sender);
     }
 
+    /// @notice Atomic rejection of unaccepted jobs; all principal returns to each original client.
+    function declineMany(uint256[] calldata ids) external chain97 open nonReentrant {
+        if (ids.length == 0 || ids.length > 16) revert InvalidJob();
+        uint256 previous;
+        for (uint256 i; i < ids.length; ++i) {
+            uint256 id = ids[i];
+            if (id <= previous) revert InvalidJob();
+            previous = id;
+            Job storage j = jobs[id];
+            if (msg.sender != j.worker) revert Unauthorized();
+            if (j.state != State.Funded) revert WrongState();
+            _asset(j.asset);
+        }
+        for (uint256 i; i < ids.length; ++i) {
+            _settle(ids[i], 0);
+            emit JobDeclined(ids[i], msg.sender);
+        }
+    }
+
     /// @notice Client may cancel before acceptance; after expiry anyone can return the exact client payment.
     function cancel(uint256 id) external chain97 open nonReentrant {
         Job storage j = jobs[id];

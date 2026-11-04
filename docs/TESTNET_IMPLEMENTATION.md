@@ -1,5 +1,43 @@
 # Testnet implementation ledger
 
+## Atomic unaccepted-job batch decline (P19)
+
+`declineMany(uint256[])` adds an isolated chain97 worker action for 1–16 strictly
+increasing nonzero job IDs. Every selected job must still be Funded and name the
+caller as worker; every asset runtime pin is checked before the first refund.
+The unchanged `_settle(id,0)` returns each whole principal only to its original
+client, followed by the existing JobDeclined event. Mixed clients/assets are
+allowed; unselected liabilities, terms, result history and funding IDs remain.
+No recipient/amount selection, new administrator, fee or recovery authority.
+Like single decline, this is voluntary rejection before or after acceptBy,
+not automatic expiry settlement. Accepted/disputed/settled/missing jobs reject;
+first valid accept/cancel/decline wins. A later failed exact transfer reverts
+all earlier transfers, state, liabilities and events. After inspecting the
+failure, explicit unchanged-calldata retry may succeed; successful replay rejects.
+Pause, runtime/backing checks, non-reentrancy and chain97 restrictions remain.
+
+Six compiled unit/fuzz groups cover 1–16 jobs, mixed clients/assets, acceptance
+expiry, fixed-client refunds, unselected liabilities/history, late failures and
+retry, roles/states/runtime/order/bounds/pause/chain rejection. A separate pinned
+Anvil1.7.1 zero-account loopback drill uses ACTUAL compiled HTTP/ABI calls and
+synthetic assets: two clients fund two unaccepted jobs while an unselected third
+job stays accepted with result history. A tax on the SECOND asset causes a mined
+whole-batch revert; exact original calldata then returns both principals with
+six ordered Transfer/JobSettled/JobDeclined logs. Balances, reserved liabilities,
+terms, funding IDs, result history, replay and old-route rejection are checked.
+Owned artifact source keccak256 must match before execution. No clock override,
+public RPC, key, generated account or public broadcast; impersonation stops after
+the drill. Failure exits1 with a fixed stage label and no PASS JSON. CI adds an
+independent three-minute step and log/JSON artifact; old steps/limits stay intact.
+
+This changes isolated escrow bytecode and requires fresh deployment/review/audit
+evidence; old deployment/audit approvals cannot transfer. Existing direct receipt
+readers reject this batch outer call; no production batch-decline observer/book,
+service, signer, real configuration or full P19 readiness is provided. One local
+fixture is not independent providers, public custody, legitimate capital, party
+identity, legal cancellation, delivery/IP/fairness or recovery evidence. Frozen
+Standard/root pins, economics and every release gate remain unchanged.
+
 ## Disabled batch-waiver observation operator command (P19)
 
 work-waiver-observations.mjs read <config> reads existing history without RPC.

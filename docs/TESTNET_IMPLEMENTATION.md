@@ -2,6 +2,20 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## Atomic worker batch payment waiver (P19)
+
+The isolated chain97 WorkEscrow now lets one named worker voluntarily waive
+1–16 accepted jobs at their exact latest revisions. All IDs/roles/states/runtime
+pins are checked before refunds; existing exact settlement returns whole
+principal only to original clients across supported assets. Any later failure
+rolls back all earlier balances, states and liabilities; history and funding
+bindings persist. Single-job APIs and direct receipt readers remain unchanged.
+Compiled VM tests cover mixed clients/assets, events, stale/foreign/unaccepted
+jobs, late transfer rollback/retry, ordering/bounds, pause/chain and bounded fuzz.
+No signer, service, public deployment, batch receipt ledger or delivery/IP/legal
+verdict; full P19 remains unfinished. New bytecode is not old audit/deployment
+approval. See SYNDICATE_WORK_ESCROW.md; Standard/root pins and gates remain.
+
 ## Compiled custody lifecycle through project MCP (P03/M07)
 
 The existing zero-account Pancake custody rehearsal now invokes the actual

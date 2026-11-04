@@ -155,6 +155,17 @@ try{
    await assert.rejects(inspectWorkBatchWaiverReceipt(clients,{...policy,amount:(j.amount+1n).toString()}));
    const {waivers:ignored,...direct}=policy;await assert.rejects(inspectWorkWorkerRefundReceipt(clients,{...direct,refundKind:'waiver',expectedRevision:String(i)}));
   }
+  // BEGIN complete batch waiver observation.
+  const {inspectAllWorkBatchWaivers}=await import('../../lib/work-batch-waiver-receipts.ts');
+  const allPolicies=await Promise.all(jobs.map(async(j,i)=>({...common,jobId:j.id.toString(),asset:j.paymentToken.toLowerCase(),assetCodeHash:keccak256(await rpc.getCode({address:j.paymentToken})),client:j.client,amount:j.amount.toString(),termsHash:keys[i]})));
+  const whole=await inspectAllWorkBatchWaivers(clients,allPolicies),wholeAgain=await inspectAllWorkBatchWaivers(clients,allPolicies);
+  assert.equal(whole.allCallEntriesObserved,true);assert.equal(whole.refunds.length,2);assert.equal(new Set(whole.refunds.map(r=>r.evidenceId)).size,2);
+  assert.deepEqual(whole.refunds.map(r=>r.clientRefund),jobs.map(j=>j.amount.toString()));assert.deepEqual(whole.refunds.map(r=>r.asset),jobs.map(j=>j.paymentToken.toLowerCase()));
+  assert.equal(whole.receiptConsistencyDigest,wholeAgain.receiptConsistencyDigest);assert.deepEqual(whole.refunds.map(r=>r.evidenceId),wholeAgain.refunds.map(r=>r.evidenceId));
+  assert.equal(whole.currentAuthorization,null);assert.equal(whole.executionAuthorized,false);assert.equal(whole.fullSyndicateReadiness,false);
+  await assert.rejects(inspectAllWorkBatchWaivers(clients,[allPolicies[0]]));
+  await assert.rejects(inspectAllWorkBatchWaivers(clients,[allPolicies[0],{...allPolicies[1],amount:(jobs[1].amount+1n).toString()}]));
+  // END complete batch waiver observation.
   assert.deepEqual(await readState(),before);
  }finally{assert.equal(await rpc.request({method:'evm_revert',params:[snapshot]}),true);}
  assert.deepEqual(await readState(),originalReadState);
@@ -165,7 +176,7 @@ try{
  assert.deepEqual(await financialState(),refunded);
  for(const who of actors)await rpc.request({method:'anvil_stopImpersonatingAccount',params:[who]});
  assert.deepEqual(await rpc.request({method:'eth_accounts'}),[]);
- const result={selectedBatchWaiverReceiptObserved:true,selectedBatchWaiverReplayStable:true,selectedBatchWaiverWrongAmountAndDirectRouteRejected:true,selectedBatchWaiverReadsPreserveState:true,compiledBatchWaiverObserved:true,mixedClientAssetRefundsMatched:true,staleRevisionAndForeignCallerRejected:true,
+ const result={wholeBatchWaiverReceiptObserved:true,wholeBatchWaiverDigestReplayStable:true,wholeBatchWaiverLatePolicyRejectedReadOnly:true,selectedBatchWaiverReceiptObserved:true,selectedBatchWaiverReplayStable:true,selectedBatchWaiverWrongAmountAndDirectRouteRejected:true,selectedBatchWaiverReadsPreserveState:true,compiledBatchWaiverObserved:true,mixedClientAssetRefundsMatched:true,staleRevisionAndForeignCallerRejected:true,
   pausedBatchRejected:true,lateTransferRolledBackWholeBatch:true,exactCalldataRetryMatched:true,canonicalSixLogReceiptMatched:true,
   originalResultAndFundingHistoryPreserved:true,successfulReplayRejected:true,ownedCompiledSourcesMatched:true,
   generatedAccounts:0,privateKeysUsed:false,publicBroadcasts:false,executionAuthorized:false,deployedToPublicNetwork:false,

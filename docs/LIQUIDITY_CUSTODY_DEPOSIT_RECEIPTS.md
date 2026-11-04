@@ -82,3 +82,13 @@ legitimate funding, retained storage, legal/audit approval or full M07 readiness
 Management, multi-wallet constraints, inventory/cost/profit accounting, signer,
 deployment, provider/asset/custody review, privacy, operations/failure/recovery
 and independent review remain separate. Audit alone is not mainnet approval.
+
+## Complete topic slots
+
+The canonical comparison checks every expected topic index for its own present
+value before normalization. Sparse arrays, inherited topic values, undefined
+and null reject for both initial and repeated receipts. JavaScript array methods
+can skip holes; ordinary JSON has no hole representation, so this is validation
+of in-process client/adapter output, not evidence of a malformed public RPC
+response or a financial exploit. Exact ordinary dense receipts, provenance,
+dedup IDs, state/clock bounds and null/false authority remain unchanged.

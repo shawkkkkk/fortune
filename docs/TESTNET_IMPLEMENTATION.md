@@ -2,6 +2,18 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## Complete custody receipt topic slots (M07 correctness)
+
+Both actual deposit/release readers now compare every expected canonical topic
+index and require an own present value before normalization. Two genuine old-source
+regressions accepted a missing signature topic from in-process clients; final
+tests reject holes, inherited values, null and undefined at every topic position
+while preserving valid dense receipts/replay. Ordinary JSON cannot encode holes;
+this is an adapter-boundary correctness fix, not public-RPC or financial-exploit
+evidence. Existing contracts, runtime, workflows, clocks, IDs, Standard/root pins
+and authority gates remain unchanged. Full M07 readiness remains unfinished;
+see the deposit/release receipt docs for limits and exact evidence.
+
 ## Historical managed-liquidity deposit receipts (M07)
 
 A separate explicit read-only engine binds direct governor deposit calldata to

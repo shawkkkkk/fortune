@@ -44,7 +44,8 @@ The checksum is byte consistency, not authentication or an independent anchor.
 `currentAuthorization` stays null. Treasury control, project consent, legitimate
 capital origin, replayed pre-release state, independent providers, finality,
 execution and full managed-liquidity readiness are always false. Matching NFT
-transfers do not establish key control, economic ownership, custody safety,+funding origin, fee funding, realized profit or current entitlement. No fees are
+transfers do not establish key control, economic ownership, custody safety,
+funding origin, fee funding, realized profit or current entitlement. No fees are
 collected/converted; launch-token-side fees remain burn-only. Creator/holder/LP
 liabilities and launch reserves are never strategy capital. No contract, frozen
 Standard, root dependency/economic policy or release gate changes.

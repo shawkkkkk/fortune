@@ -71,3 +71,18 @@ test('peer failure and real thirty-second lifetime fence late RPC and preserve o
  let release,calls=0;const left=client(),right=client();left.getChainId=async()=>{throw Error('Fixture peer failed');};right.getChainId=function(){assert.equal(this,right);return new Promise(r=>release=r);};right.getTransactionReceipt=async()=>{calls++;return receipt();};await assert.rejects(inspect([left,right],input()));release(97);await new Promise(r=>setImmediate(r));assert.equal(calls,0);
  const c=client();let finish,after=0;c.getBlockNumber=function(){assert.equal(this,c);return new Promise(r=>finish=r);};c.getChainId=async()=>{after++;return 97;};const started=Date.now();await assert.rejects(inspect([client(),c],input()),/timed out/);assert.ok(Date.now()-started>=29000);finish(130n);await new Promise(r=>setImmediate(r));assert.equal(after,0);
 });
+
+test('every canonical topic requires an own present value, including signature and indexed fields',async()=>{
+ const valid=await inspect(cs(),input());assert.equal(valid.executionAuthorized,false);
+ for(let log=0;log<3;log++)for(let slot=0;slot<receipt().logs[log].topics.length;slot++)for(const kind of ['hole','undefined','null','inherited']){
+  const changeReceipt=r=>{const topics=r.logs[log].topics,value=topics[slot];
+   if(kind==='undefined')topics[slot]=undefined;
+   else if(kind==='null')topics[slot]=null;
+   else {delete topics[slot];if(kind==='inherited'){const prototype=Object.create(Array.prototype);Object.defineProperty(prototype,slot,{value,configurable:true});Object.setPrototypeOf(topics,prototype);}}
+  };
+  await assert.rejects(inspect(cs({changeReceipt}),input()),/Canonical .* log binding differs/,`${kind} log${log} topic${slot}`);
+  let reads=0;const left=client();left.getTransactionReceipt=async()=>receipt(++reads===2?{changeReceipt}:{});
+  await assert.rejects(inspect([left,client()],input()),/Canonical .* log binding differs/,`reread ${kind} log${log} topic${slot}`);
+ }
+ assert.equal((await inspect(cs(),input())).evidenceId,valid.evidenceId);
+});

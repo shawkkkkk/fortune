@@ -1,6 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {keccak256,parseAbi,encodeFunctionData} from 'viem';
-import {inspectAllWorkBatchResultPayments,inspectWorkBatchResultPaymentReceipt,inspectWorkPaymentReceipt,inspectWorkResultPaymentReceipt,inspectWorkCancellationReceipt,inspectWorkExpiredCancellationReceipt,inspectWorkWorkerRefundReceipt,inspectWorkArbitrationReceipt} from '../../lib/work-payment-receipt.ts';
+import {inspectWorkBatchWaiverReceipt,inspectAllWorkBatchResultPayments,inspectWorkBatchResultPaymentReceipt,inspectWorkPaymentReceipt,inspectWorkResultPaymentReceipt,inspectWorkCancellationReceipt,inspectWorkExpiredCancellationReceipt,inspectWorkWorkerRefundReceipt,inspectWorkArbitrationReceipt} from '../../lib/work-payment-receipt.ts';
 const a=n=>'0x'+n.toString(16).padStart(40,'0'),h=n=>'0x'+n.toString(16).padStart(64,'0'),w=n=>BigInt(n).toString(16).padStart(64,'0');
 const code='0x60006000f3',pin=keccak256(code),sig=s=>keccak256(new TextEncoder().encode(s));
 const policy=()=>({chainId:97,escrow:a(1),escrowCodeHash:pin,governor:a(2),guardian:a(3),arbitrator:a(4),jobId:'1',client:a(5),worker:a(6),amount:'100',asset:a(7),assetCodeHash:pin,maxPerJob:'1000',termsHash:h(1),transactionHash:h(9)});
@@ -121,3 +121,32 @@ for(const inherited of [false,true])test(`work receipts reject ${inherited?'inhe
 test('dense canonical topic controls preserve all work receipt routes and authority boundaries',async()=>{
  for(const [,make,inspect]of topicRoutes){const f=make(),r=await inspect(f.clients,f.p,f);assert.equal(r.executionAuthorized,false);assert.equal(r.currentAuthorization,null);}
 });
+
+function waiverBatchFixture(index=0,count=2,revisionOverride){const revision=String(revisionOverride??index%2),f=workerRefundFixture('waiver',revision);
+ const waivers=Array.from({length:count},(_,i)=>({id:String(i+1),expectedRevision:String(revisionOverride??i%2)})),template=structuredClone(f.r.logs);
+ f.r.logs=waivers.flatMap((a,i)=>template.map((l,j)=>({...structuredClone(l),topics:j===0?l.topics:[l.topics[0],h(i+1),l.topics[2]],data:j===2?'0x'+w(a.expectedRevision):l.data,logIndex:3+i*3+j})));
+ const {refundKind,expectedRevision,...policy}=f.p;f.p={...policy,jobId:String(index+1),waivers};
+ f.tx.input=encodeFunctionData({abi:parseAbi(['function waivePaymentsMany((uint256 id,uint256 expectedRevision)[] waivers)']),functionName:'waivePaymentsMany',args:[waivers.map(a=>({id:BigInt(a.id),expectedRevision:BigInt(a.expectedRevision)}))]});return f;
+}
+test('selected batch waiver binds 1/16 boundaries, revision zero, whole client refunds and stable IDs',async()=>{
+ for(const [index,count]of [[0,1],[0,2],[1,2],[15,16]]){const f=waiverBatchFixture(index,count),x=await inspectWorkBatchWaiverReceipt(f.clients,f.p);
+ assert.equal(x.clientRefund,'100');assert.equal(x.workerPaid,'0');assert.equal(x.selectedBatchWorkerRefundObserved,true);assert.equal(x.directWorkerRefundObserved,undefined);assert.equal(x.otherBatchJobsVerified,false);assert.equal(x.batchJobIndex,index);assert.equal(x.batchJobCount,count);assert.equal(x.workerRefund.revision,String(index%2));assert.equal(x.executionAuthorized,false);assert.equal(x.currentAuthorization,null);
+ assert.equal((await inspectWorkBatchWaiverReceipt(f.clients,f.p)).evidenceId,x.evidenceId);
+ const {waivers,...p}=f.p;await assert.rejects(inspectWorkWorkerRefundReceipt(f.clients,{...p,refundKind:'waiver',expectedRevision:String(index%2)}));await assert.rejects(inspectWorkPaymentReceipt(f.clients,p));}
+ const f=waiverBatchFixture();f.r.logs[3].data='0x'+w(42);assert.equal((await inspectWorkBatchWaiverReceipt(f.clients,f.p)).otherBatchJobsVerified,false);
+});
+test('batch waiver preflight rejects malformed arrays and bindings before RPC',async()=>{
+ let calls=0;const c={getBlockNumber:async()=>{calls++;}};
+ for(const waivers of [[],Array(17).fill({id:'1',expectedRevision:'0'}),Array(2),[{id:'01',expectedRevision:'0'}],[{id:'2',expectedRevision:'0'}],[{id:'1',expectedRevision:'33'}],[{id:'1',expectedRevision:'00'}],[{id:'1',expectedRevision:0}],[{id:'1',expectedRevision:'0',extra:true}],[{id:'2',expectedRevision:'0'},{id:'1',expectedRevision:'0'}]])await assert.rejects(inspectWorkBatchWaiverReceipt([c,{}],{...policy(),waivers}));assert.equal(calls,0);
+});
+test('batch waiver rejects selected call, amount, revision, log and topic changes on either peer or reread',async()=>{
+ for(const index of [0,1])for(const mutate of [f=>f.tx.input+='00',f=>f.p.waivers[index].expectedRevision='2',f=>f.r.logs[index*3].data='0x'+w(99),f=>f.r.logs[index*3+1].topics[1]=h(99),f=>f.r.logs[index*3+2].data=h(99),f=>f.r.logs[index*3+2].logIndex++,f=>f.r.logs.pop(),f=>f.r.logs.push({...f.r.logs[0]}),f=>f.r.logs[0].removed=true]){const f=waiverBatchFixture(index);mutate(f);await assert.rejects(inspectWorkBatchWaiverReceipt(f.clients,f.p));}
+ for(const peer of [0,1])for(const stage of [1,2])for(let slot=0;slot<3;slot++){const f=waiverBatchFixture(1),c=f.clients[peer],old=c.getTransactionReceipt;let n=0;c.getTransactionReceipt=async()=>{const r=await old();if(++n===stage)delete r.logs[5].topics[slot];return r;};await assert.rejects(inspectWorkBatchWaiverReceipt(f.clients,f.p));}
+ const f=workerRefundFixture('waiver','0'),{refundKind,expectedRevision,...p}=f.p;await assert.rejects(inspectWorkBatchWaiverReceipt(f.clients,{...p,waivers:[{id:'1',expectedRevision:'0'}]}));
+});
+test('batch waiver preserves original receivers and real deadline with late follow-on fencing',{timeout:25000},async()=>{
+ const f=waiverBatchFixture();for(const c of f.clients)for(const k of ['getChainId','getBlockNumber','getBlock','getTransactionReceipt','getTransaction','getCode','readContract']){const old=c[k];c[k]=function(...a){assert.equal(this,c);return old.apply(c,a);};}await inspectWorkBatchWaiverReceipt(f.clients,f.p);
+ const g=waiverBatchFixture();let release,follow=0;g.clients[1].getBlockNumber=()=>new Promise(r=>release=r);g.clients[1].getChainId=async()=>{follow++;return 97;};await assert.rejects(inspectWorkBatchWaiverReceipt(g.clients,g.p),/timed out/);release(100n);await new Promise(r=>setImmediate(r));assert.equal(follow,0);
+});
+
+test('batch waiver accepts exact revision32 boundary',async()=>{const f=waiverBatchFixture(0,1,32),x=await inspectWorkBatchWaiverReceipt(f.clients,f.p);assert.equal(x.workerRefund.revision,'32');assert.equal(x.clientRefund,'100');});

@@ -2,6 +2,20 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## Historical managed-liquidity release receipts (M07)
+
+A separate explicit read-only engine binds a direct governor release call to the
+exact manager Approval/Transfer and custody release events, receipt-height full
+position/role/runtime policy, treasury ownership and terminal custody state.
+It reuses the actual unchanged position observation body under one30-second
+monotonic lifetime and two-client confirmation/agreement/reread checks. Stable
+IDs require downstream deduplication; no ledger, badge, fee processing, signer,
+service, real config or financial authority is added. The existing compiled
+zero-account Pancake fork drill consumes its actual release receipt and preserves
+prior assertions. This is historical component evidence, not independent providers,
+treasury control, capital origin, full M07, audit or activation approval. See
+LIQUIDITY_CUSTODY_RELEASE_RECEIPTS.md. Standard/root pins and gates remain.
+
 ## Counter observation operator integration (M06/P10)
 
 A default-disabled local command now reads existing protected Counter history

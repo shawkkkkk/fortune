@@ -112,3 +112,12 @@ custody read with fenced late completion. Two clients of ONE local fixture are
 not independent public providers, public deployment, legitimate-capital evidence
 or complete M07 readiness. Exact-source CI and retained runtime reports remain
 separate from public custody, audit and mainnet gates.
+
+## Historical release receipt integration
+
+The separate [release receipt reader](LIQUIDITY_CUSTODY_RELEASE_RECEIPTS.md) now
+binds direct governor release calldata to canonical NFT approval/transfer and
+release events, full receipt-height policy/position state and fixed treasury.
+It reuses the existing position body under shared RPC fences; the held-state
+reader and custody contract remain unchanged. Stable IDs need downstream dedup;
+there is no ledger, badge, treasury-control or financial authority.

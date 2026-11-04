@@ -62,3 +62,6 @@ export async function inspectLiquidityCustody(clients:readonly [PublicClient,Pub
   try{return await Promise.race([work(),new Promise<never>((_,reject)=>{timer=setTimeout(()=>{finished=true;reject(Error("Custody observation timed out"));},30_000);})]);}
   finally{finished=true;clearTimeout(timer);}
 }
+
+// Reuse the exact offline policy checks in receipt observation.
+export { validate as validateLiquidityCustodyPolicy };

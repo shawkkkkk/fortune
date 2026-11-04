@@ -2,6 +2,20 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## Compiled worker batch waiver RPC lifecycle (P19)
+
+A separate zero-account local VM drill now executes the unchanged batch waiver
+contract over actual HTTP/ABI: two clients/assets and revisions0/1, stale/foreign/
+paused rejection, later inexact transfer rollback, identical-calldata retry,
+canonical six-log refunds, immutable result/funding history and successful replay
+rejection. Reverts have no receipt logs and preserve all financial state. The
+new workflow step/artifact leaves old runtime, transactions and budgets unchanged.
+Owned compiled source hashes are checked before execution; failure removes old
+PASS JSON. This is synthetic local component evidence, not public deployment,
+independent providers, capital/identity/delivery/IP/legal/fairness, a batch receipt
+reconciliation engine or full P19/audit readiness. See SYNDICATE_WORK_ESCROW.md.
+Standard/root pins, contracts, old readers and all release gates remain unchanged.
+
 ## Atomic worker batch payment waiver (P19)
 
 The isolated chain97 WorkEscrow now lets one named worker voluntarily waive

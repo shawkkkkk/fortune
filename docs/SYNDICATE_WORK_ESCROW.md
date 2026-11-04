@@ -765,3 +765,36 @@ are local VM tests, not a public deployment, legitimate-capital/identity/deliver
 IP/legal/fairness proof or full P19 readiness. Changed bytecode needs fresh review
 and deployment evidence; old contract audit/deployment approval cannot transfer.
 Frozen Standard/root pins, economic policy and all release gates remain unchanged.
+
+### Compiled batch-waiver RPC rehearsal
+
+`contracts-omnichain/scripts/work-batch-waiver-runtime.mjs` starts its own pinned
+Anvil1.7.1 on a fresh loopback port, chain97 and zero generated accounts. No fork,
+public RPC URL, clock override, key or signing path is accepted. Fixed local VM
+impersonation funds synthetic accounts/assets only. Both compiled artifacts must
+match every owned source keccak256 in their metadata before execution.
+
+Two original clients fund separate runtime-pinned assets through permanent public
+funding IDs; one worker accepts both and submits revision1 for the second job.
+Actual batch transactions reject a stale revision, foreign caller and pause while
+preserving financial state. A tax on the SECOND asset forces failure after the
+first refund would have run. An actual eth_call must report InexactTransfer
+before the mined revert: both clients' balances, escrow backing/liabilities,
+job terms/state, result history and funding bindings must remain unchanged.
+After explicit fixture repair, the exact original calldata succeeds with six
+ordered Transfer/JobSettled/PaymentWaived logs, exact per-asset refunds, no worker
+payment, zero liabilities and original result/funding history. A successful replay
+rejects and leaves those values unchanged. Failed transactions consume local gas
+and nonces; rollback does not mean they were never submitted. Reverted receipts
+must contain no logs. Impersonation is stopped and eth_accounts is empty again.
+
+A separate three-minute CI step and retained log/JSON artifact are additive.
+Removing the marked step restores the previous workflow byte for byte; old
+runtime source/assertions/deadlines/mining/clock rules are unchanged. Failure
+exits1 with a fixed stage label and no PASS JSON; stale report removal precedes
+artifact/source parsing. A single fixture and synthetic tokens do not establish
+independent providers, legitimate capital, identity, delivery, IP, fairness,
+public deployment, global solvency, recovery, audit or full Syndicate readiness.
+Canonical test receipts are not a production batch receipt observer or consumed
+ledger. No contracts, Standard/root pins, economics, service config, signer or
+financial-authority gates change.

@@ -2,6 +2,19 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## Compiled custody lifecycle through project MCP (P03/M07)
+
+The existing zero-account Pancake custody rehearsal now invokes the actual
+stdio MCP tool/resource at its existing held, paused and released checkpoints.
+Positive outputs must match direct unchanged engine reads except their own
+observation times; released custody rejects privately. Policy SHA/bytes, fixed
+project, null/false authority, unknown claimable/value and before/after chain,
+role nonces, NFT/position and custody state are checked. No new transaction,
+mining or clock override; old lifecycle/receipt assertions and budgets remain.
+Two synthetic origins still reach one local fixture, not independent providers
+or public custody. Full P03/M07, audit and operational readiness remain unfinished;
+see PROJECT_LIQUIDITY_CUSTODY_MCP.md. Standard/root pins and all gates remain.
+
 ## Project custody-state MCP integration (P03/M07)
 
 A separately disabled tool/resource now invokes the actual unchanged custody

@@ -131,6 +131,96 @@ try {
   assert.equal(heldState.held, true); assert.equal(heldState.paused, false);
   assert.equal(heldState.position.liquidityUnits, first.liquidityUnits);
   assert.equal(heldState.currentAuthorization, null); assert.equal(heldState.executionAuthorized, false);
+  // BEGIN compiled custody MCP integration helper and held-state read.
+  const mcpPolicyPath = join(folder, "project-custody.json");
+  const mcpPolicyBytes = JSON.stringify(custodyReadPolicy);
+  const { createHash } = await import("node:crypto");
+  const mcpPolicyHash = createHash("sha256").update(mcpPolicyBytes).digest("hex");
+  writeFileSync(mcpPolicyPath, mcpPolicyBytes, { mode: 0o600 });
+  const mcpState = async () => ({
+    head: await rpc.getBlockNumber({ cacheTime: 0 }),
+    nonces: await Promise.all([GOV, custodyReadPolicy.guardian, TREASURY].map(address =>
+      Promise.all(["latest", "pending"].map(blockTag => rpc.getTransactionCount({ address, blockTag }))))),
+    owner: await read(POSITIONS, parseAbi(["function ownerOf(uint256) view returns(address)"]), "ownerOf", [tokenId]),
+    approved: await read(POSITIONS, parseAbi(["function getApproved(uint256) view returns(address)"]), "getApproved", [tokenId]),
+    position: await read(POSITIONS, parseAbi(["function positions(uint256) view returns(uint96,address,address,address,uint24,int24,int24,uint128,uint256,uint256,uint128,uint128)"]), "positions", [tokenId]),
+    held: await read(custody, custodyArtifact.abi, "held"),
+    released: await read(custody, custodyArtifact.abi, "released"),
+    paused: await read(custody, custodyArtifact.abi, "paused"),
+  });
+  const withoutObservationTimes = observation => {
+    const { observedAtMs, position: { observedAtMs: positionTime, ...position }, ...rest } = observation;
+    assert.ok(Number.isSafeInteger(observedAtMs) && Number.isSafeInteger(positionTime));
+    return { ...rest, position };
+  };
+  const checkCustodyMcp = async expected => {
+    const beforeMcp = await mcpState();
+    const child = spawn(process.execPath, ["--import", "./scripts/register-ts.mjs", "--import",
+      "./tests/fixtures/project-liquidity-http.mjs", "scripts/project-mcp.mjs"], {
+      env: { ...process.env, FORTUNE_PROJECT_MCP_ENABLED: "true", FORTUNE_PROJECT_TOKEN: token0,
+        FORTUNE_PROJECT_CHARACTER_ENABLED: "", FORTUNE_PROJECT_CHARACTER_RECHECK_ENABLED: "",
+        FORTUNE_PROJECT_NOTEBOOK_ENABLED: "", FORTUNE_PROJECT_LP_READ_ENABLED: "",
+        FORTUNE_PROJECT_LP_CUSTODY_READ_ENABLED: "true", FORTUNE_PROJECT_LP_CUSTODY_DISCLOSURE_REVIEWED: "true",
+        FORTUNE_PROJECT_LP_CUSTODY_POLICY: mcpPolicyPath, FORTUNE_LP_READ_RPC_URL: "https://lp-one.invalid",
+        FORTUNE_LP_SECONDARY_RPC_URL: "https://lp-two.invalid", FORTUNE_TEST_LP_RPC: url },
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    let out = "";
+    child.stdout.on("data", chunk => out += chunk);
+    child.stderr.resume();
+    // Two sequential reads retain their original individual 30-second engine lifetimes.
+    const timer = setTimeout(() => child.kill("SIGKILL"), 70000);
+    try {
+      const request = (id, method, params) => ({ jsonrpc: "2.0", id, method, params });
+      const uri = `fortune://97/${token0.toLowerCase()}/liquidity-custody`;
+      child.stdin.end([
+        request(1, "initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "local-custody-drill", version: "1" } }),
+        { jsonrpc: "2.0", method: "notifications/initialized" },
+        request(2, "tools/list"), request(3, "resources/list"),
+        request(4, "tools/call", { name: "get_liquidity_custody", arguments: {} }),
+        request(5, "resources/read", { uri }),
+      ].map(JSON.stringify).join("\n") + "\n");
+      const [status] = await once(child, "close");
+      assert.equal(status, 0, "Custody MCP child must complete");
+      const replies = out.trim().split("\n").map(JSON.parse);
+      assert.deepEqual(replies.map(reply => reply.id), [1, 2, 3, 4, 5]);
+      assert.equal(replies[0].result.protocolVersion, "2025-06-18");
+      assert.equal(replies[1].result.tools.length, 3);
+      assert.ok(replies[1].result.tools.some(tool => tool.name === "get_liquidity_custody"));
+      assert.equal(replies[2].result.resources.length, 3);
+      assert.ok(replies[2].result.resources.some(resource => resource.uri === uri));
+      if (expected === null) {
+        assert.equal(replies[3].result.isError, true);
+        assert.ok(replies[4].error);
+        assert.doesNotMatch(out, /project-custody\.json|lp-one|lp-two|codeHash/);
+      } else {
+        assert.notEqual(replies[3].result.isError, true);
+        assert.equal(replies[4].error, undefined);
+        const observations = [JSON.parse(replies[3].result.content[0].text), JSON.parse(replies[4].result.contents[0].text)];
+        for (const observation of observations) {
+          assert.equal(observation.source, "operator-selected-project-liquidity-custody-rpc-observation");
+          assert.equal(observation.projectToken, token0.toLowerCase());
+          assert.equal(observation.policyHash, mcpPolicyHash);
+          assert.equal(observation.projectCustodyVerified, false);
+          assert.equal(observation.currentAuthorization, null);
+          assert.equal(observation.executionAuthorized, false);
+          assert.equal(observation.fullManagedLiquidityReadiness, false);
+          assert.deepEqual(withoutObservationTimes(observation.custody), withoutObservationTimes(expected));
+          assert.equal(observation.custody.position.claimableFees, null);
+          assert.equal(observation.custody.position.totalValue, null);
+        }
+        assert.equal(observations[0].policyHash, observations[1].policyHash);
+      }
+      assert.equal(readFileSync(mcpPolicyPath, "utf8"), mcpPolicyBytes);
+      assert.deepEqual(await mcpState(), beforeMcp);
+    } finally {
+      clearTimeout(timer);
+      if (child.exitCode === null && child.signalCode === null) { child.kill("SIGKILL"); await once(child, "close"); }
+    }
+  };
+  stage = "compiled held custody MCP tool and resource";
+  await checkCustodyMcp(heldState);
+  // END compiled custody MCP integration helper and held-state read.
   stage = "foreign-treasury rejection";
   await assert.rejects(inspectLiquidityCustody(readers, {...custodyReadPolicy, treasury: GOV}));
   stage = "paused fixed-treasury release";
@@ -140,6 +230,10 @@ try {
   await rpc.request({method: "anvil_mine", params: ["0x14"]});
   stage = "paused custody observation";
   assert.equal((await inspectLiquidityCustody(readers, custodyReadPolicy)).paused, true);
+  // BEGIN compiled paused custody MCP integration.
+  stage = "compiled paused custody MCP tool and resource";
+  await checkCustodyMcp(await inspectLiquidityCustody(readers, custodyReadPolicy));
+  // END compiled paused custody MCP integration.
   stage = "fixed-treasury release";
   const releasedReceipt = await write(GOV, custody, custodyArtifact.abi, "releaseToTreasury");
   stage = "released custody flags";
@@ -151,6 +245,10 @@ try {
   await assert.rejects(inspectLiquidityPosition(readers, policy));
   stage = "released-custody rejection";
   await assert.rejects(inspectLiquidityCustody(readers, custodyReadPolicy));
+  // BEGIN compiled released custody MCP integration.
+  stage = "compiled released custody MCP rejection";
+  await checkCustodyMcp(null);
+  // END compiled released custody MCP integration.
   stage = "treasury-position observation";
   const transferred = await inspectLiquidityPosition(readers, {...policy, owner: TREASURY});
   assert.equal(transferred.owner, TREASURY.toLowerCase());
@@ -211,6 +309,7 @@ try {
   }
   // END custody receipt operator integration.
   const result = { sourceForkBlock: forkBlock.toString(), positionObserved: true, custodyDepositObserved: true,
+    heldCustodyMcpMatched: true, pausedCustodyMcpMatched: true, releasedCustodyMcpRejected: true, custodyMcpPolicyPreserved: true, custodyMcpReadsPreservedState: true,
     actualDepositReceiptCliMatched: true, actualReleaseReceiptCliMatched: true, receiptCliReplayStable: true, wrongReceiptCliRouteRejected: true, receiptCliReadsPreservedState: true,
     actualDepositReceiptObserved: true, depositReceiptReplayStable: true, wrongDepositGovernorRejected: true, depositReceiptReadsPreservedState: true, depositReleaseRoutesSeparated: true,
     actualReleaseReceiptObserved: true, releaseReceiptReplayStable: true, wrongReleaseTreasuryRejected: true, releaseReceiptReadsPreservedState: true,

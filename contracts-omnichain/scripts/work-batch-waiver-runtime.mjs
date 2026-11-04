@@ -177,6 +177,18 @@ try{
    book.close();book=new Book(file,scope,{enabled:true,readOnly:false});const replay=await book.capture(clients,allPolicies,head);
    assert.equal(replay.inserted,false);assert.equal(replay.digest,inserted.digest);assert.equal(replay.recordedAtMs,inserted.recordedAtMs);assert.equal(replay.readerObservedAtMs,inserted.readerObservedAtMs);assert.deepEqual(book.read(),view);
    await assert.rejects(book.capture(clients,[allPolicies[0],{...allPolicies[1],amount:(jobs[1].amount+1n).toString()}],head));assert.deepEqual(book.read(),view);
+   // BEGIN durable waiver command integration.
+   const configFile=path.join(dir,'config.json'),requestFile=path.join(dir,'request.json');
+   fs.writeFileSync(configFile,JSON.stringify({bookPath:file,bookId:view.bookId,policy:scope}));fs.writeFileSync(requestFile,JSON.stringify({policies:allPolicies,expectedHead:head}));
+   const runCommand=async(mode)=>{
+    const child=spawn(process.execPath,['--import','./scripts/register-ts.mjs','--import','./tests/fixtures/work-job-http.mjs','scripts/work-waiver-observations.mjs',mode,configFile,...(mode==='read'?[]:[requestFile])],{env:{...process.env,FORTUNE_WORK_WAIVER_BOOK_ENABLED:'true',FORTUNE_WORK_WAIVER_BOOK_WRITE_ENABLED:'true',FORTUNE_WORK_READ_RPC_URL:'https://work-one.invalid',FORTUNE_WORK_SECONDARY_RPC_URL:'https://work-two.invalid',FORTUNE_TEST_WORK_RPC:`http://127.0.0.1:${port}`},stdio:['ignore','pipe','pipe']});
+    let out='',err='';child.stdout.on('data',x=>out+=x);child.stderr.on('data',x=>err+=x);const timer=setTimeout(()=>child.kill('SIGKILL'),15000);
+    try{const [status]=await once(child,'exit');return{status,out,err};}finally{clearTimeout(timer);}
+   };
+   const read=await runCommand('read');assert.equal(read.status,0,read.err);assert.deepEqual(JSON.parse(read.out).observation,view);
+   const captured=await runCommand('capture');assert.equal(captured.status,0,captured.err);const stored=JSON.parse(captured.out).result;assert.equal(stored.inserted,false);assert.equal(stored.digest,inserted.digest);assert.equal(stored.recordedAtMs,inserted.recordedAtMs);assert.equal(stored.readerObservedAtMs,inserted.readerObservedAtMs);assert.deepEqual(book.read(),view);
+   fs.writeFileSync(requestFile,JSON.stringify({policies:[allPolicies[0],{...allPolicies[1],amount:(jobs[1].amount+1n).toString()}],expectedHead:head}));const bad=await runCommand('capture');assert.equal(bad.status,1);assert.equal(bad.out,'');assert.match(bad.err,/Work waiver observation book unavailable/);assert.deepEqual(book.read(),view);
+   // END durable waiver command integration.
   }finally{book?.close();fs.rmSync(dir,{recursive:true,force:true});}
   // END durable waiver observations.
   // END complete batch waiver observation.
@@ -190,7 +202,7 @@ try{
  assert.deepEqual(await financialState(),refunded);
  for(const who of actors)await rpc.request({method:'anvil_stopImpersonatingAccount',params:[who]});
  assert.deepEqual(await rpc.request({method:'eth_accounts'}),[]);
- const result={durableWaiverBatchCaptured:true,durableWaiverReopenReplayImmutable:true,durableWaiverLateFailureNoWrite:true,wholeBatchWaiverReceiptObserved:true,wholeBatchWaiverDigestReplayStable:true,wholeBatchWaiverLatePolicyRejectedReadOnly:true,selectedBatchWaiverReceiptObserved:true,selectedBatchWaiverReplayStable:true,selectedBatchWaiverWrongAmountAndDirectRouteRejected:true,selectedBatchWaiverReadsPreserveState:true,compiledBatchWaiverObserved:true,mixedClientAssetRefundsMatched:true,staleRevisionAndForeignCallerRejected:true,
+ const result={waiverCommandReadMatchesBook:true,waiverCommandReplayImmutable:true,waiverCommandLateFailureNoWrite:true,durableWaiverBatchCaptured:true,durableWaiverReopenReplayImmutable:true,durableWaiverLateFailureNoWrite:true,wholeBatchWaiverReceiptObserved:true,wholeBatchWaiverDigestReplayStable:true,wholeBatchWaiverLatePolicyRejectedReadOnly:true,selectedBatchWaiverReceiptObserved:true,selectedBatchWaiverReplayStable:true,selectedBatchWaiverWrongAmountAndDirectRouteRejected:true,selectedBatchWaiverReadsPreserveState:true,compiledBatchWaiverObserved:true,mixedClientAssetRefundsMatched:true,staleRevisionAndForeignCallerRejected:true,
   pausedBatchRejected:true,lateTransferRolledBackWholeBatch:true,exactCalldataRetryMatched:true,canonicalSixLogReceiptMatched:true,
   originalResultAndFundingHistoryPreserved:true,successfulReplayRejected:true,ownedCompiledSourcesMatched:true,
   generatedAccounts:0,privateKeysUsed:false,publicBroadcasts:false,executionAuthorized:false,deployedToPublicNetwork:false,

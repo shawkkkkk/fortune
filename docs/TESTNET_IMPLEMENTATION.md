@@ -1,5 +1,36 @@
 # Testnet implementation ledger
 
+## Disabled batch-waiver observation operator command (P19)
+
+work-waiver-observations.mjs read <config> reads existing history without RPC.
+An explicit capture <config> <request> requires separate
+FORTUNE_WORK_WAIVER_BOOK_ENABLED and FORTUNE_WORK_WAIVER_BOOK_WRITE_ENABLED gates
+and calls the unchanged waiver book and complete receipt reader exactly once.
+The16KiB config pins the existing book ID/path/worker policy; the68KiB request
+pins complete policies and the ORIGINAL expected predecessor. Bounded nonblocking
+regular descriptors and strictUTF8/JSON reject FIFOs, excess bytes and extra fields.
+Two distinct HTTPS origins,5second transport/no redirects/retries/credentials,
+and literal config/request bytes checked before/after all7 awaited RPC methods
+preserve the reader's20second lifetime and book's5second commit freshness.
+No initialization, head refresh, repair, reset, loop, recovery or signing.
+
+Actual child→HTTP/ABI→SQLite tests cover1/2/16 mixed-client/asset refunds,
+read/reopen/retry times and IDs, gates/foreign IDs/stale heads, late failures,
+changed inputs, private provider errors, strict bounds/UTF8 and writerless FIFOs.
+The existing compiled zero-account drill invokes the actual command for read,
+immutable retry and later-bad-policy rejection against its existing two refunds.
+No new financial transaction, mining or clock change; old state/snapshot checks
+remain. Synthetic HTTPS origins reach ONE local fixture, not independent providers.
+
+Config SHA is a checksum, not authentication. Failure/output loss may follow
+commit/quarantine: inspect history before explicit ORIGINAL retry; never renew
+the predecessor. Trusted host/files/clock/RPC can change after the last check;
+this is not a general filesystem deadline, power-loss or recovery certification.
+Permission/privacy review is required before storing/sharing real wallet metadata.
+No real config/service/cash totals/badges/financial authority; authorization null,
+execution/readiness false. Full P19/audit/public deployment remain unfinished.
+Standard/root pins, existing book/readers/commands and release gates stay unchanged.
+
 ## Durable batch-waiver observation book (P19)
 
 The separately disabled WorkWaiverObservationBook calls the unchanged complete

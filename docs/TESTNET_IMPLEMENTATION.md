@@ -2,6 +2,19 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## Disabled custody receipt operator integration (M07)
+
+An explicit default-disabled local command now invokes the unchanged deposit or
+release receipt engine using a bounded strict16KiB input, two reviewed HTTPS
+origins and literal byte pins around all7 awaited read methods. Both modes retain
+original receipt provenance/dedup IDs, null auth and false financial/readiness
+authority. Actual child HTTP/ABI tests cover modes/replay/preflight/private errors
+and policy mutation; the existing compiled zero-account Pancake drill consumes
+its actual deposit/release receipts through the command and preserves current
+chain/NFT/custody state. No ledger, signer, service, real config or financial
+action is added. See LIQUIDITY_CUSTODY_RECEIPT_OPERATOR.md; full M07 remains
+unfinished. Contracts, old readers, Standard/root pins and gates are unchanged.
+
 ## Complete custody receipt topic slots (M07 correctness)
 
 Both actual deposit/release readers now compare every expected canonical topic

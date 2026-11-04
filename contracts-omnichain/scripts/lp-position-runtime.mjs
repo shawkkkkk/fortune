@@ -188,7 +188,30 @@ try {
     assert.deepEqual(await state(),before);
   }
   // END historical direct deposit receipt integration.
+  // BEGIN custody receipt operator integration.
+  stage = "actual custody receipt operator integration";
+  {
+    const beforeCli=await state(),policyPath=join(folder,"custody-receipt.json");
+    const runCli=async(kind,input)=>{
+      writeFileSync(policyPath,JSON.stringify(input),{mode:0o600});
+      const child=spawn(process.execPath,["--import","./scripts/register-ts.mjs","--import","./tests/fixtures/liquidity-custody-http.mjs","scripts/inspect-liquidity-custody-receipt.mjs",kind,policyPath],{env:{...process.env,FORTUNE_LP_CUSTODY_RECEIPT_READ_ENABLED:"true",FORTUNE_LP_READ_RPC_URL:"https://lp-custody-one.invalid",FORTUNE_LP_SECONDARY_RPC_URL:"https://lp-custody-two.invalid",FORTUNE_TEST_LP_CUSTODY_RPC:url},stdio:["ignore","pipe","pipe"]});
+      let out="",err="";child.stdout.on("data",d=>out+=d);child.stderr.on("data",d=>err+=d);
+      const timer=setTimeout(()=>child.kill("SIGKILL"),40000);
+      try{const [status]=await once(child,"exit");return{status,out,err};}finally{clearTimeout(timer);}
+    };
+    const ids=[];
+    for(const [kind,receipt,inspect]of [["deposit",depositedReceipt,inspectLiquidityCustodyDepositReceipt],["release",releasedReceipt,inspectLiquidityCustodyReleaseReceipt]]){
+      const input={policy:custodyReadPolicy,transactionHash:receipt.transactionHash},direct=await inspect(readers,input),cli=await runCli(kind,input);
+      assert.equal(cli.status,0,cli.err);const output=JSON.parse(cli.out);assert.equal(output.kind,kind);assert.equal(output.currentAuthorization,null);assert.equal(output.executionAuthorized,false);assert.equal(output.fullManagedLiquidityReadiness,false);
+      const {observedAtMs:directTime,...expected}=direct,{observedAtMs:cliTime,...actual}=output.observation;assert.deepEqual(actual,expected);assert.ok(Number.isSafeInteger(directTime)&&Number.isSafeInteger(cliTime));ids.push(direct.evidenceId);
+    }
+    const replay=await runCli("deposit",{policy:custodyReadPolicy,transactionHash:depositedReceipt.transactionHash});assert.equal(replay.status,0,replay.err);assert.equal(JSON.parse(replay.out).observation.evidenceId,ids[0]);
+    const wrong=await runCli("release",{policy:custodyReadPolicy,transactionHash:depositedReceipt.transactionHash});assert.equal(wrong.status,1);assert.equal(wrong.out,"");assert.match(wrong.err,/Liquidity custody receipt unavailable/);
+    assert.deepEqual(await state(),beforeCli);
+  }
+  // END custody receipt operator integration.
   const result = { sourceForkBlock: forkBlock.toString(), positionObserved: true, custodyDepositObserved: true,
+    actualDepositReceiptCliMatched: true, actualReleaseReceiptCliMatched: true, receiptCliReplayStable: true, wrongReceiptCliRouteRejected: true, receiptCliReadsPreservedState: true,
     actualDepositReceiptObserved: true, depositReceiptReplayStable: true, wrongDepositGovernorRejected: true, depositReceiptReadsPreservedState: true, depositReleaseRoutesSeparated: true,
     actualReleaseReceiptObserved: true, releaseReceiptReplayStable: true, wrongReleaseTreasuryRejected: true, releaseReceiptReadsPreservedState: true,
     actualCustodyPolicyReaderMatched: true, pausedCustodyReaderMatched: true, releasedCustodyReaderRejected: true, wrongCustodyTreasuryRejected: true, formerGovernorRejectedAfterDeposit: true,

@@ -1,5 +1,35 @@
 # Isolated testnet scoped-work escrow
 
+## Complete batch-decline receipt coverage (P19)
+
+`inspectAllWorkBatchDeclines` requires complete 1–16 ordered policies for one
+chain97 direct `declineMany` call. Every policy, canonical sorted ID list,
+selected index, shared worker/call/runtime/roles and repeated-asset pin/cap is
+validated before RPC. Caller policies are cloned before awaits. It calls the
+UNCHANGED selected receipt engine for EVERY job under one real20second safe
+monotonic deadline, all7 original-receiver RPC fences and finally fences.
+All receipt reads must share a normalized bounded3N-log digest, including empty
+JobDeclined data, and every result must share a header and distinct settlement
+ID. This checksum is consistency only, not authentication. Irrelevant gas fields
+are excluded. Each refund retains its own client, asset, amount and stable
+MUST-deduplicate ID; there is no cross-asset total or consumed settlement ledger.
+
+Only the complete result reports allCallEntriesObserved:true; each selected
+result still says otherBatchJobsVerified:false. Historical receipt-height state
+is not current consent, pre/post balance proof, independent-provider/finality,
+capital origin, identity/delivery/IP/legal/fairness, global solvency or recovery.
+Authorization remains null and all financial/readiness authority false. No CLI,
+service, real configuration, signing, broadcast, badge or full P19 completion.
+Six new tests cover1/2/16 mixed-client/asset batches, completeness and0RPC
+preflight, later-job/refund/state and receipt drift, own framing, input mutation,
+original receivers, clock reversal, real deadline and failed-peer late fences.
+The compiled zero-account two-asset runtime now observes both ACTUAL refunds
+through this API, replays identical IDs/digest and rejects incomplete/bad later
+policies, reusing existing snapshot-restored confirmations and unchanged-state
+assertions. No extra transaction/mining/clock change. One VM is not independent
+providers/public custody or audit evidence. Old readers/contracts/runtime checks,
+Standard/root dependency pins, economics and release gates remain unchanged.
+
 ## Selected batch-decline receipt observation (P19)
 
 inspectWorkBatchDeclineReceipt binds ONE selected refund in direct chain97

@@ -8,6 +8,7 @@ import { createServer } from "node:net";
 import { once } from "node:events";
 import { createPublicClient, createWalletClient, http, keccak256, toHex, parseAbi } from "viem";
 import { bscTestnet } from "viem/chains";
+import { inspectLiquidityCustodyDepositReceipt } from "../../lib/liquidity-custody-deposit-receipt.ts";
 import { inspectLiquidityCustodyReleaseReceipt } from "../../lib/liquidity-custody-release-receipt.ts";
 import { inspectLiquidityCustody } from "../../lib/managed-liquidity-custody.ts";
 import { inspectLiquidityPosition } from "../../lib/managed-liquidity-position.ts";
@@ -110,7 +111,7 @@ try {
   stage = "custody opening";
   await write(GOV, custody, custodyArtifact.abi, "setPaused", [false]);
   stage = "custody NFT deposit";
-  await write(GOV, custody, custodyArtifact.abi, "deposit");
+  const depositedReceipt = await write(GOV, custody, custodyArtifact.abi, "deposit");
   stage = "custody held flag";
   assert.equal(await read(custody, custodyArtifact.abi, "held"), true);
   await rpc.request({method: "anvil_mine", params: ["0x14"]});
@@ -169,7 +170,26 @@ try {
   await assert.rejects(inspectLiquidityCustodyReleaseReceipt(readers,{...releaseInput,policy:{...custodyReadPolicy,treasury:GOV}}));
   assert.deepEqual(await state(),before);
   // END historical direct release receipt integration.
+  // BEGIN historical direct deposit receipt integration.
+  // Release's existing wall alignment also covers the earlier deposit block.
+  // Current state is terminal; the new reader must still use DEPOSIT height.
+  {
+    stage = "historical deposit receipt state snapshot";
+    const state = async()=>({head:await rpc.getBlockNumber({cacheTime:0}),nonces:await Promise.all(["latest","pending"].map(blockTag=>rpc.getTransactionCount({address:GOV,blockTag}))),owner:await read(POSITIONS,parseAbi(["function ownerOf(uint256) view returns(address)"]),"ownerOf",[tokenId]),held:await read(custody,custodyArtifact.abi,"held"),released:await read(custody,custodyArtifact.abi,"released")});
+    const before = await state(),depositInput={policy:custodyReadPolicy,transactionHash:depositedReceipt.transactionHash};
+    assert.equal(before.released,true);assert.equal(before.held,false);
+    stage = "actual direct deposit receipt observation";
+    const depositedObservation=await inspectLiquidityCustodyDepositReceipt(readers,depositInput);
+    assert.equal(depositedObservation.position.owner,custody.toLowerCase());assert.equal(depositedObservation.position.liquidityUnits,first.liquidityUnits);assert.equal(depositedObservation.held,true);assert.equal(depositedObservation.released,false);assert.equal(depositedObservation.currentAuthorization,null);assert.equal(depositedObservation.executionAuthorized,false);
+    const replay=await inspectLiquidityCustodyDepositReceipt(readers,depositInput);assert.equal(replay.evidenceId,depositedObservation.evidenceId);assert.equal(replay.receiptConsistencyDigest,depositedObservation.receiptConsistencyDigest);
+    await assert.rejects(inspectLiquidityCustodyDepositReceipt(readers,{...depositInput,policy:{...custodyReadPolicy,governor:TREASURY}}));
+    await assert.rejects(inspectLiquidityCustodyDepositReceipt(readers,releaseInput));
+    await assert.rejects(inspectLiquidityCustodyReleaseReceipt(readers,depositInput));
+    assert.deepEqual(await state(),before);
+  }
+  // END historical direct deposit receipt integration.
   const result = { sourceForkBlock: forkBlock.toString(), positionObserved: true, custodyDepositObserved: true,
+    actualDepositReceiptObserved: true, depositReceiptReplayStable: true, wrongDepositGovernorRejected: true, depositReceiptReadsPreservedState: true, depositReleaseRoutesSeparated: true,
     actualReleaseReceiptObserved: true, releaseReceiptReplayStable: true, wrongReleaseTreasuryRejected: true, releaseReceiptReadsPreservedState: true,
     actualCustodyPolicyReaderMatched: true, pausedCustodyReaderMatched: true, releasedCustodyReaderRejected: true, wrongCustodyTreasuryRejected: true, formerGovernorRejectedAfterDeposit: true,
     activeReleaseRejected: true, fixedTreasuryReleaseObserved: true, duplicateReleaseRejected: true, fullManagedLiquidityReadiness: false, transferredOwnerRejected: true,

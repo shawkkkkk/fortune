@@ -1,5 +1,21 @@
 # Testnet implementation ledger
 
+## Work settlement receipt own-topic validation (P19/P10)
+
+Both shared receipt topic validators now require own canonical bytes32 values at
+all three expected slots; receipt rereads also require own slots before JSON
+comparison (which would otherwise serialize inherited values). Missing slots and values supplied only by an array
+prototype reject before canonical event comparison or batch digesting. Payment,
+result, cancellation, expiry, worker refund, arbitration and selected/all-job
+batch routes preserve their calldata, amount, runtime, role, confirmation,
+20-second lifetime, reread, stable-ID and null/false authority rules. Tests cover
+every log/slot, either peer, initial/reread/both observations, inherited slots
+and dense controls. Two new groups fail on old source; dense controls pass.
+JSON cannot encode holes; this is an in-process client-result boundary, not a
+claimed public JSON-RPC exploit. No contract, schema, ledger recovery, signer,
+configuration or financial authority change; full P19/P10 remains incomplete.
+
+
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
 ## Compiled worker batch waiver RPC lifecycle (P19)

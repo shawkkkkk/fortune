@@ -165,6 +165,20 @@ try{
   assert.equal(whole.currentAuthorization,null);assert.equal(whole.executionAuthorized,false);assert.equal(whole.fullSyndicateReadiness,false);
   await assert.rejects(inspectAllWorkBatchWaivers(clients,[allPolicies[0]]));
   await assert.rejects(inspectAllWorkBatchWaivers(clients,[allPolicies[0],{...allPolicies[1],amount:(jobs[1].amount+1n).toString()}]));
+  // BEGIN durable waiver observations.
+  const {WorkWaiverObservationBook:Book}=await import('../../scripts/work-waiver-observation-book.mjs');
+  const fs=await import('node:fs'),os=await import('node:os'),path=await import('node:path');
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'fortune-waiver-book-')),file=path.join(dir,'book.sqlite');
+  const scope=Object.fromEntries(['chainId','escrow','escrowCodeHash','governor','guardian','arbitrator','worker'].map(k=>[k,common[k]]));let book;
+  try{
+   Book.initialize(file,scope,{enabled:true});book=new Book(file,scope,{enabled:true,readOnly:false});const head=book.read().head;
+   const inserted=await book.capture(clients,allPolicies,head),view=book.read();assert.equal(inserted.inserted,true);assert.equal(view.total,1);
+   assert.deepEqual(view.entries[0].observation.refunds.map(r=>r.clientRefund),jobs.map(j=>j.amount.toString()));
+   book.close();book=new Book(file,scope,{enabled:true,readOnly:false});const replay=await book.capture(clients,allPolicies,head);
+   assert.equal(replay.inserted,false);assert.equal(replay.digest,inserted.digest);assert.equal(replay.recordedAtMs,inserted.recordedAtMs);assert.equal(replay.readerObservedAtMs,inserted.readerObservedAtMs);assert.deepEqual(book.read(),view);
+   await assert.rejects(book.capture(clients,[allPolicies[0],{...allPolicies[1],amount:(jobs[1].amount+1n).toString()}],head));assert.deepEqual(book.read(),view);
+  }finally{book?.close();fs.rmSync(dir,{recursive:true,force:true});}
+  // END durable waiver observations.
   // END complete batch waiver observation.
   assert.deepEqual(await readState(),before);
  }finally{assert.equal(await rpc.request({method:'evm_revert',params:[snapshot]}),true);}
@@ -176,7 +190,7 @@ try{
  assert.deepEqual(await financialState(),refunded);
  for(const who of actors)await rpc.request({method:'anvil_stopImpersonatingAccount',params:[who]});
  assert.deepEqual(await rpc.request({method:'eth_accounts'}),[]);
- const result={wholeBatchWaiverReceiptObserved:true,wholeBatchWaiverDigestReplayStable:true,wholeBatchWaiverLatePolicyRejectedReadOnly:true,selectedBatchWaiverReceiptObserved:true,selectedBatchWaiverReplayStable:true,selectedBatchWaiverWrongAmountAndDirectRouteRejected:true,selectedBatchWaiverReadsPreserveState:true,compiledBatchWaiverObserved:true,mixedClientAssetRefundsMatched:true,staleRevisionAndForeignCallerRejected:true,
+ const result={durableWaiverBatchCaptured:true,durableWaiverReopenReplayImmutable:true,durableWaiverLateFailureNoWrite:true,wholeBatchWaiverReceiptObserved:true,wholeBatchWaiverDigestReplayStable:true,wholeBatchWaiverLatePolicyRejectedReadOnly:true,selectedBatchWaiverReceiptObserved:true,selectedBatchWaiverReplayStable:true,selectedBatchWaiverWrongAmountAndDirectRouteRejected:true,selectedBatchWaiverReadsPreserveState:true,compiledBatchWaiverObserved:true,mixedClientAssetRefundsMatched:true,staleRevisionAndForeignCallerRejected:true,
   pausedBatchRejected:true,lateTransferRolledBackWholeBatch:true,exactCalldataRetryMatched:true,canonicalSixLogReceiptMatched:true,
   originalResultAndFundingHistoryPreserved:true,successfulReplayRejected:true,ownedCompiledSourcesMatched:true,
   generatedAccounts:0,privateKeysUsed:false,publicBroadcasts:false,executionAuthorized:false,deployedToPublicNetwork:false,

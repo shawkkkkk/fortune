@@ -29,6 +29,11 @@ without RPC at startup. One position asset must equal the fixed project token.
 Missing, malformed, oversized or foreign policies fail without creating files.
 
 The policy file must be a regular file, at most 16KiB, with strict UTF-8 JSON.
+Every policy open uses read-only nonblocking flags before the descriptor's
+regular-file check. Writerless FIFOs, including symlink targets, reject instead
+of waiting for a writer at startup or before/after an LP observation. Ordinary
+regular-file symlinks remain supported. This is not a general filesystem
+deadline, Windows FIFO guarantee or protection from privileged path swapping.
 Reads allocate at most 16KiB+1 even if the file grows after stat. Exact startup
 bytes are checked before and after each engine read. Whitespace/key-order changes
 also require an explicit reviewed restart. This is trusted-host configuration,
@@ -68,6 +73,11 @@ LP mutation, public API, scheduler or financial authority is added.
 
 Tests cover optional discovery/coexistence/shared quota, literal bounded
 preflight, project binding, before/after policy changes and private-safe errors.
+Linux child regressions reproduce blocking FIFO opens in the original library
+at startup, before reads and after actual engine reads, and in actual MCP
+startup. Final cases cover direct/symlink FIFOs and exact16KiB regular policies
+and symlinks. Descriptor checks retain the existing byte, UTF-8 and schema bounds;
+no engine, transport, quota, output, deadline or authority change is introduced.
 A real child stdio process calls viem HTTP/ABI against a loopback fixture for
 both tool and resource. A test-only preload rewrites two synthetic HTTPS origins
 to that single fixture; production never imports it. This is runtime integration

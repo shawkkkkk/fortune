@@ -121,3 +121,13 @@ release events, full receipt-height policy/position state and fixed treasury.
 It reuses the existing position body under shared RPC fences; the held-state
 reader and custody contract remain unchanged. Stable IDs need downstream dedup;
 there is no ledger, badge, treasury-control or financial authority.
+
+## Historical deposit receipt integration
+
+The separate [deposit receipt reader](LIQUIDITY_CUSTODY_DEPOSIT_RECEIPTS.md) binds
+a direct governor deposit to the exact approval-clearing/NFT transfer/deposit
+events and full receipt-height recorded custody/position policy. It supports
+historical held state after a later release without implying current ownership.
+The compiled zero-account drill consumes the actual deposit receipt, separates
+both routes and checks replay/read-only state. Existing readers and contracts
+are unchanged; stable IDs need deduplication and all authority stays null/false.

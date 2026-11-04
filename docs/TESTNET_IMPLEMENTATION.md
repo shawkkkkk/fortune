@@ -2,6 +2,21 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## Historical managed-liquidity deposit receipts (M07)
+
+A separate explicit read-only engine binds direct governor deposit calldata to
+canonical manager Approval/Transfer and custody deposit logs, full receipt-height
+policy/position and recorded held state. The actual unchanged position body and
+custody validator run under one30-second monotonic lifetime, two-client
+confirmation/agreement and receipt/header rereads. Stable IDs require dedup; no
+ledger, badge, fee processing, signer, service, real config or financial authority.
+The existing compiled zero-account Pancake drill reads its actual deposit receipt
+after release, checks stable replay, wrong governor, mutual route rejection and
+unchanged current chain/NFT/custody state. This is historical component evidence,
+not current custody, capital origin, independent providers, full M07, audit or
+activation approval. See LIQUIDITY_CUSTODY_DEPOSIT_RECEIPTS.md. Old readers,
+contracts, Standard/root pins and gates remain unchanged.
+
 ## Historical managed-liquidity release receipts (M07)
 
 A separate explicit read-only engine binds a direct governor release call to the

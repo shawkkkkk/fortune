@@ -73,7 +73,60 @@ independent-provider, finality, eligibility, fee-funding, capital-origin,
 pre/post-balance, global-solvency and full-Counter-readiness claims. Records can
 identify recipients and transactions; protect plaintext and obtain separate
 permission before sharing real records with any client/model. No real policy or
-book is configured, and no CLI, HTTP, MCP, model or public service is enabled.
+book is configured, and no HTTP, MCP, model or public service is enabled. The
+separate local operator command below is also disabled by default.
+
+## Explicit operator command (M06/P10)
+
+`scripts/counter-claim-observations.mjs` connects an existing reviewed book to
+the unchanged book/receipt engine. With `FORTUNE_COUNTER_BOOK_ENABLED=true`:
+
+```sh
+node --import ./scripts/register-ts.mjs scripts/counter-claim-observations.mjs read /absolute/config.json
+```
+
+The exact config keys are `bookPath`, `bookId` and `policy`. `bookId` is the
+existing book's public64-character lowercase hex identifier, not a credential;
+`policy` is the fixed policy described above. The command cannot initialize an
+absent/empty book, reset history, repair corruption or clear quarantine. Read
+opens read-only, needs no RPC configuration and returns the bounded full history
+including quarantine and original times. This is identifiable plaintext; obtain
+permission for real data disclosure and protect output as well as storage.
+
+Capture additionally requires `FORTUNE_COUNTER_BOOK_WRITE_ENABLED=true`:
+
+```sh
+node --import ./scripts/register-ts.mjs scripts/counter-claim-observations.mjs capture /absolute/config.json /absolute/request.json
+```
+
+The exact request keys are `input` (the complete existing batch receipt policy)
+and `expectedHead` (the original lowercase64-character predecessor). Config is
+at most16KiB; request is at most68KiB, including the book's unchanged64KiB input
+bound. Reads use opened nonblocking regular descriptors, limit-plus-one buffers,
+strict UTF8 JSON and finally-close. Regular config/request symlinks remain
+supported; the book's stricter no-alias path rules remain unchanged. This is not
+a general filesystem deadline or protection from a privileged host swapping files.
+
+Read-only identity/history/quarantine/head/capacity preflight precedes reopening
+the book for writes. Identity and predecessor are rechecked after reopening;
+the book still rechecks under its SQLite write lock. Exact retry uses its original
+predecessor, re-reads RPC and returns original sequence/digest/times. The command
+does not refresh heads, loop, automatically retry or recover anything.
+
+Capture uses `FORTUNE_COUNTER_READ_RPC_URL` and
+`FORTUNE_COUNTER_SECONDARY_RPC_URL`: distinct HTTPS origins, no userinfo/fragment,
+five-second transport timeout, no redirects/retries and omitted browser credentials.
+URLs/errors are never printed. Config/request bytes are pinned before/after all
+seven awaited reader methods with original receivers. The engine's20-second
+lifetime and five-second book commit freshness remain unchanged; in-flight RPC
+is not canceled. Trusted host/files/clock/providers and height-call limits remain.
+
+Output includes a config-byte SHA256 consistency checksum, never authentication.
+Capture returns the original book result, not money, a claim submission, badge,
+current consent or readiness. A failure may follow a committed observation or
+quarantine, including an output failure: inspect existing history before explicit
+original retry. Never infer no commit, reset a book or replay financial work from
+the exit code. No real book/config/provider setup or service is enabled here.
 
 ## Evidence scope
 
@@ -87,3 +140,13 @@ persistent conflict quarantine and unchanged reader chain state. Both clients
 use that one fixture. Temporary databases are deleted. These are not independent
 public providers, public reorgs, real eligibility/capital/custody, retained backup,
 full M06/P10 delivery, audit approval or mainnet readiness.
+
+Actual child-command HTTP/ABI/SQLite tests cover offline reads,1/32 claims,
+replay/original times, disabled/write gates, stale predecessor, wrong book/policy,
+missing book, changed inputs, later-claim/provider failures, persistent quarantine,
+UTF8/byte bounds and Linux writerless FIFOs. A TEST-ONLY preload maps two synthetic
+HTTPS origins onto one loopback server; production has no mapping hook. The compiled
+local Counter drill also runs the command against its actual two-asset receipt,
+replay/offline history and alternate-payment quarantine without changing chain
+state. These do not establish independent providers, public reorg/custody, real
+creator/holder permission, retained storage, operational recovery or full readiness.

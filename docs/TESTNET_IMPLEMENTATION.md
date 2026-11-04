@@ -2,6 +2,19 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## Counter observation operator integration (M06/P10)
+
+A default-disabled local command now reads existing protected Counter history
+offline or, with a separate write gate, captures one explicitly reviewed complete
+batch through the unchanged book/receipt engine. Literal bounded input pins,
+read-only preflight, existing book identity and original predecessor constrain
+capture; replay retains original times and positive conflicts persist quarantine.
+Actual child HTTP/ABI/SQLite tests and the compiled zero-account two-asset drill
+exercise the command. No initialization, reset, automatic retry/recovery, service,
+signer, real configuration or financial authority is added. Raw asset units are
+not balances/totals/badges or verified eligibility/funding. Full M06/P10 remains
+unfinished; see COUNTER_CLAIM_OBSERVATION_BOOK.md. Standard/root pins/gates remain.
+
 ## Durable Counter batch-claim observations (M06/P10 reconciliation)
 
 A separate disabled local observation book connects the unchanged complete batch

@@ -190,3 +190,18 @@ The economic simulation gate already contains evidence; this work does not chang
 6. To activate the unaudited Stock Rewards beta on BSC Testnet, fund the protected testnet deployer with at least `0.1 tBNB`, run **Stock Rewards Beta Testnet Deploy + Drill** with confirmation `DEPLOY_STOCK_REWARDS_BETA`, and retain its launch, graduation, swap, fee-collection and multi-asset claim evidence. Only then set `NEXT_PUBLIC_FORTUNE_STOCK_REWARDS_FACTORY_ADDRESS` to the reported testnet factory and redeploy. Do not use a mainnet key, mainnet BNB, or treat this as audit or mainnet evidence.
 
 Hourly cloud continuation checks are configured to inspect GitHub, finish safe work when accessible, and surface changed blockers. They do not guarantee continuous execution or automatically authorize mainnet activation. Avoid concurrent edits to another active release-preparation branch.
+
+
+## Web regression step budget (P24)
+
+The Fortune CI web regression step has a 20-minute fail-closed execution budget.
+The test command, assertions, individual engine/test deadlines, dependency pins,
+permissions, browser install budget and later build/runtime/browser gates are
+unchanged. Exceeding the budget is non-passing; it must not authorize a merge.
+This future-run bound is not a diagnosis of an unavailable or long-running job,
+runner termination/log availability certification, or an intentional overrun drill.
+In particular PR195 run41723886807/job126223476063 was still reported in its
+regression step at2026-11-04 00:53UTC, with unavailable logs. Its result remains
+unclassified and cannot inherit another head's checks. No cancellation or retry
+of that run is requested by this change. Release baseline, audit, deployment and
+activation gates are unchanged.

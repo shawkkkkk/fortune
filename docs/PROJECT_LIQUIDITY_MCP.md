@@ -44,7 +44,8 @@ not privileged-host tamper resistance, immutable storage or filesystem ABA proof
 The optional tool is `get_liquidity_position`, with no arguments. Its resource
 is `fortune://97/<fixed-token>/liquidity-position`. Default discovery remains
 two tools/resources. With all existing optional readers plus this one there are
-six; the protocol version remains2025-06-18 and server version is0.6.0.
+six; the separately enabled custody reader adds a seventh (see
+PROJECT_LIQUIDITY_CUSTODY_MCP.md). The protocol remains2025-06-18; server0.7.0.
 All readers, including failed observations, share four reads per minute. Frame,
 message, initialization and backpressure limits remain unchanged. Callers cannot
 select paths, wallets, positions, tokens, providers or policies.

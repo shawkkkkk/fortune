@@ -2,6 +2,19 @@
 
 This ledger describes implementation, not audit or deployment approval. See RELEASE_HANDOFF.md for existing release evidence and owner-operated deploy/drill workflows. The expanded product direction is recorded in merged PR #61. Preserve the frozen Standard candidate.
 
+## Project custody-state MCP integration (P03/M07)
+
+A separately disabled tool/resource now invokes the actual unchanged custody
+engine and its same-snapshot LP reader. Fixed project/asset binding, separate
+disclosure review, bounded literal policy, restricted two-origin read transport
+and policy pins around all awaited RPCs preserve null/false authority. Existing
+tools remain; all readers share four reads/minute. Actual child stdio/HTTP ABI
+tests cover held-state data, wrong/released states, coexistence, quotas, policy
+changes and timeout/failure fences. No current custody/creator/capital/provider/
+finality or full-readiness approval; no signer, public service, ledger or real
+configuration. See PROJECT_LIQUIDITY_CUSTODY_MCP.md. Full P03/M07 remains
+unfinished; old engines, contracts, Standard/root pins and gates are unchanged.
+
 ## LP MCP policy descriptor admission (P03/M07 security)
 
 The actual optional LP adapter now opens policy paths read-only/nonblocking

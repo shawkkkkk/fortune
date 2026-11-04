@@ -207,6 +207,32 @@ contract FortuneTestnetWorkEscrow is ReentrancyGuard {
         emit PaymentWaived(id, msg.sender, expectedRevision);
     }
 
+    struct PaymentWaiver {
+        uint256 id;
+        uint256 expectedRevision;
+    }
+
+    /// @notice Atomic voluntary whole refunds to original clients, only by every named worker.
+    function waivePaymentsMany(PaymentWaiver[] calldata waivers) external chain97 open nonReentrant {
+        if (waivers.length == 0 || waivers.length > 16) revert InvalidResult();
+        uint256 previous;
+        for (uint256 i; i < waivers.length; ++i) {
+            PaymentWaiver calldata a = waivers[i];
+            if (a.id <= previous) revert InvalidResult();
+            previous = a.id;
+            Job storage j = jobs[a.id];
+            if (msg.sender != j.worker) revert Unauthorized();
+            if (j.state != State.Accepted) revert WrongState();
+            if (a.expectedRevision != latestResultRevision[a.id]) revert InvalidResult();
+            _asset(j.asset);
+        }
+        for (uint256 i; i < waivers.length; ++i) {
+            PaymentWaiver calldata a = waivers[i];
+            _settle(a.id, 0);
+            emit PaymentWaived(a.id, msg.sender, a.expectedRevision);
+        }
+    }
+
     /// @notice Explicit client approval after worker acceptance, never an inferred delivery verdict.
     function approvePayment(uint256 id) external chain97 open nonReentrant {
         Job storage j = jobs[id];

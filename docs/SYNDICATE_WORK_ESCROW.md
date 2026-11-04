@@ -736,3 +736,32 @@ revision rejection, replay rejection, explicit retry after pause and exact lates
 client-approval payment receipts. Local VM impersonation and synthetic assets are
 not public custody, legitimate capital, independent parties/providers or full P19
 readiness. No real profile, signer, service, public transaction or config is enabled.
+
+## Atomic worker batch waiver
+
+`waivePaymentsMany(PaymentWaiver[])` is an additive chain97-only contract path.
+One named worker may voluntarily waive 1–16 accepted jobs, sorted by strictly
+increasing nonzero job ID, with each job's exact latest result revision (including
+zero). All worker/state/revision/runtime-pin checks precede the first refund.
+Different original clients and supported assets are allowed; every whole
+principal returns only to that job's original client. No recipient or amount is
+caller-selected. The unchanged exact `_settle(id,0)` path emits `JobSettled`, then
+`PaymentWaived` for each entry. History and funding bindings remain intact.
+
+A stale revision, foreign worker, missing/unaccepted/disputed/settled job, changed
+asset runtime, inexact later transfer, pause or wrong chain rejects the whole
+call. EVM rollback retains every earlier balance, job and liability; explicit
+retry of unchanged bytes can succeed only after the underlying rejection is
+resolved. Successful replay rejects. As with single waiver, voluntary forfeiture
+is allowed before or after delivery expiry; no automatic deadline refund, partial
+waiver, admin bypass, fees or dispute verdict is added. First valid settlement or
+dispute still wins. Single-job APIs are unchanged; existing direct receipt readers
+continue to reject batch outer calls. Batch receipt reconciliation is separate work.
+
+Compiled Solidity tests cover mixed clients/assets/revisions, exact fixed-client
+refunds, canonical waiver events, late transfer rollback/retry, role/state/pin and
+ordering/bounds rejection, pause/wrong chain, expiry and 1–16-job fuzzing. These
+are local VM tests, not a public deployment, legitimate-capital/identity/delivery/
+IP/legal/fairness proof or full P19 readiness. Changed bytecode needs fresh review
+and deployment evidence; old contract audit/deployment approval cannot transfer.
+Frozen Standard/root pins, economic policy and all release gates remain unchanged.

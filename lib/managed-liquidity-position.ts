@@ -94,3 +94,6 @@ export async function inspectLiquidityPosition(clients: readonly [PublicClient,P
 
 // Reuse the exact engine policy checks for offline operator-adapter preflight.
 export { validate as validateLiquidityPositionPolicy };
+
+// Internal composition helper: callers must validate policy and fence every RPC.
+export { observe as observeLiquidityPositionAtBlock };

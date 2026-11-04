@@ -8,6 +8,7 @@ import { createServer } from "node:net";
 import { once } from "node:events";
 import { createPublicClient, createWalletClient, http, keccak256, toHex, parseAbi } from "viem";
 import { bscTestnet } from "viem/chains";
+import { inspectLiquidityCustodyReleaseReceipt } from "../../lib/liquidity-custody-release-receipt.ts";
 import { inspectLiquidityCustody } from "../../lib/managed-liquidity-custody.ts";
 import { inspectLiquidityPosition } from "../../lib/managed-liquidity-position.ts";
 
@@ -139,7 +140,7 @@ try {
   stage = "paused custody observation";
   assert.equal((await inspectLiquidityCustody(readers, custodyReadPolicy)).paused, true);
   stage = "fixed-treasury release";
-  await write(GOV, custody, custodyArtifact.abi, "releaseToTreasury");
+  const releasedReceipt = await write(GOV, custody, custodyArtifact.abi, "releaseToTreasury");
   stage = "released custody flags";
   assert.equal(await read(custody, custodyArtifact.abi, "released"), true);
   assert.equal(await read(custody, custodyArtifact.abi, "held"), false);
@@ -153,7 +154,23 @@ try {
   const transferred = await inspectLiquidityPosition(readers, {...policy, owner: TREASURY});
   assert.equal(transferred.owner, TREASURY.toLowerCase());
   assert.equal(transferred.liquidityUnits, first.liquidityUnits);
+  // BEGIN historical direct release receipt integration.
+  stage = "historical release receipt wall alignment";
+  const receiptTime = Number((await rpc.getBlock({blockNumber:releasedReceipt.blockNumber})).timestamp)*1000;
+  let last = Date.now(); const deadline = last+60000;
+  assert.ok(Number.isSafeInteger(receiptTime) && receiptTime-last<=60000);
+  while(last<receiptTime){await new Promise(r=>setTimeout(r,Math.min(1000,receiptTime-last)));const now=Date.now();assert.ok(Number.isSafeInteger(now)&&now>=last&&now<=deadline);last=now;}
+  const state = async()=>({head:await rpc.getBlockNumber({cacheTime:0}),nonces:await Promise.all(["latest","pending"].map(blockTag=>rpc.getTransactionCount({address:GOV,blockTag}))),owner:await read(POSITIONS,parseAbi(["function ownerOf(uint256) view returns(address)"]),"ownerOf",[tokenId]),held:await read(custody,custodyArtifact.abi,"held"),released:await read(custody,custodyArtifact.abi,"released")});
+  const before = await state(),releaseInput={policy:custodyReadPolicy,transactionHash:releasedReceipt.transactionHash};
+  stage = "actual direct release receipt observation";
+  const releasedObservation=await inspectLiquidityCustodyReleaseReceipt(readers,releaseInput);
+  assert.equal(releasedObservation.position.owner,TREASURY.toLowerCase());assert.equal(releasedObservation.position.liquidityUnits,first.liquidityUnits);assert.equal(releasedObservation.released,true);assert.equal(releasedObservation.currentAuthorization,null);assert.equal(releasedObservation.executionAuthorized,false);
+  const replay=await inspectLiquidityCustodyReleaseReceipt(readers,releaseInput);assert.equal(replay.evidenceId,releasedObservation.evidenceId);assert.equal(replay.receiptConsistencyDigest,releasedObservation.receiptConsistencyDigest);
+  await assert.rejects(inspectLiquidityCustodyReleaseReceipt(readers,{...releaseInput,policy:{...custodyReadPolicy,treasury:GOV}}));
+  assert.deepEqual(await state(),before);
+  // END historical direct release receipt integration.
   const result = { sourceForkBlock: forkBlock.toString(), positionObserved: true, custodyDepositObserved: true,
+    actualReleaseReceiptObserved: true, releaseReceiptReplayStable: true, wrongReleaseTreasuryRejected: true, releaseReceiptReadsPreservedState: true,
     actualCustodyPolicyReaderMatched: true, pausedCustodyReaderMatched: true, releasedCustodyReaderRejected: true, wrongCustodyTreasuryRejected: true, formerGovernorRejectedAfterDeposit: true,
     activeReleaseRejected: true, fixedTreasuryReleaseObserved: true, duplicateReleaseRejected: true, fullManagedLiquidityReadiness: false, transferredOwnerRejected: true,
     reviewedNewOwnerObserved: true, liquidityUnchanged: true, readClientsUseOneLocalFixture: true,

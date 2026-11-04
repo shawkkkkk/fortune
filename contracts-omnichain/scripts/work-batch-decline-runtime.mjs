@@ -153,6 +153,20 @@ try{
    await assert.rejects(inspectWorkBatchDeclineReceipt(clients,{...policy,amount:(j.amount+1n).toString()}));
    const {declineIds,...direct}=policy;await assert.rejects(inspectWorkWorkerRefundReceipt(clients,{...direct,refundKind:'decline'}));
   }
+  // BEGIN complete decline receipt coverage.
+  const {inspectAllWorkBatchDeclines}=await import('../../lib/work-batch-decline-receipts.ts');
+  const allPolicies=await Promise.all(jobs.map(async(j,i)=>({chainId:97,escrow:escrow.toLowerCase(),escrowCodeHash:keccak256(await rpc.getCode({address:escrow})),governor:GOV,guardian:GUARD,arbitrator:ARB,jobId:j.id.toString(),client:j.client,worker:WORKER,amount:j.amount.toString(),asset:j.paymentToken.toLowerCase(),assetCodeHash:keccak256(await rpc.getCode({address:j.paymentToken})),maxPerJob:'1000',termsHash:keys[i],transactionHash:paid.transactionHash,declineIds:ids.map(String)})));
+  const whole=await inspectAllWorkBatchDeclines(clients,allPolicies),wholeAgain=await inspectAllWorkBatchDeclines(clients,allPolicies);
+  assert.equal(whole.allCallEntriesObserved,true);assert.equal(whole.refunds.length,2);
+  assert.deepEqual(whole.refunds.map(r=>r.clientRefund),jobs.map(j=>j.amount.toString()));
+  assert.deepEqual(whole.refunds.map(r=>r.settlementLogIndex),[paid.logs[1].logIndex,paid.logs[4].logIndex]);
+  assert.deepEqual(whole.refunds.map(r=>r.evidenceId),wholeAgain.refunds.map(r=>r.evidenceId));
+  assert.equal(new Set(whole.refunds.map(r=>r.evidenceId)).size,2);assert.equal(whole.receiptConsistencyDigest,wholeAgain.receiptConsistencyDigest);
+  assert.ok(whole.refunds.every(r=>r.otherBatchJobsVerified===false&&r.workerPaid==='0'&&r.workerRefund.kind==='decline'&&r.workerRefund.revision===null));
+  assert.equal(whole.currentAuthorization,null);assert.equal(whole.executionAuthorized,false);assert.equal(whole.fullSyndicateReadiness,false);
+  await assert.rejects(inspectAllWorkBatchDeclines(clients,[allPolicies[0]]));
+  await assert.rejects(inspectAllWorkBatchDeclines(clients,[allPolicies[0],{...allPolicies[1],amount:(jobs[1].amount+1n).toString()}]));
+  // END complete decline receipt coverage.
   assert.deepEqual(await readState(),before);
  }finally{assert.equal(await rpc.request({method:'evm_revert',params:[snapshot]}),true);}
  assert.deepEqual(await readState(),original);
@@ -165,7 +179,7 @@ try{
  assert.deepEqual(await financialState(),refunded);
  for(const who of actors)await rpc.request({method:'anvil_stopImpersonatingAccount',params:[who]});
  assert.deepEqual(await rpc.request({method:'eth_accounts'}),[]);
- const result={selectedDeclineReceiptObserved:true,selectedDeclineReplayStable:true,selectedDeclineWrongPolicyAndDirectRouteRejected:true,selectedDeclineReadsPreserveState:true,compiledBatchDeclineObserved:true,mixedClientAssetRefundsMatched:true,
+ const result={wholeDeclineCoverageObserved:true,wholeDeclineReplayStable:true,wholeDeclineIncompleteAndBadPolicyRejected:true,selectedDeclineReceiptObserved:true,selectedDeclineReplayStable:true,selectedDeclineWrongPolicyAndDirectRouteRejected:true,selectedDeclineReadsPreserveState:true,compiledBatchDeclineObserved:true,mixedClientAssetRefundsMatched:true,
   callerBoundsOrderingAndAcceptedJobRejected:true,pausedBatchRejected:true,lateTransferRolledBackWholeBatch:true,
   exactCalldataRetryMatched:true,canonicalSixLogReceiptMatched:true,unselectedAcceptedLiabilityPreserved:true,
   originalTermsFundingAndResultHistoryPreserved:true,successfulReplayAndOldRoutesRejected:true,ownedCompiledSourcesMatched:true,

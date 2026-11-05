@@ -20,7 +20,7 @@ try{
   if(queued)new ReceiptObservationQueue(paths[2],market,Date.now,{readOnly:true}).close();
   const urls=[process.env.FORTUNE_ARBITRAGE_READ_RPC_URL,process.env.FORTUNE_ARBITRAGE_SECONDARY_RPC_URL].map(x=>new URL(x||''));
   if(urls.some(u=>u.protocol!=='https:'||u.username||u.password||u.hash)||urls[0].origin===urls[1].origin)throw Error('Reviewed distinct HTTPS origins required');
-  const readers=urls.map(u=>createPublicClient({transport:http(u.href,{timeout:8000,retryCount:0})}));
+  const readers=urls.map(u=>createPublicClient({transport:http(u.href,{timeout:8000,retryCount:0,fetchOptions:{redirect:'error'}})}));
   book=new StrategyNativeGasBudget(paths[1],policy);journal=new ArbitrageFillJournal(paths[0],market);
   if(queued)queue=new ReceiptObservationQueue(paths[2],market);
   const result=queued?await observeNextBudgetedReceipt(queue,book,journal,readers,market):await reconcileBudgetedReceipt(book,journal,readers,market,operation);

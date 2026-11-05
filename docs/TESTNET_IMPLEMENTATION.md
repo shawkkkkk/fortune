@@ -1,5 +1,12 @@
 # Testnet implementation ledger
 
+## Strategy receipt RPC redirects (M01/M07/M08)
+
+The direct journal, journal-only queue, and budget reconciliation commands
+reject HTTP redirects from their reviewed RPC origins. Two loopback servers
+verify that the destination receives no requests and that existing failure
+state is preserved. No independence or public route attestation follows.
+
 ## Bounded strategy operator policy files (M01/M07/M08)
 
 The queue, direct fill journal, and gas reconciliation commands require regular

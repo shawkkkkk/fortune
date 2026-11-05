@@ -99,3 +99,32 @@ test('queue CLI cannot invent a reservation for a queued hash and leaves the lea
   const b=new Book(f.bp,policy(),Date.now,{readOnly:true});assert.equal(b.status().pendingRechecks,0);assert.equal(b.status().reservedWei,'100000');b.close();
  }finally{await f.clean();}
 });
+
+for(const [entry,mode] of [['run-budget-reconciliation','budget'],['run-receipt-observer','queue'],['journal-arbitrage-fill','direct']]){
+ test(`${mode} operator rejects RPC redirects without contacting their destination`,async()=>{
+  const f=await fixture();let sourceCalls=0,destinationCalls=0;
+  const destination=createServer((req,res)=>{destinationCalls++;req.resume();res.writeHead(500).end();});
+  const source=createServer((req,res)=>{sourceCalls++;req.resume();res.writeHead(307,{Location:`http://127.0.0.1:${destination.address().port}/private-redirect`}).end();});
+  try{
+   await new Promise(r=>destination.listen(0,'127.0.0.1',r));
+   await new Promise(r=>source.listen(0,'127.0.0.1',r));
+   const args=mode==='budget'?[f.mp,f.pp,f.jp,f.bp,'--next',f.qp]:mode==='queue'?[f.mp,f.qp,f.jp,'once']:[f.mp,f.jp,TX];
+   const r=await new Promise((resolve,reject)=>{
+    const child=spawn(process.execPath,['--import','./scripts/register-ts.mjs','--import','./tests/fixtures/character-provenance-http.mjs',`scripts/${entry}.mjs`,...args],{env:{...process.env,...rpcEnv,FORTUNE_TEST_CHARACTER_RPC:`http://127.0.0.1:${source.address().port}`},stdio:['ignore','pipe','pipe']});
+    let stdout='',stderr='';child.stdout.on('data',x=>stdout+=x);child.stderr.on('data',x=>stderr+=x);child.on('error',reject);child.on('close',status=>resolve({status,stdout,stderr}));
+   });
+   assert.ok(sourceCalls>0);
+   assert.equal(destinationCalls,0);
+   assert.equal(r.status,1);
+   assert.doesNotMatch(r.stdout+r.stderr,/private-redirect|127\.0\.0\.1|reviewed-one/);
+   const [job]=f.snapshot().jobs;
+   assert.equal(job.state,mode==='budget'?'leased':'pending');
+   assert.equal(job.attempts,mode==='direct'?0:1);
+   const b=new Book(f.bp,policy(),Date.now,{readOnly:true});try{assert.equal(b.status().pendingRechecks,mode==='budget'?1:0);}finally{b.close();}
+   const j=new Journal(f.jp,market(),{readOnly:true});try{assert.equal(j.list().length,0);}finally{j.close();}
+  }finally{
+   await Promise.all([source,destination].filter(server=>server.listening).map(server=>new Promise(r=>server.close(r))));
+   await f.clean();
+  }
+ });
+}

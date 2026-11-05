@@ -103,6 +103,13 @@ runtime report is required evidence, not implied by this source change.
 
 ## Operator invocation
 
+The budget, queue and direct journal commands reject RPC redirects. Their
+reviewed HTTPS origins cannot delegate reads to another URL via HTTP redirect.
+A redirect is a provider failure: the budgeted path keeps the existing hold
+and quarantine, and the journal-only worker keeps its existing retry rules.
+This does not establish independent providers or prevent a reviewed server from
+proxying requests itself.
+
 The queue, direct journal and budget commands read each policy through an opened
 regular-file descriptor. They reject pipes and other nonregular files before
 reading, limit the actual read to 16 KiB plus one overflow byte and require valid

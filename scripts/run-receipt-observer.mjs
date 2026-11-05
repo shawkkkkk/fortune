@@ -25,7 +25,7 @@ try {
   else {
     const urls = [process.env.FORTUNE_ARBITRAGE_READ_RPC_URL, process.env.FORTUNE_ARBITRAGE_SECONDARY_RPC_URL].map(raw => new URL(raw || ""));
     if (urls.some(u => u.protocol !== "https:" || u.username || u.password || u.hash) || urls[0].origin === urls[1].origin) throw Error("Distinct reviewed read origins required");
-    const clients = urls.map(u => createPublicClient({ transport: http(u.href, { timeout: 8000, retryCount: 0 }) }));
+    const clients = urls.map(u => createPublicClient({ transport: http(u.href, { timeout: 8000, retryCount: 0, fetchOptions: { redirect: "error" } }) }));
     result = await observeNextReceipt(queue, journal, clients);
   }
   console.log(JSON.stringify({ ...result, executionAuthorized: false, profitAllocated: false }));

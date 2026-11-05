@@ -1,5 +1,36 @@
 # Testnet implementation ledger
 
+## Loopback Studio wallet handoff (P01/P02/P06)
+
+On a top-level HTTP page at `localhost` or `127.0.0.1`, open the local wallet
+handoff after choosing the project and filling its exact character draft. The
+public site does not offer this handoff. Obtain the operator's prepared request
+and a **separate, trusted** JSON object containing `policy`, `registryId`, and
+`account`. The account is the expected existing creator wallet; the policy is
+the existing chain-97 factory/runtime/index/token policy. Do not derive these
+pins from the request being reviewed.
+
+Review the project, expected wallet, registry, revision, original expiry and
+digest. Only after explicitly permitting disclosure of all ten fields can you
+request the wallet signature. The injected wallet must already expose the
+expected single account on chain 97. The adapter uses one typed-data request and
+checks identity before and after it; there is no connect, switch, fallback or
+automatic retry. Editing the draft or closing the panel discards the old
+review, consent and output, and fences late wallet results.
+
+A successful wallet response offers one explicit local envelope download. It is
+not saved to browser storage, uploaded, posted or accepted by Studio. Keep the
+file private and give it only to the intended operator. The existing registry
+accept command independently checks the signature, factory creator, revision,
+original expiry and durable write. A local download is not creator ownership,
+a session, financial authority or publication. A wallet or its provider can
+retain the text; a prompt already opened may outlive the browser review.
+
+The browser regression uses an existing arbitrary tuple returned by a fixture,
+not a generated signature or a real wallet approval. This local path does not
+deliver hosted authentication, a public creator lifecycle, or testnet/audit
+readiness.
+
 ## Wallet SDK to creator registry rehearsal (P01/P02/P06)
 
 The UNCHANGED creator signing adapter is now exercised with the installed, locked

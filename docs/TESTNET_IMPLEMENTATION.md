@@ -1,5 +1,12 @@
 # Testnet implementation ledger
 
+## Strategy receipt block timestamp agreement (M01/M07/M08)
+
+The fill verifier checks the confirmed receipt block timestamp across both
+read clients and their final rereads. Vault deadline checks use the validated
+timestamp. Historical receipt digests and journal rows keep their existing
+schema; provider independence and finality remain unverified.
+
 ## Strategy receipt RPC redirects (M01/M07/M08)
 
 The direct journal, journal-only queue, and budget reconciliation commands

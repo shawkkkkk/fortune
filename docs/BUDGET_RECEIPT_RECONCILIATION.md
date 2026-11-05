@@ -5,6 +5,16 @@ reviewed dependencies. Those sources are now integrated; the original stack no
 longer requires retargeting. #74's transaction-identity guard is required: a changed swap log
 index must not create a second trusted observation of the same transaction.
 
+## Receipt block timestamp agreement
+
+The receipt verifier requires a uint256 timestamp on the confirmed receipt
+block, checks that it stays the same on the final header reread, and compares
+the two clients' timestamps even if their hashes match. Vault deadline checks
+use the first validated timestamp. A mismatch follows the existing receipt
+failure behavior. The timestamp is checked in memory; it does not change stored
+receipt identity, digest, or journal schema. This is a consistency check of
+trusted RPC responses, not independent finality or a new freshness rule.
+
 ## Read-client admission before durable work
 
 The journal-only worker also admits both readers before claiming a job. Direct

@@ -162,3 +162,33 @@ test("expired journal replay rolls back timestamp update and preserves the origi
     db = new ArbitrageFillJournal(path, market()); assert.deepEqual(db.list(), before);
   } finally { Date.now = realNow; db?.close(); rmSync(dir, { recursive: true, force: true }); }
 });
+
+function withBlockTimes(first, second = first) {
+  const client = receiptClient();
+  const getBlock = client.getBlock;
+  let reads = 0;
+  client.getBlock = async request => ({ ...await getBlock(request), timestamp: ++reads === 1 ? first : second });
+  return client;
+}
+
+test("receipt verifier rejects equal hashes with timestamps that differ between providers", async () => {
+  await assert.rejects(readVerifiedFill([withBlockTimes(1000n), withBlockTimes(1001n)], market(), TX), /providers disagree/);
+});
+
+test("receipt verifier rejects a changed timestamp on a same-hash reread", async () => {
+  await assert.rejects(readVerifiedFill([withBlockTimes(1000n, 1001n), withBlockTimes(1000n)], market(), TX), /reorged/);
+});
+
+test("receipt verifier rejects malformed block timestamps", async () => {
+  for (const time of [-1n, 1n << 256n, "1000", null]) {
+    await assert.rejects(readVerifiedFill([withBlockTimes(time), withBlockTimes(time)], market(), TX), /not canonical/);
+  }
+});
+
+test("consistent block timestamp checks preserve the historical digest and payload schema", async () => {
+  const a = await readVerifiedFill([withBlockTimes(1000n), withBlockTimes(1000n)], market(), TX);
+  const b = await readVerifiedFill([withBlockTimes(1001n), withBlockTimes(1001n)], market(), TX);
+  assert.equal(a.receiptDigest, b.receiptDigest);
+  assert.equal(a.receiptId, b.receiptId);
+  assert.equal(Object.hasOwn(a, "blockTimestamp"), false);
+});

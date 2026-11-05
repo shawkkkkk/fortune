@@ -1,5 +1,30 @@
 # Testnet implementation ledger
 
+## Bounded shared creator/API body reads (P01/P06/P23)
+
+readLimitedBytes now rejects stalled reads after one real ten-second lifetime,
+checks safe nonnegative monotonic host time around every read and final assembly,
+and permits at most4096nonfinal fragments including empty chunks. Existing byte
+ceilings and declared-length rejection remain. Cancellation is best effort and
+never awaited; a non-cooperating stream cannot delay rejection. Pending reads may
+continue; ended fences prevent late returned bytes. Event-loop/host-clock trust
+remains; this is not a process memory bound or a whole request/Sharp/upload deadline.
+
+Actual consumers are upload ingress before wallet/quota/storage, browser metadata
+response bodies and the public asset-check request body. Their authorization,
+fixed storage providers, quota, parsing and RPC policies are unchanged. In
+particular this does NOT bound the browser metadata fetch before its response,
+JSON/form parsing or native Sharp; a valid slow/overfragmented body can now reject.
+The upload still maps malformed bodies to400 and the asset checker to400.
+
+Old-source six-group regression:1PASS5FAIL, including real stalled-read and
+non-cooperating-cancel hangs, empty/tiny fragments, clock reversal/unsafe clocks,
+and actual handleImageUpload ingress rejection with zero provider calls. Test-only
+unused provider labels are not real credentials/configuration or creator approval.
+Focused controls cover original byte limits and exactly4096valid fragments.
+No keys/accounts/signatures/public broadcasts, service activation, economic or
+frozen Standard/root dependency changes. Full features and readiness remain gated.
+
 ## Bounded image storage and retrieval (P01/P06/P23)
 
 After unchanged enablement/origin/wallet authorization, quota reservation and

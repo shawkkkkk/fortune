@@ -96,22 +96,38 @@ export async function readLimitedBytes(response: Response | Request, limit: numb
   if (declared && (!/^\d+$/.test(declared) || Number(declared) > limit)) throw new Error("Content exceeds the allowed size.");
   if (!response.body) throw new Error("Content is empty.");
   const reader = response.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  try {
+  const start = Date.now(); let last = start, ended = false;
+  const unavailable = () => new Error("Body read unavailable.");
+  const check = () => {
+    const now = Date.now();
+    if (ended || !Number.isSafeInteger(start) || start < 0 || !Number.isSafeInteger(now) || now < last || now - start >= 10_000) throw unavailable();
+    last = now;
+  };
+  const cancel = () => { try { void reader.cancel().catch(() => {}); } catch {} };
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const work = async () => {
+    const chunks: Uint8Array[] = []; let size = 0;
     while (true) {
-      const { value, done } = await reader.read();
+      check(); const {value, done} = await reader.read(); check();
       if (done) break;
       size += value.byteLength;
       if (size > limit) throw new Error("Content exceeds the allowed size.");
+      if (chunks.length >= 4096) throw new Error("Content exceeds the allowed fragment count.");
       chunks.push(value);
     }
-  } catch (error) { await reader.cancel().catch(() => {}); throw error; }
-  finally { reader.releaseLock(); }
-  const bytes = new Uint8Array(size);
-  let offset = 0;
-  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
-  return bytes;
+    const bytes = new Uint8Array(size); let offset = 0;
+    for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
+    check(); return bytes;
+  };
+  try {
+    const deadline = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => { ended = true; reject(unavailable()); cancel(); }, 10_000);
+    });
+    return await Promise.race([work(), deadline]);
+  } finally {
+    ended = true; clearTimeout(timer); cancel();
+    try { reader.releaseLock(); } catch {}
+  }
 }
 
 export async function importMetadataUri(value: string): Promise<CreatorMetadata> {

@@ -10,6 +10,19 @@ and a **separate, trusted** JSON object containing `policy`, `registryId`, and
 the existing chain-97 factory/runtime/index/token policy. Do not derive these
 pins from the request being reviewed.
 
+An operator can export those pins without preparing a draft or reading a profile:
+
+```sh
+FORTUNE_CREATOR_CANON_ENABLED=true node --import ./scripts/register-ts.mjs scripts/operate-creator-canon.mjs studio-pins "$REGISTRY" "$POLICY" "$EXPECTED_CREATOR_WALLET"
+```
+
+The command opens the existing protected registry read-only, matches its policy,
+and emits only the Studio pin object. Supply a separately reviewed, nonzero
+wallet address. It is an operator assertion; the command does not contact a
+wallet or RPC provider or verify current ownership. Send the pins through the
+trusted operator channel independently of the prepared request, with permission
+before disclosing the wallet address or project association.
+
 Review the project, expected wallet, registry, revision, original expiry and
 digest. Only after explicitly permitting disclosure of all ten fields can you
 request the wallet signature. The injected wallet must already expose the

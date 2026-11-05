@@ -1959,3 +1959,11 @@ This limits future step execution; it does not diagnose PR195's unclassified
 run41723886807/job126223476063 or certify control-plane termination/log delivery.
 No overrun drill, new engine runtime, public testnet, audit or activation evidence
 is claimed. Exact-head CI and independent post-merge checks are still required.
+
+
+## Distinct receipt queue and journal files (M01/M07/M08)
+
+The journal-only receipt observer checks real paths and existing device/inode
+identities before SQLite initialization. Separate new files remain supported.
+This preflight does not migrate old databases or prevent concurrent host
+filesystem changes.

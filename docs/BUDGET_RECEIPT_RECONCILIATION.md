@@ -240,3 +240,12 @@ while held (including replay), and exact combined swap gas of
 quarantined both journal rows and retained two frozen budget holds after reopen.
 This is a point-in-time local fork observation, not retained CI evidence or a
 public coordinator deployment. Its temporary stores were removed after the run.
+
+
+For the journal-only receipt observer, queue and journal must be distinct
+regular files. The CLI compares resolved paths and existing device/inode
+identities before opening SQLite. For new files it resolves their existing
+parent directories. This rejects shared-role aliases but is not a lock
+against concurrent changes to the local filesystem. If an older command
+already mixed the stores, stop and inspect them without deleting or resetting
+either database.

@@ -133,3 +133,30 @@ test('queue persists its final observed clock and rejects later rollback above o
   assert.throws(()=>q.claim(),/clock/);assert.equal(queueRows(f.path).config[0].last_clock,1010);assert.equal(q.stats().pending,1);
  }finally{q?.close();f.clean();}
 });
+
+for (const queued of [false, true]) test(`malformed clients leave the ${queued ? "queue and " : ""}journal unchanged`, async () => {
+  const f = setup();
+  let q, j;
+  try {
+    q = new Queue(f.path, market(), f.clock);
+    j = new Journal(f.journal, market());
+    await j.refresh(clients(), TX);
+    q.enqueue(TX);
+    const before = j.list(), jobs = queueRows(f.path);
+    let calls = 0;
+    const bad = clients();
+    bad[0].getChainId = async () => { calls++; return 97; };
+    delete bad[1].getTransactionReceipt;
+    const operation = queued ? observeNextReceipt(q, j, bad) : j.refresh(bad, TX);
+    const result = await operation.then(value => ({value}), error => ({error}));
+    assert.deepEqual(queueRows(f.path), jobs);
+    assert.deepEqual(j.list(), before);
+    assert.equal(calls, 0);
+    assert.match(result.error?.message ?? "", /Receipt RPC methods required/);
+    q.close(); q = new Queue(f.path, market(), f.clock);
+    j.close(); j = new Journal(f.journal, market());
+    assert.deepEqual(queueRows(f.path), jobs);
+    assert.deepEqual(j.list(), before);
+    assert.equal((await observeNextReceipt(q, j, clients())).state, "done");
+  } finally { q?.close(); j?.close(); f.clean(); }
+});

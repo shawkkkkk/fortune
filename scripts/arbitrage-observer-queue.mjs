@@ -1,7 +1,7 @@
 // Durable observation jobs only. No wallet, transaction submission or profit allocation.
 import { DatabaseSync } from "node:sqlite";
 import { randomUUID } from "node:crypto";
-import { fillMarketHash } from "../lib/arbitrage-receipts.ts";
+import { fillMarketHash, snapshotFillReadClients } from "../lib/arbitrage-receipts.ts";
 const MAX_ATTEMPTS = 5, LEASE_MS = 120_000, CAPACITY = 10_000;
 const txValid = value => typeof value === "string" && /^0x[0-9a-fA-F]{64}$/.test(value) && !/^0x0{64}$/.test(value);
 export class ReceiptObservationQueue {
@@ -110,9 +110,10 @@ export class ReceiptObservationQueue {
  */
 export async function observeNextReceipt(queue, journal, clients) {
   if (queue.marketHash !== journal.marketHash) throw Error("Queue and journal policy differ");
+  const readers = snapshotFillReadClients(clients);
   const lease = queue.claim();
   if (!lease) return { state: "idle", executionAuthorized: false, profitAllocated: false };
-  try { await journal.refresh(clients, lease.tx); }
+  try { await journal.refresh(readers, lease.tx); }
   catch { return queue.retry(lease); }
   return queue.complete(lease);
 }

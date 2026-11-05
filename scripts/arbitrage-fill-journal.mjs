@@ -1,5 +1,5 @@
 import { DatabaseSync } from "node:sqlite";
-import { isVerifiedFill, fillMarketHash, readVerifiedFill } from "../lib/arbitrage-receipts.ts";
+import { isVerifiedFill, fillMarketHash, readVerifiedFill, snapshotFillReadClients } from "../lib/arbitrage-receipts.ts";
 
 /** Single durable host only; do not put this database on ephemeral serverless storage. */
 export class ArbitrageFillJournal {
@@ -89,7 +89,8 @@ export class ArbitrageFillJournal {
   }
   async refresh(clients, txHash) {
     if (typeof txHash !== "string" || !/^0x[0-9a-fA-F]{64}$/.test(txHash)) throw new Error("Transaction hash required");
-    try { return this.record(await readVerifiedFill(clients, this.#market, txHash)); }
+    const readers = snapshotFillReadClients(clients);
+    try { return this.record(await readVerifiedFill(readers, this.#market, txHash)); }
     catch (e) {
       // Unavailability is conservative too. No automatically trusted state after a failed recheck.
       this.#db.prepare("UPDATE fills SET state='quarantined' WHERE receipt_id LIKE ?").run(`${this.#market.chainId}:${txHash.toLowerCase()}:%`);

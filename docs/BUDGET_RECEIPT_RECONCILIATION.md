@@ -7,6 +7,13 @@ index must not create a second trusted observation of the same transaction.
 
 ## Read-client admission before durable work
 
+The journal-only worker also admits both readers before claiming a job. Direct
+journal refresh does so before entering the error path that quarantines an
+observation. In either case a missing method is a local configuration error:
+fix the client and explicitly retry the original operation. No attempt,
+observation timestamp or quarantine changes on admission failure. Actual read
+failures after admission keep the existing quarantine and retry behavior.
+
 Direct reconciliation and the queued coordinator require both distinct clients
 to expose all seven receipt-read methods before taking a gas hold. The queue
 checks the methods before claiming an eligible job. Missing methods or unreadable

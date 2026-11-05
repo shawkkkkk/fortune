@@ -2,6 +2,11 @@
 
 ## Receipt client admission before queue claim or gas hold (M01/M07/M08)
 
+Journal-only observation uses the same admission check before a queue claim
+and before a direct refresh can enter its quarantine path. Missing methods
+leave existing rows and attempts unchanged, including after reopening SQLite.
+Actual read failures still quarantine observations and follow existing backoff.
+
 The existing strategy coordinator now checks all required read methods on both
 clients and captures them with their original receivers before taking durable
 work. Invalid local configuration leaves the queue, gas budget, and journal

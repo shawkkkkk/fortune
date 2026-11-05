@@ -16,13 +16,14 @@ let book;
 try {
   if(process.env.FORTUNE_CREATOR_CANON_ENABLED!=='true')throw Error('Disabled');
   const [mode,path,policyPath,inputPath,...extra]=process.argv.slice(2);
-  if(!['init','prepare','accept','latest','studio-pins'].includes(mode)||!path||!policyPath||extra.length
-    ||(['prepare','accept','studio-pins'].includes(mode)!==Boolean(inputPath)))throw Error('Arguments');
+  if(!['init','prepare','accept','latest','studio-pins','studio-head-pins'].includes(mode)||!path||!policyPath||extra.length
+    ||(['prepare','accept','studio-pins','studio-head-pins'].includes(mode)!==Boolean(inputPath)))throw Error('Arguments');
   const policy=JSON.parse(json(policyPath,16384));
   if(mode==='init'){CreatorCanonRegistry.initialize(path,policy);console.log(JSON.stringify({initialized:true,executionAuthorized:false}));}
   else {
     book=new CreatorCanonRegistry(path,policy,{readOnly:mode!=='accept'});
     if(mode==='studio-pins')console.log(JSON.stringify(book.studioPins(inputPath)));
+    if(mode==='studio-head-pins')console.log(JSON.stringify(book.studioHeadPins(inputPath)));
     if(mode==='latest')console.log(JSON.stringify(book.latest()));
     if(mode==='prepare'){
       const draft=restoreCharacter(json(inputPath,32768),policy.token);

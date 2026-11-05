@@ -1,5 +1,15 @@
 # Testnet implementation ledger
 
+## Studio predecessor review (P01/P02/P06)
+
+The read-only creator operator CLI can export the current revision and digest
+alongside the existing Studio pins. Studio checks the exact successor and
+predecessor digest before offering wallet consent when those pins are supplied.
+Legacy pins remain supported and explicitly unbound to the head. The export
+reads no profile, signature or evidence. It is a point-in-time host snapshot,
+so a concurrent advance still requires rejection by the unchanged registry
+accept path. This adds no RPC, signing, writes, publication or current login.
+
 ## Studio operator round-trip rehearsal (P01/P02/P06)
 
 The browser rehearsal now obtains pins through the actual operator CLI, then

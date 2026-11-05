@@ -1,5 +1,35 @@
 # Creator flow — 2026-09-25 review branch
 
+## Bounded image storage and retrieval (P01/P06/P23)
+
+After unchanged enablement/origin/wallet authorization, quota reservation and
+Sharp normalization, handleImageUpload now calls the extracted internal
+pinAndVerifyTokenImage engine. Its two FIXED HTTPS providers, multipart filename/
+WebP/CIDversion1,8192byte pin reply,2MiB retrieval limit and exact SHA256 comparison
+are retained. Each stage now has one rejecting wall timer at its ORIGINAL20/10
+second budget, safe nonnegative monotonic host-clock fences around fetch/every
+read/projection,4096nonfinal chunks including EMPTY and nonawaited best-effort
+abort/cancel. Pin JSON is strictUTF8; malformed/late/unsafe provider errors are
+private503. No new caller URLs, redirect/retry policy, credentials or enablement.
+
+A pin POST may complete after timeout and quota may already be consumed. Failure
+is NOT rollback/nonpublication proof. Inspect existing provider/proof state before
+explicit retry; no blind duplicate pin, quota reset/release or renewed wallet
+approval. Native Sharp/request-body reading and the whole upload are NOT covered
+by a certified overall deadline. Inflight operations/event-loop/host-clock trust
+remain. Old wallet verification and quota engine bodies are byte-preserved.
+
+The EXACT old storage body was first extracted without behavior changes for
+local comparison (not an old public API/authentication proof):1PASS4FAIL in5groups,
+including actual20/10second abort-ignoring fetch/read regressions and strictUTF8/
+fragment/private-error rejection. Final6new groups exercise actual storage code,
+original byte caps, clock reversal, late-stage fencing and actual Sharp→multipart
+POST→localHTTP retrieval/digest. Transport fixtures send no credentials locally;
+no accounts/keys/signatures, real provider, paid pinning or real profile were used.
+These tests do not establish creator approval, live Redis/IPFS hosting, recovery,
+auth sessions, independent providers, fullP01/P06/P23 or audit readiness. Frozen
+Standard/root dependencies and all financial/mainnet/privacy gates are unchanged.
+
 ## Bounded creator-upload quota reservation (P01/P06/P23)
 
 The ACTUAL authenticated image-upload path now bounds reserveUpload's existing

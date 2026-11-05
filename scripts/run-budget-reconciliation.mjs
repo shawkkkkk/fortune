@@ -1,4 +1,5 @@
-import { readFileSync,statSync,realpathSync } from 'node:fs';
+import { statSync,realpathSync } from 'node:fs';
+import { readReceiptPolicy } from './read-receipt-policy.mjs';
 import { createPublicClient,http } from 'viem';
 import { StrategyNativeGasBudget } from './strategy-native-gas-budget.mjs';
 import { ArbitrageFillJournal } from './arbitrage-fill-journal.mjs';
@@ -8,13 +9,12 @@ let book,journal,queue;
 try{
   const [marketPath,policyPath,journalPath,budgetPath,operation,...extra]=process.argv.slice(2);
   const queued=operation==='--next',queuePath=queued?extra[0]:null;
-  if(!marketPath||!policyPath||!journalPath||!budgetPath||!operation||(queued?extra.length!==1:extra.length!==0)
-    ||[marketPath,policyPath].some(p=>!statSync(p).isFile()||statSync(p).size>16384))throw Error('Arguments');
+  if(!marketPath||!policyPath||!journalPath||!budgetPath||!operation||(queued?extra.length!==1:extra.length!==0))throw Error('Arguments');
   // Resolve existing stores before opening any writer; aliases must not combine roles.
   const paths=[journalPath,budgetPath,...(queued?[queuePath]:[])].map(p=>realpathSync(p));
   const files=paths.map(p=>statSync(p));
   if(files.some(s=>!s.isFile())||new Set(files.map(s=>`${s.dev}:${s.ino}`)).size!==files.length)throw Error('Distinct existing stores required');
-  const market=JSON.parse(readFileSync(marketPath,'utf8')),policy=JSON.parse(readFileSync(policyPath,'utf8'));
+  const market=readReceiptPolicy(marketPath),policy=readReceiptPolicy(policyPath);
   new StrategyNativeGasBudget(paths[1],policy,Date.now,{readOnly:true}).close();
   new ArbitrageFillJournal(paths[0],market,{readOnly:true}).close();
   if(queued)new ReceiptObservationQueue(paths[2],market,Date.now,{readOnly:true}).close();

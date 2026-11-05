@@ -1,5 +1,12 @@
 # Testnet implementation ledger
 
+## Bounded strategy operator policy files (M01/M07/M08)
+
+The queue, direct fill journal, and gas reconciliation commands require regular
+UTF-8 JSON policy files and cap each actual read at 16 KiB. Writerless pipes fail
+before SQLite or RPC work; regular symlinks still work. Existing RPC, economic
+and release gates remain unchanged. This is not a general file-system deadline.
+
 ## Receipt client admission before queue claim or gas hold (M01/M07/M08)
 
 Journal-only observation uses the same admission check before a queue claim

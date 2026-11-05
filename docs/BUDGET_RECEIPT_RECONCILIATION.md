@@ -103,6 +103,13 @@ runtime report is required evidence, not implied by this source change.
 
 ## Operator invocation
 
+The queue, direct journal and budget commands read each policy through an opened
+regular-file descriptor. They reject pipes and other nonregular files before
+reading, limit the actual read to 16 KiB plus one overflow byte and require valid
+UTF-8 JSON. Symlinks to regular policy files still work. This bounds admission
+and rejects writerless pipes; it is not a deadline for all file systems or a
+guarantee against concurrent modification by a privileged host.
+
 The CLI requires both existing initialized matching files; it does not initialize,
 reserve for, migrate, sign or broadcast a transaction. Both manifests are bounded
 to16KiB. The endpoints must be reviewed distinct HTTPS origins; different origins

@@ -42,6 +42,11 @@ export class CreatorCanonRegistry {
   }
   #checkClock(){const n=clock(this.#now());if(n<this.#db.prepare('SELECT last_clock FROM canon_policy').get().last_clock)throw Error('Clock moved backwards');return n;}
   #head(){return this.#db.prepare('SELECT revision,digest FROM canon_versions ORDER BY revision DESC LIMIT 1').get()||{revision:0,digest:ZERO_CANON_DIGEST};}
+  studioPins(account){
+    this.#checkClock();
+    if(typeof account!=='string'||!/^0x[0-9a-f]{40}$/i.test(account)||/^0x0{40}$/i.test(account))throw Error('Reviewed nonzero wallet address required');
+    return {policy:{...this.#policy},registryId:this.#id,account:account.toLowerCase()};
+  }
   prepare(fields){
     const n=this.#checkClock(),head=this.#head();
     const update=canonUpdate({version:1,token:this.#policy.token,revision:head.revision+1,previousDigest:head.digest,issuedAtMs:n,expiresAtMs:n+300000,fields:characterDraft(this.#policy.token,fields).fields});

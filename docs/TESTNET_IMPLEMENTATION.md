@@ -1,5 +1,16 @@
 # Testnet implementation ledger
 
+## Studio operator pin export (P01/P02/P06)
+
+The explicitly enabled creator operator CLI exports the exact Studio pin object
+from an existing read-only registry matched against the reviewed policy. The
+operator supplies a separately reviewed, nonzero wallet address. There is no
+profile or draft read, RPC, signing, registry write, or publication. A pin
+export is not an ownership or login check; the existing accept flow still
+verifies the recovered signer and factory creator. Deliver pins separately from
+the prepared request through a trusted operator channel. See
+[creator wallet adapter](CREATOR_CANON_SIGNING.md).
+
 ## Loopback Studio wallet handoff (P01/P02/P06)
 
 On a top-level HTTP page at `localhost` or `127.0.0.1`, open the local wallet

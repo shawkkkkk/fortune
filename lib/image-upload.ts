@@ -126,22 +126,68 @@ export async function handleImageUpload(request: Request, fetcher = fetch) {
   // testnet. There is no anonymous upload or in-memory production fallback.
   await reserveUpload(address, proof, fetcher);
   const normalized = await normalizeTokenImage(bytes, file.type);
+  return pinAndVerifyTokenImage(normalized, fetcher);
+}
+
+/** Fixed-provider storage transport; an uncertain POST must never be retried here. */
+async function readStorage<T>(url: string, init: RequestInit, limit: number, budget: 10000 | 20000,
+  fetcher: typeof fetch, project: (bytes: Uint8Array) => T): Promise<T> {
+  const unavailable = () => new UploadError("Image storage is unavailable. No launch was submitted.", 503);
+  const start = Date.now(); let last = start, ended = false;
+  const check = () => {
+    const now = Date.now();
+    if (ended || !Number.isSafeInteger(start) || start < 0 || !Number.isSafeInteger(now) || now < last || now - start >= budget) throw unavailable();
+    last = now;
+  };
+  const controller = new AbortController();
+  let reader: ReadableStreamDefaultReader<Uint8Array> | undefined, timer: ReturnType<typeof setTimeout> | undefined;
+  const cancel = () => { try { void reader?.cancel().catch(() => {}); } catch {} };
+  const work = async () => {
+    check(); const response = await fetcher(url, {...init, signal: controller.signal}); check();
+    if (!response.ok || !response.body) throw unavailable();
+    const declared = response.headers.get("content-length");
+    if (declared && (!/^\d+$/.test(declared) || Number(declared) > limit)) throw unavailable();
+    reader = response.body.getReader();
+    const chunks: Uint8Array[] = []; let size = 0;
+    while (true) {
+      check(); const {value, done} = await reader.read(); check();
+      if (done) break;
+      size += value.byteLength;
+      if (size > limit || chunks.length >= 4096) throw unavailable();
+      chunks.push(value);
+    }
+    const bytes = new Uint8Array(size); let offset = 0;
+    for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
+    check(); const result = project(bytes); check(); return result;
+  };
+  try {
+    const deadline = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => { ended = true; reject(unavailable()); controller.abort(); cancel(); }, budget);
+    });
+    return await Promise.race([work(), deadline]);
+  } catch { throw unavailable(); }
+  finally { ended = true; clearTimeout(timer); controller.abort(); cancel(); try { reader?.releaseLock(); } catch {} }
+}
+
+/** Internal storage engine; caller must authorize and reserve quota before invoking. */
+export async function pinAndVerifyTokenImage(normalized: Uint8Array, fetcher = fetch) {
   const payload = new FormData();
   payload.set("file", new Blob([new Uint8Array(normalized)], { type: "image/webp" }), "fortune-token.webp");
   payload.set("pinataOptions", JSON.stringify({ cidVersion: 1 }));
-  const response = await fetcher("https://api.pinata.cloud/pinning/pinFileToIPFS", {
+  const cid = await readStorage("https://api.pinata.cloud/pinning/pinFileToIPFS", {
     method: "POST", headers: { Authorization: `Bearer ${process.env.PINATA_JWT}` }, body: payload,
-    redirect: "error", signal: AbortSignal.timeout(20_000),
+    redirect: "error",
+  }, 8192, 20000, fetcher, bytes => {
+    const body = JSON.parse(new TextDecoder("utf-8", {fatal: true}).decode(bytes));
+    if (typeof body.IpfsHash !== "string" || !isIpfsCid(body.IpfsHash)) throw new UploadError("Invalid storage result.", 503);
+    return body.IpfsHash as string;
   });
-  if (!response.ok) throw new UploadError("Image storage could not complete the upload. No launch was submitted.", 503);
-  const body = JSON.parse(new TextDecoder().decode(await readLimitedBytes(response, 8192)));
-  if (typeof body.IpfsHash !== "string" || !isIpfsCid(body.IpfsHash)) throw new UploadError("Image storage returned an invalid content address.", 503);
-  const retrieval = await fetcher(`https://gateway.pinata.cloud/ipfs/${body.IpfsHash}`, { redirect: "error", cache: "no-store", signal: AbortSignal.timeout(10_000) });
-  if (!retrieval.ok) throw new UploadError("The image was pinned but public retrieval is not ready. Retry later; no launch was submitted.", 503);
-  const retrieved = await readLimitedBytes(retrieval, MAX_IMAGE_BYTES);
+  const retrieved = await readStorage(`https://gateway.pinata.cloud/ipfs/${cid}`, {
+    redirect: "error", cache: "no-store",
+  }, MAX_IMAGE_BYTES, 10000, fetcher, bytes => bytes);
   if (createHash("sha256").update(retrieved).digest("hex") !== createHash("sha256").update(normalized).digest("hex")) {
     throw new UploadError("Public image retrieval did not match the uploaded content. No launch was submitted.", 503);
   }
-  return { uri: `ipfs://${body.IpfsHash}`, contentType: "image/webp", bytes: normalized.length,
+  return { uri: `ipfs://${cid}`, contentType: "image/webp", bytes: normalized.length,
     sha256: createHash("sha256").update(normalized).digest("hex") };
 }

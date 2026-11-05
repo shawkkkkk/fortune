@@ -1,5 +1,30 @@
 # Testnet implementation ledger
 
+## Wallet SDK to creator registry rehearsal (P01/P02/P06)
+
+The UNCHANGED creator signing adapter is now exercised with the installed, locked
+viem WalletClient over actual loopback JSON-RPC HTTP, then actual PublicClient
+factory ABI reads and the unchanged CreatorCanonRegistry/real SQLite store.
+The fixture asserts exact eth_signTypedData_v4 account/domain/types/message and
+EIP-712 digest, all ten literal fields (including untrusted text), and only the
+allowed wallet/read methods. Successful acceptance persists one original record;
+reopen preserves it and replay rejects before another RPC. Default-off/digest
+mismatch performs zero requests. Before/after account and chain changes produce
+no envelope or record; wallet rejection has exactly one v4 attempt without
+fallback/retry. A consistent wallet tuple still fails independent factory-creator
+verification and leaves no record when the fixture creator differs.
+
+This is actual SDK/HTTP/ABI/SQLite integration evidence, NOT a real wallet approval
+or independent providers. The loopback wallet fixture RETURNS an existing arbitrary
+r/s/v tuple; it does not sign, create an account/key, send a public transaction or
+prove control of the recovered address. Both read clients share ONE synthetic
+HTTP fixture with asserted chain/time/code/factory data. No public providers,
+funds, real profiles, credentials or services are used. No production adapter,
+registry, UI, workflows, root pins/dependencies, economics or release gates change.
+Full P01/P02/P06/Studio/hosted auth/creator approval and full readiness remain
+unfinished. Real profile text would be disclosed to the selected wallet/provider
+and requires the corresponding privacy permission; that boundary is unchanged.
+
 ## Reviewed creator-wallet signing adapter (P01/P02/P06)
 
 An explicit library adapter now validates the operator CLI's prepared character

@@ -1,9 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import "../launch/catalog.css";
 import { CHARACTER_FIELDS, emptyCharacter, characterKey, characterDraft, restoreCharacter, announcementDraft, type CharacterFields } from "@/lib/creator-character";
+
+const CanonHandoff = dynamic(() => import("./canon-handoff"), { ssr: false });
 
 export default function CreatorStudio() {
   const [token, setToken] = useState("");
@@ -11,10 +14,17 @@ export default function CreatorStudio() {
   const [reviewed, setReviewed] = useState(false);
   const [message, setMessage] = useState("");
   const [importText, setImportText] = useState("");
+  const [localHandoff, setLocalHandoff] = useState(false);
+  const [handoffOpen, setHandoffOpen] = useState(false);
+  const [draftVersion, setDraftVersion] = useState(0);
+  useEffect(() => {
+    setLocalHandoff(window.top === window && window.location.protocol === "http:" &&
+      ["localhost", "127.0.0.1"].includes(window.location.hostname));
+  }, []);
   let key = "", error = "", announcement = "";
   try { key = characterKey(token); characterDraft(token, fields); } catch (e) { error = e instanceof Error ? e.message : "Invalid draft."; }
   try { announcement = announcementDraft(fields); } catch { /* Incomplete drafts are allowed. */ }
-  function resetReview() { setReviewed(false); setMessage(""); }
+  function resetReview() { setReviewed(false); setMessage(""); setDraftVersion(v => v + 1); }
   function storage(action: "save" | "load" | "delete") {
     resetReview();
     try {
@@ -52,6 +62,11 @@ export default function CreatorStudio() {
       <label style={{ display: "flex", alignItems: "flex-start", gap: 10 }}><input style={{ width: 18, height: 18, minHeight: 18, flex: "none" }} type="checkbox" checked={reviewed} onChange={e => setReviewed(e.target.checked)} /> I reviewed these local fields and announcement wording. This does not authorize a post or transaction.</label>
       <div className="fieldGrid"><button className="secondaryCta" disabled={!reviewed || !!error} onClick={() => download("profile")}>Export character JSON</button><button className="secondaryCta" disabled={!reviewed || !!error || !announcement} onClick={() => download("announcement")}>Export announcement text</button></div>
       <p role="status">{message}</p>
-    </section><Link className="secondaryCta" href="/developers">Developer tools and read-only MCP →</Link>
+    </section>
+    {localHandoff && key && !error && <section className="formCard">
+      <button className="secondaryCta" onClick={() => setHandoffOpen(open => !open)}>{handoffOpen ? "Close local wallet handoff" : "Open local wallet handoff"}</button>
+    </section>}
+    {localHandoff && handoffOpen && key && !error && <CanonHandoff key={draftVersion} token={token} fields={fields} />}
+    <Link className="secondaryCta" href="/developers">Developer tools and read-only MCP →</Link>
   </main>;
 }

@@ -60,7 +60,7 @@ export async function signReviewedCanon(wallet: Wallet, review: Review,
       const recovered = await recoverTypedDataAddress({ ...typedData, signature }); check();
       if (recovered.toLowerCase() !== expectedAccount.toLowerCase()) throw Error("Signature wallet differs");
       await identity(); check();
-      // No token policy, signature or prose is sent anywhere by this adapter.
+      // Return only: no registry write or publication. The chosen wallet sees all typed text.
       return freeze({ update: structuredClone(review.update), signature });
     };
     return await Promise.race([work(), deadline]);

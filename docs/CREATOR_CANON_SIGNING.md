@@ -51,3 +51,7 @@ snapshots, clock reversal, original-expiry hung-wallet/late-follow-on fencing an
 independent registry rejection of a wrong fixture creator. One initial NEW test
 cleanup closed the old registry twice after reopening; only that fixture cleanup
 was corrected. No production guard, deadline or existing engine was weakened.
+
+The selected wallet/provider receives the FULL character typed data and may retain
+it. Call only with permission to disclose that real profile to the selected
+wallet/provider. This adapter does not promise secrecy or anonymity.

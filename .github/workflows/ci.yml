@@ -110,3 +110,13 @@ jobs:
           forge install foundry-rs/forge-std@8bbcf6e3f8f62f419e5429a0bd89331c85c37824 --no-commit
       - name: Contract tests + 1,000-run fuzz suite
         run: forge test --fuzz-runs 1000 -vvv
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install locked JavaScript dependencies for Standard vanity differential
+        working-directory: .
+        run: npm ci --ignore-scripts
+      - name: Compare Standard vanity with compiled factory and deployer
+        working-directory: .
+        run: node --import ./scripts/register-ts.mjs scripts/verify-standard-vanity-compiled.mjs

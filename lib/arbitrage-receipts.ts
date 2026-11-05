@@ -100,8 +100,9 @@ async function observe(client: FillReadClient, m: FillMarket, txHash: Hex) {
       || !Number.isSafeInteger(l.logIndex) || l.logIndex < 0 || l.logIndex > 99_999_999)
     || new Set(receipt.logs.map(l => l.logIndex)).size !== receipt.logs.length) throw new Error("Receipt provenance, depth or wallet mismatch");
   const blockNumber = receipt.blockNumber;
-  const block = await client.getBlock({ blockNumber });
-  if (block.number !== blockNumber || block.hash !== receipt.blockHash) throw new Error("Receipt block is not canonical");
+  const { number: headerNumber, hash: blockHash, timestamp: blockTimestamp } = await client.getBlock({ blockNumber });
+  if (headerNumber !== blockNumber || blockHash !== receipt.blockHash
+    || typeof blockTimestamp !== "bigint" || blockTimestamp < 0n || blockTimestamp >= (1n << 256n)) throw new Error("Receipt block is not canonical");
   await Promise.all([m.router, m.factory, m.pool, m.token, m.settlement, ...(m.vault ? [{ address: m.wallet, codeHash: m.vault.codeHash }] : [])].map(async p => {
     const code = await client.getCode({ address: p.address, blockNumber });
     if (!code || code === "0x" || !same(keccak256(code), p.codeHash)) throw new Error("Receipt contract runtime mismatch");
@@ -160,19 +161,20 @@ async function observe(client: FillReadClient, m: FillMarket, txHash: Hex) {
       || order.amountIn !== amountIn || event.args.amountIn !== amountIn || event.args.amountOut !== amountOut
       || event.args.nonce !== order.nonce || event.args.epoch !== order.epoch || order.epoch === 0n
       || event.args.minimumOut <= 0n || event.args.minimumOut < order.minAmountOut || event.args.minimumOut > amountOut
-      || order.deadline < block.timestamp || order.deadline > block.timestamp + 120n) throw new Error("Vault order, execution and pool fill differ");
+      || order.deadline < blockTimestamp || order.deadline > blockTimestamp + 120n) throw new Error("Vault order, execution and pool fill differ");
     execution = { executionVault: m.wallet.toLowerCase() as Address, gasPayer: sender.toLowerCase() as Address, authorizationEpoch: order.epoch.toString(), executionNonce: order.nonce.toString() };
   }
   const gasCost = positive(receipt.gasUsed * receipt.effectiveGasPrice);
-  const after = await client.getBlock({ blockNumber });
-  if (await client.getChainId() !== m.chainId || after.number !== blockNumber || after.hash !== block.hash) throw new Error("Receipt reorged during verification");
+  const { number: finalNumber, hash: finalHash, timestamp: finalTimestamp } = await client.getBlock({ blockNumber });
+  if (await client.getChainId() !== m.chainId || finalNumber !== blockNumber || finalHash !== blockHash
+    || finalTimestamp !== blockTimestamp) throw new Error("Receipt reorged during verification");
   return {
-    ...execution,
-    receiptDigest: digest([receipt.status, txHash.toLowerCase(), receipt.blockNumber, receipt.blockHash.toLowerCase(), receipt.from.toLowerCase(), receipt.to.toLowerCase(),
+    ...execution, blockTimestamp,
+    receiptDigest: digest([receipt.status, txHash.toLowerCase(), receipt.blockNumber, blockHash.toLowerCase(), receipt.from.toLowerCase(), receipt.to.toLowerCase(),
       receipt.gasUsed, receipt.effectiveGasPrice, tx.type, tx.input, tx.value,
       [...receipt.logs].sort((a, b) => a.logIndex - b.logIndex).map(l => [l.logIndex, l.address.toLowerCase(), l.data.toLowerCase(), l.topics.map(t => t.toLowerCase())])]),
     receiptId: `${m.chainId}:${txHash.toLowerCase()}:${log.logIndex}`, chainId: m.chainId, transactionHash: txHash.toLowerCase() as Hex,
-    blockNumber: blockNumber.toString(), blockHash: receipt.blockHash, swapLogIndex: log.logIndex,
+    blockNumber: blockNumber.toString(), blockHash, swapLogIndex: log.logIndex,
     wallet: m.wallet.toLowerCase() as Address, pool: m.pool.address.toLowerCase() as Address,
     token: m.token.address.toLowerCase() as Address, settlement: m.settlement.address.toLowerCase() as Address,
     tokenDecimals: m.token.decimals, settlementDecimals: m.settlement.decimals,
@@ -215,9 +217,9 @@ export async function readVerifiedFill(clients: readonly [FillReadClient, FillRe
       timer = setTimeout(() => reject(Error("Receipt observation timed out")), 60_000);
     });
     return await Promise.race([(async () => {
-      const observations = await Promise.all(readers.map(c => observe(c, m, txHash)));
-      if (digest(observations[0]) !== digest(observations[1])) throw new Error("Receipt providers disagree");
-      const fill = Object.freeze({ ...observations[0], marketHash, observedAtMs: clock(), executionAuthorized: false as const });
+      const [{ blockTimestamp: firstTime, ...first }, { blockTimestamp: secondTime, ...second }] = await Promise.all(readers.map(c => observe(c, m, txHash)));
+      if (firstTime !== secondTime || digest(first) !== digest(second)) throw new Error("Receipt providers disagree");
+      const fill = Object.freeze({ ...first, marketHash, observedAtMs: clock(), executionAuthorized: false as const });
       approved.add(fill);
       return fill;
     })(), timeout]);

@@ -1,5 +1,12 @@
 # Testnet implementation ledger
 
+## Strategy receipt block timestamp agreement (M01/M07/M08)
+
+The fill verifier checks the confirmed receipt block timestamp across both
+read clients and their final rereads. Vault deadline checks use the validated
+timestamp. Historical receipt digests and journal rows keep their existing
+schema; provider independence and finality remain unverified.
+
 ## Strategy receipt RPC redirects (M01/M07/M08)
 
 The direct journal, journal-only queue, and budget reconciliation commands
@@ -1953,10 +1960,19 @@ run41723886807/job126223476063 or certify control-plane termination/log delivery
 No overrun drill, new engine runtime, public testnet, audit or activation evidence
 is claimed. Exact-head CI and independent post-merge checks are still required.
 
+
+## Distinct receipt queue and journal files (M01/M07/M08)
+
+The journal-only receipt observer checks real paths and existing device/inode
+identities before SQLite initialization. Separate new files remain supported.
+This preflight does not migrate old databases or prevent concurrent host
+filesystem changes.
+
 ## Standard testnet CREATE2 vanity observation (P17)
 
-The additive library derives the frozen factory's first suffix candidate from
-pinned creation bytes and exact manifest inputs. Its read-only observer checks
-factory preview, direct deployer prediction and code/nonce occupancy at one
-caller-pinned block. Loopback HTTP tests are component evidence; compiled parity,
-artifact provenance, public availability and the full P17 catalog remain open.
+The read-only library computes the first frozen suffix candidate from pinned
+creation bytes and compares it with factory/deployer reads at one pinned block.
+CI runs a separate local Forge differential against the unchanged Standard
+contracts, checking the artifact, creator and launch nonce, and code-only and
+nonce-only collisions. Local evidence does not establish public availability,
+artifact provenance for live deployments, or the full P17 catalog.

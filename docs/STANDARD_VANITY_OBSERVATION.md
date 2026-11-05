@@ -36,6 +36,20 @@ nothing. No candidate is a platform token address or proof of ownership,
 authorization, release readiness, or audit approval.
 
 The loopback tests exercise actual viem HTTP and ABI encoding with synthetic
-bytecode and responses. Compiled factory/deployer differential evidence,
-reviewed artifact provenance, and actual testnet route evidence are separate
-and are not claimed here.
+bytecode and responses. Separately, after the normal Standard Forge suite has
+built its artifact, CI runs:
+
+```sh
+node --import ./scripts/register-ts.mjs scripts/verify-standard-vanity-compiled.mjs
+```
+
+The command copies a test fixture into the Foundry test directory only for the
+run, refuses to overwrite an existing fixture, and removes its copy afterward.
+It checks that Standard creation bytes did not change, then compares three
+compiled factory vectors with the offline engine: the first launch, the same
+creator after its nonce advances, and a different creator. The fixture also
+executes the compiled launch path inside Forge to check that code alone or a
+nonzero nonce alone causes a revert, and that the same candidate succeeds
+after the fixture clears the collision. It uses no fork, generated accounts,
+signing or broadcast. This differential does not validate a live deployment or
+approve a real creator draft or artifact.

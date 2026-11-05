@@ -8,7 +8,7 @@ import { prepareStandardVanity } from "../lib/standard-vanity.ts";
 const root = new URL("../", import.meta.url);
 const contracts = fileURLToPath(new URL("contracts/", root));
 const fixture = fileURLToPath(new URL("tests/fixtures/StandardVanityDifferential.sol", root));
-const temporary = fileURLToPath(new URL("contracts/test/StandardVanityDifferential.generated.t.sol", root));
+const temporary = fileURLToPath(new URL("contracts/test/StandardVanityDifferential.t.sol", root));
 const artifact = new URL("contracts/out/FortuneToken.sol/FortuneToken.json", root);
 function creationCode() {
   const code = JSON.parse(readFileSync(artifact, "utf8")).bytecode.object;
@@ -30,7 +30,7 @@ copyFileSync(fixture, temporary, constants.COPYFILE_EXCL);
 let output;
 try {
   output = execFileSync("forge", [
-    "test", "--match-path", "test/StandardVanityDifferential.generated.t.sol",
+    "test", "--match-contract", "^StandardVanityDifferential$",
     "--match-test", "^testCompiledStandardVanityDifferential$", "-vv",
   ], { cwd: contracts, encoding: "utf8", timeout: 180_000, maxBuffer: 1024 * 1024 });
 } finally {

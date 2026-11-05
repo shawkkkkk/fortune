@@ -47,6 +47,12 @@ export class CreatorCanonRegistry {
     if(typeof account!=='string'||!/^0x[0-9a-f]{40}$/i.test(account)||/^0x0{40}$/i.test(account))throw Error('Reviewed nonzero wallet address required');
     return {policy:{...this.#policy},registryId:this.#id,account:account.toLowerCase()};
   }
+  studioHeadPins(account){
+    const pins=this.studioPins(account),head=this.#head();
+    if(!Number.isSafeInteger(head.revision)||head.revision<0||head.revision>1000||
+      !/^0x[0-9a-f]{64}$/.test(head.digest)||(head.revision===0)!==(head.digest===ZERO_CANON_DIGEST))throw Error('Invalid registry head');
+    return {...pins,head:{revision:head.revision,digest:head.digest}};
+  }
   prepare(fields){
     const n=this.#checkClock(),head=this.#head();
     const update=canonUpdate({version:1,token:this.#policy.token,revision:head.revision+1,previousDigest:head.digest,issuedAtMs:n,expiresAtMs:n+300000,fields:characterDraft(this.#policy.token,fields).fields});

@@ -3,11 +3,11 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { createWalletClient, custom, type Address, type Hex } from "viem";
 import { reviewCanonSigningRequest, signReviewedCanon } from "@/lib/creator-canon-signing";
-import type { CanonPolicy } from "@/lib/creator-canon-authorization";
+import { ZERO_CANON_DIGEST, type CanonPolicy } from "@/lib/creator-canon-authorization";
 import type { CharacterFields } from "@/lib/creator-character";
 
 type Provider = { request(args: { method: string; params?: unknown }): Promise<unknown> };
-type Reviewed = { request: ReturnType<typeof reviewCanonSigningRequest>; account: Address };
+type Reviewed = { request: ReturnType<typeof reviewCanonSigningRequest>; account: Address; predecessorChecked: boolean };
 type Envelope = Awaited<ReturnType<typeof signReviewedCanon>>;
 let walletBusy = false;
 
@@ -37,17 +37,28 @@ export default function CanonHandoff({ token, fields }: { token: string; fields:
     invalidate();
     try {
       if (!isLocalCanonHandoff() || new TextEncoder().encode(pins).length > 4096) throw Error();
-      const p = JSON.parse(pins) as { policy: CanonPolicy; registryId: Hex; account: Address };
-      if (Object.keys(p).sort().join() !== "account,policy,registryId" ||
+      const p = JSON.parse(pins) as { policy: CanonPolicy; registryId: Hex; account: Address; head?: { revision: number; digest: Hex } };
+      const keys = Object.keys(p).sort().join();
+      const predecessorChecked = keys === "account,head,policy,registryId";
+      if ((!predecessorChecked && keys !== "account,policy,registryId") ||
           Object.keys(p.policy).sort().join() !== "chainId,factory,factoryCodeHash,launchIndex,token" ||
           typeof p.account !== "string" || !/^0x[0-9a-f]{40}$/i.test(p.account) || /^0x0{40}$/i.test(p.account) ||
           p.policy.token !== token.toLowerCase()) throw Error();
       const request = reviewCanonSigningRequest(prepared, p.policy, p.registryId, fields);
+      if (predecessorChecked) {
+        const head = p.head;
+        if (!head || Object.keys(head).sort().join() !== "digest,revision" ||
+            !Number.isSafeInteger(head.revision) || head.revision < 0 || head.revision >= 1000 ||
+            typeof head.digest !== "string" || !/^0x[0-9a-f]{64}$/.test(head.digest) ||
+            (head.revision === 0) !== (head.digest === ZERO_CANON_DIGEST) ||
+            request.update.revision !== head.revision + 1 ||
+            request.update.previousDigest !== head.digest) throw Error();
+      }
       const now = Date.now();
       if (now < request.update.issuedAtMs || now >= request.update.expiresAtMs) throw Error();
-      setReview({ request, account: p.account });
+      setReview({ request, account: p.account, predecessorChecked });
     } catch {
-      setStatus("Request rejected. Check the separate operator pins, project, exact draft fields and original expiry.");
+      setStatus("Request rejected. Check the separate operator pins, project, registry revision, exact draft fields and original expiry.");
     }
   }
   async function requestWallet() {
@@ -105,11 +116,12 @@ export default function CanonHandoff({ token, fields }: { token: string; fields:
     <h2>Local creator wallet handoff</h2>
     <p>Use only with an operator you trust. Obtain the policy, registry ID and expected wallet address separately from the prepared request. Connect the expected account to this local site in your wallet first.</p>
     <label>Operator pins JSON<textarea disabled={busy} rows={4} maxLength={4096} value={pins} onChange={e => { invalidate(); setPins(e.target.value); }} /></label>
-    <p className="fieldHint">Use a JSON object with <code>policy</code>, <code>registryId</code> and <code>account</code>. Never enter a key or recovery phrase.</p>
+    <p className="fieldHint">Use the operator pin export. Prefer the export that includes the registry head. Never enter a key or recovery phrase.</p>
     <label>Prepared character request JSON<textarea disabled={busy} rows={5} maxLength={40960} value={prepared} onChange={e => { invalidate(); setPrepared(e.target.value); }} /></label>
     <button className="secondaryCta" disabled={busy || !pins || !prepared} onClick={reviewRequest}>Review prepared request</button>
     {review && <>
       <p>Review the character fields above. This request is for revision {review.request.update.revision}, expiring {new Date(review.request.update.expiresAtMs).toISOString()}.</p>
+      <p>{review.predecessorChecked ? "Predecessor matches the operator’s registry snapshot. The registry may advance before acceptance." : "These pins do not include a registry head. The operator will check the revision on acceptance."}</p>
       <pre className="apiCode">{`Wallet: ${review.account}\nProject: ${review.request.update.token}\nRegistry: ${review.request.registryId}\nDigest: ${review.request.digest}`}</pre>
       <label style={{ display: "flex", alignItems: "flex-start", gap: 10 }}><input style={{ width: 18, height: 18, minHeight: 18, flex: "none" }} type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} /> I reviewed the request and allow my browser wallet and its provider to receive all ten character fields.</label>
       <button className="secondaryCta" disabled={!consent} onClick={requestWallet}>Request character signature</button>

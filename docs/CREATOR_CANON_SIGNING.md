@@ -30,6 +30,22 @@ wallet or RPC provider or verify current ownership. Send the pins through the
 trusted operator channel independently of the prepared request, with permission
 before disclosing the wallet address or project association.
 
+To also check the prepared revision before prompting the wallet, use:
+
+```sh
+FORTUNE_CREATOR_CANON_ENABLED=true node --import ./scripts/register-ts.mjs scripts/operate-creator-canon.mjs studio-head-pins "$REGISTRY" "$POLICY" "$EXPECTED_CREATOR_WALLET"
+```
+
+This variant adds only the stored head revision and digest to the same pins.
+It does not read the profile, signature or evidence. Studio rejects a prepared
+request unless its revision is exactly the next one and its previous digest
+matches the separate snapshot. A full registry cannot prepare another revision
+through head-checked Studio review. Legacy three-field pins still work and are
+explicitly labeled as lacking a predecessor check. The snapshot can become stale
+after export; final operator acceptance still checks the actual head and the
+original expiry. Keep the head export in the same trusted channel as the legacy
+pins. Neither export grants authorization or permission to share profile data.
+
 Review the project, expected wallet, registry, revision, original expiry and
 digest. Only after explicitly permitting disclosure of all ten fields can you
 request the wallet signature. The injected wallet must already expose the

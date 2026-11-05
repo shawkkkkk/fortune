@@ -67,3 +67,22 @@ test('creator CLI emits no Studio pins for disabled, missing, mismatched or inva
     assert.equal(mismatch.error,undefined);assert.equal(mismatch.status,1);assert.equal(mismatch.stdout,'');
   }finally{rmSync(s.dir,{recursive:true,force:true});}
 });
+
+test('creator CLI exports the original empty head and the durable accepted head without profile or signature disclosure',async()=>{
+  const s=fixture();try {
+    const book=new CreatorCanonRegistry(s.db,policy,{now:()=>now});
+    try {
+      const {creatorFor,signature,client}=await import('../fixtures/creator-canon.mjs');
+      const prepared=book.prepare(fields),account=await creatorFor(prepared);
+      const args=['studio-head-pins',s.db,s.pp,account];
+      const pins={policy,registryId:prepared.typedData.domain.salt,account};
+      const empty=run(args);assert.equal(empty.status,0,empty.stderr);
+      assert.deepEqual(JSON.parse(empty.stdout),{...pins,head:{revision:0,digest:prepared.update.previousDigest}});
+      const accepted=await book.accept({update:prepared.update,signature},[client(account),client(account)]);
+      const current=run(args);assert.equal(current.status,0,current.stderr);
+      assert.deepEqual(JSON.parse(current.stdout),{...pins,head:{revision:accepted.revision,digest:accepted.digest}});
+      assert.equal(book.latest().acceptedAtMs,now);
+      const invalid=run([...args,'extra']);assert.equal(invalid.status,1);assert.equal(invalid.stdout,'');
+    }finally{book.close();}
+  }finally{rmSync(s.dir,{recursive:true,force:true});}
+});

@@ -75,11 +75,15 @@ try {
     const raw = JSON.stringify(prepared, (_, value) => typeof value === "bigint" ? String(value) : value);
     const policyPath = join(folder, "policy.json");
     await writeFile(policyPath, JSON.stringify(policy), { mode: 0o600 });
-    const pins = execFileSync(process.execPath, ["--import", "./scripts/register-ts.mjs",
-      "scripts/operate-creator-canon.mjs", "studio-pins", path, policyPath, creator], {
+    const exportPins = mode => execFileSync(process.execPath, ["--import", "./scripts/register-ts.mjs",
+      "scripts/operate-creator-canon.mjs", mode, path, policyPath, creator], {
       encoding: "utf8", timeout: 5000, env: { ...process.env, FORTUNE_CREATOR_CANON_ENABLED: "true" },
     });
+    const pins = exportPins("studio-pins");
+    const initialHeadPins = exportPins("studio-head-pins");
     assert.deepEqual(JSON.parse(pins), { policy, registryId: prepared.typedData.domain.salt, account: creator });
+    assert.deepEqual(JSON.parse(initialHeadPins), { ...JSON.parse(pins),
+      head: { revision: 0, digest: prepared.update.previousDigest } });
     const page = await context.newPage(), writes = [], errors = [];
     page.on("pageerror", e => errors.push(e.message));
     await context.route("**/*", route => {
@@ -115,9 +119,9 @@ try {
     await name.fill("Wallet Cat");
     assert.equal(await page.getByLabel("Operator pins JSON").count(), 0);
     await page.getByRole("button", { name: "Open local wallet handoff" }).click();
-    const fillRequest = async pinText => {
+    const fillRequest = async (pinText, preparedText = raw) => {
       await page.getByLabel("Operator pins JSON").fill(pinText);
-      await page.getByLabel("Prepared character request JSON").fill(raw);
+      await page.getByLabel("Prepared character request JSON").fill(preparedText);
       await page.getByRole("button", { name: "Review prepared request" }).click();
     };
     const sign = page.getByRole("button", { name: "Request character signature" });
@@ -125,6 +129,10 @@ try {
     assert.equal(await sign.count(), 0);
     await fillRequest(pins);
     assert.equal(await sign.isDisabled(), true);
+    assert.equal(await page.getByText(/These pins do not include a registry head/).count(), 1);
+    await fillRequest(initialHeadPins);
+    assert.equal(await sign.isDisabled(), true);
+    assert.equal(await page.getByText(/Predecessor matches the operator/).count(), 1);
     assert.deepEqual(await page.evaluate(() => window.fixtureCalls), headerCalls);
     const consent = page.getByRole("checkbox", { name: /allow my browser wallet/ });
     await consent.check();
@@ -178,11 +186,27 @@ try {
       assert.equal(record.executionAuthorized, false);
     } finally { acceptor.close(); }
     const reopened = new CreatorCanonRegistry(path, policy);
+    let nextRaw;
     try {
       assert.deepEqual(reopened.latest(), record);
       await assert.rejects(reopened.accept(envelope, []), /revision/i);
       assert.deepEqual(reopened.latest(), record);
+      nextRaw = JSON.stringify(reopened.prepare({ ...emptyCharacter, name: "Wallet Cat" }),
+        (_, value) => typeof value === "bigint" ? String(value) : value);
     } finally { reopened.close(); }
+    const nextHeadPins = exportPins("studio-head-pins");
+    assert.deepEqual(JSON.parse(nextHeadPins).head, { revision: 1, digest: record.digest });
+    const before = await page.evaluate(() => window.fixtureCalls);
+    await fillRequest(nextHeadPins);
+    assert.equal(await sign.count(), 0);
+    await fillRequest(nextHeadPins.replace(record.digest, "0x" + "ff".repeat(32)), nextRaw);
+    assert.equal(await sign.count(), 0);
+    await fillRequest(nextHeadPins, nextRaw);
+    assert.equal(await sign.isDisabled(), true);
+    assert.deepEqual(await page.evaluate(() => window.fixtureCalls), before);
+    assert.deepEqual(writes, []);
+    assert.deepEqual(errors, []);
+    console.log("PASS Studio registry predecessor check: stale request and wrong digest rejected before wallet access");
     console.log("PASS Studio operator round trip: CLI pins, browser envelope, wrong-creator rejection, durable acceptance and replay rejection");
   } finally {
     await context.close();

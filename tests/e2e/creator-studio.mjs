@@ -98,6 +98,11 @@ try {
     await dialog.getByRole("checkbox").check();
     await dialog.getByRole("button", { name: "Continue to Fortune →" }).click();
     await dialog.waitFor({ state: "hidden" });
+    // The unchanged global Header reads already-connected identity on mount.
+    // Keep these in the trace and require zero *additional* calls before consent.
+    await page.waitForFunction(() => window.fixtureCalls.length >= 2);
+    const headerCalls = [{ method: "eth_accounts" }, { method: "eth_chainId" }];
+    assert.deepEqual(await page.evaluate(() => window.fixtureCalls), headerCalls);
     const name = page.getByLabel("Project name", { exact: true });
     await page.getByLabel("BSC Testnet project address", { exact: true }).fill(policy.token);
     await name.fill("Wallet Cat");
@@ -113,7 +118,7 @@ try {
     assert.equal(await sign.count(), 0);
     await fillRequest(pins);
     assert.equal(await sign.isDisabled(), true);
-    assert.deepEqual(await page.evaluate(() => window.fixtureCalls), []);
+    assert.deepEqual(await page.evaluate(() => window.fixtureCalls), headerCalls);
     const consent = page.getByRole("checkbox", { name: /allow my browser wallet/ });
     await consent.check();
     await sign.click();
@@ -125,13 +130,13 @@ try {
     const envelopePath = join(folder, "envelope.json");
     await download.saveAs(envelopePath);
     assert.deepEqual(JSON.parse(await readFile(envelopePath, "utf8")), { update: prepared.update, signature });
-    const calls = await page.evaluate(() => window.fixtureCalls);
+    const calls = (await page.evaluate(() => window.fixtureCalls)).slice(headerCalls.length);
     assert.deepEqual(calls.map(x => x.method), ["eth_accounts", "eth_chainId", "eth_signTypedData_v4", "eth_accounts", "eth_chainId"]);
     assert.equal(calls[2].params[0].toLowerCase(), creator);
     const typed = JSON.parse(calls[2].params[1]);
     assert.deepEqual(typed.message, JSON.parse(raw).typedData.message);
     assert.deepEqual(typed.domain, prepared.typedData.domain);
-    assert.ok(await page.evaluate(() => !Object.values(localStorage).some(v => v.includes("Wallet Cat") || v.includes(window.fixtureCalls[2].params[0]))));
+    assert.ok(await page.evaluate(() => !Object.values(localStorage).some(v => v.includes("Wallet Cat") || v.includes(window.fixtureCalls.find(x => x.method === "eth_signTypedData_v4").params[0]))));
 
     await page.evaluate(() => { window.fixtureHold = true; });
     await fillRequest(pins);
@@ -145,7 +150,7 @@ try {
     await fillRequest(pins);
     assert.equal(await sign.isDisabled(), true);
     assert.equal(await downloadButton.count(), 0);
-    assert.deepEqual((await page.evaluate(() => window.fixtureCalls)).slice(5).map(x => x.method), ["eth_accounts", "eth_chainId", "eth_signTypedData_v4"]);
+    assert.deepEqual((await page.evaluate(() => window.fixtureCalls)).slice(headerCalls.length + 5).map(x => x.method), ["eth_accounts", "eth_chainId", "eth_signTypedData_v4"]);
     assert.deepEqual(writes, []);
     assert.deepEqual(errors, []);
     console.log("PASS Studio local wallet handoff: exact envelope, separate pins and consent, in-flight edit fence, no network writes");

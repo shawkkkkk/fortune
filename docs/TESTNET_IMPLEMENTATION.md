@@ -1,5 +1,30 @@
 # Testnet implementation ledger
 
+## Bounded creator-upload quota reservation (P01/P06/P23)
+
+The ACTUAL authenticated image-upload path now bounds reserveUpload's existing
+Redis POST and body decoding with one rejecting five-second wall timer and
+safe nonnegative monotonic host-clock checks before/after fetch, every stream
+read and result projection. Responses are capped at4096 declared/actual bytes,
+4096 nonfinal fragments including empty ones, and strictUTF8 JSON. Hung fetch,
+read or cancellation cannot keep the caller pending; abort/cancel are best effort
+and not awaited. Inflight operations may still complete, and event-loop/host-clock
+trust remains. This is per-reservation, not a whole-upload/native-Sharp deadline.
+
+Original Lua, proof dedup, wallet-hour/global-day keys,10/250 limits and600/3600/
+86400 expiries are unchanged. Allowed/replay409/limited429 semantics remain;
+invalid/late/unsafe responses return private503. No retry, quota reset or release.
+A timeout/error DOES NOT prove Redis did not commit. Inspect existing proof/quota
+state before explicit retry; do not blindly replay a write or renew authorization.
+Wallet proof, file normalization, pin/retrieval and enablement gates are unchanged.
+No credentials, keys, signing, paid provider call, public configuration or service
+enablement was used. Tests call the ACTUAL reservation engine: ignored abort,
+hung body/noncooperating cancel, byte/fragment/UTF8 bounds, unsafe/reversed clocks,
+old result/key controls and a credential-free localHTTP EVAL roundtrip.
+Four groups failed old source (first5group run); final6groups cover the fix.
+Fixtures are not liveRedis/pinning/creator approval/hosting/auth-session/recovery
+or fullP01/P06/P23 readiness. Frozen Standard/root pins and all gates remain.
+
 ## Complete batch-decline receipt coverage (P19)
 
 `inspectAllWorkBatchDeclines` requires complete 1–16 ordered policies for one

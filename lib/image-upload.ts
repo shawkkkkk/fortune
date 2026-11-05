@@ -36,18 +36,61 @@ redis.call('INCR', KEYS[3]); redis.call('EXPIRE', KEYS[3], 86400)
 return 'allowed'`;
 
 export async function reserveUpload(address: string, proof: string, fetcher = fetch, now = Date.now()) {
-  const response = await fetcher(process.env.UPSTASH_REDIS_REST_URL!, {
-    method: "POST", redirect: "error", cache: "no-store", signal: AbortSignal.timeout(5000),
-    headers: { Authorization: `Bearer ${process.env.UPSTASH_REDIS_REST_TOKEN}`, "Content-Type": "application/json" },
-    body: JSON.stringify(["EVAL", quotaScript, "3", `fortune:upload:proof:${proof}`,
-      `fortune:upload:wallet:${address.toLowerCase()}:${Math.floor(now / 3_600_000)}`,
-      `fortune:upload:daily:${Math.floor(now / 86_400_000)}`]),
-  });
-  if (!response.ok) throw new UploadError("Upload protection is unavailable. Try later.", 503);
-  const body = await response.json();
-  if (body.result === "replay") throw new UploadError("This upload authorization was already used. Sign a new upload request.", 409);
-  if (body.result === "limited") throw new UploadError("Image upload limit reached. Try later or use your own public image URI.", 429);
-  if (body.result !== "allowed" || body.error) throw new UploadError("Upload protection is unavailable. Try later.", 503);
+  const unavailable = () => new UploadError("Upload protection is unavailable. Try later.", 503);
+  const start = Date.now(); let last = start, ended = false;
+  const check = () => {
+    const time = Date.now();
+    if (ended || !Number.isSafeInteger(start) || start < 0 || !Number.isSafeInteger(time) || time < last || time - start >= 5000) throw unavailable();
+    last = time;
+  };
+  const controller = new AbortController();
+  let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
+  const cancel = () => { try { void reader?.cancel().catch(() => {}); } catch {} };
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const work = async () => {
+    check();
+    const response = await fetcher(process.env.UPSTASH_REDIS_REST_URL!, {
+      method: "POST", redirect: "error", cache: "no-store", signal: controller.signal,
+      headers: { Authorization: `Bearer ${process.env.UPSTASH_REDIS_REST_TOKEN}`, "Content-Type": "application/json" },
+      body: JSON.stringify(["EVAL", quotaScript, "3", `fortune:upload:proof:${proof}`,
+        `fortune:upload:wallet:${address.toLowerCase()}:${Math.floor(now / 3_600_000)}`,
+        `fortune:upload:daily:${Math.floor(now / 86_400_000)}`]),
+    });
+    check();
+    if (!response.ok || !response.body) throw unavailable();
+    const declared = response.headers.get("content-length");
+    if (declared && (!/^\d+$/.test(declared) || Number(declared) > 4096)) throw unavailable();
+    reader = response.body.getReader();
+    const chunks: Uint8Array[] = []; let size = 0;
+    while (true) {
+      check(); const {value, done} = await reader.read(); check();
+      if (done) break;
+      size += value.byteLength;
+      if (size > 4096 || chunks.length >= 4096) throw unavailable();
+      chunks.push(value);
+    }
+    const bytes = new Uint8Array(size); let offset = 0;
+    for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
+    check();
+    const body = JSON.parse(new TextDecoder("utf-8", {fatal: true}).decode(bytes));
+    check();
+    if (body.result === "replay") throw new UploadError("This upload authorization was already used. Sign a new upload request.", 409);
+    if (body.result === "limited") throw new UploadError("Image upload limit reached. Try later or use your own public image URI.", 429);
+    if (body.result !== "allowed" || body.error) throw new UploadError("Upload protection is unavailable. Try later.", 503);
+    check();
+  };
+  try {
+    const deadline = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => { ended = true; reject(unavailable()); controller.abort(); cancel(); }, 5000);
+    });
+    await Promise.race([work(), deadline]);
+  } catch (error) {
+    if (error instanceof UploadError) throw error;
+    throw unavailable();
+  } finally {
+    ended = true; clearTimeout(timer); controller.abort(); cancel();
+    try { reader?.releaseLock(); } catch {}
+  }
 }
 
 export async function authorizeImageUpload(address: string, digest: string, issuedAt: number, signature: string, origin: string, now = Date.now()) {

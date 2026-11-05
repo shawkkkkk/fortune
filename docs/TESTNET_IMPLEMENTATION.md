@@ -1967,3 +1967,12 @@ The journal-only receipt observer checks real paths and existing device/inode
 identities before SQLite initialization. Separate new files remain supported.
 This preflight does not migrate old databases or prevent concurrent host
 filesystem changes.
+
+## Standard testnet CREATE2 vanity observation (P17)
+
+The read-only library computes the first frozen suffix candidate from pinned
+creation bytes and compares it with factory/deployer reads at one pinned block.
+CI runs a separate local Forge differential against the unchanged Standard
+contracts, checking the artifact, creator and launch nonce, and code-only and
+nonce-only collisions. Local evidence does not establish public availability,
+artifact provenance for live deployments, or the full P17 catalog.

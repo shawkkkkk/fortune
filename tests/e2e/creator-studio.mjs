@@ -1,6 +1,7 @@
 /** Local browser/storage/download fixture. No identity or publishing claim. */
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
+import { execFileSync } from "node:child_process";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 const { chromium } = await import(process.env.FORTUNE_PLAYWRIGHT_MODULE || "playwright");
@@ -59,7 +60,7 @@ try {
   await import("../../scripts/register-ts.mjs");
   const { CreatorCanonRegistry } = await import("../../scripts/creator-canon-registry.mjs");
   const { emptyCharacter } = await import("../../lib/creator-character.ts");
-  const { policy, signature, creatorFor } = await import("../fixtures/creator-canon.mjs");
+  const { policy, signature, creatorFor, client, a } = await import("../fixtures/creator-canon.mjs");
   const folder = await mkdtemp(join(tmpdir(), "fortune-studio-canon-"));
   const context = await browser.newContext({ acceptDownloads: true });
   try {
@@ -72,7 +73,13 @@ try {
     finally { book.close(); }
     const creator = await creatorFor(prepared);
     const raw = JSON.stringify(prepared, (_, value) => typeof value === "bigint" ? String(value) : value);
-    const pins = JSON.stringify({ policy, registryId: prepared.typedData.domain.salt, account: creator });
+    const policyPath = join(folder, "policy.json");
+    await writeFile(policyPath, JSON.stringify(policy), { mode: 0o600 });
+    const pins = execFileSync(process.execPath, ["--import", "./scripts/register-ts.mjs",
+      "scripts/operate-creator-canon.mjs", "studio-pins", path, policyPath, creator], {
+      encoding: "utf8", timeout: 5000, env: { ...process.env, FORTUNE_CREATOR_CANON_ENABLED: "true" },
+    });
+    assert.deepEqual(JSON.parse(pins), { policy, registryId: prepared.typedData.domain.salt, account: creator });
     const page = await context.newPage(), writes = [], errors = [];
     page.on("pageerror", e => errors.push(e.message));
     await context.route("**/*", route => {
@@ -129,7 +136,8 @@ try {
     const download = await pending;
     const envelopePath = join(folder, "envelope.json");
     await download.saveAs(envelopePath);
-    assert.deepEqual(JSON.parse(await readFile(envelopePath, "utf8")), { update: prepared.update, signature });
+    const envelope = JSON.parse(await readFile(envelopePath, "utf8"));
+    assert.deepEqual(envelope, { update: prepared.update, signature });
     const calls = (await page.evaluate(() => window.fixtureCalls)).slice(headerCalls.length);
     assert.deepEqual(calls.map(x => x.method), ["eth_accounts", "eth_chainId", "eth_signTypedData_v4", "eth_accounts", "eth_chainId"]);
     assert.equal(calls[2].params[0].toLowerCase(), creator);
@@ -154,6 +162,28 @@ try {
     assert.deepEqual(writes, []);
     assert.deepEqual(errors, []);
     console.log("PASS Studio local wallet handoff: exact envelope, separate pins and consent, in-flight edit fence, no network writes");
+
+    // The explicit operator-side acceptance is separate from the browser flow.
+    const acceptor = new CreatorCanonRegistry(path, policy);
+    let record;
+    try {
+      assert.equal(acceptor.latest(), null);
+      await assert.rejects(acceptor.accept(envelope, [client(a(99), { now }), client(a(99), { now })]), /creator/i);
+      assert.equal(acceptor.latest(), null);
+      await acceptor.accept(envelope, [client(creator, { now }), client(creator, { now })]);
+      record = acceptor.latest();
+      assert.deepEqual(record.update, envelope.update);
+      assert.equal(record.signature, envelope.signature);
+      assert.equal(record.currentAuthorization, null);
+      assert.equal(record.executionAuthorized, false);
+    } finally { acceptor.close(); }
+    const reopened = new CreatorCanonRegistry(path, policy);
+    try {
+      assert.deepEqual(reopened.latest(), record);
+      await assert.rejects(reopened.accept(envelope, []), /revision/i);
+      assert.deepEqual(reopened.latest(), record);
+    } finally { reopened.close(); }
+    console.log("PASS Studio operator round trip: CLI pins, browser envelope, wrong-creator rejection, durable acceptance and replay rejection");
   } finally {
     await context.close();
     await rm(folder, { recursive: true, force: true });

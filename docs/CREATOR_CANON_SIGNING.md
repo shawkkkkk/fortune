@@ -1,5 +1,12 @@
 # Creator character wallet adapter
 
+The browser rehearsal now obtains pins through the actual operator CLI, then
+passes the exact downloaded envelope to the existing registry verifier. It
+checks wrong-creator rejection, a single durable acceptance, reopen and replay
+rejection. The wallet returns the existing arbitrary fixture tuple and the two
+read clients supply fixture factory state; this does not demonstrate independent
+providers, live approval, publication, or audit readiness.
+
 ## Loopback Studio wallet handoff (P01/P02/P06)
 
 On a top-level HTTP page at `localhost` or `127.0.0.1`, open the local wallet

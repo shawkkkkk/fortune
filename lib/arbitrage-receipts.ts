@@ -57,7 +57,32 @@ export function fillMarketHash(m: FillMarket): Hex {
   return digest(parts);
 }
 
-async function observe(client: PublicClient, m: FillMarket, txHash: Hex) {
+const FILL_RPC_METHODS = ["getChainId", "getTransactionReceipt", "getTransaction", "getBlockNumber", "getBlock", "getCode", "readContract"] as const;
+type FillReadClient = Pick<PublicClient, (typeof FILL_RPC_METHODS)[number]>;
+const fillRpcMethodSet: ReadonlySet<string> = new Set(FILL_RPC_METHODS);
+
+/** Admit all required methods before a caller takes a lease or durable hold. */
+export function snapshotFillReadClients(clients: unknown): readonly [FillReadClient, FillReadClient] {
+  if (!Array.isArray(clients) || clients.length !== 2 || !Object.hasOwn(clients, 0) || !Object.hasOwn(clients, 1)) {
+    throw Error("Two distinct read clients required");
+  }
+  const [a, b] = [clients[0], clients[1]];
+  if (a === b) throw Error("Two distinct read clients required");
+  function snapshot(target: unknown): FillReadClient {
+    if (!target || typeof target !== "object") throw Error("Receipt RPC methods required");
+    const actions = Object.fromEntries(FILL_RPC_METHODS.map(name => {
+      let action: unknown;
+      try { action = Reflect.get(target, name, target); }
+      catch { throw Error("Receipt RPC methods required"); }
+      if (typeof action !== "function") throw Error("Receipt RPC methods required");
+      return [name, (...args: unknown[]) => Reflect.apply(action, target, args)] as const;
+    }));
+    return actions as FillReadClient;
+  }
+  return Object.freeze([snapshot(a), snapshot(b)] as const);
+}
+
+async function observe(client: FillReadClient, m: FillMarket, txHash: Hex) {
   if (await client.getChainId() !== m.chainId) throw new Error("Receipt RPC chain mismatch");
   const [receipt, tx, head] = await Promise.all([
     client.getTransactionReceipt({ hash: txHash }), client.getTransaction({ hash: txHash }), client.getBlockNumber({ cacheTime: 0 }),
@@ -160,7 +185,7 @@ async function observe(client: PublicClient, m: FillMarket, txHash: Hex) {
 /** Two separately configured trusted RPC clients must independently agree.
  * This is RPC-backed evidence, not a receipt Merkle proof or independent-provider attestation.
  */
-export async function readVerifiedFill(clients: readonly [PublicClient, PublicClient], market: FillMarket, txHash: Hex): Promise<VerifiedFill> {
+export async function readVerifiedFill(clients: readonly [FillReadClient, FillReadClient], market: FillMarket, txHash: Hex): Promise<VerifiedFill> {
   const m = structuredClone(market), marketHash = fillMarketHash(m);
   if (!hash(txHash) || !Array.isArray(clients) || clients.length !== 2 || clients[0] === clients[1]) throw new Error("Transaction hash and two distinct RPC clients required");
   const start = Date.now();
@@ -174,10 +199,9 @@ export async function readVerifiedFill(clients: readonly [PublicClient, PublicCl
     previous = now;
     return now;
   };
-  const methods = new Set(["getChainId", "getTransactionReceipt", "getTransaction", "getBlockNumber", "getBlock", "getCode", "readContract"]);
   const readers = clients.map(client => new Proxy(client, { get(target, key) {
     const value = Reflect.get(target, key, target);
-    if (typeof key !== "string" || !methods.has(key) || typeof value !== "function") return value;
+    if (typeof key !== "string" || !fillRpcMethodSet.has(key) || typeof value !== "function") return value;
     return async (...parameters: unknown[]) => {
       clock();
       const result = await value.apply(target, parameters);

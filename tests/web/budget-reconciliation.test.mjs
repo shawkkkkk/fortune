@@ -119,3 +119,44 @@ test('operator CLI refuses absent files and does not expose private configuratio
  assert.equal(r.status,1);assert.equal(r.stdout,'');assert.equal(existsSync(missing),false);assert.doesNotMatch(r.stderr,/private-market|private-policy|private-budget|secret.invalid|private-key/);
  }finally{f.clean();}
 });
+
+for(const queued of [false,true])test(`malformed receipt client rejects before ${queued?'queue claim':'direct hold'} or provider calls`,async()=>{
+ const f=setup();let b,j,q;
+ try{
+  const qp=join(f.dir,'jobs.sqlite');
+  b=new Book(f.path,policy(),f.clock);j=new Journal(f.jp,market());q=new Queue(qp,market(),f.clock);
+  b.reserve(TX,'100000');q.enqueue(TX);
+  const before=b.status();let calls=0;
+  const bad=clients().map(c=>({...c,async getChainId(){calls++;return 97;}}));
+  delete bad[1].getTransactionReceipt;
+  const run=readers=>queued?observe(q,b,j,readers,market()):reconcile(b,j,readers,market(),TX);
+  await assert.rejects(run(bad),/Receipt RPC methods required/);
+  await assert.rejects(run([bad[0],null]),/Receipt RPC methods required/);
+  Object.defineProperty(bad[1],'getTransactionReceipt',{get(){throw Error('private provider URL');}});
+  await assert.rejects(run(bad),{message:'Receipt RPC methods required'});
+  const sparse=[bad[0],,];Object.setPrototypeOf(sparse,Object.assign(Object.create(Array.prototype),{1:clients()[0]}));
+  await assert.rejects(run(sparse),/Two distinct read clients required/);
+  assert.equal(calls,0);
+  assert.deepEqual(q.stats(),{pending:1,leased:0,done:0,exhausted:0});
+  assert.deepEqual(b.status(),before);assert.deepEqual(j.list(),[]);
+  b.close();b=null;q.close();q=null;
+  b=new Book(f.path,policy(),f.clock);q=new Queue(qp,market(),f.clock);
+  assert.deepEqual(b.status(),before);assert.equal(q.stats().pending,1);
+ }finally{q?.close();j?.close();b?.close();f.clean();}
+});
+test('queued reconciliation pins admitted methods and retains their original receiver',async()=>{
+ const f=setup();let b,j,q;
+ try{
+  b=new Book(f.path,policy(),f.clock);j=new Journal(f.jp,market());q=new Queue(join(f.dir,'jobs.sqlite'),market(),f.clock);
+  b.reserve(TX,'100000');q.enqueue(TX);
+  const pair=clients();let calls=0;
+  for(const c of pair){
+   const get=c.getTransactionReceipt;
+   c.getTransactionReceipt=function(...args){assert.equal(this,c);assert.equal(b.status().pendingRechecks,1);calls++;return get.apply(this,args);};
+  }
+  const claim=q.claim.bind(q);
+  q.claim=()=>{const lease=claim();for(const c of pair)c.getTransactionReceipt=()=>{throw Error('unexpected replacement');};return lease;};
+  assert.equal((await observe(q,b,j,pair,market())).state,'done');
+  assert.equal(calls,2);assert.equal(j.list().length,1);assert.equal(b.status().chargedRollingDayWei,'50000');
+ }finally{q?.close();j?.close();b?.close();f.clean();}
+});

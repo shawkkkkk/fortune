@@ -5,6 +5,22 @@ reviewed dependencies. Those sources are now integrated; the original stack no
 longer requires retargeting. #74's transaction-identity guard is required: a changed swap log
 index must not create a second trusted observation of the same transaction.
 
+## Read-client admission before durable work
+
+Direct reconciliation and the queued coordinator require both distinct clients
+to expose all seven receipt-read methods before taking a gas hold. The queue
+checks the methods before claiming an eligible job. Missing methods or unreadable
+method accessors are configuration errors: no provider method is called, no
+attempt is consumed, and no hold, freeze, or journal entry is created. The queued
+coordinator still stops on a blocked book before inspecting methods. Each admitted callable
+is captured with its original receiver, so swapping a method after the queue
+claim cannot change that observation's call path.
+
+This preflight checks method presence, not endpoint availability or provider
+independence. Genuine provider failures after the durable hold retain the same
+quarantine behavior. There is no hold recovery, retry, funding, profit allocation,
+signing or execution authority.
+
 ## Durable hold before network work
 
 `reconcileBudgetedReceipt` binds the journal market policy, budget's allowed market

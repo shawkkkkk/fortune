@@ -1,5 +1,14 @@
 # Testnet implementation ledger
 
+## Receipt client admission before queue claim or gas hold (M01/M07/M08)
+
+The existing strategy coordinator now checks all required read methods on both
+clients and captures them with their original receivers before taking durable
+work. Invalid local configuration leaves the queue, gas budget, and journal
+unchanged; actual provider failures after a hold still quarantine. Journal
+commit before gas charge and queue completion remains unchanged. This neither
+attests provider independence nor recovers a hold or authorizes execution.
+
 ## Studio predecessor review (P01/P02/P06)
 
 The read-only creator operator CLI can export the current revision and digest

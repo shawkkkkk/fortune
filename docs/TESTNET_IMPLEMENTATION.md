@@ -1952,3 +1952,11 @@ This limits future step execution; it does not diagnose PR195's unclassified
 run41723886807/job126223476063 or certify control-plane termination/log delivery.
 No overrun drill, new engine runtime, public testnet, audit or activation evidence
 is claimed. Exact-head CI and independent post-merge checks are still required.
+
+## Standard testnet CREATE2 vanity observation (P17)
+
+The additive library derives the frozen factory's first suffix candidate from
+pinned creation bytes and exact manifest inputs. Its read-only observer checks
+factory preview, direct deployer prediction and code/nonce occupancy at one
+caller-pinned block. Loopback HTTP tests are component evidence; compiled parity,
+artifact provenance, public availability and the full P17 catalog remain open.

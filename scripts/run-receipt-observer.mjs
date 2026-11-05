@@ -1,4 +1,5 @@
-import { readFileSync, statSync } from "node:fs";
+import { statSync } from "node:fs";
+import { readReceiptPolicy } from "./read-receipt-policy.mjs";
 import { resolve } from "node:path";
 import { createPublicClient, http } from "viem";
 import { ArbitrageFillJournal } from "./arbitrage-fill-journal.mjs";
@@ -7,10 +8,10 @@ let queue, journal;
 try {
   const [manifestPath, queuePath, journalPath, action, tx, ...extra] = process.argv.slice(2);
   if (!manifestPath || !queuePath || !journalPath || resolve(queuePath) === resolve(journalPath) || extra.length || !["enqueue", "once", "status"].includes(action)
-    || (action === "enqueue" ? !tx : tx !== undefined) || statSync(manifestPath).size > 16_384) throw Error("Arguments");
+    || (action === "enqueue" ? !tx : tx !== undefined)) throw Error("Arguments");
   // Monitoring must not create empty files and mistake an absent worker installation for health.
   if (action === "status" && (!statSync(queuePath).isFile() || !statSync(journalPath).isFile())) throw Error("Existing durable files required");
-  const market = JSON.parse(readFileSync(manifestPath, "utf8"));
+  const market = readReceiptPolicy(manifestPath);
   // Check both files against the same manifest even for enqueue/status; no silent policy migration.
   queue = new ReceiptObservationQueue(queuePath, market, Date.now, { readOnly: action === "status" });
   journal = new ArbitrageFillJournal(journalPath, market, { readOnly: action === "status" });

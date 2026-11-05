@@ -10,7 +10,7 @@ export async function creatorFor(prepared){return (await recoverTypedDataAddress
 export function client(creator,o={}){
   let reads=0;
   return {async getChainId(){return o.chain??97;},async getBlockNumber(){return o.head??130n;},
-    async getBlock({blockNumber}){assertBlock(blockNumber);reads++;return {number:blockNumber,hash:o.reorg&&reads>1?h(9):o.hash??h(110),timestamp:BigInt(now/1000)-(o.old?500n:10n)};},
+    async getBlock({blockNumber}){assertBlock(blockNumber);reads++;return {number:blockNumber,hash:o.reorg&&reads>1?h(9):o.hash??h(110),timestamp:BigInt(Math.floor((o.now??now)/1000))-(o.old?500n:10n)};},
     async getCode({address,blockNumber}){assertBlock(blockNumber);return address.toLowerCase()===policy.factory?(o.badCode?'0x6001':code):(o.contract?'0x6000':'0x');},
     async readContract({address,functionName,args,blockNumber}){assertBlock(blockNumber);if(address!==policy.factory||functionName!=='launches'||args[0]!==7n)throw Error('Unexpected call');
       if(o.unavailable)throw Error('secret provider URL');

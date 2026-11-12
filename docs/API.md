@@ -285,3 +285,16 @@ online; demo-backed endpoints identify their data mode in response metadata.
 `GET /api/public/v1/transactions/{hash}` can return `data.launch` only for a successful receipt addressed to the configured Standard factory with a matching factory `LaunchCreated` event and creator. Pending/not-found responses never authorize blind resubmission. Raw upstream RPC error details are not included in public responses.
 
 Read-only catalog/registry inspection can operate while mainnet is paused. Wallet transaction permission still requires the unchanged release gates. `/api/ready` also checks full mainnet release readiness on chain 56.
+### X Money payout adapter
+
+```http
+GET /api/public/v1/xmoney/status
+POST /api/public/v1/xmoney/preview
+```
+
+The status endpoint reports the pinned provider's Base USDC and X Money/USD
+capability plus Fortune's disabled-by-default unsigned-preparation gates. The
+preview endpoint normalizes a proposed creator payout and returns a stable plan
+and blockers. It never registers a payee, calls a signer or broadcasts. Every
+requested check is a caller assertion rather than verified evidence, so
+`transactionReady` is always false. See [X_MONEY_PAYOUTS.md](X_MONEY_PAYOUTS.md).

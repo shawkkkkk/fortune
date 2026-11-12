@@ -1967,3 +1967,18 @@ The journal-only receipt observer checks real paths and existing device/inode
 identities before SQLite initialization. Separate new files remain supported.
 This preflight does not migrate old databases or prevent concurrent host
 filesystem changes.
+## X Money creator payout adapter (M04/M08/P20/P24, 2026-11-12)
+
+Fortune now pins `@zkp2p/cash@0.8.0` and exposes read-only capability plus a
+deterministic public preview for X Money/USD payouts from canonical Base USDC.
+The public preview remains non-executable. A server-only adapter can prepare the
+provider's unsigned Base transactions only after a separate capped operator
+authorization matches custody, screening and settlement references; it never
+signs, broadcasts or retries. Receipt reconciliation requires every delivered
+fill's verified USD amount, payment id, fulfilment time and released USDC.
+
+This does not alter the current custom-pair social vault or eliminate its bound-
+wallet claim. The BSC fee collection, asset conversion/bridge, custody wallet,
+durable payout ledger, preproduction USD-arrival drill, privacy/legal review,
+independent review and production canary remain blocked. See
+[X_MONEY_PAYOUTS.md](X_MONEY_PAYOUTS.md).

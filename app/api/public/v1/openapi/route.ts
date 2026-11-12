@@ -19,9 +19,39 @@ export async function GET(request: Request) {
       { name: "Assets" },
       { name: "Markets" },
       { name: "Launches" },
+      { name: "Payouts" },
       { name: "Analytics" },
     ],
     paths: {
+      "/xmoney/status": {
+        get: {
+          tags: ["Payouts"],
+          summary: "X Money payout provider capability and disabled-by-default execution status",
+          description: "Reads the pinned Peer Cash SDK's synchronous Base-USDC/X-Money capability. It does not register a recipient, prepare transactions, sign, broadcast or prove that an X account has X Money enabled.",
+          responses: { "200": { description: "Provider version, environment, Base USDC destination, X Money/USD corridor and server preparation gates" } },
+        },
+      },
+      "/xmoney/preview": {
+        post: {
+          tags: ["Payouts"],
+          summary: "Normalize a proposed X Money payout without preparing a transaction",
+          description: "Maximum body 8192 bytes. Caller-supplied checks are requests for later operator review, not verified evidence. A stable planId does not grant custody, signing or payment authority; transactionReady is always false.",
+          requestBody: { required: true, content: { "application/json": { schema: {
+            type: "object", additionalProperties: false,
+            required: ["xHandle", "baseUsdcUnits", "baseSettlementTxHash", "sourceReference", "requestedChecks"],
+            properties: {
+              xHandle: { type: "string", description: "X username, with or without leading @" },
+              baseUsdcUnits: { type: "string", pattern: "^[1-9][0-9]{0,19}$", description: "Canonical Base USDC base units (6 decimals)" },
+              baseSettlementTxHash: { type: "string", pattern: "^0x[0-9a-fA-F]{64}$" },
+              sourceReference: { type: "string", minLength: 8, maxLength: 128 },
+              requestedChecks: { type: "object", additionalProperties: false, required: ["xIdentityVerified", "xMoneyEnabledConfirmed", "receiptConnectionVerified", "liveScreeningPassed", "baseUsdcSettled", "custodyPolicyApproved", "ownerAuthorizationPresent"], properties: {
+                xIdentityVerified: { type: "boolean" }, xMoneyEnabledConfirmed: { type: "boolean" }, receiptConnectionVerified: { type: "boolean" }, liveScreeningPassed: { type: "boolean" }, baseUsdcSettled: { type: "boolean" }, custodyPolicyApproved: { type: "boolean" }, ownerAuthorizationPresent: { type: "boolean" },
+              } },
+            },
+          } } } },
+          responses: { "200": { description: "Non-executable normalized plan, blockers and stable planId" }, "400": { description: "Malformed JSON or invalid plan" }, "413": { description: "Body exceeds 8192 bytes" }, "415": { description: "JSON content type required" } },
+        },
+      },
       "/omnichain/preview": {
         post: {
           tags: ["Launches"],

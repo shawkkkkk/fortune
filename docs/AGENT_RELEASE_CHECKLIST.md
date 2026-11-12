@@ -3,8 +3,10 @@
 Use this with [MAINNET_READINESS.md](MAINNET_READINESS.md),
 [RELEASE_HANDOFF.md](RELEASE_HANDOFF.md), [AUDIT_SCOPE.md](AUDIT_SCOPE.md),
 [MAINNET_AUDIT_REQUEST.md](MAINNET_AUDIT_REQUEST.md), and the root release/dependency
-manifests. This checklist grants no deployment, signing, funding or activation
-authority and does not alter any gate.
+manifests. This checklist grants no standing deployment, signing, funding or
+activation authority and does not alter any gate. A current explicit owner
+instruction can authorize only the exact capped test or canary it names, subject
+to every chain/asset/custody/recipient/provider/receipt/recovery gate below.
 
 The question is not only "does testnet work?" Each exact engine/release needs
 separate functional, security, operational and authorization evidence.
@@ -47,8 +49,11 @@ force a result.
 
 After pinned setup, run the relevant source/CI checks in CONTRIBUTING.md. Also
 inspect the existing workflows before any manual dispatch; a workflow called
-testnet or audit may still broadcast or consume credentials. Agents must not
-dispatch funded/signer/deploy/activate workflows.
+testnet or audit may still broadcast or consume credentials. Do not dispatch a
+funded, signer, deploy or activate workflow without a current explicit owner
+instruction for that exact workflow and scope. Record the cap and gates before
+dispatch, inspect persisted state before any retry, and never expand a canary
+authorization into general activation.
 
 ```bash
 npm run mainnet:check
@@ -114,6 +119,8 @@ Precise owner/operator actions still required:
 
 Read mainnet-release.json and the engine-specific release requirements; enumerate
 every missing gate, not only audit. Credentials/funding, independent auditors,
-legal reviewers and governance signatures remain separate owner/operator work.
-Do not generate signatures, grant permissions or enable mainnet during an agent
-contribution. Update the implementation ledger and review packet honestly.
+legal reviewers and governance signatures remain separate owner/operator work
+unless the owner expressly authorizes one exact bounded operation under the
+rules above. Do not generate signatures, grant permissions or enable mainnet
+merely to complete a contribution. Update the implementation ledger and review
+packet honestly.

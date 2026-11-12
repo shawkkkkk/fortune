@@ -114,5 +114,9 @@ stays unfinished until its own evidence supports completion.
 
 Follow [SECURITY.md](SECURITY.md). Use private vulnerability reporting where
 available; do not publish exploitable details or credentials in public issues.
-No contribution agent is authorized to sign, provision secrets, fund workflows,
-deploy/activate mainnet, fabricate external review or grant legal approval.
+Contribution agents have no standing authority to sign, provision secrets, fund
+workflows or deploy/activate mainnet. A current explicit owner instruction may
+authorize one specified, capped payout test or canary after the chain, asset,
+signer/custody path, recipient screening, provider environment, receipt and
+recovery gates in `AGENTS.md` are satisfied. It does not authorize broader
+activation. No contributor may fabricate external review or legal approval.

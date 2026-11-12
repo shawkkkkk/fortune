@@ -130,13 +130,18 @@ The final two commands must currently fail: missing evidence is not a passing re
 The original frozen 63-file candidate had aggregate
 `d70ed0820e5cc9d86919dcfd15618ad021d777a86397ce5ebcb4450fc5677129`.
 That is a historical baseline, not the fingerprint of the current root after
-PR #89's dependency refresh. The measured source candidate now has this record:
+PR #89's dependency refresh. On 2026-11-12 the owner explicitly authorized the
+root dependency change needed for the isolated X Money payout adapter. Pinning
+`@zkp2p/cash@0.8.0` changes the 63-file candidate fingerprint again; it does not
+change Standard contracts and does not transfer old audit, deployment or release
+approval to the new dependency graph. The measured source candidate now has this
+record:
 
 <!-- fortune-current-candidate -->
 ```json
 {
   "schemaVersion": 1,
-  "aggregateSha256": "f84734eeb945d7c93a206db40a67ec1925a3718b2d79e84468eca92f0ae1efc6",
+  "aggregateSha256": "0d24769d0d493816f2ff80c02b6126047020397f5dd2af6348ac5edb4d919648",
   "fileCount": 63,
   "acceptance": "not-established",
   "historicalAggregateSha256": "d70ed0820e5cc9d86919dcfd15618ad021d777a86397ce5ebcb4450fc5677129"

@@ -49,6 +49,7 @@ export async function GET() {
         finalBuyPartialFillRefund: true,
         sevenDayGraduationRescue: true,
         authoritativeMarketPhases: true,
+        xMoneyPayouts: "Base-USDC adapter and non-executable preview; unsigned preparation disabled by default",
       },
       docs: "/developers",
       openapi: "/api/public/v1/openapi",

@@ -293,7 +293,9 @@ POST /api/public/v1/xmoney/preview
 ```
 
 The status endpoint reports the pinned provider's Base USDC and X Money/USD
-capability plus Fortune's disabled-by-default unsigned-preparation gates. The
+capability, private receipt-binding controls and Fortune's disabled-by-default
+unsigned-preparation gates. Receipt controls are descriptive only: the public API
+does not accept raw receipt links or payment ids. The
 preview endpoint normalizes a proposed creator payout and returns a stable plan
 and blockers. It never registers a payee, calls a signer or broadcasts. Every
 requested check is a caller assertion rather than verified evidence, so

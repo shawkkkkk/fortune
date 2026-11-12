@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { registerHooks } from "node:module";
 import { planXMoneyPayout, reconcileXMoneyReceipt, XMONEY_PAYOUT_RULES } from "../../lib/xmoney-payout.ts";
-import { prepareAuthorizedXMoneyPayout, readXMoneyPayoutStatus } from "../../lib/xmoney-payout-server.ts";
+import { prepareAuthorizedXMoneyPayout, readAndReconcileBoundXMoneyOrder, readXMoneyPayoutStatus } from "../../lib/xmoney-payout-server.ts";
+import { createXMoneyReceiptBinding, reconcileBoundXMoneyReceipt, xMoneyPaymentReference, XMONEY_RECEIPT_CONTROLS } from "../../lib/xmoney-receipt.ts";
 
 registerHooks({ resolve(specifier, context, next) { return next(specifier === "next/server" ? "next/server.js" : specifier, context); } });
 const { POST } = await import("../../app/api/public/v1/xmoney/preview/route.ts");
@@ -102,6 +103,48 @@ test("receipt reconciliation requires delivered provider evidence for every fill
   assert.equal(reconcileXMoneyReceipt({ ...order, state: "matched" }).verified, false);
 });
 
+test("bound receipt controls reject replay and return no raw payment identifiers", async () => {
+  const depositId = `${"0x" + "2".repeat(40)}_7`;
+  const key = "fortune-receipt-test-key-longer-than-thirty-two-bytes";
+  const binding = createXMoneyReceiptBinding({
+    planReference: planXMoneyPayout(input()).planId,
+    depositId,
+    payeeHash: hash("5"),
+    expectedBaseUsdcUnits: "2500000",
+  });
+  const order = {
+    depositId, state: "delivered", totalAmount: 2500000n, filledAmount: 2500000n,
+    pendingAmount: 0n, returnedAmount: 0n, nextActions: [], isInFlight: false, deliveredAt: 1_800_000_020,
+    payouts: [{ platform: "xmoney", platformHash: hash("3"), currency: "USD", currencyHash: hash("4"), payeeHash: hash("5"), active: true, pricing: { marketRate: true } }],
+    fills: [{
+      intentHash: hash("6"), status: "FULFILLED", amount: 2500000n, buyer: `0x${"7".repeat(40)}`,
+      fiatPaid: 2.5, paidCurrency: "USD", paymentId: "xmoney-payment-7", paidAt: 1_800_000_010,
+      signaledAt: 1_800_000_000, expiresAt: 1_800_000_060, releasedAmount: 2500000n, fulfilledAt: 1_800_000_015,
+    }],
+    explain() { return "delivered"; },
+  };
+  const receipt = reconcileBoundXMoneyReceipt(order, binding, key);
+  assert.equal(receipt.verified, true);
+  assert.equal(receipt.rawReceiptStored, false);
+  assert.equal(receipt.paymentCount, 1);
+  assert.equal(JSON.stringify(receipt).includes("xmoney-payment-7"), false);
+  const used = new Set([xMoneyPaymentReference("xmoney-payment-7", key)]);
+  assert.deepEqual(reconcileBoundXMoneyReceipt(order, binding, key, used).reasons, ["fill_0_receipt_replay"]);
+  assert.equal(reconcileBoundXMoneyReceipt({ ...order, payouts: [{ ...order.payouts[0], payeeHash: hash("8") }] }, binding, key).reasons.includes("payee_hash_mismatch"), true);
+  assert.equal(reconcileBoundXMoneyReceipt({ ...order, fills: [{ ...order.fills[0], paidAt: 1_799_999_999 }] }, binding, key).reasons.includes("fill_0_outside_provider_intent_window"), true);
+  assert.throws(() => xMoneyPaymentReference("https://money.x.com/private-receipt", key));
+  assert.throws(() => reconcileBoundXMoneyReceipt(order, { ...binding, expectedBaseUsdcUnits: "1" }, key), /modified/);
+
+  const fromServer = await readAndReconcileBoundXMoneyOrder(binding, key, new Set(), { order: async () => order });
+  assert.equal(fromServer.verified, true);
+  assert.deepEqual(XMONEY_RECEIPT_CONTROLS, readXMoneyPayoutStatus({ capabilities() { return {
+    chainId: 8453, token: { address: XMONEY_PAYOUT_RULES.baseUsdc, symbol: "USDC", decimals: 6 },
+    destination: { chainId: 8453, token: { address: XMONEY_PAYOUT_RULES.baseUsdc, symbol: "USDC", decimals: 6 } },
+    source: { default: { chainId: 8453, token: { address: XMONEY_PAYOUT_RULES.baseUsdc, symbol: "USDC", decimals: 6 } } },
+    environment: "preproduction", platforms: [],
+  }; } }).receiptVerification);
+});
+
 test("public endpoints expose capability and preview, never the prepare call", async () => {
   const previous = process.env.FORTUNE_XMONEY_PREPARE_ENABLED;
   delete process.env.FORTUNE_XMONEY_PREPARE_ENABLED;
@@ -111,6 +154,8 @@ test("public endpoints expose capability and preview, never the prepare call", a
   assert.equal(statusBody.corridor.platform, "xmoney");
   assert.deepEqual(statusBody.corridor.currencies, ["USD"]);
   assert.equal(statusBody.prepareEnabled, false);
+  assert.equal(statusBody.receiptVerification.rawReceiptStorage, false);
+  assert.equal(statusBody.receiptVerification.directReceiptLinksAccepted, false);
 
   const request = (value) => new Request("https://fortune.test/api/public/v1/xmoney/preview", {
     method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(value),

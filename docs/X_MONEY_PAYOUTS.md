@@ -37,6 +37,28 @@ Base USDC is confirmed and reconciled on Base.
   provider reports an X Money/USD payout, the whole order is delivered, no funds
   were returned, and every released fill has verified USD, payment-id and time
   evidence.
+- `createXMoneyReceiptBinding()` binds one reviewed plan to the persisted Peer
+  deposit, its on-chain payee hash and exact Base-USDC amount.
+  `readAndReconcileBoundXMoneyOrder()` is the server-only admission path: every
+  fill must be fulfilled inside its provider-reported intent window and release
+  its exact amount. It returns keyed HMAC receipt references for replay checks,
+  never raw payment ids or shareable receipt links. There is no public receipt
+  submission or verification endpoint.
+
+## Backers control pattern
+
+[Backers' public guide](https://trybackers.com/docs#overview), reviewed November
+11, 2026, describes a different product: a user pays a named recipient through
+X Money, submits the receipt, and may be reimbursed from a SOL fee pool with a
+bonus. Fortune does not adopt its reimbursement economics, SOL pool, ten-minute
+hold, strike system or user-submitted receipt-link workflow.
+
+The reusable safety pattern is one obligation per payment, exact recipient,
+amount, currency, time and completion checks, payment replay prevention, private
+receipt handling and explicit pending/manual-review states. Fortune applies the
+parts supported by Peer order data. Peer remains the underlying payment-proof
+verifier; this binding is not independent X Money authentication, current creator
+login, legal approval or evidence that USD arrived in preproduction.
 
 ## Required checks before preparation
 
@@ -65,6 +87,8 @@ actual sender, note and receipt fields in preproduction before a live canary.
 
 No provider API key or wallet key is added here. If either becomes necessary,
 provision it only in managed server storage and update the threat model first.
+The receipt HMAC key is a separate managed server secret of at least 32 bytes;
+it is not a wallet key, provider credential or public environment variable.
 
 ## Failure and retry rules
 

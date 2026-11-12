@@ -8,7 +8,7 @@ export async function GET() {
     cacheSeconds: 3600,
     staleSeconds: 86400,
     meta: {
-      note: "Capability status only. This endpoint cannot register a payee, prepare a transaction, sign, broadcast or prove X Money enrollment.",
+      note: "Capability status only. Receipt controls accept provider order evidence server-side and never accept raw receipt links here. This endpoint cannot register a payee, prepare a transaction, sign, broadcast or prove X Money enrollment.",
     },
   });
 }

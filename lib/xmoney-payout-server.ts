@@ -7,6 +7,11 @@ import {
   type PreparedCashoutReceipt,
 } from "@zkp2p/cash";
 import { XMONEY_PAYOUT_RULES, type XMoneyPayoutPlan } from "@/lib/xmoney-payout";
+import {
+  reconcileBoundXMoneyReceipt,
+  XMONEY_RECEIPT_CONTROLS,
+  type XMoneyReceiptBinding,
+} from "@/lib/xmoney-receipt";
 
 type XMoneyEnvironment = "staging" | "preproduction" | "production";
 
@@ -57,6 +62,7 @@ export function readXMoneyPayoutStatus(cash: XMoneyClientPort = client()) {
     destination: capabilities.destination,
     corridor: corridor ?? null,
     rules: XMONEY_PAYOUT_RULES,
+    receiptVerification: XMONEY_RECEIPT_CONTROLS,
     senderDisclosure: "The creator sees the matched buyer as sender; Fortune can be included in the payment note.",
   };
 }
@@ -105,4 +111,19 @@ export function finalizePreparedXMoneyPayout(receipt: PreparedCashoutReceipt, ca
 
 export async function readXMoneyOrder(depositId: string, cash: XMoneyClientPort = client()) {
   return orderToJson(await cash.order(depositId));
+}
+
+/**
+ * Server-only receipt admission. The caller supplies a managed HMAC key and
+ * the durable set of previously consumed receipt references. No raw payment id
+ * or shareable receipt link is returned.
+ */
+export async function readAndReconcileBoundXMoneyOrder(
+  binding: XMoneyReceiptBinding,
+  receiptHmacKey: string | Uint8Array,
+  usedReceiptReferences: ReadonlySet<string>,
+  cash: XMoneyClientPort = client()
+) {
+  const order = await cash.order(binding.depositId);
+  return reconcileBoundXMoneyReceipt(order, binding, receiptHmacKey, usedReceiptReferences);
 }

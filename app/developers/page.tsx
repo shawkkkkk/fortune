@@ -115,7 +115,9 @@ export default function DevelopersPage() {
           pinned provider capability. The public API cannot claim BSC fees,
           prepare, sign or broadcast a transaction. Server-side preparation is
           unsigned and requires separate capped custody, screening, settlement
-          and operator evidence.
+          and operator evidence. Server-side receipt admission binds one plan to
+          its Peer deposit, payee hash, exact amount and provider intent windows;
+          public endpoints never accept raw receipt links.
         </p>
         <p className="dataDisclaimer">
           A valid X handle does not prove X Money enrollment. The current social

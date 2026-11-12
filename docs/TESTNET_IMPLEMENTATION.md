@@ -1982,3 +1982,21 @@ wallet claim. The BSC fee collection, asset conversion/bridge, custody wallet,
 durable payout ledger, preproduction USD-arrival drill, privacy/legal review,
 independent review and production canary remain blocked. See
 [X_MONEY_PAYOUTS.md](X_MONEY_PAYOUTS.md).
+
+## Bound X Money receipt admission (M04/M08/P20/P24, 2026-11-12)
+
+The server-only X Money reader can now bind one reviewed payout plan to the
+persisted Peer deposit id, on-chain payee hash and exact Base-USDC amount. It
+requires one X Money/USD payout leg, fully delivered amounts, fulfilled fills,
+exact released units and payment times inside each provider-reported intent
+window. External payment ids become keyed HMAC references so a durable consumer
+can reject reuse without returning raw ids or receipt URLs. The public status
+endpoint describes these controls but exposes no receipt-submission path.
+
+Focused fixture tests cover valid admission, modified binding, wrong payee,
+wrong amount, early payment, replay, raw-link rejection and the actual server
+order-read composition. This adapts receipt-safety ideas documented by Backers;
+it does not copy Backers' SOL rebate/bonus economics or establish independent
+X Money proof, provider independence, a durable global replay ledger, live USD
+arrival, custody, signing, legal approval, audit or production readiness. All
+existing execution and release gates remain unchanged.

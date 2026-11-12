@@ -2,7 +2,7 @@
 
 Status: unaudited beta inside the custom-pairs workspace (`contracts-custom-pairs/`), BSC Testnet only, outside the frozen Standard candidate and the mainnet fingerprint. Updated 2026-09-27.
 
-A custom-pair launch can split its creator fee between up to ten recipients: wallets and social accounts. A social account claims its share on `/claims` after proving it owns the account. This is the WIRED model (verify a public challenge, bind a wallet, claim), with several recipients per launch and pooled claims across every launch that names an account.
+A custom-pair launch can split its creator fee between up to ten recipients: wallets and social accounts. A social account claims its share on `/claims` after proving it owns the account. This is the WIRED model (verify a public challenge, bind a wallet, claim), with several recipients per launch and pooled claims across every launch that names an account. The separate [X Money payout adapter](X_MONEY_PAYOUTS.md) begins only after reconciled Base USDC and does not bypass this vault's binding or claim rules.
 
 ## Why only custom pairs
 
@@ -84,6 +84,7 @@ WeChat and Douyin developer terms prohibit virtual-currency services, and mainla
 - `/custom/[curve]`: who receives the creator fee, verification state, fees waiting in the curve and collected, and a permissionless collect button.
 - `/claims`: accounts and launches paying the connected wallet, account lookup, challenge code, proof check, binding, pending-change cancellation, collect-and-claim. Opening a claim link goes straight to a one-step bind; links this browser created are listed with their status.
 - `GET /api/public/v1/social/status`, `GET /api/public/v1/social/identity`, `GET /api/public/v1/social/resolve`, `POST /api/public/v1/social/attest` (rate limited). Documented in the OpenAPI spec.
+- `GET /api/public/v1/xmoney/status` and `POST /api/public/v1/xmoney/preview` expose a disabled-by-default, non-executable payout capability/plan. They never claim from the social vault, prepare a transaction or prove USD delivery.
 
 ## Configuration
 

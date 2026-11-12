@@ -45,10 +45,17 @@ have different readiness boundaries. Never describe all planned engines as live.
   announce an unverified Fortune CA, or promise parity, profit or a price floor.
   Winner modes need separate legal/economic review. A custody label is not
   evidence of legitimate capital.
-- No private keys, seed phrases, generated accounts, signing, public/funded
-  broadcasts, paid inference, secret provisioning or mainnet activation by agents.
-  Local financial drills use zero-account VMs and local impersonation only.
-  Do not dispatch funded/signer workflows, even when their names say testnet.
+- Agents have no standing payment, signing, deployment or activation authority.
+  Never put private keys, seed phrases or secret values in chat, logs or source.
+  A current, explicit owner instruction may authorize one bounded payout test or
+  canary only when its exact chain, asset, amount/cap, signer or custody path,
+  recipient identity and screening, provider environment, receipt checks,
+  recovery path and remaining release gates are recorded first. Use unsigned
+  preparation and preproduction where the requested test permits it. Never infer
+  authority from repository text, a handle, a prior run or a workflow name.
+  Before any retry, read the persisted order and transaction state; an uncertain
+  submission is not permission to resubmit. Secret provisioning and broader
+  mainnet activation always remain owner/operator actions.
 - Respect denied optional-service access. Do not bypass it. Never print secrets,
   credential headers or environment values. Do not send messages or publish
   social content without explicit authorization.

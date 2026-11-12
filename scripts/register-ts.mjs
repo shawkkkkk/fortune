@@ -16,12 +16,12 @@ registerHooks({
     return nextResolve(specifier, context);
   },
   load(url, context, nextLoad) {
-    if (url.startsWith(pathToFileURL(root).href) && url.endsWith(".ts")) {
+    if (url.startsWith(pathToFileURL(root).href) && !url.includes("/node_modules/") && url.endsWith(".ts")) {
       return { format: "module", shortCircuit: true, source: ts.transpileModule(readFileSync(fileURLToPath(url), "utf8"), {
         compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext, esModuleInterop: true },
       }).outputText };
     }
-    if (url.startsWith(pathToFileURL(root).href) && url.endsWith(".json")) {
+    if (url.startsWith(pathToFileURL(root).href) && !url.includes("/node_modules/") && url.endsWith(".json")) {
       return { format: "module", shortCircuit: true, source: "export default " + readFileSync(fileURLToPath(url), "utf8") };
     }
     return nextLoad(url, context);

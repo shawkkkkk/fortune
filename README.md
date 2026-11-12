@@ -224,6 +224,8 @@ Current endpoints include:
 - `GET /stats`
 - `GET /automations`
 - `GET /revenue`
+- `GET /xmoney/status`
+- `POST /xmoney/preview`
 - `GET /openapi`
 
 A lightweight identity-only asset index is also available at `/api/public/total-assets`.

@@ -13,6 +13,8 @@ const endpoints = [
   ["GET", "/api/public/v1/creators/{address}", "A creator's launches, graduation record and current holdings"],
   ["GET", "/api/public/v1/universe", "BNB Chain stocks, RWA, pre-IPO and crypto pair assets with eligibility"],
   ["POST", "/api/public/v1/launches/preview", "Validate a launch configuration"],
+  ["GET", "/api/public/v1/xmoney/status", "X Money/USD capability and disabled-by-default preparation status"],
+  ["POST", "/api/public/v1/xmoney/preview", "Normalize a Base-USDC payout request without transaction authority"],
   ["GET", "/api/public/v1/transactions/{hash}", "Resolve transaction status before retrying"],
 ] as const;
 
@@ -102,6 +104,27 @@ export default function DevelopersPage() {
         <pre className="apiCode">{mcpConfig}</pre>
         <a className="secondaryCta" href="https://github.com/shawkkkkk/fortune/blob/main/docs/PROJECT_MCP.md">
           Project MCP setup and limits →
+        </a>
+      </section>
+
+      <section className="panel contentSection" aria-labelledby="xmoney-title">
+        <span className="eyebrow">CREATOR PAYOUT ADAPTER · DISABLED BY DEFAULT</span>
+        <h2 id="xmoney-title">X Money starts after Base USDC settles.</h2>
+        <p>
+          Fortune can normalize an X Money/USD payout request and inspect the
+          pinned provider capability. The public API cannot claim BSC fees,
+          prepare, sign or broadcast a transaction. Server-side preparation is
+          unsigned and requires separate capped custody, screening, settlement
+          and operator evidence.
+        </p>
+        <p className="dataDisclaimer">
+          A valid X handle does not prove X Money enrollment. The current social
+          vault still requires its bound-wallet claim; asset conversion, custody,
+          durable payout recovery and a verified preproduction USD receipt remain
+          separate launch gates.
+        </p>
+        <a className="secondaryCta" href="https://github.com/shawkkkkk/fortune/blob/main/docs/X_MONEY_PAYOUTS.md">
+          X Money payout boundary →
         </a>
       </section>
 

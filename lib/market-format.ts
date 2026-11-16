@@ -65,15 +65,15 @@ export function formatAge(timestamp: number | null | undefined, zh = false, now 
   const seconds = Math.max(0, Math.round(now - timestamp));
   const [value, en, cn] = seconds < 60 ? [seconds, "s ago", "秒前"]
     : seconds < 3600 ? [Math.floor(seconds / 60), "m ago", "分钟前"]
-    : seconds < 86_400 ? [Math.floor(seconds / 3600), "h ago", "小时前"]
-    : [Math.floor(seconds / 86_400), "d ago", "天前"];
+      : seconds < 86_400 ? [Math.floor(seconds / 3600), "h ago", "小时前"]
+        : [Math.floor(seconds / 86_400), "d ago", "天前"];
   return value + (zh ? cn : en);
 }
 
 export function formatHours(seconds: number, zh = false) {
   const hours = seconds / 3600;
-  if (hours >= 48) return Math.round(hours / 24) + (zh ? "天" : " days");
-  return (hours >= 10 ? Math.round(hours) : hours.toFixed(1)) + (zh ? "小时" : " hours");
+  if (hours >= 48) return Math.round(hours / 24) + (zh ? " 天" : " days");
+  return (hours >= 10 ? Math.round(hours) : hours.toFixed(1)) + (zh ? " 小时" : " hours");
 }
 
 export function shortAddress(value: string) {
@@ -116,7 +116,7 @@ export function assetTextColor(background: string) {
 }
 
 /** Coin colours, darkened step by step until white or ink text reaches WCAG AA (4.5:1). */
-export function assetColorStyle(symbol: string) {
+export function assetCoinStyle(symbol: string) {
   let background = assetColor(symbol);
   for (let step = 0; step < 8; step++) {
     const { white, ink } = contrasts(background);

@@ -6,21 +6,25 @@ const SUBSCRIPT = "₀₁₂₃₄₅₆₇₈₉";
 export function formatPrice(value: number | null | undefined) {
   if (value === null || value === undefined || !Number.isFinite(value)) return "—";
   if (value === 0) return "$0";
-  if (value >= 1) return "$" + value.toLocaleString("en-US", { maximumFractionDigits: value >= 1000 ? 0 : 4 });
-  const digits = value.toFixed(20).slice(2);
+  // A negative price is invalid data, but it must never render as "$0..": the sub-$1 branch below assumes a "0.xxx" string from toFixed(20), so format the magnitude and keep the sign in front.
+  const sign = value < 0 ? "−" : "";
+  const abs = Math.abs(value);
+  if (abs >= 1) return sign + "$" + abs.toLocaleString("en-US", { maximumFractionDigits: abs >= 1000 ? 0 : 4 });
+  const digits = abs.toFixed(20).slice(2);
   const zeros = digits.match(/^0*/)?.[0].length ?? 0;
   const significant = digits.slice(zeros, zeros + 4).replace(/0+$/, "") || "0";
   if (zeros >= 4) {
     const run = String(zeros).split("").map((d) => SUBSCRIPT[Number(d)]).join("");
-    return "$0.0" + run + significant;
+    return sign + "$0.0" + run + significant;
   }
-  return "$0." + "0".repeat(zeros) + significant;
+  return sign + "$0." + "0".repeat(zeros) + significant;
 }
 
 /** A price in another token's units (no currency sign), keeping tiny values readable. */
 export function formatUnitPrice(value: number | null | undefined) {
   const text = formatPrice(value);
-  return text === "—" ? text : text.replace(/^\$/, "");
+  if (text === "—") return text;
+  return text.replace(/^−?\$/, (match) => (match.startsWith("−") ? "−" : ""));
 }
 
 /** Totals such as market cap, volume and liquidity. */
@@ -36,12 +40,20 @@ export function formatUsd(value: number | null | undefined) {
 
 export function formatAmount(value: number | null | undefined) {
   if (value === null || value === undefined || !Number.isFinite(value)) return "—";
+  const abs = Math.abs(value);
+  // Six fraction digits would round any sub-micro amount to "0", so keep four significant digits instead; larger values are unchanged.
+  if (abs > 0 && abs < 0.000001) {
+    const places = Math.min(100, -Math.floor(Math.log10(abs)) + 3);
+    return value.toFixed(places).replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "");
+  }
   return new Intl.NumberFormat("en-US", { notation: value >= 100_000 ? "compact" : "standard", maximumFractionDigits: value >= 1 ? 2 : 6 }).format(value);
 }
 
 /** A 0–1 share as a compact percentage: "50%", "12.5%", "0.25%", "<0.1%". */
-export function formatShare(share: number) {
+export function formatShare(share: number): string {
   if (share === 0) return "0%";
+  // A negative share rendered as "<0.1%", losing the sign entirely, so keep the sign in front.
+  if (share < 0) return "−" + formatShare(-share);
   if (share < 0.001) return "<0.1%";
   const value = share * 100;
   const text = value >= 10 ? value.toFixed(1) : value.toFixed(2);
